@@ -27,6 +27,8 @@ import (
 
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
+	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/client-go/tools/clientcmd/api"
 )
 
 // startCmd represents the start command
@@ -42,9 +44,7 @@ var startCmd = &cobra.Command{
 - Allows the use of kubectl from the root account,
 - Installs flannel, metal-lb and local-path-provisioner.
 `,
-	Run: func(cmd *cobra.Command, args []string) {
-		perform()
-	},
+	Run: perform,
 }
 
 func init() {
@@ -72,6 +72,7 @@ const crioServiceName = "crio"
 const kubeletServiceName = "kubelet"
 
 const kubeletConfigFilename = "/var/lib/kubelet/config.yaml"
+const kubectl = "/usr/bin/kubectl"
 
 var fs = afero.NewOsFs()
 var afs = &afero.Afero{Fs: fs}
@@ -153,7 +154,33 @@ func GetOutboundIP() (net.IP, error) {
 	return localAddr.IP, nil
 }
 
-func perform() {
+func ReadKubeConfig() (*api.Config, error) {
+	config, err := clientcmd.LoadFromFile("/etc/kubernetes/admin.conf")
+	if err != nil {
+		return nil, err
+	}
+	return config, nil
+}
+
+func RenameConfig(c *api.Config, newName string) *api.Config {
+	newClusters := make(map[string]*api.Cluster)
+	for _, v := range c.Clusters {
+		newClusters[newName] = v
+	}
+	c.Clusters = newClusters
+
+	newContexts := make(map[string]*api.Context)
+	for _, v := range c.Contexts {
+		newContexts[newName] = v
+		v.Cluster = newName
+	}
+	c.Contexts = newContexts
+
+	c.CurrentContext = newName
+	return c
+}
+
+func perform(cmd *cobra.Command, args []string) {
 
 	// Start openrc. Actually it is not used but is requested by
 	// the `kubeadm init phase preflight` command
@@ -190,8 +217,13 @@ func perform() {
 	// We don't mess with IPV6
 	cobra.CheckErr(MoveFileIfExists("/etc/cni/net.d/10-crio-bridge.conf", "/etc/cni/net.d/12-crio-bridge.conf"))
 
+	// Allow forwarding
+	afs.WriteFile("/proc/sys/net/ipv4/ip_forward", []byte("1\n"), os.FileMode(int(0644)))
+
 	// We need to start CRI-O
 	cobra.CheckErr(StartService("crio"))
+
+	// TODO: need to wait for CRI-O to be ready. Wait for socket ?
 
 	// If the cluster has not been initialized yet, do it
 	if _, err := os.Stat(kubeletConfigFilename); err != nil {
@@ -202,24 +234,33 @@ func perform() {
 				"init",
 				fmt.Sprintf("--apiserver-advertise-address=%v", ip),
 				"--kubernetes-version=1.22.4",
-				"--pod-network-cidr 10.244.0.0/16",
+				"--pod-network-cidr=10.244.0.0/16",
 			}
 			fmt.Println("Running", "/usr/bin/kubeadm", strings.Join(parameters, " "), "...")
-			if out, err := exec.Command("/usr/bin/kubeadm", parameters...).Output(); err != nil {
-				log.Fatal(err)
+			if out, err := exec.Command("/usr/bin/kubeadm", parameters...).CombinedOutput(); err != nil {
+				log.Fatal(err, "\n", string(out))
 			} else {
 				fmt.Print(string(out))
 			}
 			// TODO: Missing
-			// Copy kubelet to home directory.
 			//  - Add flannel (Kustomize ?)
 			//  - Add Metal LB (Kustomize ?)
 			//  - Add
-			//  - Untaint master
 		}
 	} else {
 		// Just start the service
-		cobra.CheckErr(StartService("kubelet"))
+		// cobra.CheckErr(StartService("kubelet"))
+	}
+
+	config, err := ReadKubeConfig()
+	cobra.CheckErr(err)
+	cobra.CheckErr(clientcmd.WriteToFile(*RenameConfig(config, "k8wsl"), "/root/.kube/config"))
+
+	// Untaint master
+	if out, err := exec.Command("/usr/bin/kubectl", "taint", "nodes", "--all", "node-role.kubernetes.io/master-").CombinedOutput(); err != nil {
+		if strout := string(out); strout != "error: taint \"node-role.kubernetes.io/master\" not found\n" {
+			log.Fatal(err, strout)
+		}
 	}
 
 	fmt.Println("executed")
