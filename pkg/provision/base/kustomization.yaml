@@ -22,4 +22,12 @@ patches:
     target:
       kind: StorageClass
       name: local-path
+  - patch: |-
+      - op: add
+        path: /spec/template/spec/containers/0/args/-
+        value: --kubelet-insecure-tls
+    target:
+      kind: Deployment
+      name: metrics-server
+      namespace: kube-system
 
