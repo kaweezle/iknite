@@ -17,13 +17,21 @@ package cmd
 
 import (
 	"fmt"
+	"io"
 	"os"
+
+	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
 	"github.com/spf13/viper"
 )
 
-var cfgFile string
+var (
+	cfgFile  string
+	v        string
+	jsonLogs bool
+)
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
@@ -53,7 +61,16 @@ func init() {
 	// Cobra supports persistent flags, which, if defined here,
 	// will be global for your application.
 
+	rootCmd.PersistentPreRunE = func(cmd *cobra.Command, args []string) error {
+		if err := SetUpLogs(os.Stderr, v, jsonLogs); err != nil {
+			return err
+		}
+		return nil
+	}
+
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.k8wsl.yaml)")
+	rootCmd.PersistentFlags().StringVarP(&v, "verbosity", "v", logrus.WarnLevel.String(), "Log level (debug, info, warn, error, fatal, panic)")
+	rootCmd.PersistentFlags().BoolVar(&jsonLogs, "json", false, "Log messages in JSON")
 
 	// Cobra also supports local flags, which will only run
 	// when this action is called directly.
@@ -82,4 +99,17 @@ func initConfig() {
 	if err := viper.ReadInConfig(); err == nil {
 		fmt.Fprintln(os.Stderr, "Using config file:", viper.ConfigFileUsed())
 	}
+}
+
+func SetUpLogs(out io.Writer, level string, json bool) error {
+	logrus.SetOutput(out)
+	if json {
+		logrus.SetFormatter(&logrus.JSONFormatter{})
+	}
+	lvl, err := logrus.ParseLevel(v)
+	if err != nil {
+		return errors.Wrap(err, "parsing log level")
+	}
+	logrus.SetLevel(lvl)
+	return nil
 }

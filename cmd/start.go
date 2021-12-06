@@ -16,15 +16,20 @@ limitations under the License.
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
 	"os/exec"
 	"strings"
 
-	"log"
 	"net"
 	"os"
 	"path"
+	"time"
 
+	c "github.com/antoinemartin/k8wsl/pkg/constants"
+	"github.com/antoinemartin/k8wsl/pkg/provision"
+	"github.com/pkg/errors"
+	log "github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 	"k8s.io/client-go/tools/clientcmd"
@@ -72,7 +77,7 @@ const crioServiceName = "crio"
 const kubeletServiceName = "kubelet"
 
 const kubeletConfigFilename = "/var/lib/kubelet/config.yaml"
-const kubectl = "/usr/bin/kubectl"
+const crioSock = "/run/crio/crio.sock"
 
 var fs = afero.NewOsFs()
 var afs = &afero.Afero{Fs: fs}
@@ -82,7 +87,7 @@ var afs = &afero.Afero{Fs: fs}
 func ExecuteIfNotExist(file string, fn func() error) error {
 	exists, err := afs.Exists(file)
 	if err != nil {
-		return err
+		return errors.Wrapf(err, "Error while checking if %s exists", file)
 	}
 
 	if !exists {
@@ -97,7 +102,7 @@ func ExecuteIfServiceNotStarted(serviceName string, fn func() error) error {
 	serviceLink := path.Join(startedServicesDir, serviceName)
 	exists, err := afs.Exists(serviceLink)
 	if err != nil {
-		return err
+		return errors.Wrapf(err, "Error while checking if service %s exists", serviceLink)
 	}
 	if !exists {
 		return fn()
@@ -122,7 +127,7 @@ func StartService(serviceName string) error {
 			fmt.Println(string(out))
 			return nil
 		} else {
-			return err
+			return errors.Wrapf(err, "Error while starting service %s", serviceName)
 		}
 	})
 }
@@ -135,17 +140,17 @@ func MoveFileIfExists(src string, dst string) error {
 		if os.IsNotExist(err) {
 			return nil
 		}
-		return err
+		return errors.Wrapf(err, "Error while linking %s to %s", src, dst)
 	}
 
 	return os.Remove(src)
 }
 
-// Get preferred outbound ip of this machine
+// GetOutboundIP returns the preferred outbound ip of this machine
 func GetOutboundIP() (net.IP, error) {
 	conn, err := net.Dial("udp", "8.8.8.8:80")
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "Error while getting IP address")
 	}
 	defer conn.Close()
 
@@ -154,14 +159,8 @@ func GetOutboundIP() (net.IP, error) {
 	return localAddr.IP, nil
 }
 
-func ReadKubeConfig() (*api.Config, error) {
-	config, err := clientcmd.LoadFromFile("/etc/kubernetes/admin.conf")
-	if err != nil {
-		return nil, err
-	}
-	return config, nil
-}
-
+// RenameConfig changes the name of the cluster and the context from the
+// default (kubernetes) to newName in c.
 func RenameConfig(c *api.Config, newName string) *api.Config {
 	newClusters := make(map[string]*api.Cluster)
 	for _, v := range c.Clusters {
@@ -180,6 +179,61 @@ func RenameConfig(c *api.Config, newName string) *api.Config {
 	return c
 }
 
+type CRIOCondition struct {
+	Type    string `json:"type"`
+	Status  bool   `json:"status"`
+	Reason  string `json:"reason"`
+	Message string `json:"message"`
+}
+
+type CRIOStatus struct {
+	Conditions []CRIOCondition `json:"conditions"`
+}
+
+type CRIOStatusResponse struct {
+	Status CRIOStatus `json:"status"`
+}
+
+func WaitForCrio() (bool, error) {
+	retries := 3
+	for retries > 0 {
+		exist, err := afs.Exists(crioSock)
+		if err != nil {
+			return false, errors.Wrapf(err, "Error while checking crio sock %s", crioSock)
+		}
+		if exist {
+			out, err := exec.Command("/usr/bin/crictl", "--runtime-endpoint", "unix:///run/crio/crio.sock", "info").Output()
+			if err == nil {
+				log.Trace(string(out))
+				response := &CRIOStatusResponse{}
+				err = json.Unmarshal(out, &response)
+				if err == nil {
+					conditions := 0
+					falseConditions := 0
+					for _, v := range response.Status.Conditions {
+						conditions += 1
+						if !v.Status {
+							falseConditions += 1
+						}
+					}
+					if conditions >= 2 && falseConditions == 0 {
+						break
+					}
+				} else {
+					log.WithError(err).Warn("Error while parsing crio status")
+				}
+			} else {
+				log.WithError(err).Warn("Error while checking crio sock")
+			}
+		}
+		retries = retries - 1
+
+		log.Debug("Waiting 2 seconds...")
+		time.Sleep(2 * time.Second)
+	}
+	return retries > 0, nil
+}
+
 func perform(cmd *cobra.Command, args []string) {
 
 	// Start openrc. Actually it is not used but is requested by
@@ -189,7 +243,7 @@ func perform(cmd *cobra.Command, args []string) {
 			fmt.Println(string(out))
 			return nil
 		} else {
-			return err
+			return errors.Wrap(err, "Error while starting openrc")
 		}
 	})
 	cobra.CheckErr(err)
@@ -222,46 +276,58 @@ func perform(cmd *cobra.Command, args []string) {
 
 	// We need to start CRI-O
 	cobra.CheckErr(StartService("crio"))
+	available, err := WaitForCrio()
+	cobra.CheckErr(err)
+	if !available {
+		log.Fatal("CRI-O not available")
+	}
 
-	// TODO: need to wait for CRI-O to be ready. Wait for socket ?
+	ip, err := GetOutboundIP()
+	cobra.CheckErr(errors.Wrap(err, "While getting IP address"))
 
 	// If the cluster has not been initialized yet, do it
-	if _, err := os.Stat(kubeletConfigFilename); err != nil {
-		if ip, err := GetOutboundIP(); err != nil {
-			log.Fatal(err)
+	exist, err := afs.Exists(kubeletConfigFilename)
+	cobra.CheckErr(err)
+	if !exist {
+		parameters := []string{
+			"init",
+			fmt.Sprintf("--apiserver-advertise-address=%v", ip),
+			"--kubernetes-version=1.22.4",
+			"--pod-network-cidr=10.244.0.0/16",
+		}
+		log.Info("Running", "/usr/bin/kubeadm", strings.Join(parameters, " "), "...")
+		if out, err := exec.Command("/usr/bin/kubeadm", parameters...).CombinedOutput(); err != nil {
+			log.Fatal(err, "\n", string(out))
 		} else {
-			parameters := []string{
-				"init",
-				fmt.Sprintf("--apiserver-advertise-address=%v", ip),
-				"--kubernetes-version=1.22.4",
-				"--pod-network-cidr=10.244.0.0/16",
-			}
-			fmt.Println("Running", "/usr/bin/kubeadm", strings.Join(parameters, " "), "...")
-			if out, err := exec.Command("/usr/bin/kubeadm", parameters...).CombinedOutput(); err != nil {
-				log.Fatal(err, "\n", string(out))
-			} else {
-				fmt.Print(string(out))
-			}
-			// TODO: Missing
-			//  - Add flannel (Kustomize ?)
-			//  - Add Metal LB (Kustomize ?)
-			//  - Add
+			log.Trace(string(out))
 		}
 	} else {
 		// Just start the service
-		// cobra.CheckErr(StartService("kubelet"))
+		cobra.CheckErr(StartService("kubelet"))
 	}
 
-	config, err := ReadKubeConfig()
+	// TODO: Check that cluster is Ok
+	config, err := clientcmd.LoadFromFile("/etc/kubernetes/admin.conf")
 	cobra.CheckErr(err)
 	cobra.CheckErr(clientcmd.WriteToFile(*RenameConfig(config, "k8wsl"), "/root/.kube/config"))
 
-	// Untaint master
-	if out, err := exec.Command("/usr/bin/kubectl", "taint", "nodes", "--all", "node-role.kubernetes.io/master-").CombinedOutput(); err != nil {
+	// Untaint master. It needs a valid kubeconfig
+	if out, err := exec.Command(c.KubectlCmd, "taint", "nodes", "--all", "node-role.kubernetes.io/master-").CombinedOutput(); err != nil {
 		if strout := string(out); strout != "error: taint \"node-role.kubernetes.io/master\" not found\n" {
 			log.Fatal(err, strout)
 		}
 	}
 
-	fmt.Println("executed")
+	// Apply base customization. This adds the following to the cluster
+	// - MetalLB
+	// - Flannel
+	// - Local path provisioner
+	// - Metrics server
+	// The outbound ip address is needed for MetalLB.
+	context := log.Fields{
+		"OutboundIP": ip,
+	}
+	cobra.CheckErr(provision.ApplyBaseKustomizations(context))
+
+	log.Info("executed")
 }
