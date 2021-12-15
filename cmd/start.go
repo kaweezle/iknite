@@ -60,8 +60,6 @@ func init() {
 	// startCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 }
 
-const kubeletConfigFilename = "/var/lib/kubelet/config.yaml"
-
 func perform(cmd *cobra.Command, args []string) {
 
 	// Start OpenRC
@@ -91,19 +89,34 @@ func perform(cmd *cobra.Command, args []string) {
 	ip, err := utils.GetOutboundIP()
 	cobra.CheckErr(errors.Wrap(err, "While getting IP address"))
 
-	// If the cluster has not been initialized yet, do it
-	exist, err := utils.Exists(kubeletConfigFilename)
-	cobra.CheckErr(err)
+	exist := false
+	config, err := clientcmd.LoadFromFile(constants.KubernetesAdminConfig)
+	if err == nil {
+		if k8s.IsConfigServerAddress(config, ip) {
+			exist = true
+		} else {
+			cobra.CheckErr(k8s.CleanConfig())
+		}
+	} else {
+		if !os.IsNotExist(err) {
+			cobra.CheckErr(errors.Wrap(err, "While loading existing kubeconfig"))
+		}
+	}
+
 	if !exist {
 		cobra.CheckErr(k8s.RunKubeadmInit(ip))
+		config, err = clientcmd.LoadFromFile(constants.KubernetesAdminConfig)
+		cobra.CheckErr(err)
 	} else {
 		// Just start the service
+		log.Info("Starting the kubelet service...")
 		cobra.CheckErr(alpine.StartService(constants.KubeletServiceName))
+		// TODO: Need to wait for node to be ready
+		log.Info("Waiting for service to start...")
+		cobra.CheckErr(k8s.CheckClusterRunning(config))
 	}
 
 	// TODO: Check that cluster is Ok
-	config, err := clientcmd.LoadFromFile("/etc/kubernetes/admin.conf")
-	cobra.CheckErr(err)
 	cobra.CheckErr(clientcmd.WriteToFile(*k8s.RenameConfig(config, "k8wsl"), "/root/.kube/config"))
 
 	// Untaint master. It needs a valid kubeconfig

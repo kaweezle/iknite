@@ -86,11 +86,10 @@ func ApplyKustomizations(content *embed.FS, dirname string, data interface{}) er
 	}
 
 	log.WithField("tmpdir", tmpdir).Trace("Applying kustomization")
-	out, err := exec.Command(c.KubectlCmd, "apply", "-k", tmpdir).Output()
+	out, err := exec.Command(c.KubectlCmd, "apply", "-k", tmpdir).CombinedOutput()
+	log.WithField("data", data).Trace(string(out))
 	if err != nil {
 		return errors.Wrap(err, "While applying templates")
-	} else {
-		log.WithField("data", data).Trace(string(out))
 	}
 	return nil
 }

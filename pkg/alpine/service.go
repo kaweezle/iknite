@@ -1,7 +1,6 @@
 package alpine
 
 import (
-	"fmt"
 	"os"
 	"os/exec"
 	"path"
@@ -29,7 +28,7 @@ func StartOpenRC() (err error) {
 		}
 	})
 
-	if err != nil {
+	if err == nil {
 		// OpenRC is picky when starting services if it hasn't been started by
 		// init. In our case, init is provided by WSL. Creating this file makes
 		// OpenRC happy.
@@ -72,7 +71,7 @@ func EnableService(serviceName string) error {
 func StartService(serviceName string) error {
 	return ExecuteIfServiceNotStarted(serviceName, func() error {
 		if out, err := exec.Command("/sbin/rc-service", serviceName, "start").Output(); err == nil {
-			fmt.Println(string(out))
+			log.Trace(string(out))
 			return nil
 		} else {
 			return errors.Wrapf(err, "Error while starting service %s", serviceName)
