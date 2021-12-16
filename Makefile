@@ -64,7 +64,7 @@ $(BUILDDIR)/rootfs: $(BUILDDIR)/base.tar.gz wslimage/profile k8wsl
 	cp -f wslimage/profile $@/etc/profile
 	cp -f k8wsl $@
 	echo "http://dl-cdn.alpinelinux.org/alpine/edge/testing/" >> $@/etc/apk/repositories
-	chroot $@ /sbin/apk --update add zsh oh-my-zsh cri-o kubelet kubeadm kubectl kubelet-openrc cri-o-contrib-cni util-linux-misc
+	chroot $@ /sbin/apk --update add zsh oh-my-zsh cri-o kubelet kubeadm kubectl kubelet-openrc cri-o-contrib-cni util-linux-misc git
 	mv $@/etc/cni/net.d/10-crio-bridge.conf $@/etc/cni/net.d/12-crio-bridge.conf
 	cp -f $@/usr/share/oh-my-zsh/templates/zshrc.zsh-template $@/root/.zshrc
 	chmod +x $@/root/.zshrc
