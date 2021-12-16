@@ -1,7 +1,7 @@
 # To build the image in the build directory, build this docker image:
 # docker build -t builder .
 # mkdir -p /tmp/containers/storage
-# docker run --rm  --privileged -it -v /tmp/containers:/var/lib/containers -v $(pwd)/build:/k8wsl/build builder
+# docker run --rm  --privileged -it -v /tmp/containers:/var/lib/containers -v $(pwd):/k8wsl builder
 FROM alpine:3.15
 
 RUN set -euxo pipefail ;\
@@ -17,9 +17,5 @@ RUN set -euxo pipefail ;\
 RUN mkdir -p /k8wsl/build
 
 WORKDIR /k8wsl
-
-ADD . .
-
-VOLUME /k8wsl/build
 
 CMD [ "make" ]
