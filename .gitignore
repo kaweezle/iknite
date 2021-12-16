@@ -5,6 +5,7 @@
 *.so
 *.dylib
 k8wsl
+build/
 
 # Test binary, built with `go test -c`
 *.test
