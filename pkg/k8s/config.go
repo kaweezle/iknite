@@ -6,15 +6,27 @@ import (
 	"net"
 	"time"
 
+	"github.com/antoinemartin/k8wsl/pkg/constants"
 	log "github.com/sirupsen/logrus"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/clientcmd/api"
 )
 
+type Config api.Config
+
+func LoadFromDefault() (*Config, error) {
+	_config, err := clientcmd.LoadFromFile(constants.KubernetesAdminConfig)
+	if err != nil {
+		return nil, err
+	}
+	config := (*Config)(_config)
+	return config, nil
+}
+
 // RenameConfig changes the name of the cluster and the context from the
 // default (kubernetes) to newName in c.
-func RenameConfig(c *api.Config, newName string) *api.Config {
+func (c *Config) RenameConfig(newName string) *Config {
 	newClusters := make(map[string]*api.Cluster)
 	for _, v := range c.Clusters {
 		newClusters[newName] = v
@@ -32,7 +44,7 @@ func RenameConfig(c *api.Config, newName string) *api.Config {
 	return c
 }
 
-func IsConfigServerAddress(config *api.Config, ip net.IP) bool {
+func (config *Config) IsConfigServerAddress(ip net.IP) bool {
 	expectedURL := fmt.Sprintf("https://%v:6443", ip)
 	for _, cluster := range config.Clusters {
 		if cluster.Server != expectedURL {
@@ -42,9 +54,9 @@ func IsConfigServerAddress(config *api.Config, ip net.IP) bool {
 	return true
 }
 
-func CheckClusterRunning(config *api.Config) error {
+func (config *Config) CheckClusterRunning() error {
 
-	clientconfig := clientcmd.NewDefaultClientConfig(*config, nil)
+	clientconfig := clientcmd.NewDefaultClientConfig(api.Config(*config), nil)
 	rest, err := clientconfig.ClientConfig()
 	if err != nil {
 		return err
@@ -83,4 +95,8 @@ func CheckClusterRunning(config *api.Config) error {
 	}
 
 	return err
+}
+
+func (config *Config) WriteToFile(filename string) error {
+	return clientcmd.WriteToFile(*(*api.Config)(config), filename)
 }

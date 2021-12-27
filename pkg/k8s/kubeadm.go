@@ -19,6 +19,7 @@ const (
 	configurationPattern             = "*.conf"
 	pkiSubdirectory                  = "pki"
 	manifestsSubdirectory            = "manifests"
+	KubernetesVersion                = "1.23.1"
 )
 
 func RunKubeadm(parameters []string) (err error) {
@@ -35,7 +36,7 @@ func RunKubeadmInit(ip net.IP) error {
 	parameters := []string{
 		"init",
 		fmt.Sprintf("--apiserver-advertise-address=%v", ip),
-		"--kubernetes-version=1.22.4",
+		fmt.Sprintf("--kubernetes-version=%s", KubernetesVersion),
 		"--pod-network-cidr=10.244.0.0/16",
 		// "--control-plane-endpoint=kaweezle.local",
 		"--ignore-preflight-errors=DirAvailable--var-lib-etcd,Swap",

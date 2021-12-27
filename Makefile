@@ -11,14 +11,15 @@ DLR_FLAGS=-L
 BASE_URL=https://dl-cdn.alpinelinux.org/alpine/v3.15/releases/x86_64/alpine-minirootfs-3.15.0-x86_64.tar.gz
 LNCR_ZIP_URL=https://github.com/yuk7/wsldl/releases/download/21082800/icons.zip
 LNCR_ZIP_EXE=Alpine.exe
+KUBERNETES_VERSION=1.23.1
 
 KUBERNETES_CONTAINER_IMAGES=k8s.gcr.io/pause:3.5 \
-	k8s.gcr.io/kube-controller-manager:v1.22.4 \
+	k8s.gcr.io/kube-controller-manager:v$(KUBERNETES_VERSION) \
 	k8s.gcr.io/etcd:3.5.0-0 \
-	k8s.gcr.io/kube-proxy:v1.22.4 \
-	k8s.gcr.io/kube-scheduler:v1.22.4 \
+	k8s.gcr.io/kube-proxy:v$(KUBERNETES_VERSION) \
+	k8s.gcr.io/kube-scheduler:v$(KUBERNETES_VERSION) \
 	k8s.gcr.io/coredns/coredns:v1.8.4 \
-	k8s.gcr.io/kube-apiserver:v1.22.4
+	k8s.gcr.io/kube-apiserver:v$(KUBERNETES_VERSION)
 
 
 BASE_CONTAINER_IMAGES=docker.io/rancher/local-path-provisioner:v0.0.20 \
@@ -103,7 +104,7 @@ $(BUILDDIR):
 
 k8wsl:
 	go mod tidy
-	go build
+	go build -ldflags "-X k8s.KUBERNETES_VERSION=$(KUBERNETES_VERSION)"
 
 clean:
 	@echo -e '\e[1;31mCleaning files...\e[m'

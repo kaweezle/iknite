@@ -27,7 +27,6 @@ import (
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
-	"k8s.io/client-go/tools/clientcmd"
 )
 
 // startCmd represents the start command
@@ -90,9 +89,9 @@ func perform(cmd *cobra.Command, args []string) {
 	cobra.CheckErr(errors.Wrap(err, "While getting IP address"))
 
 	exist := false
-	config, err := clientcmd.LoadFromFile(constants.KubernetesAdminConfig)
+	config, err := k8s.LoadFromDefault()
 	if err == nil {
-		if k8s.IsConfigServerAddress(config, ip) {
+		if config.IsConfigServerAddress(ip) {
 			exist = true
 		} else {
 			cobra.CheckErr(k8s.CleanConfig())
@@ -105,7 +104,7 @@ func perform(cmd *cobra.Command, args []string) {
 
 	if !exist {
 		cobra.CheckErr(k8s.RunKubeadmInit(ip))
-		config, err = clientcmd.LoadFromFile(constants.KubernetesAdminConfig)
+		config, err = k8s.LoadFromDefault()
 		cobra.CheckErr(err)
 	} else {
 		// Just start the service
@@ -113,11 +112,11 @@ func perform(cmd *cobra.Command, args []string) {
 		cobra.CheckErr(alpine.StartService(constants.KubeletServiceName))
 		// TODO: Need to wait for node to be ready
 		log.Info("Waiting for service to start...")
-		cobra.CheckErr(k8s.CheckClusterRunning(config))
+		cobra.CheckErr(config.CheckClusterRunning())
 	}
 
 	// TODO: Check that cluster is Ok
-	cobra.CheckErr(clientcmd.WriteToFile(*k8s.RenameConfig(config, "k8wsl"), "/root/.kube/config"))
+	cobra.CheckErr(config.RenameConfig("k8wsl").WriteToFile("/root/.kube/config"))
 
 	// Untaint master. It needs a valid kubeconfig
 	/*if out, err := exec.Command(c.KubectlCmd, "taint", "nodes", "--all", "node-role.kubernetes.io/master-").CombinedOutput(); err != nil {
