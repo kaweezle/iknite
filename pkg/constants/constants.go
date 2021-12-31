@@ -6,4 +6,5 @@ const (
 	CrioServiceName       = "crio"
 	KubeletServiceName    = "kubelet"
 	KubernetesAdminConfig = "/etc/kubernetes/admin.conf"
+	DefaultClusterName    = "kaweezle"
 )

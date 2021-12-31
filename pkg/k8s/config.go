@@ -29,6 +29,12 @@ func LoadFromDefault() (*Config, error) {
 // RenameConfig changes the name of the cluster and the context from the
 // default (kubernetes) to newName in c.
 func (c *Config) RenameConfig(newName string) *Config {
+	newUsers := make(map[string]*api.AuthInfo)
+	for _, v := range c.AuthInfos {
+		newUsers[newName] = v
+	}
+	c.AuthInfos = newUsers
+
 	newClusters := make(map[string]*api.Cluster)
 	for _, v := range c.Clusters {
 		newClusters[newName] = v
@@ -39,6 +45,7 @@ func (c *Config) RenameConfig(newName string) *Config {
 	for _, v := range c.Contexts {
 		newContexts[newName] = v
 		v.Cluster = newName
+		v.AuthInfo = newName
 	}
 	c.Contexts = newContexts
 

@@ -20,6 +20,7 @@ import (
 	"io"
 	"os"
 
+	"github.com/antoinemartin/k8wsl/pkg/constants"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -28,9 +29,10 @@ import (
 )
 
 var (
-	cfgFile  string
-	v        string
-	jsonLogs bool
+	cfgFile     string
+	v           string
+	jsonLogs    bool
+	ClusterName string
 )
 
 // rootCmd represents the base command when called without any subcommands
@@ -70,6 +72,7 @@ func init() {
 
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.k8wsl.yaml)")
 	rootCmd.PersistentFlags().StringVarP(&v, "verbosity", "v", logrus.WarnLevel.String(), "Log level (debug, info, warn, error, fatal, panic)")
+	rootCmd.PersistentFlags().StringVarP(&ClusterName, "name", "n", constants.DefaultClusterName, "Cluster name")
 	rootCmd.PersistentFlags().BoolVar(&jsonLogs, "json", false, "Log messages in JSON")
 
 	// Cobra also supports local flags, which will only run

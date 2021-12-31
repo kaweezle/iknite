@@ -116,7 +116,7 @@ func perform(cmd *cobra.Command, args []string) {
 	}
 
 	// TODO: Check that cluster is Ok
-	cobra.CheckErr(config.RenameConfig("k8wsl").WriteToFile("/root/.kube/config"))
+	cobra.CheckErr(config.RenameConfig(ClusterName).WriteToFile("/root/.kube/config"))
 
 	// Untaint master. It needs a valid kubeconfig
 	/*if out, err := exec.Command(c.KubectlCmd, "taint", "nodes", "--all", "node-role.kubernetes.io/master-").CombinedOutput(); err != nil {
