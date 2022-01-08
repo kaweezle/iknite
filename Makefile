@@ -12,12 +12,12 @@ LNCR_ZIP_URL=https://github.com/yuk7/wsldl/releases/download/21082800/icons.zip
 LNCR_ZIP_EXE=Alpine.exe
 KUBERNETES_VERSION=1.23.1
 
-KUBERNETES_CONTAINER_IMAGES=k8s.gcr.io/pause:3.5 \
+KUBERNETES_CONTAINER_IMAGES=k8s.gcr.io/pause:3.6 \
 	k8s.gcr.io/kube-controller-manager:v$(KUBERNETES_VERSION) \
-	k8s.gcr.io/etcd:3.5.0-0 \
+	k8s.gcr.io/etcd:3.5.1-0 \
 	k8s.gcr.io/kube-proxy:v$(KUBERNETES_VERSION) \
 	k8s.gcr.io/kube-scheduler:v$(KUBERNETES_VERSION) \
-	k8s.gcr.io/coredns/coredns:v1.8.4 \
+	k8s.gcr.io/coredns/coredns:v1.8.6 \
 	k8s.gcr.io/kube-apiserver:v$(KUBERNETES_VERSION)
 
 
