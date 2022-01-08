@@ -9,6 +9,7 @@
 [![Apache 2.0 License][license-shield]][license-url]
 [![Experimental][stability]][license-url]
 [![LinkedIn][linkedin-shield]][linkedin-url]
+[![Workflow][workflow-shield]][workflow-url]
 
 <!-- PROJECT LOGO -->
 <br />
@@ -312,3 +313,7 @@ project.
     https://img.shields.io/badge/Go-1.17+-00ADD8?style=for-the-badge&logo=go
 [stability]:
     https://img.shields.io/badge/stability-experimental-orange?style=for-the-badge
+[workflow-shield]:
+    https://github.com/antoinemartin/kaweezle-rootfs/actions/workflows/build.yaml/badge.svg
+[workflow-url]:
+    https://github.com/antoinemartin/kaweezle-rootfs/actions/workflows/build.yaml

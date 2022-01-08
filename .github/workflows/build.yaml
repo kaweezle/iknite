@@ -95,3 +95,14 @@ jobs:
         with:
           name: kaweezle.zip
           path: "${{ github.workspace }}/build/kaweezle.zip"
+      - name: Make Development release
+        uses: "marvinpinto/action-automatic-releases@latest"
+        if: ${{ github.ref == 'refs/heads/main' }}
+        with:
+          repo_token: "${{ secrets.GITHUB_TOKEN }}"
+          automatic_release_tag: "latest"
+          prerelease: true
+          title: "Development Build"
+          files: |
+            LICENSE.txt
+            build/rootfs.tar.gz
