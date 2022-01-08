@@ -12,7 +12,8 @@ RUN set -euxo pipefail ;\
         go \
         make \
         skopeo \
-        libarchive-tools
+        libarchive-tools \
+        fuse-overlayfs
 
 RUN mkdir -p /kaweezle-rootfs/build
 

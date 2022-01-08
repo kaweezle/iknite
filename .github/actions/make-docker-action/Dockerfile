@@ -8,7 +8,8 @@ RUN set -euxo pipefail ;\
         go \
         make \
         skopeo \
-        libarchive-tools
+        libarchive-tools \
+        fuse-overlayfs
 
 COPY entrypoint.sh /entrypoint.sh
 
