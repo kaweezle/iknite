@@ -259,7 +259,7 @@ Project Link:
 
 <!-- ACKNOWLEDGMENTS -->
 
-## Acknowledgments
+## Acknowledgements
 
 This project started from the amazing work made by
 [yuk7](https://github.com/yuk7) with [wsldl](https://github.com/yuk7/wsldl) and
@@ -289,17 +289,17 @@ project.
 <!-- https://www.markdownguide.org/basic-syntax/#reference-style-links -->
 
 [contributors-shield]:
-    https://img.shields.io/github/contributors/antoinemartin/kaweezle.svg?style=for-the-badge
+    https://img.shields.io/github/contributors/antoinemartin/kaweezle-rootfs.svg?style=for-the-badge
 [contributors-url]:
     https://github.com/antoinemartin/kaweezle-rootfs/graphs/contributors
 [forks-shield]:
-    https://img.shields.io/github/forks/antoinemartin/kaweezle.svg?style=for-the-badge
+    https://img.shields.io/github/forks/antoinemartin/kaweezle-rootfs.svg?style=for-the-badge
 [forks-url]: https://github.com/antoinemartin/kaweezle-rootfs/network/members
 [stars-shield]:
-    https://img.shields.io/github/stars/antoinemartin/kaweezle.svg?style=for-the-badge
+    https://img.shields.io/github/stars/antoinemartin/kaweezle-rootfs.svg?style=for-the-badge
 [stars-url]: https://github.com/antoinemartin/kaweezle-rootfs/stargazers
 [issues-shield]:
-    https://img.shields.io/github/issues/antoinemartin/kaweezle.svg?style=for-the-badge
+    https://img.shields.io/github/issues/antoinemartin/kaweezle-rootfs.svg?style=for-the-badge
 [issues-url]: https://github.com/antoinemartin/kaweezle-rootfs/issues
 [license-shield]:
     https://img.shields.io/badge/license-apache_2.0-green?style=for-the-badge&logo=none
