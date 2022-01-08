@@ -3,8 +3,8 @@
 
 BUILDDIR = build
 
-OUT_ZIP=$(BUILDDIR)/k8wsl.zip
-LNCR_EXE=k8wsl.exe
+OUT_ZIP=$(BUILDDIR)/kaweezle.zip
+LNCR_EXE=kaweezle.exe
 
 DLR=curl
 DLR_FLAGS=-L
@@ -31,7 +31,7 @@ BASE_CONTAINER_IMAGES=docker.io/rancher/local-path-provisioner:v0.0.20 \
 
 CONTAINER_IMAGES=$(KUBERNETES_CONTAINER_IMAGES) $(BASE_CONTAINER_IMAGES)
 
-.PHONY: make_images default clean k8wsl
+.PHONY: make_images default clean kwsl
 
 default: $(OUT_ZIP)
 
@@ -51,7 +51,7 @@ $(BUILDDIR)/Launcher.exe: $(BUILDDIR)/icons.zip
 	mv $(LNCR_ZIP_EXE) $@
 	touch $@
 
-$(BUILDDIR)/rootfs.tar.gz: $(BUILDDIR)/rootfs $(BUILDDIR)/rootfs/k8wsl
+$(BUILDDIR)/rootfs.tar.gz: $(BUILDDIR)/rootfs $(BUILDDIR)/rootfs/kwsl
 	@echo -e '\e[1;31mBuilding rootfs.tar.gz...\e[m'
 	bsdtar -zcpf $@ -C $< `ls $<`
 	chown `id -un` $@
@@ -77,8 +77,9 @@ $(BUILDDIR)/rootfs: $(BUILDDIR)/base.tar.gz wslimage/profile
 	-umount /var/lib/containers/storage
 	chmod +x $@
 
-$(BUILDDIR)/rootfs/k8wsl: $(BUILDDIR)/rootfs k8wsl
-	cp -f k8wsl $@
+$(BUILDDIR)/rootfs/kwsl: $(BUILDDIR)/rootfs
+	go mod tidy
+	go build -o $@ -ldflags "-X k8s.KUBERNETES_VERSION=$(KUBERNETES_VERSION)"
 
 # For this to work, you need to have cri-o and skopeo installed locally
 make_images: $(BUILDDIR)/rootfs
@@ -102,13 +103,9 @@ $(BUILDDIR)/icons.zip: | $(BUILDDIR)
 $(BUILDDIR):
 	mkdir -p $(BUILDDIR)
 
-k8wsl:
-	go mod tidy
-	go build -ldflags "-X k8s.KUBERNETES_VERSION=$(KUBERNETES_VERSION)"
-
 clean:
 	@echo -e '\e[1;31mCleaning files...\e[m'
 	-rm -rf $(BUILDDIR)
-	rm -f k8wsl
+	rm -f kwsl
 
 print-%  : ; @echo $* = $($*)

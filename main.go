@@ -15,7 +15,7 @@ limitations under the License.
 */
 package main
 
-import "github.com/antoinemartin/k8wsl/cmd"
+import "github.com/antoinemartin/kaweezle-rootfs/cmd"
 
 func main() {
 	cmd.Execute()

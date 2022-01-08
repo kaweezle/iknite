@@ -6,7 +6,7 @@ import (
 	"net"
 	"time"
 
-	"github.com/antoinemartin/k8wsl/pkg/constants"
+	"github.com/antoinemartin/kaweezle-rootfs/pkg/constants"
 	log "github.com/sirupsen/logrus"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"

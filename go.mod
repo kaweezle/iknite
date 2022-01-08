@@ -1,4 +1,4 @@
-module github.com/antoinemartin/k8wsl
+module github.com/antoinemartin/kaweezle-rootfs
 
 go 1.17
 

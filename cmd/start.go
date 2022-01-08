@@ -18,12 +18,12 @@ package cmd
 import (
 	"os"
 
-	"github.com/antoinemartin/k8wsl/pkg/alpine"
-	"github.com/antoinemartin/k8wsl/pkg/constants"
-	"github.com/antoinemartin/k8wsl/pkg/crio"
-	"github.com/antoinemartin/k8wsl/pkg/k8s"
-	"github.com/antoinemartin/k8wsl/pkg/provision"
-	"github.com/antoinemartin/k8wsl/pkg/utils"
+	"github.com/antoinemartin/kaweezle-rootfs/pkg/alpine"
+	"github.com/antoinemartin/kaweezle-rootfs/pkg/constants"
+	"github.com/antoinemartin/kaweezle-rootfs/pkg/crio"
+	"github.com/antoinemartin/kaweezle-rootfs/pkg/k8s"
+	"github.com/antoinemartin/kaweezle-rootfs/pkg/provision"
+	"github.com/antoinemartin/kaweezle-rootfs/pkg/utils"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"

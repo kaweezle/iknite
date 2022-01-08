@@ -4,7 +4,7 @@
 *.dll
 *.so
 *.dylib
-k8wsl
+kwsl
 build/
 
 # Test binary, built with `go test -c`

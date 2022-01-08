@@ -5,7 +5,7 @@ import (
 	"os/exec"
 	"path"
 
-	"github.com/antoinemartin/k8wsl/pkg/utils"
+	"github.com/antoinemartin/kaweezle-rootfs/pkg/utils"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 )

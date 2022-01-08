@@ -1,7 +1,7 @@
 # To build the image in the build directory, build this docker image:
 # docker build -t builder .
 # mkdir -p /tmp/containers/storage
-# docker run --rm  --privileged -it -v /tmp/containers:/var/lib/containers -v $(pwd):/k8wsl builder
+# docker run --rm  --privileged -it -v /tmp/containers:/var/lib/containers -v $(pwd):/kaweezle-rootfs builder
 FROM alpine:3.15
 
 RUN set -euxo pipefail ;\
@@ -14,8 +14,8 @@ RUN set -euxo pipefail ;\
         skopeo \
         libarchive-tools
 
-RUN mkdir -p /k8wsl/build
+RUN mkdir -p /kaweezle-rootfs/build
 
-WORKDIR /k8wsl
+WORKDIR /kaweezle-rootfs
 
 CMD [ "make" ]

@@ -4,5 +4,5 @@ Launcher.exe
 *.zip
 *.tar.gz
 images/
-k8wsl
+kwsl
 build/

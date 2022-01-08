@@ -20,7 +20,7 @@ import (
 	"io"
 	"os"
 
-	"github.com/antoinemartin/k8wsl/pkg/constants"
+	"github.com/antoinemartin/kaweezle-rootfs/pkg/constants"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -37,7 +37,7 @@ var (
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
-	Use:   "k8wsl",
+	Use:   "kwsl",
 	Short: "A brief description of your application",
 	Long: `A longer description that spans multiple lines and likely contains
 examples and usage of using your application. For example:
@@ -70,7 +70,7 @@ func init() {
 		return nil
 	}
 
-	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.k8wsl.yaml)")
+	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.kwsl.yaml)")
 	rootCmd.PersistentFlags().StringVarP(&v, "verbosity", "v", logrus.WarnLevel.String(), "Log level (debug, info, warn, error, fatal, panic)")
 	rootCmd.PersistentFlags().StringVarP(&ClusterName, "name", "n", constants.DefaultClusterName, "Cluster name")
 	rootCmd.PersistentFlags().BoolVar(&jsonLogs, "json", false, "Log messages in JSON")
@@ -90,10 +90,10 @@ func initConfig() {
 		home, err := os.UserHomeDir()
 		cobra.CheckErr(err)
 
-		// Search config in home directory with name ".k8wsl" (without extension).
+		// Search config in home directory with name ".kwsl" (without extension).
 		viper.AddConfigPath(home)
 		viper.SetConfigType("yaml")
-		viper.SetConfigName(".k8wsl")
+		viper.SetConfigName(".kwsl")
 	}
 
 	viper.AutomaticEnv() // read in environment variables that match
