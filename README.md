@@ -149,8 +149,8 @@ You can create a WSL distribution with the following set of commands:
 > cd $env:LocalAppData
 > mkdir kwsl
 > cd kwsl
-> Invoke-WebRequest https://github.com/antoinemartin/kaweezle-rootfs/releases/0.0.1/rootfs.tar.gz -Out rootfs.tar.gz
-> wsl --import kwsl . rootfs.tar.gz
+> (New-Object Net.WebClient).DownloadFile("https://github.com/antoinemartin/kaweezle-rootfs/releases/download/latest/rootfs.tar.gz", "$PWD\rootfs.tar.gz")
+> wsl --import kwsl .
 ```
 
 You will have a WSL distribution called `kwsl` which file system will be located
