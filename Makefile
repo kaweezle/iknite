@@ -1,7 +1,6 @@
 # On Apline, you will need the following packages:
 # apk --update add curl libarchive-tools sudo
-GITHUB_WORKSPACE ?= $(PWD)
-BUILDDIR = $(GITHUB_WORKSPACE)/build
+BUILDDIR = $(PWD)/build
 
 OUT_ZIP=$(BUILDDIR)/kaweezle.zip
 LNCR_EXE=kaweezle.exe
