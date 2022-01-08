@@ -109,13 +109,13 @@ To run kaweezle, you'll need to have
 
 The simplest way to install it is to run the following command:
 
-```console
+```powershell
 > wsl --install
 ```
 
 After reboot, update the kernel and set the default version to version 2:
 
-```console
+```powershell
 > sudo wsl --update
 > wsl --set-default-version 2
 ```
@@ -125,7 +125,7 @@ For the other tools, you can use [Scoop](https://scoop.sh/) or
 
 To use the kubernetes cluster, you will need to have kubectl installed:
 
-```console
+```powershell
 > scoop install kubectl
 ```
 
@@ -133,7 +133,7 @@ Other tools might be of insterest, like `k9s`, `kubectx`, `kubens` or `stern`.
 All are available through scoop. You can install all of them at once with the
 following command:
 
-```console
+```powershell
 > scoop install k9s kubectx kubens stern
 ```
 
@@ -144,7 +144,7 @@ The root filesystem can be downloaded from the
 
 You can create a WSL distribution with the following set of commands:
 
-```console
+```powershell
 > cd $env:LocalAppData
 > mkdir kwsl
 > cd kwsl
@@ -155,7 +155,7 @@ You can create a WSL distribution with the following set of commands:
 You will have a WSL distribution called `kwsl` which file system will be located
 in the current director:
 
-```console
+```powershell
 ❯ wsl -l -v
   NAME                    STATE           VERSION
 * Alpine                  Stopped         2
@@ -170,14 +170,14 @@ in the current director:
 
 To start the kubernetes cluster, issue the following command:
 
-```console
-~#@❯ wsl -d kwsl /kwsl start
+```powershell
+❯ wsl -d kwsl /kwsl start
 ```
 
 The distribution is now running:
 
-```
-~#@❯ wsl -l -v
+```powershell
+❯ wsl -l -v
   NAME                    STATE           VERSION
 * Alpine                  Stopped         2
   kwsl                    Running         2
@@ -185,12 +185,12 @@ The distribution is now running:
 
 Now the kubernetes cluster can be accessed:
 
-```console
-~#@❯ $env:KUBECONFIG="\\wsl$\kwsl\root\.kube\config"
-~#@❯ kubectl get nodes
+```powershell
+❯ $env:KUBECONFIG="\\wsl$\kwsl\root\.kube\config"
+❯ kubectl get nodes
 NAME              STATUS   ROLES    AGE   VERSION
 laptop-vkhdd5jr   Ready    <none>   61s   v1.23.1
-~#@❯ kubectl get pod --all-namespaces
+❯ kubectl get pod --all-namespaces
 NAMESPACE            NAME                                      READY   STATUS    RESTARTS   AGE
 kube-system          coredns-64897985d-bhhzq                   1/1     Running   0          68s
 kube-system          coredns-64897985d-mvpbb                   1/1     Running   0          68s
