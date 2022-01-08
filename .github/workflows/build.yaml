@@ -1,0 +1,25 @@
+name: Build root fs and zip
+
+on:
+  push:
+    branches: ["main "]
+  pull_request:
+    branches: ["main"]
+
+jobs:
+  Build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Build root fs
+        uses: ./.github/actions/make-docker-action
+      - name: Upload root fs artifact
+        uses: actions/upload-artifact@v2
+        with:
+          name: rootfs.tar.gz
+          path: build/rootfs.tar.gz
+      - name: Upload zip artifact
+        uses: actions/upload-artifact@v2
+        with:
+          name: kaweezle.zip
+          path: build/kaweezle.zip
