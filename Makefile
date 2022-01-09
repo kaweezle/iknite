@@ -32,7 +32,10 @@ CONTAINER_IMAGES=$(KUBERNETES_CONTAINER_IMAGES) $(BASE_CONTAINER_IMAGES)
 
 .PHONY: make_images default clean kwsl
 
-default: $(OUT_ZIP)
+default: $(OUT_ZIP).sha256 $(BUILDDIR)/rootfs.tar.gz.sha256
+
+%.sha256: %
+	sha256sum $< | cut -d' ' -f 1 > $@
 
 $(OUT_ZIP): $(BUILDDIR)/ziproot
 	@echo -e '\e[1;31mBuilding $(OUT_ZIP)\e[m'

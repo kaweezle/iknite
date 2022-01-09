@@ -104,5 +104,6 @@ jobs:
           prerelease: true
           title: "Development Build"
           files: |
-            LICENSE.txt
+            LICENSE
             build/rootfs.tar.gz
+            build/rootfs.tar.gz.sha256
