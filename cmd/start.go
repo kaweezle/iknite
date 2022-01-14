@@ -110,20 +110,11 @@ func perform(cmd *cobra.Command, args []string) {
 		// Just start the service
 		log.Info("Starting the kubelet service...")
 		cobra.CheckErr(alpine.StartService(constants.KubeletServiceName))
-		// TODO: Need to wait for node to be ready
 		log.Info("Waiting for service to start...")
 		cobra.CheckErr(config.CheckClusterRunning())
 	}
 
-	// TODO: Check that cluster is Ok
 	cobra.CheckErr(config.RenameConfig(ClusterName).WriteToFile("/root/.kube/config"))
-
-	// Untaint master. It needs a valid kubeconfig
-	/*if out, err := exec.Command(c.KubectlCmd, "taint", "nodes", "--all", "node-role.kubernetes.io/master-").CombinedOutput(); err != nil {
-		if strout := string(out); strout != "error: taint \"node-role.kubernetes.io/master\" not found\n" {
-			log.Fatal(err, strout)
-		}
-	}*/
 
 	// Apply base customization. This adds the following to the cluster
 	// - MetalLB
