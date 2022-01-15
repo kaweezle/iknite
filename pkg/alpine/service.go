@@ -64,6 +64,20 @@ func ExecuteIfServiceNotStarted(serviceName string, fn func() error) error {
 	return nil
 }
 
+// ExecuteIfServiceStarted executes the fn function if the service serviceName
+// is started.
+func ExecuteIfServiceStarted(serviceName string, fn func() error) error {
+	exists, err := IsServiceStarted(serviceName)
+	if err != nil {
+		return errors.Wrapf(err, "Error while checking if service %s exists", serviceName)
+	}
+	if exists {
+		return fn()
+	}
+
+	return nil
+}
+
 // EnableService enables the service named serviceName
 func EnableService(serviceName string) error {
 	serviceFilename := path.Join(servicesDir, serviceName)
@@ -77,6 +91,18 @@ func EnableService(serviceName string) error {
 func StartService(serviceName string) error {
 	return ExecuteIfServiceNotStarted(serviceName, func() error {
 		if out, err := exec.Command("/sbin/rc-service", serviceName, "start").Output(); err == nil {
+			log.Trace(string(out))
+			return nil
+		} else {
+			return errors.Wrapf(err, "Error while starting service %s", serviceName)
+		}
+	})
+}
+
+// StopService stops the serviceName service if it is  started.
+func StopService(serviceName string) error {
+	return ExecuteIfServiceStarted(serviceName, func() error {
+		if out, err := exec.Command("/sbin/rc-service", serviceName, "stop").Output(); err == nil {
 			log.Trace(string(out))
 			return nil
 		} else {

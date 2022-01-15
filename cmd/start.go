@@ -19,6 +19,7 @@ import (
 	"os"
 
 	"github.com/antoinemartin/kaweezle-rootfs/pkg/alpine"
+	"github.com/antoinemartin/kaweezle-rootfs/pkg/constants"
 	"github.com/antoinemartin/kaweezle-rootfs/pkg/crio"
 	"github.com/antoinemartin/kaweezle-rootfs/pkg/k8s"
 	"github.com/antoinemartin/kaweezle-rootfs/pkg/provision"
@@ -82,7 +83,9 @@ func perform(cmd *cobra.Command, args []string) {
 		if config.IsConfigServerAddress(ip) {
 			exist = true
 		} else {
+			cobra.CheckErr(alpine.StopService(constants.KubeletServiceName))
 			cobra.CheckErr(k8s.CleanConfig())
+
 		}
 	} else {
 		if !os.IsNotExist(err) {
