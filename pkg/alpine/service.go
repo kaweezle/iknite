@@ -30,12 +30,11 @@ const servicesDir = "/etc/init.d"
 const runLevelDir = "/etc/runlevels/default"
 
 var startedServicesDir = path.Join(openRCDirectory, "started")
-var softLevelFile = path.Join(openRCDirectory, "softlevel")
 
 func StartOpenRC() (err error) {
 	err = utils.ExecuteIfNotExist(openRCDirectory, func() error {
 		log.Info("Starting openrc...")
-		if out, err := exec.Command("/sbin/openrc", "-n").CombinedOutput(); err == nil {
+		if out, err := exec.Command("/sbin/openrc", "default").CombinedOutput(); err == nil {
 			log.Trace(string(out))
 			return nil
 		} else {
@@ -43,14 +42,6 @@ func StartOpenRC() (err error) {
 		}
 	})
 
-	if err == nil {
-		// OpenRC is picky when starting services if it hasn't been started by
-		// init. In our case, init is provided by WSL. Creating this file makes
-		// OpenRC happy.
-		err = utils.ExecuteIfNotExist(softLevelFile, func() error {
-			return utils.WriteFile(softLevelFile, []byte{}, os.FileMode(int(0444)))
-		})
-	}
 	return
 }
 
