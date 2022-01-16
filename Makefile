@@ -58,7 +58,7 @@ $(BUILDDIR)/rootfs.tar.gz: $(BUILDDIR)/rootfs $(BUILDDIR)/rootfs/kwsl
 	bsdtar -zcpf $@ -C $< `ls $<`
 	chown `id -un` $@
 
-$(BUILDDIR)/rootfs: $(BUILDDIR)/base.tar.gz wslimage/profile
+$(BUILDDIR)/rootfs: $(BUILDDIR)/base.tar.gz wslimage/profile wslimage/rc.conf
 	@echo -e '\e[1;31mBuilding rootfs...\e[m'
 	mkdir -p $@
 	bsdtar -zxpkf $(BUILDDIR)/base.tar.gz -C $@
@@ -78,6 +78,13 @@ $(BUILDDIR)/rootfs: $(BUILDDIR)/base.tar.gz wslimage/profile
 	$(foreach I, $(CONTAINER_IMAGES), skopeo copy docker://$I containers-storage:$I;)
 	-umount $@/var/lib/containers/storage/overlay
 	chmod +x $@
+	mkdir -p $@/lib/rc/init.d
+	chroot $@ ln -s /lib/rc/init.d /run/openrc || /bin/true
+	touch $@/lib/rc/init.d/softlevel
+	[ -f $@/etc/rc.conf.orig ] || mv $@/etc/rc.conf $@/etc/rc.conf.orig
+	cp -f wslimage/rc.conf $@/etc/rc.conf
+	chroot $@ rc-update add crio default
+	chroot $@ rc-update add kubelet default
 
 $(BUILDDIR)/rootfs/kwsl: $(BUILDDIR)/rootfs
 	go mod tidy

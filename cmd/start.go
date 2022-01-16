@@ -61,24 +61,13 @@ func init() {
 
 func perform(cmd *cobra.Command, args []string) {
 
-	// Start OpenRC
-	cobra.CheckErr(alpine.StartOpenRC())
-
-	// Networking is already started so we pretend the service has been run.
-	cobra.CheckErr(alpine.PretendServiceStarted("networking"))
-
-	// Enable CRIO and Kubelet. Kubelet will be started by kubeadm or by us
-	cobra.CheckErr(alpine.EnableService(constants.CrioServiceName))
-	cobra.CheckErr(alpine.EnableService(constants.KubeletServiceName))
-
-	// We don't mess with IPV6
-	cobra.CheckErr(utils.MoveFileIfExists("/etc/cni/net.d/10-crio-bridge.conf", "/etc/cni/net.d/12-crio-bridge.conf"))
-
 	// Allow forwarding (kubeadm requirement)
 	utils.WriteFile("/proc/sys/net/ipv4/ip_forward", []byte("1\n"), os.FileMode(int(0644)))
 
-	// We need to start CRI-O
-	cobra.CheckErr(alpine.StartService("crio"))
+	// Start OpenRC
+	cobra.CheckErr(alpine.StartOpenRC())
+
+	// CRI-O is started by OpenRC
 	available, err := crio.WaitForCrio()
 	cobra.CheckErr(err)
 	if !available {
@@ -94,7 +83,9 @@ func perform(cmd *cobra.Command, args []string) {
 		if config.IsConfigServerAddress(ip) {
 			exist = true
 		} else {
+			cobra.CheckErr(alpine.StopService(constants.KubeletServiceName))
 			cobra.CheckErr(k8s.CleanConfig())
+
 		}
 	} else {
 		if !os.IsNotExist(err) {
@@ -107,9 +98,7 @@ func perform(cmd *cobra.Command, args []string) {
 		config, err = k8s.LoadFromDefault()
 		cobra.CheckErr(err)
 	} else {
-		// Just start the service
-		log.Info("Starting the kubelet service...")
-		cobra.CheckErr(alpine.StartService(constants.KubeletServiceName))
+		// The service should have been started by OpenRC
 		log.Info("Waiting for service to start...")
 		cobra.CheckErr(config.CheckClusterRunning())
 	}
