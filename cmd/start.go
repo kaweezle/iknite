@@ -85,7 +85,6 @@ func perform(cmd *cobra.Command, args []string) {
 		} else {
 			cobra.CheckErr(alpine.StopService(constants.KubeletServiceName))
 			cobra.CheckErr(k8s.CleanConfig())
-
 		}
 	} else {
 		if !os.IsNotExist(err) {
@@ -94,9 +93,14 @@ func perform(cmd *cobra.Command, args []string) {
 	}
 
 	if !exist {
+		restartProxy := err == nil
 		cobra.CheckErr(k8s.RunKubeadmInit(ip))
 		config, err = k8s.LoadFromDefault()
 		cobra.CheckErr(err)
+		if restartProxy {
+			log.Info("Restart kube-proxy")
+			cobra.CheckErr(config.RestartProxy())
+		}
 	} else {
 		// The service should have been started by OpenRC
 		log.Info("Waiting for service to start...")

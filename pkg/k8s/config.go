@@ -23,7 +23,10 @@ import (
 
 	"github.com/antoinemartin/kaweezle-rootfs/pkg/constants"
 	log "github.com/sirupsen/logrus"
+	appsv1 "k8s.io/api/apps/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/clientcmd/api"
 )
@@ -80,17 +83,24 @@ func (config *Config) IsConfigServerAddress(ip net.IP) bool {
 	return true
 }
 
+// Client returns a clientset for config.
+func (config *Config) Client() (client *kubernetes.Clientset, err error) {
+	clientconfig := clientcmd.NewDefaultClientConfig(api.Config(*config), nil)
+	var rest *rest.Config
+	rest, err = clientconfig.ClientConfig()
+	if err != nil {
+		return
+	}
+	client, err = kubernetes.NewForConfig(rest)
+	return
+}
+
 // CheckClusterRunning checks that the cluster is running by requesting the
 // API server /readyz endpoint. It checks 10 times and waits for 2 seconds
 // between each check.
 func (config *Config) CheckClusterRunning() error {
 
-	clientconfig := clientcmd.NewDefaultClientConfig(api.Config(*config), nil)
-	rest, err := clientconfig.ClientConfig()
-	if err != nil {
-		return err
-	}
-	client, err := kubernetes.NewForConfig(rest)
+	client, err := config.Client()
 	if err != nil {
 		return err
 	}
@@ -130,4 +140,30 @@ func (config *Config) CheckClusterRunning() error {
 // it returns the appropriate error in case of failure.
 func (config *Config) WriteToFile(filename string) error {
 	return clientcmd.WriteToFile(*(*api.Config)(config), filename)
+}
+
+// RestartProxy restarts kube-proxy after config has been updated. This needs to
+// be done after an IP address change.
+// The restart method is taken from kubectl: https://github.com/kubernetes/kubectl/blob/652881798563c00c1895ded6ced819030bfaa4d7/pkg/polymorphichelpers/objectrestarter.go#L81
+func (config *Config) RestartProxy() (err error) {
+
+	var client *kubernetes.Clientset
+	if client, err = config.Client(); err != nil {
+		return
+	}
+
+	ctx := context.Background()
+
+	var ds *appsv1.DaemonSet
+	if ds, err = client.AppsV1().DaemonSets("kube-system").Get(ctx, "kube-proxy", metav1.GetOptions{}); err != nil {
+		return
+	}
+
+	if ds.Spec.Template.ObjectMeta.Annotations == nil {
+		ds.Spec.Template.ObjectMeta.Annotations = make(map[string]string)
+	}
+	ds.Spec.Template.ObjectMeta.Annotations["kubectl.kubernetes.io/restartedAt"] = time.Now().Format(time.RFC3339)
+
+	_, err = client.AppsV1().DaemonSets("kube-system").Update(ctx, ds, metav1.UpdateOptions{})
+	return
 }
