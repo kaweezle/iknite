@@ -21,7 +21,7 @@ import (
 	"net"
 	"time"
 
-	"github.com/antoinemartin/kaweezle-rootfs/pkg/constants"
+	"github.com/kaweezle/kaweezle-rootfs/pkg/constants"
 	log "github.com/sirupsen/logrus"
 	appsv1 "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

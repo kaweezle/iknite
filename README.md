@@ -15,7 +15,7 @@
 <br />
 <div align="center">
 
-  <a href="https://github.com/antoinemartin/kaweezle-rootfs">
+  <a href="https://github.com/kaweezle/kaweezle-rootfs">
     <img src="images/logo.svg" alt="Logo" width="80" height="80">
   </a>
   <h3 align="center">Kaweezle Root Filesystem</h3>
@@ -23,12 +23,12 @@
   <p align="center">
     Run Vanilla Kubernetes on Windows with WSL 2 and Alpine Linux
     <br />
-    <a href="https://github.com/antoinemartin/kaweezle-rootfs"><strong>Explore the docs »</strong></a>
+    <a href="https://github.com/kaweezle/kaweezle-rootfs"><strong>Explore the docs »</strong></a>
     <br />
     <br />
-    <a href="https://github.com/antoinemartin/kaweezle-rootfs/issues">Report Bug</a>
+    <a href="https://github.com/kaweezle/kaweezle-rootfs/issues">Report Bug</a>
     ·
-    <a href="https://github.com/antoinemartin/kaweezle-rootfs/issues">Request Feature</a>
+    <a href="https://github.com/kaweezle/kaweezle-rootfs/issues">Request Feature</a>
   </p>
 </div>
 
@@ -66,7 +66,7 @@ Kaweezle allows running a Kubernetes cluster on Windows using Windows Subsystem
 for Linux 2 (WSL 2).
 
 This project is the sister project of
-[Kaweezle](https://github.com/antoinemartin/kaweezle). It contains the root
+[Kaweezle](https://github.com/kaweezle/kaweezle). It contains the root
 filesystem of the WSL distribution used for running Kubernetes.
 
 The distribution is created from the Alpine
@@ -97,7 +97,7 @@ This project uses the following components:
 ## Getting Started
 
 Please refer to the
-[kaweezle readme](https://github.com/antoinemartin/kaweezle/README.md) for
+[kaweezle readme](https://github.com/kaweezle/kaweezle/README.md) for
 installation instructions.
 
 The follwing sections give instuctions on how to use the root filesystem without
@@ -141,7 +141,7 @@ following command:
 ### Download and installation
 
 The root filesystem can be downloaded from the
-[Releases](https://github.com/antoinemartin/kaweezle-rootfs/releases) page.
+[Releases](https://github.com/kaweezle/kaweezle-rootfs/releases) page.
 
 You can create a WSL distribution with the following set of commands:
 
@@ -149,7 +149,7 @@ You can create a WSL distribution with the following set of commands:
 > cd $env:LocalAppData
 > mkdir kwsl
 > cd kwsl
-> (New-Object Net.WebClient).DownloadFile("https://github.com/antoinemartin/kaweezle-rootfs/releases/download/latest/rootfs.tar.gz", "$PWD\rootfs.tar.gz")
+> (New-Object Net.WebClient).DownloadFile("https://github.com/kaweezle/kaweezle-rootfs/releases/download/latest/rootfs.tar.gz", "$PWD\rootfs.tar.gz")
 > wsl --import kwsl .
 ```
 
@@ -216,8 +216,8 @@ metallb-system       speaker-2h66l                             1/1     Running  
 -   [ ] Automate the releases through Github actions.
 -   [ ] ...
 
-See the [open issues](https://github.com/antoinemartin/kaweezle-rootfs/issues)
-for a full list of proposed features (and known issues).
+See the [open issues](https://github.com/kaweezle/kaweezle-rootfs/issues) for a
+full list of proposed features (and known issues).
 
 <p align="right">(<a href="#top">back to top</a>)</p>
 
@@ -251,10 +251,10 @@ Distributed under the Apache License. See `LICENSE` for more information.
 
 ## Contact
 
-Antoine Martin - [@antoinemartin](https://twitter.com/antoinemartin)
+Kaweezle - [@kaweezle](https://twitter.com/kaweezle)
 
 Project Link:
-[https://github.com/antoinemartin/kaweezle-rootfs](https://github.com/antoinemartin/kaweezle-rootfs)
+[https://github.com/kaweezle/kaweezle-rootfs](https://github.com/kaweezle/kaweezle-rootfs)
 
 <p align="right">(<a href="#top">back to top</a>)</p>
 
@@ -290,30 +290,29 @@ project.
 <!-- https://www.markdownguide.org/basic-syntax/#reference-style-links -->
 
 [contributors-shield]:
-    https://img.shields.io/github/contributors/antoinemartin/kaweezle-rootfs.svg?style=for-the-badge
+    https://img.shields.io/github/contributors/kaweezle/kaweezle-rootfs.svg?style=for-the-badge
 [contributors-url]:
-    https://github.com/antoinemartin/kaweezle-rootfs/graphs/contributors
+    https://github.com/kaweezle/kaweezle-rootfs/graphs/contributors
 [forks-shield]:
-    https://img.shields.io/github/forks/antoinemartin/kaweezle-rootfs.svg?style=for-the-badge
-[forks-url]: https://github.com/antoinemartin/kaweezle-rootfs/network/members
+    https://img.shields.io/github/forks/kaweezle/kaweezle-rootfs.svg?style=for-the-badge
+[forks-url]: https://github.com/kaweezle/kaweezle-rootfs/network/members
 [stars-shield]:
-    https://img.shields.io/github/stars/antoinemartin/kaweezle-rootfs.svg?style=for-the-badge
-[stars-url]: https://github.com/antoinemartin/kaweezle-rootfs/stargazers
+    https://img.shields.io/github/stars/kaweezle/kaweezle-rootfs.svg?style=for-the-badge
+[stars-url]: https://github.com/kaweezle/kaweezle-rootfs/stargazers
 [issues-shield]:
-    https://img.shields.io/github/issues/antoinemartin/kaweezle-rootfs.svg?style=for-the-badge
-[issues-url]: https://github.com/antoinemartin/kaweezle-rootfs/issues
+    https://img.shields.io/github/issues/kaweezle/kaweezle-rootfs.svg?style=for-the-badge
+[issues-url]: https://github.com/kaweezle/kaweezle-rootfs/issues
 [license-shield]:
     https://img.shields.io/badge/license-apache_2.0-green?style=for-the-badge&logo=none
-[license-url]:
-    https://github.com/antoinemartin/kaweezle-rootfs/blob/master/LICENSE
+[license-url]: https://github.com/kaweezle/kaweezle-rootfs/blob/master/LICENSE
 [linkedin-shield]:
     https://img.shields.io/badge/-LinkedIn-black.svg?style=for-the-badge&logo=linkedin&colorB=555
-[linkedin-url]: https://linkedin.com/in/antoinemartin
+[linkedin-url]: https://linkedin.com/in/kaweezle
 [go-version]:
     https://img.shields.io/badge/Go-1.17+-00ADD8?style=for-the-badge&logo=go
 [stability]:
     https://img.shields.io/badge/stability-experimental-orange?style=for-the-badge
 [workflow-shield]:
-    https://github.com/antoinemartin/kaweezle-rootfs/actions/workflows/build.yaml/badge.svg
+    https://github.com/kaweezle/kaweezle-rootfs/actions/workflows/build.yaml/badge.svg
 [workflow-url]:
-    https://github.com/antoinemartin/kaweezle-rootfs/actions/workflows/build.yaml
+    https://github.com/kaweezle/kaweezle-rootfs/actions/workflows/build.yaml

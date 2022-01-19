@@ -1,4 +1,4 @@
-module github.com/antoinemartin/kaweezle-rootfs
+module github.com/kaweezle/kaweezle-rootfs
 
 go 1.17
 

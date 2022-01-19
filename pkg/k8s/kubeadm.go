@@ -24,7 +24,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/antoinemartin/kaweezle-rootfs/pkg/utils"
+	"github.com/kaweezle/kaweezle-rootfs/pkg/utils"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 )
