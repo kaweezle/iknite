@@ -307,5 +307,5 @@ project.
 [stability]:
     https://img.shields.io/badge/stability-experimental-orange?style=for-the-badge
 [workflow-shield]:
-    https://github.com/kaweezle/iknite/actions/workflows/build.yaml/badge.svg
-[workflow-url]: https://github.com/kaweezle/iknite/actions/workflows/build.yaml
+    https://github.com/kaweezle/iknite/actions/workflows/release.yml/badge.svg
+[workflow-url]: https://github.com/kaweezle/iknite/actions/workflows/release.yml
