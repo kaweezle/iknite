@@ -25,7 +25,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	c "github.com/kaweezle/kaweezle-rootfs/pkg/constants"
+	c "github.com/kaweezle/iknite/pkg/constants"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/afero"

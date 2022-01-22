@@ -15,20 +15,20 @@
 <br />
 <div align="center">
 
-  <a href="https://github.com/kaweezle/kaweezle-rootfs">
+  <a href="https://github.com/kaweezle/iknite">
     <img src="images/logo.svg" alt="Logo" width="80" height="80">
   </a>
-  <h3 align="center">Kaweezle Root Filesystem</h3>
+  <h3 align="center">Iknite</h3>
 
   <p align="center">
-    Run Vanilla Kubernetes on Windows with WSL 2 and Alpine Linux
+    Manages the initialization and start of a Kubernetes mono-machine cluster on Alpine Linux.
     <br />
-    <a href="https://github.com/kaweezle/kaweezle-rootfs"><strong>Explore the docs »</strong></a>
+    <a href="https://github.com/kaweezle/iknite"><strong>Explore the docs »</strong></a>
     <br />
     <br />
-    <a href="https://github.com/kaweezle/kaweezle-rootfs/issues">Report Bug</a>
+    <a href="https://github.com/kaweezle/iknite/issues">Report Bug</a>
     ·
-    <a href="https://github.com/kaweezle/kaweezle-rootfs/issues">Request Feature</a>
+    <a href="https://github.com/kaweezle/iknite/issues">Request Feature</a>
   </p>
 </div>
 
@@ -62,22 +62,18 @@
 
 ## About The Project
 
+Iknite manages the initialization and start of a Kubernetes cluster in an Alpine
+based WSL 2 distribution or VM.
+
+Iknite is part of the [kaweezle](https://github.com/kaweezle/kaweezle) project.
 Kaweezle allows running a Kubernetes cluster on Windows using Windows Subsystem
 for Linux 2 (WSL 2).
 
-This project is the sister project of
-[Kaweezle](https://github.com/kaweezle/kaweezle). It contains the root
-filesystem of the WSL distribution used for running Kubernetes.
+It is a small go based executable. It can be run from the command line or as an
+openrc based service.
 
-The distribution is created from the Alpine
-[mini root FS](https://dl-cdn.alpinelinux.org/alpine/v3.15/releases/x86_64/) by
-adding the appropriate packages from the Edge repository. The container images
-of the base pods (coredns, api-server, ...) are also downloaded for faster setup
-times.
-
-The distribution contains a small go based executable, `kwsl` that is run by its
-Windows counterpart (`kaweezle`) to start or restart the appropriate
-dependencies and the Kubernetes cluster.
+It is packaged as an APK that is used by the
+[kaweelze-rootfs](https://github.com/kaweezle/kaweezle-rootfs) project.
 
 <p align="right">(<a href="#top">back to top</a>)</p>
 
@@ -101,7 +97,7 @@ Please refer to the
 installation instructions.
 
 The follwing sections give instuctions on how to use the root filesystem without
-the `kaweezle` command.
+the `kaweezle` windows command.
 
 ### Prerequisites
 
@@ -121,8 +117,7 @@ After reboot, update the kernel and set the default version to version 2:
 > wsl --set-default-version 2
 ```
 
-For the other tools, you can use [Scoop](https://scoop.sh/) or
-[Chocolatey](https://chocolatey.org/).
+For the other tools, you can use [Scoop](https://scoop.sh/).
 
 To use the kubernetes cluster, you will need to have kubectl installed:
 
@@ -172,7 +167,7 @@ in the current director:
 To start the kubernetes cluster, issue the following command:
 
 ```powershell
-❯ wsl -d kwsl /kwsl start
+❯ wsl -d kwsl /sbin/iknite start
 ```
 
 The distribution is now running:
@@ -216,8 +211,8 @@ metallb-system       speaker-2h66l                             1/1     Running  
 -   [ ] Automate the releases through Github actions.
 -   [ ] ...
 
-See the [open issues](https://github.com/kaweezle/kaweezle-rootfs/issues) for a
-full list of proposed features (and known issues).
+See the [open issues](https://github.com/kaweezle/iknite/issues) for a full list
+of proposed features (and known issues).
 
 <p align="right">(<a href="#top">back to top</a>)</p>
 
@@ -254,7 +249,7 @@ Distributed under the Apache License. See `LICENSE` for more information.
 Kaweezle - [@kaweezle](https://twitter.com/kaweezle)
 
 Project Link:
-[https://github.com/kaweezle/kaweezle-rootfs](https://github.com/kaweezle/kaweezle-rootfs)
+[https://github.com/kaweezle/iknite](https://github.com/kaweezle/iknite)
 
 <p align="right">(<a href="#top">back to top</a>)</p>
 
@@ -290,21 +285,20 @@ project.
 <!-- https://www.markdownguide.org/basic-syntax/#reference-style-links -->
 
 [contributors-shield]:
-    https://img.shields.io/github/contributors/kaweezle/kaweezle-rootfs.svg?style=for-the-badge
-[contributors-url]:
-    https://github.com/kaweezle/kaweezle-rootfs/graphs/contributors
+    https://img.shields.io/github/contributors/kaweezle/iknite.svg?style=for-the-badge
+[contributors-url]: https://github.com/kaweezle/iknite/graphs/contributors
 [forks-shield]:
-    https://img.shields.io/github/forks/kaweezle/kaweezle-rootfs.svg?style=for-the-badge
-[forks-url]: https://github.com/kaweezle/kaweezle-rootfs/network/members
+    https://img.shields.io/github/forks/kaweezle/iknite.svg?style=for-the-badge
+[forks-url]: https://github.com/kaweezle/iknite/network/members
 [stars-shield]:
-    https://img.shields.io/github/stars/kaweezle/kaweezle-rootfs.svg?style=for-the-badge
-[stars-url]: https://github.com/kaweezle/kaweezle-rootfs/stargazers
+    https://img.shields.io/github/stars/kaweezle/iknite.svg?style=for-the-badge
+[stars-url]: https://github.com/kaweezle/iknite/stargazers
 [issues-shield]:
-    https://img.shields.io/github/issues/kaweezle/kaweezle-rootfs.svg?style=for-the-badge
-[issues-url]: https://github.com/kaweezle/kaweezle-rootfs/issues
+    https://img.shields.io/github/issues/kaweezle/iknite.svg?style=for-the-badge
+[issues-url]: https://github.com/kaweezle/iknite/issues
 [license-shield]:
     https://img.shields.io/badge/license-apache_2.0-green?style=for-the-badge&logo=none
-[license-url]: https://github.com/kaweezle/kaweezle-rootfs/blob/master/LICENSE
+[license-url]: https://github.com/kaweezle/iknite/blob/master/LICENSE
 [linkedin-shield]:
     https://img.shields.io/badge/-LinkedIn-black.svg?style=for-the-badge&logo=linkedin&colorB=555
 [linkedin-url]: https://linkedin.com/in/kaweezle
@@ -313,6 +307,5 @@ project.
 [stability]:
     https://img.shields.io/badge/stability-experimental-orange?style=for-the-badge
 [workflow-shield]:
-    https://github.com/kaweezle/kaweezle-rootfs/actions/workflows/build.yaml/badge.svg
-[workflow-url]:
-    https://github.com/kaweezle/kaweezle-rootfs/actions/workflows/build.yaml
+    https://github.com/kaweezle/iknite/actions/workflows/build.yaml/badge.svg
+[workflow-url]: https://github.com/kaweezle/iknite/actions/workflows/build.yaml

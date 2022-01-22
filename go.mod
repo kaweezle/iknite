@@ -1,4 +1,4 @@
-module github.com/kaweezle/kaweezle-rootfs
+module github.com/kaweezle/iknite
 
 go 1.17
 

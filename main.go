@@ -15,7 +15,7 @@ limitations under the License.
 */
 package main
 
-import "github.com/kaweezle/kaweezle-rootfs/cmd"
+import "github.com/kaweezle/iknite/cmd"
 
 func main() {
 	cmd.Execute()

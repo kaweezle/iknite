@@ -20,7 +20,7 @@ builds:
       - -s -w -X main.version={{.Version}} -X main.commit={{.Commit}} -X
         main.date={{ .CommitDate }} -X main.builtBy=pterm -X
         k8s.KUBERNETES_VERSION={{ .Env.KUBERNETES_VERSION }}
-    binary: kwsl
+    binary: iknite
 archives:
   - name_template:
       "{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}"
@@ -46,10 +46,10 @@ changelog:
 nfpms:
   - formats: [apk]
     license: Apache 2.0
-    package_name: kwsl
+    package_name: iknite
     maintainer: Antoine Martin <antoine@openance.com>
-    description: Deploy Kubernetes in Alpine Linux
-    homepage: https://github.com/antoinemartin/kaweezle-rootfs
+    description: Start Kubernetes in Alpine Linux
+    homepage: https://github.com/kaweezle/iknite
     dependencies:
       - cri-o
       - kubelet

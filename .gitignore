@@ -4,7 +4,7 @@
 *.dll
 *.so
 *.dylib
-kwsl
+iknite
 build/
 
 # Test binary, built with `go test -c`

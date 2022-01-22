@@ -1,9 +1,0 @@
-# action.yml
-name: "Run make in workspace"
-description: "Runs make in workspace"
-inputs: {}
-outputs: {}
-runs:
-  using: "docker"
-  image: "Dockerfile"
-  args: []
