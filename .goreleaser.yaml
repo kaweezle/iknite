@@ -57,6 +57,8 @@ nfpms:
       - kubectl
       - kubelet-openrc
       - cri-o-contrib-cni
+      - git
+      - util-linux-misc
     bindir: /sbin
     apk:
       signature:
