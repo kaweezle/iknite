@@ -47,7 +47,7 @@ nfpms:
   - formats: [apk]
     license: Apache 2.0
     package_name: iknite
-    maintainer: Antoine Martin <antoine@openance.com>
+    maintainer: Kaweezle <kaweezle-devel@kaweezle.com>
     description: Start Kubernetes in Alpine Linux
     homepage: https://github.com/kaweezle/iknite
     dependencies:
@@ -58,3 +58,7 @@ nfpms:
       - kubelet-openrc
       - cri-o-contrib-cni
     bindir: /sbin
+    apk:
+      signature:
+        key_file: gpg_key.asc
+        key_name: kaweezle-devel@kaweezle.com-c9d89864.rsa.pub

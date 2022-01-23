@@ -17,3 +17,4 @@ build/
 # vendor/
 
 dist/
+gpg_key.asc
