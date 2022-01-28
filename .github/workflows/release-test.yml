@@ -17,7 +17,7 @@ jobs:
       - name: Import Signature key
         shell: bash
         run: |
-          echo -e "${{ secrets.GPG_PRIVATE_KEY }}" > gpg_key.asc
+          echo -e "${{ secrets.GPG_PRIVATE_KEY }}" | openssl base64 -d -A > gpg_key.asc
       - name: Run GoReleaser Tests
         uses: goreleaser/goreleaser-action@v2
         with:
