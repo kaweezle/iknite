@@ -27,3 +27,9 @@ jobs:
           args: release --rm-dist
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Trigger root fs build
+        uses: peter-evans/repository-dispatch@v1
+        with:
+          token: ${{ secrets.ROOTFS_ACCESS_TOKEN }}
+          repository: kaweezle/kaweezle-rootfs
+          event-type: iknite-release

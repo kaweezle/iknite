@@ -55,7 +55,6 @@ nfpms:
       - kubelet
       - kubeadm
       - kubectl
-      - kubelet-openrc
       - cri-o-contrib-cni
       - git
       - util-linux-misc
