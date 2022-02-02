@@ -51,6 +51,8 @@ nfpms:
     description: Start Kubernetes in Alpine Linux
     homepage: https://github.com/kaweezle/iknite
     dependencies:
+      - openrc
+      - ip6tables
       - cri-o
       - kubelet
       - kubeadm
@@ -59,6 +61,9 @@ nfpms:
       - git
       - util-linux-misc
     bindir: /sbin
+    contents:
+      - src: apk/crictl.sh
+        dst: /etc/profile.d/crictl.sh
     apk:
       signature:
         key_file: gpg_key.asc

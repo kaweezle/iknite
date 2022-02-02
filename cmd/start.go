@@ -64,6 +64,8 @@ func perform(cmd *cobra.Command, args []string) {
 	// Allow forwarding (kubeadm requirement)
 	utils.WriteFile("/proc/sys/net/ipv4/ip_forward", []byte("1\n"), os.FileMode(int(0644)))
 
+	cobra.CheckErr(alpine.EnsureNetFilter())
+
 	// Start OpenRC
 	cobra.CheckErr(alpine.StartOpenRC())
 

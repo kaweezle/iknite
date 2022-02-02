@@ -33,3 +33,6 @@ jobs:
           token: ${{ secrets.ROOTFS_ACCESS_TOKEN }}
           repository: kaweezle/kaweezle-rootfs
           event-type: iknite-release
+          client-payload: >-
+            {"version": "${{ github.ref_name }}", "ref": "${{ github.ref }}",
+            "sha": "${{ github.sha }}"}
