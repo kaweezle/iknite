@@ -3,7 +3,6 @@ package alpine
 import (
 	"os/exec"
 
-	"github.com/kaweezle/iknite/pkg/utils"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 )
@@ -14,15 +13,13 @@ const (
 )
 
 func EnsureNetFilter() (err error) {
-	err = utils.ExecuteIfNotExist(conntrackFile, func() error {
-		log.Info("Enabling netfilter...")
-		if out, err := exec.Command("/sbin/modprobe", netfilter_module).CombinedOutput(); err == nil {
-			log.Trace(string(out))
-			return nil
-		} else {
-			return errors.Wrap(err, "Error while starting openrc")
-		}
-	})
+	log.Debug("Enabling netfilter...")
+	var out []byte
+	if out, err = exec.Command("/sbin/modprobe", netfilter_module).CombinedOutput(); err == nil {
+		log.Trace(string(out))
+	} else {
+		err = errors.Wrap(err, "Error while starting openrc")
+	}
 
 	return
 }
