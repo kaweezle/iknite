@@ -20,6 +20,7 @@ jobs:
         shell: bash
         run: |
           echo -e "${{ secrets.GPG_PRIVATE_KEY }}" | openssl base64 -d -A > gpg_key.asc
+          openssl rsa -in gpg_key.asc -pubout -out kaweezle-devel@kaweezle.com-c9d89864.rsa.pub
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v2
         with:
