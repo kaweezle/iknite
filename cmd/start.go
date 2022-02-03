@@ -69,6 +69,10 @@ func perform(cmd *cobra.Command, args []string) {
 	// Start OpenRC
 	cobra.CheckErr(alpine.StartOpenRC())
 
+	cobra.CheckErr(alpine.EnableService(constants.CrioServiceName))
+	cobra.CheckErr(alpine.EnableService(constants.KubeletServiceName))
+	cobra.CheckErr(alpine.StartService(constants.CrioServiceName))
+
 	// CRI-O is started by OpenRC
 	available, err := crio.WaitForCrio()
 	cobra.CheckErr(err)
