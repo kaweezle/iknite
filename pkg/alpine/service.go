@@ -25,9 +25,11 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-const openRCDirectory = "/run/openrc"
-const servicesDir = "/etc/init.d"
-const runLevelDir = "/etc/runlevels/default"
+const (
+	openRCDirectory = "/run/openrc"
+	servicesDir     = "/etc/init.d"
+	runLevelDir     = "/etc/runlevels/default"
+)
 
 var startedServicesDir = path.Join(openRCDirectory, "started")
 
