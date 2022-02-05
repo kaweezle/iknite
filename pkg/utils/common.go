@@ -27,20 +27,33 @@ import (
 var fs = afero.NewOsFs()
 var afs = &afero.Afero{Fs: fs}
 
-// ExecuteIfNotExist executes the function fn if the file file
-// doesn't exist.
-func ExecuteIfNotExist(file string, fn func() error) error {
+// ExecuteOnExistence executes the function fn if the file existence is the
+// one given by the parameter.
+func ExecuteOnExistence(file string, existence bool, fn func() error) error {
 	exists, err := afs.Exists(file)
 	if err != nil {
 		return errors.Wrapf(err, "Error while checking if %s exists", file)
 	}
 
-	if !exists {
+	if exists == existence {
 		return fn()
 	}
 	return nil
 }
 
+// ExecuteIfNotExist executes the function fn if the file file
+// doesn't exist.
+func ExecuteIfNotExist(file string, fn func() error) error {
+	return ExecuteOnExistence(file, false, fn)
+}
+
+// ExecuteIfExist executes the function fn if the file file
+// exists.
+func ExecuteIfExist(file string, fn func() error) error {
+	return ExecuteOnExistence(file, true, fn)
+}
+
+// Exists tells if file exists
 func Exists(path string) (bool, error) {
 	return afs.Exists(path)
 }
