@@ -47,6 +47,12 @@ nfpms:
   - formats: [apk]
     license: Apache 2.0
     package_name: iknite
+    file_name_template:
+      "{{ .PackageName }}-{{ .Version }}.{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{
+      end }}{{ if .Mips }}_{{ .Mips }}{{ end }}"
+    replacements:
+      amd64: x86_64
+      "386": x86
     maintainer: Kaweezle <kaweezle-devel@kaweezle.com>
     description: Start Kubernetes in Alpine Linux
     homepage: https://github.com/kaweezle/iknite
