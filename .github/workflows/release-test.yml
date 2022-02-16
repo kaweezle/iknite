@@ -37,3 +37,17 @@ jobs:
           signature_key: "${{ secrets.GPG_PRIVATE_KEY }}"
           signature_key_name: kaweezle-devel@kaweezle.com-c9d89864.rsa
           destination: dist/repo
+      - name: Commit repo to kaweezle.com
+        uses: cpina/github-action-push-to-another-repository@main
+        env:
+          API_TOKEN_GITHUB: ${{ secrets.REPO_ACCESS_TOKEN }}
+        with:
+          source-directory: dist/repo
+          destination-github-username: kaweezle
+          destination-repository-name: kaweezle.github.io
+          # TODO: replace with kaweezle-devel
+          user-name: antoinemartin
+          user-email: antoine@openance.com
+          target-branch: release-test
+          target-directory: docs/repo
+          commit-message: iknite APK repo ${{ github.ref_name }}
