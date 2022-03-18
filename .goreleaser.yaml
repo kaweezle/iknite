@@ -1,7 +1,7 @@
 # This is an example .goreleaser.yml file with some sensible defaults.
 # Make sure to check the documentation at https://goreleaser.com
 env:
-  - KUBERNETES_VERSION=1.23.1
+  - KUBERNETES_VERSION=1.23.5
 before:
   hooks:
     - go mod tidy
@@ -19,7 +19,7 @@ builds:
     ldflags:
       - -s -w -X main.version={{.Version}} -X main.commit={{.Commit}} -X
         main.date={{ .CommitDate }} -X main.builtBy=pterm -X
-        k8s.KUBERNETES_VERSION={{ .Env.KUBERNETES_VERSION }}
+        k8s.KubernetesVersion={{ .Env.KUBERNETES_VERSION }}
     binary: iknite
 archives:
   - name_template:

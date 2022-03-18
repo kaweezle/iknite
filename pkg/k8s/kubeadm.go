@@ -34,8 +34,9 @@ const (
 	configurationPattern             = "*.conf"
 	pkiSubdirectory                  = "pki"
 	manifestsSubdirectory            = "manifests"
-	KubernetesVersion                = "1.23.1"
 )
+
+var KubernetesVersion = "1.23.5"
 
 func RunKubeadm(parameters []string) (err error) {
 	log.Info("Running", "/usr/bin/kubeadm ", strings.Join(parameters, " "), "...")
