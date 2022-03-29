@@ -11,10 +11,15 @@ import (
 const (
 	netfilter_module = "br_netfilter"
 	conntrackFile    = "/proc/sys/net/nf_conntrack_max"
+	brNetfilterDir   = "/proc/sys/net/bridge"
 )
 
+// EnsureNetFilter ensures net filtering is available. It does so by checking
+// The availability of the /proc/sys/net/bridge directory. On Windows 11, WSL2
+// includes br_netfilter in the kernel and modprobe is not available.
+// On other linuxes, netfilter is provided as a module.
 func EnsureNetFilter() error {
-	return utils.ExecuteIfExist("/lib/modules", func() (err error) {
+	return utils.ExecuteIfNotExist(brNetfilterDir, func() (err error) {
 		log.Debug("Enabling netfilter...")
 		var out []byte
 		if out, err = exec.Command("/sbin/modprobe", netfilter_module).CombinedOutput(); err == nil {
