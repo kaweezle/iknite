@@ -110,10 +110,10 @@ func perform(cmd *cobra.Command, args []string) {
 	} else {
 		// The service should have been started by OpenRC
 		log.Info("Waiting for service to start...")
-		cobra.CheckErr(config.CheckClusterRunning())
+		cobra.CheckErr(config.CheckClusterRunning(10, 2, 2))
 	}
 
-	cobra.CheckErr(config.RenameConfig(ClusterName).WriteToFile("/root/.kube/config"))
+	cobra.CheckErr(config.RenameConfig(ClusterName).WriteToFile(constants.KubernetesRootConfig))
 
 	// Apply base customization. This adds the following to the cluster
 	// - MetalLB
@@ -124,7 +124,7 @@ func perform(cmd *cobra.Command, args []string) {
 	context := log.Fields{
 		"OutboundIP": ip,
 	}
-	cobra.CheckErr(provision.ApplyBaseKustomizations(context))
+	cobra.CheckErr(provision.ApplyBaseKustomizations(constants.DefaultKustomizationDirectory, context))
 
 	log.Info("executed")
 }

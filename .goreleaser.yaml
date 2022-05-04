@@ -70,6 +70,24 @@ nfpms:
     contents:
       - src: apk/crictl.sh
         dst: /etc/profile.d/crictl.sh
+      - src: apk/iknite.d/kustomization.yaml
+        dst: /etc/iknite.d/kustomization.yaml
+      - src: apk/iknite.d/base/kustomization.yaml
+        dst: /etc/iknite.d/base/kustomization.yaml
+      - src: apk/iknite.d/base/metallb-generator.yaml
+        dst: /etc/iknite.d/base/metallb-generator.yaml
+      - src: apk/iknite.d/base/plugins/metallb-config.sh
+        dst: /etc/iknite.d/base/plugins/metallb-config.sh
+      # - src: apk/iknite.d/argocd/apisix.yaml
+      #   dst: /etc/iknite.d/argocd/apisix.yaml
+      # - src: apk/iknite.d/argocd/argo-ingress.yaml
+      #   dst: /etc/iknite.d/argocd/argo-ingress.yaml
+      # - src: apk/iknite.d/argocd/kustomization.yaml
+      #   dst: /etc/iknite.d/argocd/kustomization.yaml
+      # - src: apk/iknite.d/argocd/namespace.yaml
+      #   dst: /etc/iknite.d/argocd/namespace.yaml
+      # - src: apk/iknite.d/argocd/openance-dev-tls.yaml
+      #   dst: /etc/iknite.d/argocd/openance-dev-tls.yaml
     apk:
       signature:
         key_file: gpg_key.asc

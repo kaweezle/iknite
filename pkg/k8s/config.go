@@ -33,15 +33,20 @@ import (
 
 type Config api.Config
 
-// LoadFromDefault loads the configuration from the default admin.conf file,
-// usually located at /etc/kubernetes/admin.conf.
-func LoadFromDefault() (*Config, error) {
-	_config, err := clientcmd.LoadFromFile(constants.KubernetesAdminConfig)
+// LoadFromFile loads the configuration from the file specified by filename.
+func LoadFromFile(filename string) (*Config, error) {
+	_config, err := clientcmd.LoadFromFile(filename)
 	if err != nil {
 		return nil, err
 	}
 	config := (*Config)(_config)
 	return config, nil
+}
+
+// LoadFromDefault loads the configuration from the default admin.conf file,
+// usually located at /etc/kubernetes/admin.conf.
+func LoadFromDefault() (*Config, error) {
+	return LoadFromFile(constants.KubernetesAdminConfig)
 }
 
 // RenameConfig changes the name of the cluster and the context from the
@@ -96,16 +101,16 @@ func (config *Config) Client() (client *kubernetes.Clientset, err error) {
 }
 
 // CheckClusterRunning checks that the cluster is running by requesting the
-// API server /readyz endpoint. It checks 10 times and waits for 2 seconds
-// between each check.
-func (config *Config) CheckClusterRunning() error {
+// API server /readyz endpoint. It checks retries times and waits for waittime
+// seconds between each check. It needs at least okresponses good responses from
+// the server.
+func (config *Config) CheckClusterRunning(retries, okresponses, waittime int) error {
 
 	client, err := config.Client()
 	if err != nil {
 		return err
 	}
 
-	retries := 10
 	oktries := 0
 	query := client.Discovery().RESTClient().Get().AbsPath("/readyz")
 	for retries > 0 {
@@ -116,8 +121,8 @@ func (config *Config) CheckClusterRunning() error {
 				err = fmt.Errorf("cluster health API returned: %s", contentStr)
 			} else {
 				oktries = oktries + 1
-				log.WithField("oktries", oktries).Trace("Ok ressponse from server")
-				if oktries == 2 {
+				log.WithField("oktries", oktries).Trace("Ok response from server")
+				if oktries == okresponses {
 					break
 				}
 			}
@@ -128,8 +133,10 @@ func (config *Config) CheckClusterRunning() error {
 			log.Trace("No more retries left.")
 			return err
 		} else {
-			log.WithField("err", err).Debug("Waiting 2 seconds...")
-			time.Sleep(2 * time.Second)
+			log.WithFields(log.Fields{
+				"err":       err,
+				"wait_time": waittime}).Debug("Waiting...")
+			time.Sleep(time.Duration(waittime) * time.Second)
 		}
 	}
 

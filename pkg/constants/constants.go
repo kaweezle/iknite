@@ -16,10 +16,12 @@ limitations under the License.
 package constants
 
 const (
-	KubectlCmd            = "/usr/bin/kubectl"
-	CrioSock              = "/run/crio/crio.sock"
-	CrioServiceName       = "crio"
-	KubeletServiceName    = "kubelet"
-	KubernetesAdminConfig = "/etc/kubernetes/admin.conf"
-	DefaultClusterName    = "kaweezle"
+	KubectlCmd                    = "/usr/bin/kubectl"
+	CrioSock                      = "/run/crio/crio.sock"
+	CrioServiceName               = "crio"
+	KubeletServiceName            = "kubelet"
+	KubernetesAdminConfig         = "/etc/kubernetes/admin.conf"
+	KubernetesRootConfig          = "/root/.kube/config"
+	DefaultClusterName            = "kaweezle"
+	DefaultKustomizationDirectory = "/etc/iknite.d"
 )

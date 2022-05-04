@@ -20,25 +20,20 @@ import (
 	"embed"
 	"fmt"
 	"html/template"
-	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 
-	c "github.com/kaweezle/iknite/pkg/constants"
+	"github.com/kaweezle/iknite/pkg/constants"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
-	"github.com/spf13/afero"
+	"sigs.k8s.io/kustomize/api/krusty"
+	"sigs.k8s.io/kustomize/api/resmap"
+	"sigs.k8s.io/kustomize/api/types"
+	"sigs.k8s.io/kustomize/kyaml/filesys"
 )
 
-var fs = afero.NewOsFs()
-var afs = &afero.Afero{Fs: fs}
-
-func deleteTempDir(d string) error {
-	return os.RemoveAll(d)
-}
-
-func createTempKustomizeDirectory(content *embed.FS, tmpdir string, dirname string, data interface{}) error {
+func createTempKustomizeDirectory(content *embed.FS, fs filesys.FileSystem, tmpdir string, dirname string, data interface{}) error {
 	log.WithFields(log.Fields{
 		"tmpdir":  tmpdir,
 		"dirname": dirname,
@@ -78,7 +73,7 @@ func createTempKustomizeDirectory(content *embed.FS, tmpdir string, dirname stri
 				outPath = strings.TrimSuffix(outPath, ".tmpl")
 			}
 			log.WithField("outPath", outPath).Trace("Writing content")
-			err = afs.WriteFile(outPath, payload, 0644)
+			err = fs.WriteFile(outPath, payload)
 			if err != nil {
 				return errors.Wrapf(err, "While writing %s to temp dir %s", entry.Name(), tmpdir)
 			}
@@ -87,24 +82,57 @@ func createTempKustomizeDirectory(content *embed.FS, tmpdir string, dirname stri
 	return nil
 }
 
-func ApplyKustomizations(content *embed.FS, dirname string, data interface{}) error {
-	tmpdir, err := afs.TempDir("", dirname)
+func ApplyKustomizations(fs filesys.FileSystem, dirname string) error {
+	out, err := RunKustomizations(fs, dirname)
 	if err != nil {
-		return errors.Wrap(err, "While creating temp directory")
+		return errors.Wrap(err, "While applying templates")
 	}
-	log.WithField("tmpdir", tmpdir).Trace("Temp dir created")
-	defer deleteTempDir(dirname)
+	buffer := bytes.Buffer{}
+	buffer.Write(out)
 
-	err = createTempKustomizeDirectory(content, tmpdir, dirname, data)
-	if err != nil {
-		return err
-	}
-
-	log.WithField("tmpdir", tmpdir).Trace("Applying kustomization")
-	out, err := exec.Command(c.KubectlCmd, "apply", "-k", tmpdir).CombinedOutput()
-	log.WithField("data", data).Trace(string(out))
+	cmd := exec.Command(constants.KubectlCmd, "apply", "-f", "-")
+	cmd.Stdin = &buffer
+	out, err = cmd.CombinedOutput()
+	log.Trace(string(out))
 	if err != nil {
 		return errors.Wrap(err, "While applying templates")
 	}
 	return nil
+}
+
+func ApplyLocalKustomizations(dirname string) error {
+	return ApplyKustomizations(filesys.MakeFsOnDisk(), dirname)
+}
+
+func ApplyEmbeddedKustomizations(content *embed.FS, dirname string, data interface{}) error {
+	fs := filesys.MakeFsInMemory()
+	if err := fs.MkdirAll(dirname); err != nil {
+		return err
+	}
+
+	if err := createTempKustomizeDirectory(content, fs, dirname, dirname, data); err != nil {
+		return err
+	}
+	return ApplyKustomizations(fs, dirname)
+}
+
+func EnablePlugins(opts *krusty.Options) *krusty.Options {
+	opts.PluginConfig = types.EnabledPluginConfig(types.BploUseStaticallyLinked)
+	opts.PluginConfig.FnpLoadingOptions.EnableExec = true
+	opts.PluginConfig.FnpLoadingOptions.AsCurrentUser = true
+	opts.PluginConfig.HelmConfig.Command = "helm"
+	return opts
+}
+
+func RunKustomizations(fs filesys.FileSystem, dirname string) (yaml []byte, err error) {
+
+	opts := EnablePlugins(krusty.MakeDefaultOptions())
+	k := krusty.MakeKustomizer(opts)
+	var resources resmap.ResMap
+	if resources, err = k.Run(fs, dirname); err != nil {
+		return
+	}
+
+	yaml, err = resources.AsYaml()
+	return
 }

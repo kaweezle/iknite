@@ -1,0 +1,20 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: argocd
+
+resources:
+  - namespace.yaml
+  - https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+  - apisix.yaml
+  - openance-dev-tls.yaml
+  - argo-ingress.yaml
+
+patches:
+  - patch: |-
+      - op: add
+        path: /spec/template/spec/containers/0/command/-
+        value: --insecure
+    target:
+      kind: Deployment
+      name: argocd-server
+

@@ -17,14 +17,28 @@ package provision
 
 import (
 	"embed"
+	"path"
 
+	"github.com/kaweezle/iknite/pkg/utils"
 	log "github.com/sirupsen/logrus"
 )
 
 //go:embed base
 var content embed.FS
 
-func ApplyBaseKustomizations(data interface{}) error {
-	log.Info("Apply base kustomization...")
-	return ApplyKustomizations(&content, "base", data)
+func ApplyBaseKustomizations(dirname string, data interface{}) error {
+
+	exits, err := utils.Exists(path.Join(dirname, "kustomization.yaml"))
+	if err != nil {
+		return err
+	}
+
+	if exits {
+		log.WithField("directory", dirname).Info("Applying base kustomization...")
+		return ApplyLocalKustomizations(dirname)
+	} else {
+		log.Info("Apply embedded kustomization...")
+
+		return ApplyEmbeddedKustomizations(&content, "base", data)
+	}
 }
