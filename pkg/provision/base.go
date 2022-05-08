@@ -21,16 +21,17 @@ import (
 
 	"github.com/kaweezle/iknite/pkg/utils"
 	log "github.com/sirupsen/logrus"
+	"sigs.k8s.io/kustomize/kyaml/resid"
 )
 
 //go:embed base
 var content embed.FS
 
-func ApplyBaseKustomizations(dirname string, data interface{}) error {
+func ApplyBaseKustomizations(dirname string, data interface{}) ([]resid.ResId, error) {
 
 	exits, err := utils.Exists(path.Join(dirname, "kustomization.yaml"))
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	if exits {

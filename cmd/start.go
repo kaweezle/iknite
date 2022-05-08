@@ -17,6 +17,7 @@ package cmd
 
 import (
 	"os"
+	"time"
 
 	"github.com/kaweezle/iknite/pkg/alpine"
 	"github.com/kaweezle/iknite/pkg/constants"
@@ -27,6 +28,7 @@ import (
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+	"sigs.k8s.io/kustomize/kyaml/resid"
 )
 
 // startCmd represents the start command
@@ -45,6 +47,9 @@ var startCmd = &cobra.Command{
 	Run: perform,
 }
 
+var waitTimeout = 0
+var minimumPodsReady = 6
+
 func init() {
 	rootCmd.AddCommand(startCmd)
 
@@ -57,6 +62,9 @@ func init() {
 	// Cobra supports local flags which will only run when this command
 	// is called directly, e.g.:
 	// startCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+	startCmd.Flags().IntVarP(&waitTimeout, "wait", "w", waitTimeout, "Wait n seconds for all pods to settle")
+	startCmd.Flags().IntVarP(&minimumPodsReady, "minimum-pods", "m", minimumPodsReady, "Minimal number of pods")
+
 }
 
 func perform(cmd *cobra.Command, args []string) {
@@ -100,6 +108,7 @@ func perform(cmd *cobra.Command, args []string) {
 
 	if !exist {
 		restartProxy := err == nil
+		cobra.CheckErr(alpine.FixKubeletConfiguration())
 		cobra.CheckErr(k8s.RunKubeadmInit(ip))
 		config, err = k8s.LoadFromDefault()
 		cobra.CheckErr(err)
@@ -124,7 +133,17 @@ func perform(cmd *cobra.Command, args []string) {
 	context := log.Fields{
 		"OutboundIP": ip,
 	}
-	cobra.CheckErr(provision.ApplyBaseKustomizations(constants.DefaultKustomizationDirectory, context))
+	var ids []resid.ResId
+	ids, err = provision.ApplyBaseKustomizations(constants.DefaultKustomizationDirectory, context)
+	cobra.CheckErr(err)
+	log.WithFields(log.Fields{
+		"directory": constants.DefaultKustomizationDirectory,
+		"resources": ids,
+	}).Info("Configuration applied")
+
+	if waitTimeout > 0 {
+		cobra.CheckErr(config.WaitForCluster(time.Second*time.Duration(waitTimeout), minimumPodsReady))
+	}
 
 	log.Info("executed")
 }

@@ -23,6 +23,13 @@ spec:
         - name: ingress-controller.enabled
           value: "true"
       values: |-
+        etcd:
+          livenessProbe:
+            initialDelaySeconds: 15
+          readinessProbe:
+            initialDelaySeconds: 15
+          replicaCount: 1
+
         ingress-controller:
           enabled: true
           config:

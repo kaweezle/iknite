@@ -16,6 +16,8 @@ limitations under the License.
 package cmd
 
 import (
+	"time"
+
 	"github.com/kaweezle/iknite/pkg/constants"
 	"github.com/kaweezle/iknite/pkg/k8s"
 	"github.com/kaweezle/iknite/pkg/provision"
@@ -23,6 +25,7 @@ import (
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+	"sigs.k8s.io/kustomize/kyaml/resid"
 )
 
 var (
@@ -55,6 +58,9 @@ func init() {
 
 	configureCmd.Flags().StringVarP(&kustomizationDirectory, "directory", "d", constants.DefaultKustomizationDirectory,
 		"The directory to look for kustomoization")
+	configureCmd.Flags().IntVarP(&waitTimeout, "wait", "w", waitTimeout, "Wait n seconds for all pods to settle")
+	configureCmd.Flags().IntVarP(&minimumPodsReady, "minimum-pods", "m", minimumPodsReady, "Minimal number of pods")
+
 }
 
 func performConfigure(cmd *cobra.Command, args []string) {
@@ -70,7 +76,15 @@ func performConfigure(cmd *cobra.Command, args []string) {
 	context := log.Fields{
 		"OutboundIP": ip,
 	}
-	cobra.CheckErr(provision.ApplyBaseKustomizations(kustomizationDirectory, context))
+	var ids []resid.ResId
+	ids, err = provision.ApplyBaseKustomizations(kustomizationDirectory, context)
+	cobra.CheckErr(err)
+	log.WithFields(log.Fields{
+		"directory": kustomizationDirectory,
+		"resources": ids,
+	}).Info("Configuration applied")
 
-	log.Info("Base configuration applied")
+	if waitTimeout > 0 {
+		cobra.CheckErr(config.WaitForCluster(time.Second*time.Duration(waitTimeout), minimumPodsReady))
+	}
 }

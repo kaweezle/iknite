@@ -31,6 +31,7 @@ import (
 	"sigs.k8s.io/kustomize/api/resmap"
 	"sigs.k8s.io/kustomize/api/types"
 	"sigs.k8s.io/kustomize/kyaml/filesys"
+	"sigs.k8s.io/kustomize/kyaml/resid"
 )
 
 func createTempKustomizeDirectory(content *embed.FS, fs filesys.FileSystem, tmpdir string, dirname string, data interface{}) error {
@@ -82,11 +83,26 @@ func createTempKustomizeDirectory(content *embed.FS, fs filesys.FileSystem, tmpd
 	return nil
 }
 
-func ApplyKustomizations(fs filesys.FileSystem, dirname string) error {
-	out, err := RunKustomizations(fs, dirname)
+func ApplyKustomizations(fs filesys.FileSystem, dirname string) (ids []resid.ResId, err error) {
+
+	var resources resmap.ResMap
+	resources, err = RunKustomizations(fs, dirname)
 	if err != nil {
-		return errors.Wrap(err, "While applying templates")
+		err = errors.Wrap(err, "While building templates")
+		return
 	}
+
+	for _, workload := range resources.Resources() {
+		ids = append(ids, workload.CurId())
+	}
+
+	log.WithField("resources", ids).Debug("Generated resources")
+
+	var out []byte
+	if out, err = resources.AsYaml(); err != nil {
+		return
+	}
+
 	buffer := bytes.Buffer{}
 	buffer.Write(out)
 
@@ -95,23 +111,27 @@ func ApplyKustomizations(fs filesys.FileSystem, dirname string) error {
 	out, err = cmd.CombinedOutput()
 	log.Trace(string(out))
 	if err != nil {
-		return errors.Wrap(err, "While applying templates")
+		log.WithFields(log.Fields{
+			"code": cmd.ProcessState.ExitCode(),
+		}).Error(string(out))
+		err = errors.Wrap(err, "While applying templates")
+		return
 	}
-	return nil
+	return
 }
 
-func ApplyLocalKustomizations(dirname string) error {
+func ApplyLocalKustomizations(dirname string) ([]resid.ResId, error) {
 	return ApplyKustomizations(filesys.MakeFsOnDisk(), dirname)
 }
 
-func ApplyEmbeddedKustomizations(content *embed.FS, dirname string, data interface{}) error {
+func ApplyEmbeddedKustomizations(content *embed.FS, dirname string, data interface{}) ([]resid.ResId, error) {
 	fs := filesys.MakeFsInMemory()
 	if err := fs.MkdirAll(dirname); err != nil {
-		return err
+		return nil, err
 	}
 
 	if err := createTempKustomizeDirectory(content, fs, dirname, dirname, data); err != nil {
-		return err
+		return nil, err
 	}
 	return ApplyKustomizations(fs, dirname)
 }
@@ -124,15 +144,10 @@ func EnablePlugins(opts *krusty.Options) *krusty.Options {
 	return opts
 }
 
-func RunKustomizations(fs filesys.FileSystem, dirname string) (yaml []byte, err error) {
+func RunKustomizations(fs filesys.FileSystem, dirname string) (resources resmap.ResMap, err error) {
 
 	opts := EnablePlugins(krusty.MakeDefaultOptions())
 	k := krusty.MakeKustomizer(opts)
-	var resources resmap.ResMap
-	if resources, err = k.Run(fs, dirname); err != nil {
-		return
-	}
-
-	yaml, err = resources.AsYaml()
+	resources, err = k.Run(fs, dirname)
 	return
 }

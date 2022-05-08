@@ -2,7 +2,6 @@ apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   annotations:
-    kubernetes.io/ingress.class: apisix
     cert-manager.io/cluster-issuer: letsencrypt-openance
     external-dns.alpha.kubernetes.io/ttl: "60"
     ingress.kubernetes.io/auth-secret: argo-sso
@@ -10,6 +9,7 @@ metadata:
   name: argo
   namespace: argocd
 spec:
+  ingressClassName: traefik
   rules:
   - host: citest-gitops.openance.dev
     http:

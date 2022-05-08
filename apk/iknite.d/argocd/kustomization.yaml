@@ -5,9 +5,6 @@ namespace: argocd
 resources:
   - namespace.yaml
   - https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
-  - apisix.yaml
-  - openance-dev-tls.yaml
-  - argo-ingress.yaml
 
 patches:
   - patch: |-
@@ -17,4 +14,14 @@ patches:
     target:
       kind: Deployment
       name: argocd-server
-
+  - patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/image
+        value: "chatwork/argocd-helmfile:latest"
+      - op: add
+        path: /spec/template/spec/containers/0/securityContext/runAsUser
+        value: 999
+    target:
+      kind: Deployment
+      name: argocd-repo-server
+  - path: configuration.yaml
