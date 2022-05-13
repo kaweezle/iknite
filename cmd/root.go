@@ -97,6 +97,7 @@ func initConfig() {
 	}
 
 	viper.AutomaticEnv() // read in environment variables that match
+	viper.SetEnvPrefix("iknite")
 
 	// If a config file is found, read it in.
 	if err := viper.ReadInConfig(); err == nil {

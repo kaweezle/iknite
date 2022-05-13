@@ -16,6 +16,7 @@ limitations under the License.
 package cmd
 
 import (
+	"net"
 	"time"
 
 	"github.com/kaweezle/iknite/pkg/constants"
@@ -25,11 +26,14 @@ import (
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 	"sigs.k8s.io/kustomize/kyaml/resid"
 )
 
 var (
 	kustomizationDirectory = constants.DefaultKustomizationDirectory
+	waitTimeout            = 0
+	minimumPodsReady       = 6
 )
 
 // configureCmd represents the start command
@@ -51,15 +55,40 @@ applies the Embedded configuration that installs the following components:
 	Run: performConfigure,
 }
 
+func initializeKustomization(cmd *cobra.Command) {
+	cmd.Flags().StringVarP(&kustomizationDirectory, "kustomize-directory", "d", constants.DefaultKustomizationDirectory,
+		"The directory to look for kustomization. Can be an URL")
+	viper.BindPFlag("kustomize_directory", cmd.Flags().Lookup("kustomize-directory"))
+	cmd.Flags().IntVarP(&waitTimeout, "wait", "w", waitTimeout, "Wait n seconds for all pods to settle")
+	cmd.Flags().IntVarP(&minimumPodsReady, "minimum-pods", "m", minimumPodsReady, "Minimal number of pods")
+}
+
 func init() {
 	rootCmd.AddCommand(configureCmd)
 
-	// Here you will define your flags and configuration settings.
+	initializeKustomization(rootCmd)
+}
 
-	configureCmd.Flags().StringVarP(&kustomizationDirectory, "directory", "d", constants.DefaultKustomizationDirectory,
-		"The directory to look for kustomoization")
-	configureCmd.Flags().IntVarP(&waitTimeout, "wait", "w", waitTimeout, "Wait n seconds for all pods to settle")
-	configureCmd.Flags().IntVarP(&minimumPodsReady, "minimum-pods", "m", minimumPodsReady, "Minimal number of pods")
+func doConfiguration(ip net.IP, config *k8s.Config) error {
+	context := log.Fields{
+		"OutboundIP": ip,
+	}
+	var ids []resid.ResId
+	var err error
+	kustomizeDirectory := viper.GetString("kustomize_directory")
+	if ids, err = provision.ApplyBaseKustomizations(kustomizeDirectory, context); err != nil {
+		return err
+	}
+
+	log.WithFields(log.Fields{
+		"directory": kustomizeDirectory,
+		"resources": ids,
+	}).Info("Configuration applied")
+
+	if waitTimeout > 0 {
+		return config.WaitForCluster(time.Second*time.Duration(waitTimeout), minimumPodsReady)
+	}
+	return nil
 
 }
 
@@ -73,18 +102,5 @@ func performConfigure(cmd *cobra.Command, args []string) {
 	cobra.CheckErr(errors.Wrap(err, "While loading local cluster configuration"))
 	cobra.CheckErr(config.CheckClusterRunning(1, 1, 0))
 
-	context := log.Fields{
-		"OutboundIP": ip,
-	}
-	var ids []resid.ResId
-	ids, err = provision.ApplyBaseKustomizations(kustomizationDirectory, context)
-	cobra.CheckErr(err)
-	log.WithFields(log.Fields{
-		"directory": kustomizationDirectory,
-		"resources": ids,
-	}).Info("Configuration applied")
-
-	if waitTimeout > 0 {
-		cobra.CheckErr(config.WaitForCluster(time.Second*time.Duration(waitTimeout), minimumPodsReady))
-	}
+	cobra.CheckErr(doConfiguration(ip, config))
 }

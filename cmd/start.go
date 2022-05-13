@@ -17,18 +17,15 @@ package cmd
 
 import (
 	"os"
-	"time"
 
 	"github.com/kaweezle/iknite/pkg/alpine"
 	"github.com/kaweezle/iknite/pkg/constants"
 	"github.com/kaweezle/iknite/pkg/crio"
 	"github.com/kaweezle/iknite/pkg/k8s"
-	"github.com/kaweezle/iknite/pkg/provision"
 	"github.com/kaweezle/iknite/pkg/utils"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
-	"sigs.k8s.io/kustomize/kyaml/resid"
 )
 
 // startCmd represents the start command
@@ -47,9 +44,6 @@ var startCmd = &cobra.Command{
 	Run: perform,
 }
 
-var waitTimeout = 0
-var minimumPodsReady = 6
-
 func init() {
 	rootCmd.AddCommand(startCmd)
 
@@ -62,8 +56,7 @@ func init() {
 	// Cobra supports local flags which will only run when this command
 	// is called directly, e.g.:
 	// startCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
-	startCmd.Flags().IntVarP(&waitTimeout, "wait", "w", waitTimeout, "Wait n seconds for all pods to settle")
-	startCmd.Flags().IntVarP(&minimumPodsReady, "minimum-pods", "m", minimumPodsReady, "Minimal number of pods")
+	initializeKustomization(startCmd)
 
 }
 
@@ -130,20 +123,7 @@ func perform(cmd *cobra.Command, args []string) {
 	// - Local path provisioner
 	// - Metrics server
 	// The outbound ip address is needed for MetalLB.
-	context := log.Fields{
-		"OutboundIP": ip,
-	}
-	var ids []resid.ResId
-	ids, err = provision.ApplyBaseKustomizations(constants.DefaultKustomizationDirectory, context)
-	cobra.CheckErr(err)
-	log.WithFields(log.Fields{
-		"directory": constants.DefaultKustomizationDirectory,
-		"resources": ids,
-	}).Info("Configuration applied")
-
-	if waitTimeout > 0 {
-		cobra.CheckErr(config.WaitForCluster(time.Second*time.Duration(waitTimeout), minimumPodsReady))
-	}
+	cobra.CheckErr(doConfiguration(ip, config))
 
 	log.Info("executed")
 }

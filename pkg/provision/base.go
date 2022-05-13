@@ -17,9 +17,11 @@ package provision
 
 import (
 	"embed"
+	"net/url"
 	"path"
 
 	"github.com/kaweezle/iknite/pkg/utils"
+	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"sigs.k8s.io/kustomize/kyaml/resid"
 )
@@ -29,12 +31,19 @@ var content embed.FS
 
 func ApplyBaseKustomizations(dirname string, data interface{}) ([]resid.ResId, error) {
 
-	exits, err := utils.Exists(path.Join(dirname, "kustomization.yaml"))
-	if err != nil {
-		return nil, err
+	exists := false
+	var err error
+	_, err = url.Parse(dirname)
+	if err == nil {
+		exists = true
+	} else {
+		exists, err = utils.Exists(path.Join(dirname, "kustomization.yaml"))
+		if err != nil {
+			return nil, errors.Wrap(err, "While testing for directory")
+		}
 	}
 
-	if exits {
+	if exists {
 		log.WithField("directory", dirname).Info("Applying base kustomization...")
 		return ApplyLocalKustomizations(dirname)
 	} else {
