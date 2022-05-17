@@ -67,6 +67,25 @@ func perform(cmd *cobra.Command, args []string) {
 
 	cobra.CheckErr(alpine.EnsureNetFilter())
 
+	ip, err := utils.GetOutboundIP()
+	cobra.CheckErr(errors.Wrap(err, "While getting IP address"))
+
+	exist := false
+	config, err := k8s.LoadFromDefault()
+	if err == nil {
+		if config.IsConfigServerAddress(ip) {
+			exist = true
+		} else {
+			cobra.CheckErr(alpine.StopService(constants.KubeletServiceName))
+			cobra.CheckErr(alpine.DisableService(constants.KubeletServiceName))
+			cobra.CheckErr(k8s.CleanConfig())
+		}
+	} else {
+		if !os.IsNotExist(err) {
+			cobra.CheckErr(errors.Wrap(err, "While loading existing kubeconfig"))
+		}
+	}
+
 	// Start OpenRC
 	cobra.CheckErr(alpine.StartOpenRC())
 
@@ -79,24 +98,6 @@ func perform(cmd *cobra.Command, args []string) {
 	cobra.CheckErr(err)
 	if !available {
 		log.Fatal("CRI-O not available")
-	}
-
-	ip, err := utils.GetOutboundIP()
-	cobra.CheckErr(errors.Wrap(err, "While getting IP address"))
-
-	exist := false
-	config, err := k8s.LoadFromDefault()
-	if err == nil {
-		if config.IsConfigServerAddress(ip) {
-			exist = true
-		} else {
-			cobra.CheckErr(alpine.StopService(constants.KubeletServiceName))
-			cobra.CheckErr(k8s.CleanConfig())
-		}
-	} else {
-		if !os.IsNotExist(err) {
-			cobra.CheckErr(errors.Wrap(err, "While loading existing kubeconfig"))
-		}
 	}
 
 	if !exist {
