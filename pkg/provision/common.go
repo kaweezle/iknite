@@ -141,6 +141,7 @@ func EnablePlugins(opts *krusty.Options) *krusty.Options {
 	opts.PluginConfig.FnpLoadingOptions.EnableExec = true
 	opts.PluginConfig.FnpLoadingOptions.AsCurrentUser = true
 	opts.PluginConfig.HelmConfig.Command = "helm"
+	opts.LoadRestrictions = types.LoadRestrictionsNone
 	return opts
 }
 

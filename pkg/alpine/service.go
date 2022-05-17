@@ -89,6 +89,14 @@ func EnableService(serviceName string) error {
 	})
 }
 
+// DisableService disables the service named serviceName
+func DisableService(serviceName string) error {
+	destinationFilename := path.Join(runLevelDir, serviceName)
+	return utils.ExecuteIfExist(destinationFilename, func() error {
+		return os.Remove(destinationFilename)
+	})
+}
+
 // StartService start the serviceName service if it is not already started.
 func StartService(serviceName string) error {
 	return ExecuteIfServiceNotStarted(serviceName, func() error {

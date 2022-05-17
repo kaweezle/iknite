@@ -43,7 +43,7 @@ var rootCmd = &cobra.Command{
 Makes the appropriate initialization of a WSL 2 Alpine distribution for running
 kubernetes.`,
 	Example: `> iknite start`,
-	Version: "v0.1.16", // <---VERSION--->
+	Version: "v0.1.17", // <---VERSION--->
 	// Uncomment the following line if your bare application
 	// has an action associated with it:
 	// Run: func(cmd *cobra.Command, args []string) { },
@@ -97,6 +97,7 @@ func initConfig() {
 	}
 
 	viper.AutomaticEnv() // read in environment variables that match
+	viper.SetEnvPrefix("iknite")
 
 	// If a config file is found, read it in.
 	if err := viper.ReadInConfig(); err == nil {
