@@ -49,6 +49,6 @@ jobs:
           # TODO: replace with kaweezle-devel
           user-name: antoinemartin
           user-email: antoine@openance.com
-          target-branch: release-test
+          target-branch: release-iknite-test
           target-directory: docs/repo
           commit-message: iknite APK repo ${{ github.ref_name }}
