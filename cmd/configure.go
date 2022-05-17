@@ -66,7 +66,7 @@ func initializeKustomization(cmd *cobra.Command) {
 func init() {
 	rootCmd.AddCommand(configureCmd)
 
-	initializeKustomization(rootCmd)
+	initializeKustomization(configureCmd)
 }
 
 func doConfiguration(ip net.IP, config *k8s.Config) error {
