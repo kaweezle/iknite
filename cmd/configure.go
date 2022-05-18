@@ -59,6 +59,7 @@ func initializeKustomization(cmd *cobra.Command) {
 		"The directory to look for kustomization. Can be an URL")
 	viper.BindPFlag("kustomize_directory", cmd.Flags().Lookup("kustomize-directory"))
 	cmd.Flags().IntVarP(&waitTimeout, "wait", "w", waitTimeout, "Wait n seconds for all pods to settle")
+	cmd.Flags().BoolP("force-config", "C", false, "Force configuration even if it has already occured")
 }
 
 func init() {
@@ -67,25 +68,46 @@ func init() {
 	initializeKustomization(configureCmd)
 }
 
-func doConfiguration(ip net.IP, config *k8s.Config) error {
-	context := log.Fields{
-		"OutboundIP": ip,
-	}
-	var ids []resid.ResId
-	var err error
-	kustomizeDirectory := viper.GetString("kustomize_directory")
-	if ids, err = provision.ApplyBaseKustomizations(kustomizeDirectory, context); err != nil {
+func doConfiguration(ip net.IP, config *k8s.Config, force bool) error {
+	client, err := config.Client()
+	if err != nil {
 		return err
 	}
-
-	log.WithFields(log.Fields{
-		"directory": kustomizeDirectory,
-		"resources": ids,
-	}).Info("Configuration applied")
-
-	if waitTimeout > 0 {
-		return config.WaitForWorkloads(time.Second*time.Duration(waitTimeout), nil)
+	cm, err := k8s.GetIkniteConfigMap(client)
+	if err != nil {
+		return err
 	}
+	if cm.Data["configured"] == "true" && !force {
+		log.Info("configuration has already occured. Use -C to force.")
+		return nil
+	} else {
+		context := log.Fields{
+			"OutboundIP": ip,
+		}
+		var ids []resid.ResId
+		var err error
+		kustomizeDirectory := viper.GetString("kustomize_directory")
+		if ids, err = provision.ApplyBaseKustomizations(kustomizeDirectory, context); err != nil {
+			return err
+		}
+
+		cm.Data["configured"] = "true"
+		_, err = k8s.WriteIkniteConfigMap(client, cm)
+		if err != nil {
+			return errors.Wrap(err, "While writing confiugration")
+		}
+
+		log.WithFields(log.Fields{
+			"directory": kustomizeDirectory,
+			"resources": ids,
+		}).Info("Configuration applied")
+
+		if waitTimeout > 0 {
+			return config.WaitForWorkloads(time.Second*time.Duration(waitTimeout), nil)
+		}
+
+	}
+
 	return nil
 
 }
@@ -100,5 +122,7 @@ func performConfigure(cmd *cobra.Command, args []string) {
 	cobra.CheckErr(errors.Wrap(err, "While loading local cluster configuration"))
 	cobra.CheckErr(config.CheckClusterRunning(1, 1, 0))
 
-	cobra.CheckErr(doConfiguration(ip, config))
+	force, err := cmd.Flags().GetBool("force-config")
+	cobra.CheckErr(err)
+	cobra.CheckErr(doConfiguration(ip, config, force))
 }

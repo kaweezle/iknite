@@ -118,13 +118,9 @@ func perform(cmd *cobra.Command, args []string) {
 
 	cobra.CheckErr(config.RenameConfig(ClusterName).WriteToFile(constants.KubernetesRootConfig))
 
-	// Apply base customization. This adds the following to the cluster
-	// - MetalLB
-	// - Flannel
-	// - Local path provisioner
-	// - Metrics server
-	// The outbound ip address is needed for MetalLB.
-	cobra.CheckErr(doConfiguration(ip, config))
+	force, err := cmd.Flags().GetBool("force-config")
+	cobra.CheckErr(err)
+	cobra.CheckErr(doConfiguration(ip, config, force))
 
 	log.Info("executed")
 }

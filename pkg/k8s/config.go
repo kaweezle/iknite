@@ -24,6 +24,8 @@ import (
 	"github.com/kaweezle/iknite/pkg/constants"
 	log "github.com/sirupsen/logrus"
 	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -119,6 +121,7 @@ func (config *Config) CheckClusterRunning(retries, okresponses, waittime int) er
 			contentStr := string(content)
 			if contentStr != "ok" {
 				err = fmt.Errorf("cluster health API returned: %s", contentStr)
+				log.WithError(err).Debug("Bad response")
 			} else {
 				oktries = oktries + 1
 				log.WithField("oktries", oktries).Trace("Ok response from server")
@@ -126,6 +129,8 @@ func (config *Config) CheckClusterRunning(retries, okresponses, waittime int) er
 					break
 				}
 			}
+		} else {
+			log.WithError(err).Debug("while querying cluster readyness")
 		}
 
 		retries = retries - 1
@@ -172,5 +177,30 @@ func (config *Config) RestartProxy() (err error) {
 	ds.Spec.Template.ObjectMeta.Annotations["kubectl.kubernetes.io/restartedAt"] = time.Now().Format(time.RFC3339)
 
 	_, err = client.AppsV1().DaemonSets("kube-system").Update(ctx, ds, metav1.UpdateOptions{})
+	return
+}
+
+func GetIkniteConfigMap(client *kubernetes.Clientset) (cm *corev1.ConfigMap, err error) {
+	cm, err = client.CoreV1().ConfigMaps("kube-system").Get(context.TODO(), "iknite-config", metav1.GetOptions{})
+	if errors.IsNotFound(err) {
+		err = nil
+		cm = &corev1.ConfigMap{
+			TypeMeta:   metav1.TypeMeta{Kind: "ConfigMap", APIVersion: "v1"},
+			ObjectMeta: metav1.ObjectMeta{Name: "iknite-config", Namespace: "kube-system"},
+			Immutable:  new(bool),
+			Data:       map[string]string{"configured": "false"},
+			BinaryData: map[string][]byte{},
+		}
+	}
+	return
+}
+
+func WriteIkniteConfigMap(client *kubernetes.Clientset, cm *corev1.ConfigMap) (res *corev1.ConfigMap, err error) {
+	if cm.UID != "" {
+		res, err = client.CoreV1().ConfigMaps("kube-system").Update(context.TODO(), cm, metav1.UpdateOptions{})
+	} else {
+		res, err = client.CoreV1().ConfigMaps("kube-system").Create(context.TODO(), cm, metav1.CreateOptions{})
+	}
+
 	return
 }
