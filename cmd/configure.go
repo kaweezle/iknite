@@ -33,7 +33,6 @@ import (
 var (
 	kustomizationDirectory = constants.DefaultKustomizationDirectory
 	waitTimeout            = 0
-	minimumPodsReady       = 6
 )
 
 // configureCmd represents the start command
@@ -60,7 +59,6 @@ func initializeKustomization(cmd *cobra.Command) {
 		"The directory to look for kustomization. Can be an URL")
 	viper.BindPFlag("kustomize_directory", cmd.Flags().Lookup("kustomize-directory"))
 	cmd.Flags().IntVarP(&waitTimeout, "wait", "w", waitTimeout, "Wait n seconds for all pods to settle")
-	cmd.Flags().IntVarP(&minimumPodsReady, "minimum-pods", "m", minimumPodsReady, "Minimal number of pods")
 }
 
 func init() {
@@ -86,7 +84,7 @@ func doConfiguration(ip net.IP, config *k8s.Config) error {
 	}).Info("Configuration applied")
 
 	if waitTimeout > 0 {
-		return config.WaitForCluster(time.Second*time.Duration(waitTimeout), minimumPodsReady)
+		return config.WaitForWorkloads(time.Second*time.Duration(waitTimeout), nil)
 	}
 	return nil
 
