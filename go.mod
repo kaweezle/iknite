@@ -3,7 +3,7 @@ module github.com/kaweezle/iknite
 go 1.17
 
 require (
-	github.com/bitfield/script v0.20.0
+	github.com/bitfield/script v0.20.2
 	github.com/pkg/errors v0.9.1
 	github.com/sirupsen/logrus v1.8.1
 	github.com/spf13/afero v1.8.2
