@@ -102,7 +102,6 @@ func perform(cmd *cobra.Command, args []string) {
 
 	if !exist {
 		restartProxy := err == nil
-		cobra.CheckErr(alpine.FixKubeletConfiguration())
 		cobra.CheckErr(k8s.RunKubeadmInit(ip))
 		config, err = k8s.LoadFromDefault()
 		cobra.CheckErr(err)
