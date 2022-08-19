@@ -8,11 +8,11 @@ require (
 	github.com/spf13/afero v1.9.2
 	github.com/spf13/cobra v1.5.0
 	github.com/spf13/viper v1.12.0
-	k8s.io/api v0.24.3
-	k8s.io/apimachinery v0.24.3
-	k8s.io/cli-runtime v0.24.3
-	k8s.io/client-go v0.24.3
-	k8s.io/kubectl v0.24.3
+	k8s.io/api v0.24.4
+	k8s.io/apimachinery v0.24.4
+	k8s.io/cli-runtime v0.24.4
+	k8s.io/client-go v0.24.4
+	k8s.io/kubectl v0.24.4
 	sigs.k8s.io/kustomize/api v0.12.1
 	sigs.k8s.io/kustomize/kyaml v0.13.9
 )
@@ -82,7 +82,7 @@ require (
 	gopkg.in/ini.v1 v1.66.4 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.0 // indirect
-	k8s.io/component-base v0.24.3 // indirect
+	k8s.io/component-base v0.24.4 // indirect
 	k8s.io/klog/v2 v2.60.1 // indirect
 	k8s.io/kube-openapi v0.0.0-20220401212409-b28bf2818661 // indirect
 	k8s.io/utils v0.0.0-20220210201930-3a6ce19ff2f9 // indirect
