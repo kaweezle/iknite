@@ -75,10 +75,8 @@ nfpms:
         dst: /etc/iknite.d/kustomization.yaml
       - src: apk/iknite.d/base/kustomization.yaml
         dst: /etc/iknite.d/base/kustomization.yaml
-      - src: apk/iknite.d/base/metallb-generator.yaml
-        dst: /etc/iknite.d/base/metallb-generator.yaml
-      - src: apk/iknite.d/base/plugins/metallb-config.sh
-        dst: /etc/iknite.d/base/plugins/metallb-config.sh
+      - src: apk/iknite.d/base/metallb-addresspool.yaml
+        dst: /etc/iknite.d/base/metallb-addresspool.yaml
     apk:
       signature:
         key_file: gpg_key.asc
