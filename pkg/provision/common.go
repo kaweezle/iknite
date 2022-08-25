@@ -28,6 +28,7 @@ import (
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"sigs.k8s.io/kustomize/api/krusty"
+	"sigs.k8s.io/kustomize/api/provider"
 	"sigs.k8s.io/kustomize/api/resmap"
 	"sigs.k8s.io/kustomize/api/types"
 	"sigs.k8s.io/kustomize/kyaml/filesys"
@@ -83,21 +84,7 @@ func createTempKustomizeDirectory(content *embed.FS, fs filesys.FileSystem, tmpd
 	return nil
 }
 
-func ApplyKustomizations(fs filesys.FileSystem, dirname string) (ids []resid.ResId, err error) {
-
-	var resources resmap.ResMap
-	resources, err = RunKustomizations(fs, dirname)
-	if err != nil {
-		err = errors.Wrap(err, "While building templates")
-		return
-	}
-
-	for _, workload := range resources.Resources() {
-		ids = append(ids, workload.CurId())
-	}
-
-	log.WithField("resources", ids).Debug("Generated resources")
-
+func applyResmap(resources resmap.ResMap) (err error) {
 	var out []byte
 	if out, err = resources.AsYaml(); err != nil {
 		return
@@ -117,6 +104,41 @@ func ApplyKustomizations(fs filesys.FileSystem, dirname string) (ids []resid.Res
 		err = errors.Wrap(err, "While applying templates")
 		return
 	}
+	return
+
+}
+
+func ApplyKustomizations(fs filesys.FileSystem, dirname string) (ids []resid.ResId, err error) {
+
+	var resources, crds resmap.ResMap
+	resources, err = RunKustomizations(fs, dirname)
+	if err != nil {
+		err = errors.Wrap(err, "While building templates")
+		return
+	}
+
+	ids = resources.AllIds()
+
+	// The set of resources may contain CRDs and CRs. If there are cluster wide
+	// resources (CRDs are cluster wide), we apply them first and then the rest.
+	// TODO: Don't apply CRDs twice
+	crds = resmap.NewFactory(provider.NewDefaultDepProvider().GetResourceFactory()).FromResourceSlice(resources.ClusterScoped())
+
+	if crds.Size() != 0 {
+		crdIds := crds.AllIds()
+		log.WithField("resources", crdIds).Debug("Cluster resources")
+		if err = applyResmap(crds); err != nil {
+			return
+		}
+		for _, curId := range crdIds {
+			resources.Remove(curId)
+		}
+	}
+
+	log.WithField("resources", resources.AllIds()).Debug("Non Cluster resources")
+
+	err = applyResmap(resources)
+
 	return
 }
 
