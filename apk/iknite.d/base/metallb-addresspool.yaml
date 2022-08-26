@@ -1,23 +1,97 @@
 ---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app: metallb
+  name: metallb:node-lister
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - nodes
+  verbs:
+  - get
+  - list
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  labels:
+    app: metallb
+  name: metallb-address-pool-admin
+  namespace: metallb-system
+rules:
+- apiGroups:
+  - apps
+  resources:
+  - deployments
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - metallb.io
+  resources:
+  - ipaddresspools
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - metallb.io
+  resources:
+  - l2advertisements
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+---
 apiVersion: v1
 kind: ServiceAccount
 metadata:
   labels:
     app: metallb
-  name: metallb-admin
+  name: metallb-address-pool-admin
+  namespace: metallb-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  labels:
+    app: metallb
+  name: metallb-address-pool-admin
+  namespace: metallb-system
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: metallb-address-pool-admin
+subjects:
+- kind: ServiceAccount
+  name: metallb-address-pool-admin
   namespace: metallb-system
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: metallb-admin
+  labels:
+    app: metallb
+  name: metallb-address-pool-admin
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: cluster-admin
+  name: metallb:node-lister
 subjects:
 - kind: ServiceAccount
-  name: metallb-admin
+  name: metallb-address-pool-admin
   namespace: metallb-system
 ---
 apiVersion: batch/v1
@@ -32,7 +106,7 @@ spec:
   backoffLimit: 3
   template:
     spec:
-      serviceAccountName: metallb-admin
+      serviceAccountName: metallb-address-pool-admin
       automountServiceAccountToken: true
       restartPolicy: OnFailure
       containers:
