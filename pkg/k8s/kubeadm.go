@@ -36,7 +36,7 @@ const (
 	manifestsSubdirectory            = "manifests"
 )
 
-var KubernetesVersion = "1.24.3"
+var KubernetesVersion = "1.25.0"
 
 func RunKubeadm(parameters []string) (err error) {
 	log.Info("Running", "/usr/bin/kubeadm ", strings.Join(parameters, " "), "...")
