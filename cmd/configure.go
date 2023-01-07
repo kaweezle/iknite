@@ -27,6 +27,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"k8s.io/apimachinery/pkg/util/runtime"
 	"sigs.k8s.io/kustomize/kyaml/resid"
 )
 
@@ -103,6 +104,7 @@ func doConfiguration(ip net.IP, config *k8s.Config, force bool) error {
 		}).Info("Configuration applied")
 
 		if waitTimeout > 0 {
+			runtime.ErrorHandlers = runtime.ErrorHandlers[:0]
 			return config.WaitForWorkloads(time.Second*time.Duration(waitTimeout), nil)
 		}
 
