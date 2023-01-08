@@ -16,17 +16,17 @@ limitations under the License.
 package k8s
 
 import (
-	"fmt"
-	"net"
+	"io"
 	"os"
-	"os/exec"
 	"path"
 	"path/filepath"
 	"strings"
+	"text/template"
 
 	"github.com/kaweezle/iknite/pkg/utils"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
+	"github.com/spf13/afero"
 )
 
 const (
@@ -38,9 +38,70 @@ const (
 
 var KubernetesVersion = "1.25.0"
 
+type KubeadmConfig struct {
+	Ip                string `mapstructure:"ip"`
+	KubernetesVersion string `mapstructure:"kubernetes_version"`
+	DomainName        string `mapstructure:"domain_name"`
+	CreateIp          bool   `mapstructure:"create_ip"`
+	NetworkInterface  string `mapstructure:"network_interface"`
+}
+
+const kubeadmConfigTemplate = `
+apiVersion: kubeadm.k8s.io/v1beta3
+kind: ClusterConfiguration
+kubernetesVersion: "{{ .KubernetesVersion }}"
+networking:
+  podSubnet: 10.244.0.0/16
+{{- if .DomainName }}
+controlPlaneEndpoint: {{ .DomainName }}
+{{- end }}
+---
+apiVersion: kubeadm.k8s.io/v1beta3
+kind: InitConfiguration
+localAPIEndpoint:
+  advertiseAddress: {{ .Ip }}
+skipPhases:
+  - mark-control-plane
+nodeRegistration:
+{{- if .DomainName }}
+  name: {{ .DomainName }}
+{{- end }}
+  kubeletExtraArgs:
+    node-ip: {{ .Ip }}
+  ignorePreflightErrors:
+    - DirAvailable--var-lib-etcd
+    - Swap
+`
+
+func CreateKubeadmConfiguration(wr io.Writer, config *KubeadmConfig) error {
+	tmpl, err := template.New("config").Parse(kubeadmConfigTemplate)
+	if err != nil {
+		return err
+	}
+
+	return tmpl.Execute(wr, config)
+}
+
+func WriteKubeadmConfiguration(fs afero.Fs, config *KubeadmConfig) (f afero.File, err error) {
+	afs := &afero.Afero{Fs: fs}
+	f, err = afs.TempFile("", "config*.yaml")
+	if err != nil {
+		return
+	}
+	defer f.Close()
+
+	err = CreateKubeadmConfiguration(f, config)
+	if err != nil {
+		f.Close()
+		afs.Remove(f.Name())
+		f = nil
+	}
+	return
+}
+
 func RunKubeadm(parameters []string) (err error) {
 	log.Info("Running", "/usr/bin/kubeadm ", strings.Join(parameters, " "), "...")
-	if out, err := exec.Command("/usr/bin/kubeadm", parameters...).CombinedOutput(); err != nil {
+	if out, err := utils.Exec.Run(true, "/usr/bin/kubeadm", parameters...); err != nil {
 		return errors.Wrap(err, string(out))
 	} else {
 		log.Trace(string(out))
@@ -48,15 +109,19 @@ func RunKubeadm(parameters []string) (err error) {
 	return
 }
 
-func RunKubeadmInit(ip net.IP) error {
+func RunKubeadmInit(config *KubeadmConfig) error {
+
+	fs := afero.NewOsFs()
+	f, err := WriteKubeadmConfiguration(fs, config)
+	if err != nil {
+		return err
+	}
+
+	defer fs.Remove(f.Name())
 	parameters := []string{
 		"init",
-		fmt.Sprintf("--apiserver-advertise-address=%v", ip),
-		fmt.Sprintf("--kubernetes-version=%s", KubernetesVersion),
-		"--pod-network-cidr=10.244.0.0/16",
-		// "--control-plane-endpoint=kaweezle.local",
-		"--ignore-preflight-errors=DirAvailable--var-lib-etcd,Swap",
-		"--skip-phases=mark-control-plane",
+		"--config",
+		f.Name(),
 	}
 	return RunKubeadm(parameters)
 }

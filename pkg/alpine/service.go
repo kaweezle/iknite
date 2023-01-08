@@ -17,7 +17,6 @@ package alpine
 
 import (
 	"os"
-	"os/exec"
 	"path"
 
 	"github.com/kaweezle/iknite/pkg/utils"
@@ -36,7 +35,7 @@ var startedServicesDir = path.Join(openRCDirectory, "started")
 func StartOpenRC() (err error) {
 	err = utils.ExecuteIfNotExist(openRCDirectory, func() error {
 		log.Info("Starting openrc...")
-		if out, err := exec.Command("/sbin/openrc", "default").CombinedOutput(); err == nil {
+		if out, err := utils.Exec.Run(true, "/sbin/openrc", "default"); err == nil {
 			log.Trace(string(out))
 			return nil
 		} else {
@@ -100,7 +99,7 @@ func DisableService(serviceName string) error {
 // StartService start the serviceName service if it is not already started.
 func StartService(serviceName string) error {
 	return ExecuteIfServiceNotStarted(serviceName, func() error {
-		if out, err := exec.Command("/sbin/rc-service", serviceName, "start").Output(); err == nil {
+		if out, err := utils.Exec.Run(false, "/sbin/rc-service", serviceName, "start"); err == nil {
 			log.Trace(string(out))
 			return nil
 		} else {
@@ -112,7 +111,7 @@ func StartService(serviceName string) error {
 // StopService stops the serviceName service if it is  started.
 func StopService(serviceName string) error {
 	return ExecuteIfServiceStarted(serviceName, func() error {
-		if out, err := exec.Command("/sbin/rc-service", serviceName, "stop").Output(); err == nil {
+		if out, err := utils.Exec.Run(false, "/sbin/rc-service", serviceName, "stop"); err == nil {
 			log.Trace(string(out))
 			return nil
 		} else {

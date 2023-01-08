@@ -16,6 +16,8 @@ limitations under the License.
 package cmd
 
 import (
+	"fmt"
+	"net"
 	"os"
 
 	"github.com/kaweezle/iknite/pkg/alpine"
@@ -26,6 +28,7 @@ import (
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 // startCmd represents the start command
@@ -56,6 +59,21 @@ func init() {
 	// Cobra supports local flags which will only run when this command
 	// is called directly, e.g.:
 	// startCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+	ip, err := utils.GetOutboundIP()
+	cobra.CheckErr(errors.Wrap(err, "While getting IP address"))
+
+	startCmd.Flags().String("ip", ip.String(), "Cluster IP address")
+	startCmd.Flags().Bool("ip-create", false, "Add IP address if it doesn't exist")
+	startCmd.Flags().String("ip-network-interface", "eth0", "Interface to which add IP")
+	startCmd.Flags().String("domain-name", "", "Domain name of the cluster")
+	startCmd.Flags().StringVar(&k8s.KubernetesVersion, "kubernetes-version", k8s.KubernetesVersion, "Kubernetes version to install")
+
+	viper.BindPFlag("cluster.ip", startCmd.Flags().Lookup("ip"))
+	viper.BindPFlag("cluster.create_ip", startCmd.Flags().Lookup("ip-create"))
+	viper.BindPFlag("cluster.network_interface", startCmd.Flags().Lookup("ip-network-interface"))
+	viper.BindPFlag("cluster.domain_name", startCmd.Flags().Lookup("domain-name"))
+	viper.BindPFlag("cluster.kubernetes_version", startCmd.Flags().Lookup("kubernetes-version"))
+
 	initializeKustomization(startCmd)
 
 }
@@ -67,13 +85,23 @@ func perform(cmd *cobra.Command, args []string) {
 
 	cobra.CheckErr(alpine.EnsureNetFilter())
 
-	ip, err := utils.GetOutboundIP()
-	cobra.CheckErr(errors.Wrap(err, "While getting IP address"))
+	clusterIP, _, err := net.ParseCIDR(viper.GetString("cluster.ip"))
+	cobra.CheckErr(err)
+
+	ipExists, err := alpine.CheckIpExists(clusterIP)
+	cobra.CheckErr(errors.Wrap(err, "While getting local ip addresses"))
+	if !ipExists {
+		if viper.GetBool("cluster.create_ip") {
+			cobra.CheckErr(alpine.AddIpAddress(viper.GetString("cluster.network_interface"), clusterIP))
+		} else {
+			cobra.CheckErr(fmt.Errorf("ip address %v is not available locally", clusterIP))
+		}
+	}
 
 	exist := false
 	config, err := k8s.LoadFromDefault()
 	if err == nil {
-		if config.IsConfigServerAddress(ip) {
+		if config.IsConfigServerAddress(clusterIP) {
 			exist = true
 		} else {
 			cobra.CheckErr(alpine.StopService(constants.KubeletServiceName))
@@ -102,7 +130,9 @@ func perform(cmd *cobra.Command, args []string) {
 
 	if !exist {
 		restartProxy := err == nil
-		cobra.CheckErr(k8s.RunKubeadmInit(ip))
+		clusterConfig := &k8s.KubeadmConfig{}
+		cobra.CheckErr(viper.Sub("cluster").Unmarshal(clusterConfig))
+		cobra.CheckErr(k8s.RunKubeadmInit(clusterConfig))
 		config, err = k8s.LoadFromDefault()
 		cobra.CheckErr(err)
 		if restartProxy {
@@ -119,7 +149,7 @@ func perform(cmd *cobra.Command, args []string) {
 
 	force, err := cmd.Flags().GetBool("force-config")
 	cobra.CheckErr(err)
-	cobra.CheckErr(doConfiguration(ip, config, force))
+	cobra.CheckErr(doConfiguration(clusterIP, config, force))
 
 	log.Info("executed")
 }
