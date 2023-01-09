@@ -85,8 +85,10 @@ func perform(cmd *cobra.Command, args []string) {
 
 	cobra.CheckErr(alpine.EnsureNetFilter())
 
-	clusterIP, _, err := net.ParseCIDR(viper.GetString("cluster.ip"))
-	cobra.CheckErr(err)
+	clusterIP := net.ParseIP(viper.GetString("cluster.ip"))
+	if clusterIP == nil {
+		cobra.CheckErr(fmt.Errorf("ip address %v is invalid", viper.GetString("cluster.ip")))
+	}
 
 	ipExists, err := alpine.CheckIpExists(clusterIP)
 	cobra.CheckErr(errors.Wrap(err, "While getting local ip addresses"))
