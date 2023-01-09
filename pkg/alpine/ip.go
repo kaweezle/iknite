@@ -55,7 +55,7 @@ func AddIpAddress(iface string, address net.IP) (err error) {
 	}
 
 	var out []byte
-	if out, err = utils.Exec.Run(true, "ip", parameters...); err != nil {
+	if out, err = utils.Exec.Run(true, "/sbin/ip", parameters...); err != nil {
 		err = errors.Wrap(err, string(out))
 	}
 	return

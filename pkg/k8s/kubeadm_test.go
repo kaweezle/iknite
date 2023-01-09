@@ -2,9 +2,9 @@ package k8s
 
 import (
 	"bytes"
-	"io"
 	"testing"
 
+	tu "github.com/kaweezle/iknite/pkg/testutils"
 	"github.com/kaweezle/iknite/pkg/utils"
 	"github.com/lithammer/dedent"
 	log "github.com/sirupsen/logrus"
@@ -13,45 +13,20 @@ import (
 	"github.com/stretchr/testify/suite"
 )
 
-type MockExecutor struct {
-	mock.Mock
-}
-
-func (m *MockExecutor) Run(combined bool, cmd string, arguments ...string) ([]byte, error) {
-
-	items := append(make([]interface{}, 0), combined, cmd)
-	for _, arg := range arguments {
-		items = append(items, arg)
-	}
-	args := m.Called(items...)
-	return []byte(args.String(0)), args.Error(1)
-}
-
-func (m *MockExecutor) Pipe(stdin io.Reader, combined bool, cmd string, arguments ...string) ([]byte, error) {
-	items := append(make([]interface{}, 0), stdin, combined, cmd)
-	for _, arg := range arguments {
-		items = append(items, arg)
-	}
-	args := m.Called(items...)
-	return []byte(args.String(0)), args.Error(1)
-}
-
 type KubeadmTestSuite struct {
 	suite.Suite
-	Executor    *MockExecutor
+	Executor    *tu.MockExecutor
 	OldExecutor *utils.Executor
 }
 
 func (s *KubeadmTestSuite) SetupTest() {
-	s.Executor = &MockExecutor{}
+	s.Executor = &tu.MockExecutor{}
 	s.OldExecutor = &utils.Exec
 	utils.Exec = s.Executor
 }
 
 func (s *KubeadmTestSuite) TeardownTest() {
-	s.Executor = &MockExecutor{}
-	s.OldExecutor = &utils.Exec
-	utils.Exec = s.Executor
+	utils.Exec = *s.OldExecutor
 }
 
 const WSLKubeadmConfig = `
