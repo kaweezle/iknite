@@ -18,7 +18,6 @@ package k8s
 import (
 	"context"
 	"fmt"
-	"net"
 	"time"
 
 	"github.com/kaweezle/iknite/pkg/constants"
@@ -80,8 +79,8 @@ func (c *Config) RenameConfig(newName string) *Config {
 
 // IsConfigServerAddress checks that config points to the server at ip IP
 // address
-func (config *Config) IsConfigServerAddress(ip net.IP) bool {
-	expectedURL := fmt.Sprintf("https://%v:6443", ip)
+func (config *Config) IsConfigServerAddress(address string) bool {
+	expectedURL := fmt.Sprintf("https://%v:6443", address)
 	for _, cluster := range config.Clusters {
 		if cluster.Server != expectedURL {
 			return false

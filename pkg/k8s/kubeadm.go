@@ -46,6 +46,13 @@ type KubeadmConfig struct {
 	NetworkInterface  string `mapstructure:"network_interface"`
 }
 
+func (c *KubeadmConfig) GetApiEndPoint() string {
+	if c.DomainName != "" {
+		return c.DomainName
+	}
+	return c.Ip
+}
+
 const kubeadmConfigTemplate = `
 apiVersion: kubeadm.k8s.io/v1beta3
 kind: ClusterConfiguration

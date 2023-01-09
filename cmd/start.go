@@ -80,21 +80,24 @@ func init() {
 
 func perform(cmd *cobra.Command, args []string) {
 
+	clusterConfig := &k8s.KubeadmConfig{}
+	cobra.CheckErr(viper.Sub("cluster").Unmarshal(clusterConfig))
+
 	// Allow forwarding (kubeadm requirement)
 	utils.WriteFile("/proc/sys/net/ipv4/ip_forward", []byte("1\n"), os.FileMode(int(0644)))
 
 	cobra.CheckErr(alpine.EnsureNetFilter())
 
-	clusterIP := net.ParseIP(viper.GetString("cluster.ip"))
+	clusterIP := net.ParseIP(clusterConfig.Ip)
 	if clusterIP == nil {
-		cobra.CheckErr(fmt.Errorf("ip address %v is invalid", viper.GetString("cluster.ip")))
+		cobra.CheckErr(fmt.Errorf("ip address %v is invalid", clusterConfig.Ip))
 	}
 
 	ipExists, err := alpine.CheckIpExists(clusterIP)
 	cobra.CheckErr(errors.Wrap(err, "While getting local ip addresses"))
 	if !ipExists {
-		if viper.GetBool("cluster.create_ip") {
-			cobra.CheckErr(alpine.AddIpAddress(viper.GetString("cluster.network_interface"), clusterIP))
+		if clusterConfig.CreateIp {
+			cobra.CheckErr(alpine.AddIpAddress(clusterConfig.NetworkInterface, clusterIP))
 		} else {
 			cobra.CheckErr(fmt.Errorf("ip address %v is not available locally", clusterIP))
 		}
@@ -103,7 +106,7 @@ func perform(cmd *cobra.Command, args []string) {
 	exist := false
 	config, err := k8s.LoadFromDefault()
 	if err == nil {
-		if config.IsConfigServerAddress(clusterIP) {
+		if config.IsConfigServerAddress(clusterConfig.GetApiEndPoint()) {
 			exist = true
 		} else {
 			cobra.CheckErr(alpine.StopService(constants.KubeletServiceName))
@@ -132,8 +135,6 @@ func perform(cmd *cobra.Command, args []string) {
 
 	if !exist {
 		restartProxy := err == nil
-		clusterConfig := &k8s.KubeadmConfig{}
-		cobra.CheckErr(viper.Sub("cluster").Unmarshal(clusterConfig))
 		cobra.CheckErr(k8s.RunKubeadmInit(clusterConfig))
 		config, err = k8s.LoadFromDefault()
 		cobra.CheckErr(err)

@@ -46,10 +46,16 @@ func CheckIpExists(ip net.IP) (result bool, err error) {
 func AddIpAddress(iface string, address net.IP) (err error) {
 
 	ones, _ := address.DefaultMask().Size()
+	ipWithMask := fmt.Sprintf("%v/%d", address, ones)
+
+	log.WithFields(log.Fields{
+		"ip":    ipWithMask,
+		"iface": iface,
+	}).Info("Adding IP address")
 
 	parameters := []string{
 		"addr",
-		"add", fmt.Sprintf("%v/%d", address, ones),
+		"add", ipWithMask,
 		"broadcast", "+", // This will set the broadcast address automatically
 		"dev", iface,
 	}
