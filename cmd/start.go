@@ -44,7 +44,8 @@ var startCmd = &cobra.Command{
 - Allows the use of kubectl from the root account,
 - Installs flannel, metal-lb and local-path-provisioner.
 `,
-	Run: perform,
+	PersistentPreRun: startPersistentPreRun,
+	Run:              perform,
 }
 
 func init() {
@@ -68,14 +69,16 @@ func init() {
 	startCmd.Flags().String("domain-name", "", "Domain name of the cluster")
 	startCmd.Flags().StringVar(&k8s.KubernetesVersion, "kubernetes-version", k8s.KubernetesVersion, "Kubernetes version to install")
 
-	viper.BindPFlag("cluster.ip", startCmd.Flags().Lookup("ip"))
-	viper.BindPFlag("cluster.create_ip", startCmd.Flags().Lookup("ip-create"))
-	viper.BindPFlag("cluster.network_interface", startCmd.Flags().Lookup("ip-network-interface"))
-	viper.BindPFlag("cluster.domain_name", startCmd.Flags().Lookup("domain-name"))
-	viper.BindPFlag("cluster.kubernetes_version", startCmd.Flags().Lookup("kubernetes-version"))
-
 	initializeKustomization(startCmd)
 
+}
+
+func startPersistentPreRun(cmd *cobra.Command, args []string) {
+	viper.BindPFlag("cluster.ip", cmd.Flags().Lookup("ip"))
+	viper.BindPFlag("cluster.create_ip", cmd.Flags().Lookup("ip-create"))
+	viper.BindPFlag("cluster.network_interface", cmd.Flags().Lookup("ip-network-interface"))
+	viper.BindPFlag("cluster.domain_name", cmd.Flags().Lookup("domain-name"))
+	viper.BindPFlag("cluster.kubernetes_version", cmd.Flags().Lookup("kubernetes-version"))
 }
 
 func perform(cmd *cobra.Command, args []string) {

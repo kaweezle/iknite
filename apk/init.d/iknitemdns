@@ -1,0 +1,13 @@
+#!/sbin/openrc-run
+name="Iknite Multicast DNS"
+description="Make host address available through multicast"
+
+command="/sbin/iknite"
+command_args="mdns"
+command_background="yes"
+pidfile="/run/$RC_SVCNAME.pid"
+
+depend() {
+        after net
+        before kubelet
+}
