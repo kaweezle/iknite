@@ -5,6 +5,7 @@ on:
 name: Create Git Tag
 jobs:
   versioner:
+    name: Create a tag if version has changed
     runs-on: ubuntu-latest
     steps:
       - name: Update Version

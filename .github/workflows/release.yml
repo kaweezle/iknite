@@ -6,14 +6,15 @@ on:
 
 jobs:
   goreleaser:
+    name: Release iknite package
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           fetch-depth: 0
       - name: Set up Go
-        uses: actions/setup-go@v2
+        uses: actions/setup-go@v3
         with:
           go-version: 1.18
       - name: Import Signature key
@@ -24,12 +25,19 @@ jobs:
         env:
           GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
       - name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@v2
+        uses: goreleaser/goreleaser-action@v4
         with:
           version: latest
           args: release --rm-dist
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Upload assets
+        uses: actions/upload-artifact@v3
+        with:
+          name: packages
+          path: |
+            dist/*.apk
+            dist/metadata.json
       - name: Trigger APK repo build
         uses: peter-evans/repository-dispatch@v1
         with:
@@ -39,12 +47,60 @@ jobs:
           client-payload: >-
             {"version": "${{ github.ref_name }}", "ref": "${{ github.ref }}",
             "sha": "${{ github.sha }}"}
-      - name: Trigger root fs build
-        uses: peter-evans/repository-dispatch@v1
+
+  build-rootfs:
+    name: Build Root Filesystem for WSL
+    needs: [goreleaser]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
         with:
-          token: ${{ secrets.ROOTFS_ACCESS_TOKEN }}
-          repository: kaweezle/kaweezle-rootfs
-          event-type: iknite-release
-          client-payload: >-
-            {"version": "${{ github.ref_name }}", "ref": "${{ github.ref }}",
-            "sha": "${{ github.sha }}"}
+          driver-opts: |
+            image=moby/buildkit:master
+          buildkitd-flags: '--allow-insecure-entitlement security.insecure'
+
+      - name: Cache Docker layers
+        uses: actions/cache@v3
+        with:
+          path: /tmp/.buildx-cache
+          key: ${{ runner.os }}-single-buildx-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-single-buildx
+
+      - name: Get built apks
+        uses: actions/download-artifact@v3
+        with:
+          name: packages
+          path: packages
+
+      - name: Build root fs
+        run: |
+          export IKNITE_VERSION=$(jq -Mr ".version" packages/metadata.json)
+          export IKNITE_LAST_TAG=$(jq -Mr ".tag" packages/metadata.json)
+          echo "Version is $IKNITE_VERSION"
+          mv packages/iknite-${IKNITE_VERSION}.x86_64.apk rootfs
+          cd rootfs
+          mkdir -p /tmp/.buildx-cache
+          mkdir -p /tmp/.buildx-cache-new
+          docker buildx build \
+             --build-arg IKNITE_VERSION=$IKNITE_VERSION \
+             --build-arg IKNITE_LAST_TAG=$IKNITE_LAST_TAG \
+             --allow security.insecure \
+             --cache-from type=local,src=/tmp/.buildx-cache \
+             --cache-to type=local,dest=/tmp/.buildx-cache-new \
+             --output type=tar . | gzip >kaweezle.rootfs.tar.gz
+
+
+      - name: Upload root fs artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: rootfs
+          path: "${{ github.workspace }}/rootfs/kaweezle.rootfs.tar.gz"
+
+      - name: Move cache
+        run: |
+          rm -rf /tmp/.buildx-cache
+          mv /tmp/.buildx-cache-new /tmp/.buildx-cache

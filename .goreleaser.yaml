@@ -1,7 +1,7 @@
 # This is an example .goreleaser.yml file with some sensible defaults.
 # Make sure to check the documentation at https://goreleaser.com
 env:
-  - KUBERNETES_VERSION=1.25.0
+  - KUBERNETES_VERSION=1.26.0
 before:
   hooks:
     - go mod tidy
@@ -23,12 +23,13 @@ builds:
     binary: iknite
     id: iknite
 archives:
-  - name_template:
-      "{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}"
-    replacements:
-      linux: Linux
-      386: i386
-      amd64: x86_64
+  - name_template: >-
+      {{ .ProjectName }}_
+      {{- title .Os }}_
+      {{- if eq .Arch "amd64" }}x86_64
+      {{- else if eq .Arch "386" }}i386
+      {{- else }}{{ .Arch }}{{ end }}
+      {{- if .Arm }}v{{ .Arm }}{{ end }}
 checksum:
   name_template: "{{ .ProjectName }}_checksums.txt"
 snapshot:
@@ -48,12 +49,14 @@ nfpms:
   - formats: [apk]
     license: Apache 2.0
     package_name: iknite
-    file_name_template:
-      "{{ .PackageName }}-{{ .Version }}.{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{
-      end }}{{ if .Mips }}_{{ .Mips }}{{ end }}"
-    replacements:
-      amd64: x86_64
-      "386": x86
+    file_name_template: >-
+      {{ .PackageName }}-
+      {{- .Version }}.
+      {{- if eq .Arch "amd64" }}x86_64
+      {{- else if eq .Arch "386" }}i386
+      {{- else }}{{ .Arch }}{{ end }}
+      {{- if .Arm }}v{{ .Arm }}{{ end }}
+      {{- if .Mips }}_{{ .Mips }}{{ end }}
     maintainer: Kaweezle <kaweezle-devel@kaweezle.com>
     description: Start Kubernetes in Alpine Linux
     homepage: https://github.com/kaweezle/iknite
