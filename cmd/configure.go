@@ -80,7 +80,6 @@ func doConfiguration(ip net.IP, config *k8s.Config, force bool) error {
 	}
 	if cm.Data["configured"] == "true" && !force {
 		log.Info("configuration has already occured. Use -C to force.")
-		return nil
 	} else {
 		context := log.Fields{
 			"OutboundIP": ip,
@@ -103,11 +102,12 @@ func doConfiguration(ip net.IP, config *k8s.Config, force bool) error {
 			"resources": ids,
 		}).Info("Configuration applied")
 
-		if waitTimeout > 0 {
-			runtime.ErrorHandlers = runtime.ErrorHandlers[:0]
-			return config.WaitForWorkloads(time.Second*time.Duration(waitTimeout), nil)
-		}
+	}
 
+	if waitTimeout > 0 {
+		log.Infof("Waiting for workloads for %d seconds...", waitTimeout)
+		runtime.ErrorHandlers = runtime.ErrorHandlers[:0]
+		return config.WaitForWorkloads(time.Second*time.Duration(waitTimeout), nil)
 	}
 
 	return nil

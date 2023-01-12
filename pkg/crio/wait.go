@@ -17,10 +17,10 @@ package crio
 
 import (
 	"encoding/json"
-	"os/exec"
 	"time"
 
 	"github.com/kaweezle/iknite/pkg/constants"
+	"github.com/kaweezle/iknite/pkg/utils"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
@@ -52,7 +52,7 @@ func WaitForCrio() (bool, error) {
 			return false, errors.Wrapf(err, "Error while checking crio sock %s", constants.CrioSock)
 		}
 		if exist {
-			out, err := exec.Command("/usr/bin/crictl", "--runtime-endpoint", "unix:///run/crio/crio.sock", "info").Output()
+			out, err := utils.Exec.Run(false, "/usr/bin/crictl", "--runtime-endpoint", "unix:///run/crio/crio.sock", "info")
 			if err == nil {
 				log.Trace(string(out))
 				response := &CRIOStatusResponse{}

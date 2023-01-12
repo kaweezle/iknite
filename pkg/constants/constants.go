@@ -20,8 +20,11 @@ const (
 	CrioSock                      = "/run/crio/crio.sock"
 	CrioServiceName               = "crio"
 	KubeletServiceName            = "kubelet"
+	MDNSServiceName               = "iknitemdns"
 	KubernetesAdminConfig         = "/etc/kubernetes/admin.conf"
 	KubernetesRootConfig          = "/root/.kube/config"
 	DefaultClusterName            = "kaweezle"
 	DefaultKustomizationDirectory = "/etc/iknite.d"
+	WSLHostName                   = "kaweezle.local"
+	WSLIPAddress                  = "192.168.99.2"
 )

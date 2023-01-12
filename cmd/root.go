@@ -43,7 +43,7 @@ var rootCmd = &cobra.Command{
 Makes the appropriate initialization of a WSL 2 Alpine distribution for running
 kubernetes.`,
 	Example: `> iknite start`,
-	Version: "v0.1.26", // <---VERSION--->
+	Version: "v0.2.0", // <---VERSION--->
 	// Uncomment the following line if your bare application
 	// has an action associated with it:
 	// Run: func(cmd *cobra.Command, args []string) { },
@@ -69,7 +69,7 @@ func init() {
 		return nil
 	}
 
-	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.iknite.yaml)")
+	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.config/iknite/iknite.yaml or /etc/iknite.d/iknite.yaml)")
 	rootCmd.PersistentFlags().StringVarP(&v, "verbosity", "v", logrus.WarnLevel.String(), "Log level (debug, info, warn, error, fatal, panic)")
 	rootCmd.PersistentFlags().StringVarP(&ClusterName, "name", "n", constants.DefaultClusterName, "Cluster name")
 	rootCmd.PersistentFlags().BoolVar(&jsonLogs, "json", false, "Log messages in JSON")
@@ -85,15 +85,11 @@ func initConfig() {
 		// Use config file from the flag.
 		viper.SetConfigFile(cfgFile)
 	} else {
-		// Find home directory.
-		home, err := os.UserHomeDir()
-		cobra.CheckErr(err)
 
-		// Search config in home directory with name ".iknite" (without extension).
-		// TODO: this should be somewhere in /etc
-		viper.AddConfigPath(home)
 		viper.SetConfigType("yaml")
-		viper.SetConfigName(".iknite")
+		viper.SetConfigName("iknite")
+		viper.AddConfigPath("$HOME/.config/iknite/")
+		viper.AddConfigPath("/etc/iknite.d/")
 	}
 
 	viper.AutomaticEnv() // read in environment variables that match
