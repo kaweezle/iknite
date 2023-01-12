@@ -109,3 +109,8 @@ func RemoveDirectoryContents(dir string, predicate func(string) bool) error {
 	}
 	return nil
 }
+
+func IsOnWSL() bool {
+	wsl, _ := afs.DirExists("/run/WSL")
+	return wsl
+}

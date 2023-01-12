@@ -44,6 +44,7 @@ type KubeadmConfig struct {
 	DomainName        string `mapstructure:"domain_name"`
 	CreateIp          bool   `mapstructure:"create_ip"`
 	NetworkInterface  string `mapstructure:"network_interface"`
+	EnableMDNS        bool   `mapstructure:"enable_mdns"`
 }
 
 func (c *KubeadmConfig) GetApiEndPoint() string {

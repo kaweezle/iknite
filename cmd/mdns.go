@@ -19,6 +19,8 @@ import (
 	"net"
 	"os"
 
+	"github.com/kaweezle/iknite/pkg/constants"
+	"github.com/kaweezle/iknite/pkg/utils"
 	"github.com/pion/mdns"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
@@ -29,9 +31,11 @@ import (
 // configureCmd represents the start command
 var mdnsCmd = &cobra.Command{
 	Use:   "mdns",
-	Short: "Publish current hostname through mdns",
+	Short: "Publish cluster hostname through mdns",
 	Long: `On WSL, publishing the localhost over mdns allows avoiding messing
 with the DNS on the Windows side.
+
+It assumes that mDNS is not use elsewhere inside WSL.
 `,
 	PersistentPreRun: mdnsPersistentPreRun,
 	Run:              performMdns,
@@ -39,8 +43,12 @@ with the DNS on the Windows side.
 
 func init() {
 	rootCmd.AddCommand(mdnsCmd)
+
 	hostname, err := os.Hostname()
 	cobra.CheckErr(err)
+	if utils.IsOnWSL() {
+		hostname = constants.WSLHostName
+	}
 	mdnsCmd.Flags().String("domain-name", hostname, "Domain name of the cluster")
 }
 

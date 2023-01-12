@@ -4,6 +4,7 @@ go 1.18
 
 require (
 	github.com/lithammer/dedent v1.1.0
+	github.com/mitchellh/mapstructure v1.5.0
 	github.com/pion/mdns v0.0.5
 	github.com/pkg/errors v0.9.1
 	github.com/sirupsen/logrus v1.9.0
@@ -11,6 +12,7 @@ require (
 	github.com/spf13/cobra v1.6.1
 	github.com/spf13/viper v1.13.0
 	github.com/stretchr/testify v1.8.0
+	github.com/txn2/txeh v1.3.0
 	golang.org/x/net v0.3.1-0.20221206200815-1e63c2f08a10
 	k8s.io/api v0.26.0
 	k8s.io/apimachinery v0.26.0
@@ -54,7 +56,6 @@ require (
 	github.com/magiconair/properties v1.8.6 // indirect
 	github.com/mailru/easyjson v0.7.6 // indirect
 	github.com/mitchellh/go-wordwrap v1.0.0 // indirect
-	github.com/mitchellh/mapstructure v1.5.0 // indirect
 	github.com/moby/spdystream v0.2.0 // indirect
 	github.com/moby/term v0.0.0-20220808134915-39b0c02b01ae // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect

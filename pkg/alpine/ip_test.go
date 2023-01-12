@@ -1,11 +1,15 @@
 package alpine
 
 import (
+	"io/ioutil"
 	"net"
 	"os/exec"
+	"regexp"
 	"testing"
 
 	tu "github.com/kaweezle/iknite/pkg/testutils"
+	"github.com/spf13/afero"
+	"github.com/txn2/txeh"
 
 	"github.com/kaweezle/iknite/pkg/utils"
 	"github.com/stretchr/testify/suite"
@@ -66,6 +70,57 @@ func (s *IPTestSuite) TestAddIpAddress() {
 	s.Executor.AssertExpectations(s.T())
 
 	require.EqualError(err, "RTNETLINK answers: File exists: <nil>")
+}
+
+func (s *IPTestSuite) TestAddIpMapping() {
+	require := s.Require()
+
+	fs := afero.NewOsFs()
+	afs := &afero.Afero{Fs: fs}
+
+	f, err := ioutil.TempFile("", "hosts")
+	require.NoError(err)
+	f.Close()
+
+	config := txeh.HostsConfig{
+		ReadFilePath:  "testdata/hosts1",
+		WriteFilePath: f.Name(),
+	}
+
+	ip := "192.168.99.2"
+	domainName := "kaweezle.local"
+
+	err = AddIpMapping(&config, ip, domainName, []net.IP{})
+	require.NoError(err)
+
+	changed, err := afs.ReadFile(f.Name())
+	require.NoError(err)
+
+	re := regexp.MustCompile(`(?m)^192\.168\.99\.2\s+kaweezle.local$`)
+
+	found := re.Find(changed)
+	require.NotNilf(found, "File doesn't contain ip mapping:\n[%s]", string(changed))
+
+	// Same test with the removal of an existing address
+	config = txeh.HostsConfig{
+		ReadFilePath:  "testdata/hosts2",
+		WriteFilePath: f.Name(),
+	}
+
+	err = AddIpMapping(&config, ip, domainName, []net.IP{net.ParseIP("192.168.99.4")})
+	require.NoError(err)
+	require.NoError(err)
+
+	changed, err = afs.ReadFile(f.Name())
+	require.NoError(err)
+
+	found = re.Find(changed)
+	require.NotNil(found, "File doesn't contain ip mapping")
+
+	re2 := regexp.MustCompile(`192\.168\.99\.4`)
+	found = re2.Find(changed)
+	require.Nil(found, "Shouldn't contain old IP")
+
 }
 
 func TestIP(t *testing.T) {
