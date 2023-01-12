@@ -93,7 +93,6 @@ jobs:
              --cache-to type=local,dest=/tmp/.buildx-cache-new \
              --output type=tar . | gzip >kaweezle.rootfs.tar.gz
 
-
       - name: Upload root fs artifact
         uses: actions/upload-artifact@v3
         with:
@@ -104,3 +103,11 @@ jobs:
         run: |
           rm -rf /tmp/.buildx-cache
           mv /tmp/.buildx-cache-new /tmp/.buildx-cache
+
+      - name: release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            rootfs/kaweezle.rootfs.tar.gz
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

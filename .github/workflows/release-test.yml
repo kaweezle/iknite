@@ -83,7 +83,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-single-buildx
 
-      - name: Get built apk
+      - name: Get built apks
         uses: actions/download-artifact@v3
         with:
           name: packages

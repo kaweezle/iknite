@@ -50,6 +50,7 @@ COPY --chown=root:root ./p10k.zsh /root/.p10k.zsh
 RUN --security=insecure apk add podman fuse-overlayfs && \
     sed -ie 's/^#mount_program/mount_program/' /etc/containers/storage.conf && \
     podman image pull \
+        registry.k8s.io/pause:3.6 \
         registry.k8s.io/pause:3.8 \
         registry.k8s.io/pause:3.9 \
         registry.k8s.io/kube-controller-manager:v${KUBERNETES_VERSION} \
