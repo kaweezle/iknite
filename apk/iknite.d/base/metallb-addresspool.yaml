@@ -111,7 +111,7 @@ spec:
       restartPolicy: OnFailure
       containers:
       - name: create-address-pools
-        image: boxboat/kubectl:1.25.0
+        image: boxboat/kubectl:1.26.0
         imagePullPolicy: IfNotPresent
         command:
         - /bin/sh

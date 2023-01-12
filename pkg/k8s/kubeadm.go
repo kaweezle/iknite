@@ -36,7 +36,7 @@ const (
 	manifestsSubdirectory            = "manifests"
 )
 
-var KubernetesVersion = "1.25.0"
+var KubernetesVersion = "1.26.0"
 
 type KubeadmConfig struct {
 	Ip                string `mapstructure:"ip"`
