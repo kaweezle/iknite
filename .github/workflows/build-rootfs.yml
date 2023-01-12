@@ -1,0 +1,63 @@
+name: Build root fs
+
+on:
+  pull_request:
+    branches: ["main"]
+  workflow_dispatch: {}
+
+jobs:
+  build-rootfs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: git-get-release-action
+        id: iknite_release
+        uses: cardinalby/git-get-release-action@1.2.4
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          latest: true
+          repo: kaweezle/iknite
+
+      - name: Set the version from iknite build
+        run: |
+          echo "IKNITE_VERSION=$(echo ${{ steps.iknite_release.outputs.tag_name }} | cut -c 2-)" >> $GITHUB_ENV
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+        with:
+          driver-opts: |
+            image=moby/buildkit:master
+          buildkitd-flags: '--allow-insecure-entitlement security.insecure'
+
+      - name: Cache Docker layers
+        uses: actions/cache@v3
+        with:
+          path: /tmp/.buildx-cache
+          key: ${{ runner.os }}-single-buildx-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-single-buildx
+
+      # We are doing nasty things on the environment
+      - name: Build image
+        run: |
+          cd rootfs
+          mkdir -p /tmp/.buildx-cache
+          mkdir -p /tmp/.buildx-cache-new
+          docker buildx build --build-arg IKNITE_VERSION=$IKNITE_VERSION \
+             --allow security.insecure \
+             --cache-from type=local,src=/tmp/.buildx-cache \
+             --cache-to type=local,dest=/tmp/.buildx-cache-new \
+             --output type=tar . | gzip >kaweezle.rootfs.tar.gz
+
+      - name: Upload root fs artifact
+        uses: actions/upload-artifact@v2
+        with:
+          name: rootfs.tar.gz
+          path: "${{ github.workspace }}/rootfs/kaweezle.rootfs.tar.gz"
+
+      - name: Move cache
+        run: |
+          rm -rf /tmp/.buildx-cache
+          mv /tmp/.buildx-cache-new /tmp/.buildx-cache
