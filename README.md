@@ -1,4 +1,6 @@
+<!-- markdownlint-disable MD033 MD041 -->
 <div id="top"></div>
+<!-- markdownlint-enable MD033 MD041-->
 
 <!-- PROJECT SHIELDS -->
 
@@ -12,6 +14,7 @@
 [![Workflow][workflow-shield]][workflow-url]
 
 <!-- PROJECT LOGO -->
+<!-- markdownlint-disable MD033 -->
 <br />
 <div align="center">
 
@@ -57,7 +60,7 @@
     <li><a href="#acknowledgments">Acknowledgments</a></li>
   </ol>
 </details>
-
+<!-- markdownlint-enable MD033 -->
 <!-- ABOUT THE PROJECT -->
 
 ## About The Project
@@ -75,18 +78,18 @@ openrc based service.
 It is packaged as an APK that is used by the
 [kaweelze-rootfs](https://github.com/kaweezle/kaweezle-rootfs) project.
 
-<p align="right">(<a href="#top">back to top</a>)</p>
+<!-- markdownlint-disable-line --><p align="right">(<a href="#top">back to top</a>)</p>
 
 ### Built With
 
 This project uses the following components:
 
--   [go](https://go.dev/)
--   [cobra](https://github.com/spf13/cobra)
--   [logrus](github.com/sirupsen/logrus)
--   [client-go](https://github.com/kubernetes/client-go)
+- [go](https://go.dev/)
+- [cobra](https://github.com/spf13/cobra)
+- [logrus](github.com/sirupsen/logrus)
+- [client-go](https://github.com/kubernetes/client-go)
 
-<p align="right">(<a href="#top">back to top</a>)</p>
+<!-- markdownlint-disable-line --><p align="right">(<a href="#top">back to top</a>)</p>
 
 <!-- GETTING STARTED -->
 
@@ -158,7 +161,7 @@ in the current director:
   kwsl                    Stopped         2
 ```
 
-<p align="right">(<a href="#top">back to top</a>)</p>
+<!-- markdownlint-disable-line --><p align="right">(<a href="#top">back to top</a>)</p>
 
 <!-- USAGE EXAMPLES -->
 
@@ -202,14 +205,14 @@ metallb-system       controller-7cf77c64fb-h72jx               1/1     Running  
 metallb-system       speaker-2h66l                             1/1     Running   0          68s
 ```
 
-<p align="right">(<a href="#top">back to top</a>)</p>
+<!-- markdownlint-disable-line --><p align="right">(<a href="#top">back to top</a>)</p>
 
 <!-- ROADMAP -->
 
 ## Roadmap
 
--   [ ] Automate the releases through Github actions.
--   [ ] ...
+- [ ] Automate the releases through Github actions.
+- [ ] ...
 
 See the [open issues](https://github.com/kaweezle/iknite/issues) for a full list
 of proposed features (and known issues).
@@ -232,7 +235,7 @@ create a pull request. You can also simply open an issue with the tag
 4. Push to the Branch (`git push origin feature/AmazingFeature`)
 5. Open a Pull Request
 
-<p align="right">(<a href="#top">back to top</a>)</p>
+<!-- markdownlint-disable-line --><p align="right">(<a href="#top">back to top</a>)</p>
 
 <!-- LICENSE -->
 
@@ -251,7 +254,7 @@ Kaweezle - [@kaweezle](https://twitter.com/kaweezle)
 Project Link:
 [https://github.com/kaweezle/iknite](https://github.com/kaweezle/iknite)
 
-<p align="right">(<a href="#top">back to top</a>)</p>
+<!-- markdownlint-disable-line --><p align="right">(<a href="#top">back to top</a>)</p>
 
 <!-- ACKNOWLEDGMENTS -->
 
@@ -267,9 +270,9 @@ repository.
 You may be interested by existing alternatives from which we have taken some
 ideas:
 
--   [Rancher Desktop](https://rancherdesktop.io/)
--   [Minikube](https://github.com/kubernetes/minikube)
--   [Kind](https://kind.sigs.k8s.io/)
+- [Rancher Desktop](https://rancherdesktop.io/)
+- [Minikube](https://github.com/kubernetes/minikube)
+- [Kind](https://kind.sigs.k8s.io/)
 
 By using
 [kubeadm](https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/create-cluster-kubeadm/)
@@ -279,33 +282,26 @@ This readme has has been created from the
 [Best-README-Template](https://github.com/othneildrew/Best-README-Template)
 project.
 
-<p align="right">(<a href="#top">back to top</a>)</p>
+<!-- markdownlint-disable-line --><p align="right">(<a href="#top">back to top</a>)</p>
 
 <!-- MARKDOWN LINKS & IMAGES -->
 <!-- https://www.markdownguide.org/basic-syntax/#reference-style-links -->
 
-[contributors-shield]:
-    https://img.shields.io/github/contributors/kaweezle/iknite.svg?style=for-the-badge
+<!-- prettier-ignore-start -->
+[contributors-shield]: https://img.shields.io/github/contributors/kaweezle/iknite.svg?style=for-the-badge
 [contributors-url]: https://github.com/kaweezle/iknite/graphs/contributors
-[forks-shield]:
-    https://img.shields.io/github/forks/kaweezle/iknite.svg?style=for-the-badge
+[forks-shield]: https://img.shields.io/github/forks/kaweezle/iknite.svg?style=for-the-badge
 [forks-url]: https://github.com/kaweezle/iknite/network/members
-[stars-shield]:
-    https://img.shields.io/github/stars/kaweezle/iknite.svg?style=for-the-badge
+[stars-shield]: https://img.shields.io/github/stars/kaweezle/iknite.svg?style=for-the-badge
 [stars-url]: https://github.com/kaweezle/iknite/stargazers
-[issues-shield]:
-    https://img.shields.io/github/issues/kaweezle/iknite.svg?style=for-the-badge
+[issues-shield]: https://img.shields.io/github/issues/kaweezle/iknite.svg?style=for-the-badge
 [issues-url]: https://github.com/kaweezle/iknite/issues
-[license-shield]:
-    https://img.shields.io/badge/license-apache_2.0-green?style=for-the-badge&logo=none
+[license-shield]: https://img.shields.io/badge/license-apache_2.0-green?style=for-the-badge&logo=none
 [license-url]: https://github.com/kaweezle/iknite/blob/master/LICENSE
-[linkedin-shield]:
-    https://img.shields.io/badge/-LinkedIn-black.svg?style=for-the-badge&logo=linkedin&colorB=555
+[linkedin-shield]: https://img.shields.io/badge/-LinkedIn-black.svg?style=for-the-badge&logo=linkedin&colorB=555
 [linkedin-url]: https://linkedin.com/in/kaweezle
-[go-version]:
-    https://img.shields.io/badge/Go-1.17+-00ADD8?style=for-the-badge&logo=go
-[stability]:
-    https://img.shields.io/badge/stability-experimental-orange?style=for-the-badge
-[workflow-shield]:
-    https://github.com/kaweezle/iknite/actions/workflows/release.yml/badge.svg
+[go-version]: https://img.shields.io/badge/Go-1.17+-00ADD8?style=for-the-badge&logo=go
+[stability]: https://img.shields.io/badge/stability-experimental-orange?style=for-the-badge
+[workflow-shield]: https://github.com/kaweezle/iknite/actions/workflows/release.yml/badge.svg
 [workflow-url]: https://github.com/kaweezle/iknite/actions/workflows/release.yml
+<!-- prettier-ignore-end -->
