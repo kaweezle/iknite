@@ -42,7 +42,7 @@
     <li>
       <a href="#about-the-project">About The Project</a>
       <ul>
-        <li><a href="#built-with">Built With</a></li>
+        <li><a href="#built-with">How it works</a></li>
       </ul>
     </li>
     <li>
@@ -73,21 +73,48 @@ Kaweezle allows running a Kubernetes cluster on Windows using Windows Subsystem
 for Linux 2 (WSL 2).
 
 It is a small go based executable. It can be run from the command line or as an
-openrc based service.
+openrc based service (Soon).
 
-It is packaged as an APK that is used by the
-[kaweelze-rootfs](https://github.com/kaweezle/kaweezle-rootfs) project.
+It is packaged as an APK that is published in its own repository:
+https://kaweezle.com/repo/
+
+It used by the [kaweelze-rootfs](https://github.com/kaweezle/kaweezle-rootfs)
+project (now deprecated) and is included in the WSL root filesystem available
+with each release (see below).
 
 <!-- markdownlint-disable-line --><p align="right">(<a href="#top">back to top</a>)</p>
 
-### Built With
+### How it works
 
-This project uses the following components:
+Under the hood, iknite uses
+[kubeadm](https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/)
+to install the cluster, and [CRI-O](https://github.com/cri-o/cri-o) as the
+container runtime. The APK package contains the relevant Alpine dependencies so
+everything is already available when iknite is first launched.
 
-- [go](https://go.dev/)
+With kubeadm, you get a vanilla Kubernetes installation, with its pros and cons.
+There are more moving parts than in other light distributions but you won't be
+blocked because some feature has been removed.
+
+Some additional components are also installed:
+
+- [flannel](https://github.com/flannel-io/flannel) as the CNI (Common Network
+  Interface) provider
+- [metrics-server](https://github.com/kubernetes-sigs/metrics-server) for
+  providing basic metrics to tools like K9s and for use by
+  [Horizontal Pod Autoscaling](https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/)
+- [MetalLB](https://metallb.universe.tf/) allowing to created a `LoadBalancer`
+  service.
+- [Local Path Provisioner](https://github.com/rancher/local-path-provisioner) to
+  provide a default storage class bound to the local host filesystem.
+
+This project uses the following popular [go](https://go.dev/) tools:
+
 - [cobra](https://github.com/spf13/cobra)
 - [logrus](github.com/sirupsen/logrus)
 - [client-go](https://github.com/kubernetes/client-go)
+- [goreleaser](https://goreleaser.com/) for building and packaging
+- ... (take a look at `go.mod`)
 
 <!-- markdownlint-disable-line --><p align="right">(<a href="#top">back to top</a>)</p>
 
@@ -99,8 +126,8 @@ Please refer to the
 [kaweezle readme](https://github.com/kaweezle/kaweezle/README.md) for
 installation instructions.
 
-The follwing sections give instuctions on how to use the root filesystem without
-the `kaweezle` windows command.
+The follwing sections gives instuctions on how to use the root filesystem
+without the `kaweezle` windows command.
 
 ### Prerequisites
 
@@ -128,9 +155,9 @@ To use the kubernetes cluster, you will need to have kubectl installed:
 > scoop install kubectl
 ```
 
-Other tools might be of insterest, like `k9s`, `kubectx`, `kubens` or `stern`.
-All are available through scoop. You can install all of them at once with the
-following command:
+**(Optional)** Other tools might be of insterest, like `k9s`, `kubectx`,
+`kubens` or `stern`. All are available through scoop. You can install all of
+them at once with the following command:
 
 ```powershell
 > scoop install k9s kubectx kubens stern
@@ -139,20 +166,23 @@ following command:
 ### Download and installation
 
 The root filesystem can be downloaded from the
-[Releases](https://github.com/kaweezle/kaweezle-rootfs/releases) page.
+[Releases](https://github.com/kaweezle/iknite/releases) page.
 
 You can create a WSL distribution with the following set of commands:
 
 ```powershell
-> cd $env:LocalAppData
-> mkdir kwsl
-> cd kwsl
-> (New-Object Net.WebClient).DownloadFile("https://github.com/kaweezle/kaweezle-rootfs/releases/download/latest/rootfs.tar.gz", "$PWD\rootfs.tar.gz")
-> wsl --import kwsl .
+PS> cd $env:LOCALAPPDATA
+PS> mkdir kwsl
+PS> cd kwsl
+# 500Mb download ahead
+PS> (New-Object Net.WebClient).DownloadFile("https://github.com/kaweezle/iknite/releases/latest/download/kaweezle.rootfs.tar.gz", "$PWD\rootfs.tar.gz")
+PS> wsl --import kwsl . rootfs.tar.gz
+...
+PS>
 ```
 
 You will have a WSL distribution called `kwsl` which file system will be located
-in the current director:
+in the current directory:
 
 ```powershell
 ❯ wsl -l -v
@@ -170,7 +200,21 @@ in the current director:
 To start the kubernetes cluster, issue the following command:
 
 ```powershell
-❯ wsl -d kwsl /sbin/iknite start
+❯ wsl -d kwsl /sbin/iknite -v info start -w 120
+INFO[0000] Adding IP address                             iface=eth0 ip=192.168.99.2/24
+INFO[0000] Check domain name to IP mapping...            domainName=kaweezle.local ip=192.168.99.2
+INFO[0001] Mapping not found, creating...                domainName=kaweezle.local ip=192.168.99.2
+INFO[0001] Starting openrc...
+INFO[0003] Running/usr/bin/kubeadm init --config /tmp/config419805402.yaml...
+INFO[0012] Applying base kustomization...                directory=/etc/iknite.d
+INFO[0014] Configuration applied                         directory=/etc/iknite.d resources="..."
+INFO[0014] Waiting for workloads for 120 seconds...
+INFO[0014] Workloads total: 7, ready: 0, unready:7       ready=0 total=7 unready=7
+INFO[0016] Workloads total: 7, ready: 0, unready:7       ready=0 total=7 unready=7
+...
+INFO[0066] Workloads total: 7, ready: 6, unready:1       ready=6 total=7 unready=1
+INFO[0068] Workloads total: 7, ready: 7, unready:0       ready=7 total=7 unready=0
+INFO[0068] executed
 ```
 
 The distribution is now running:
@@ -187,32 +231,33 @@ Now the kubernetes cluster can be accessed:
 ```powershell
 ❯ $env:KUBECONFIG="\\wsl$\kwsl\root\.kube\config"
 ❯ kubectl get nodes
-NAME              STATUS   ROLES    AGE   VERSION
-laptop-vkhdd5jr   Ready    <none>   61s   v1.23.1
-❯ kubectl get pod --all-namespaces
-NAMESPACE            NAME                                      READY   STATUS    RESTARTS   AGE
-kube-system          coredns-64897985d-bhhzq                   1/1     Running   0          68s
-kube-system          coredns-64897985d-mvpbb                   1/1     Running   0          68s
-kube-system          etcd-laptop-vkhdd5jr                      1/1     Running   0          84s
-kube-system          kube-apiserver-laptop-vkhdd5jr            1/1     Running   0          84s
-kube-system          kube-controller-manager-laptop-vkhdd5jr   1/1     Running   0          84s
-kube-system          kube-flannel-ds-hkz9p                     1/1     Running   0          68s
-kube-system          kube-proxy-xx5xp                          1/1     Running   0          68s
-kube-system          kube-scheduler-laptop-vkhdd5jr            1/1     Running   0          78s
-kube-system          metrics-server-d9c898cdf-7qbbr            1/1     Running   0          68s
-local-path-storage   local-path-provisioner-566b877b9c-qnpzx   1/1     Running   0          68s
-metallb-system       controller-7cf77c64fb-h72jx               1/1     Running   0          68s
-metallb-system       speaker-2h66l                             1/1     Running   0          68s
+NAME             STATUS   ROLES    AGE     VERSION
+kaweezle.local   Ready    <none>   3m22s   v1.26.0
+❯ kubectl get pod -A
+NAMESPACE            NAME                                     READY   STATUS    RESTARTS        AGE
+kube-flannel         kube-flannel-ds-nf9z2                    1/1     Running   0               3m43s
+kube-system          coredns-787d4945fb-vdv7s                 1/1     Running   0               3m43s
+kube-system          coredns-787d4945fb-zxdnc                 1/1     Running   0               3m43s
+kube-system          etcd-kaweezle.local                      1/1     Running   0               3m58s
+kube-system          kube-apiserver-kaweezle.local            1/1     Running   0               3m58s
+kube-system          kube-controller-manager-kaweezle.local   1/1     Running   0               3m57s
+kube-system          kube-proxy-hgzvk                         1/1     Running   0               3m43s
+kube-system          kube-scheduler-kaweezle.local            1/1     Running   0               3m56s
+kube-system          metrics-server-699cfc467c-jn28p          1/1     Running   0               3m43s
+local-path-storage   local-path-provisioner-8bc8875b-p7tqp    1/1     Running   0               3m43s
+metallb-system       controller-577b5bdfcc-8grxd              1/1     Running   1 (3m10s ago)   3m43s
+metallb-system       speaker-4p5b2                            1/1     Running   0               3m43s
 ```
+
+You can now deploy anything on the cluster. As in contains
+[MetalLB](https://metallb.universe.tf/), Any ingress controller (Traefik, for
+instance) can be installed and be available locally.
 
 <!-- markdownlint-disable-line --><p align="right">(<a href="#top">back to top</a>)</p>
 
 <!-- ROADMAP -->
 
 ## Roadmap
-
-- [ ] Automate the releases through Github actions.
-- [ ] ...
 
 See the [open issues](https://github.com/kaweezle/iknite/issues) for a full list
 of proposed features (and known issues).
@@ -243,7 +288,7 @@ create a pull request. You can also simply open an issue with the tag
 
 Distributed under the Apache License. See `LICENSE` for more information.
 
-<p align="right">(<a href="#top">back to top</a>)</p>
+<!-- markdownlint-disable-line --><p align="right">(<a href="#top">back to top</a>)</p>
 
 <!-- CONTACT -->
 
