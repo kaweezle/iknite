@@ -32,8 +32,11 @@ import (
 )
 
 var (
-	kustomizationDirectory = constants.DefaultKustomizationDirectory
-	waitTimeout            = 0
+	kustomizationDirectory       = constants.DefaultKustomizationDirectory
+	waitTimeout                  = 0
+	clusterCheckWaitMilliseconds = 500
+	clusterCheckRetries          = 1
+	clusterCheckOkResponses      = 1
 )
 
 // configureCmd represents the start command
@@ -48,7 +51,7 @@ applies the Embedded configuration that installs the following components:
 
 - Flannel for networking.
 - MetalLB for Load balancer services.
-- Local-path provisionner to make PVCs avaiable.
+- Local-path provisioner to make PVCs available.
 - metrics-server to make resources work on payloads.
 
 `,
@@ -60,7 +63,10 @@ func initializeKustomization(cmd *cobra.Command) {
 		"The directory to look for kustomization. Can be an URL")
 	viper.BindPFlag("kustomize_directory", cmd.Flags().Lookup("kustomize-directory"))
 	cmd.Flags().IntVarP(&waitTimeout, "wait", "w", waitTimeout, "Wait n seconds for all pods to settle")
-	cmd.Flags().BoolP("force-config", "C", false, "Force configuration even if it has already occured")
+	cmd.Flags().BoolP("force-config", "C", false, "Force configuration even if it has already occurred")
+	cmd.Flags().IntVar(&clusterCheckWaitMilliseconds, "cluster-check-wait", clusterCheckWaitMilliseconds, "Milliseconds to wait between each cluster check")
+	cmd.Flags().IntVar(&clusterCheckRetries, "cluster-check-retries", clusterCheckRetries, "Number of tries to access the cluster")
+	cmd.Flags().IntVar(&clusterCheckOkResponses, "cluster-check-ok-responses", clusterCheckOkResponses, "Number of Ok response to receive before proceeding")
 }
 
 func init() {
@@ -79,7 +85,7 @@ func doConfiguration(ip net.IP, config *k8s.Config, force bool) error {
 		return err
 	}
 	if cm.Data["configured"] == "true" && !force {
-		log.Info("configuration has already occured. Use -C to force.")
+		log.Info("configuration has already occurred. Use -C to force.")
 	} else {
 		context := log.Fields{
 			"OutboundIP": ip,
@@ -94,7 +100,7 @@ func doConfiguration(ip net.IP, config *k8s.Config, force bool) error {
 		cm.Data["configured"] = "true"
 		_, err = k8s.WriteIkniteConfigMap(client, cm)
 		if err != nil {
-			return errors.Wrap(err, "While writing confiugration")
+			return errors.Wrap(err, "While writing configuration")
 		}
 
 		log.WithFields(log.Fields{
@@ -122,7 +128,7 @@ func performConfigure(cmd *cobra.Command, args []string) {
 	// We need to get it from root as we will apply configuration
 	config, err := k8s.LoadFromFile(constants.KubernetesRootConfig)
 	cobra.CheckErr(errors.Wrap(err, "While loading local cluster configuration"))
-	cobra.CheckErr(config.CheckClusterRunning(1, 1, 0))
+	cobra.CheckErr(config.CheckClusterRunning(clusterCheckRetries, clusterCheckOkResponses, clusterCheckWaitMilliseconds))
 
 	force, err := cmd.Flags().GetBool("force-config")
 	cobra.CheckErr(err)

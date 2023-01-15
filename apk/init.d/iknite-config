@@ -1,0 +1,16 @@
+#!/sbin/openrc-run
+
+name="Iknite Kubernetes configurer"
+description="Configure Kubernetes after initialization"
+
+
+depend() {
+    after iknite-init
+    after kubelet
+}
+
+start() {
+    ebegin "Running iknite config"
+    /sbin/iknite -v debug configure --cluster-check-retries 10 --cluster-check-ok-responses 2 >>/var/log/iknite.log 2>&1
+    eend $?
+}
