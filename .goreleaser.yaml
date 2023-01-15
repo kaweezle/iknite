@@ -1,5 +1,6 @@
 # This is an example .goreleaser.yml file with some sensible defaults.
 # Make sure to check the documentation at https://goreleaser.com
+# cSpell: disable
 env:
   - KUBERNETES_VERSION=1.26.0
 before:
@@ -80,8 +81,12 @@ nfpms:
         dst: /etc/iknite.d/base/kustomization.yaml
       - src: apk/iknite.d/base/metallb-addresspool.yaml
         dst: /etc/iknite.d/base/metallb-addresspool.yaml
-      - src: apk/init.d/iknitemdns
-        dst: /etc/init.d/iknitemdns
+      - src: apk/init.d/iknite-mdns
+        dst: /etc/init.d/iknite-mdns
+      - src: apk/init.d/iknite-init
+        dst: /etc/init.d/iknite-init
+      - src: apk/init.d/iknite-config
+        dst: /etc/init.d/iknite-config
     apk:
       signature:
         key_file: gpg_key.asc

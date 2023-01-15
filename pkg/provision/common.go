@@ -35,9 +35,9 @@ import (
 	"sigs.k8s.io/kustomize/kyaml/resid"
 )
 
-func createTempKustomizeDirectory(content *embed.FS, fs filesys.FileSystem, tmpdir string, dirname string, data interface{}) error {
+func createTempKustomizeDirectory(content *embed.FS, fs filesys.FileSystem, tempdir string, dirname string, data interface{}) error {
 	log.WithFields(log.Fields{
-		"tmpdir":  tmpdir,
+		"tempdir": tempdir,
 		"dirname": dirname,
 		"data":    data,
 	}).Trace("Start creating directory")
@@ -49,7 +49,7 @@ func createTempKustomizeDirectory(content *embed.FS, fs filesys.FileSystem, tmpd
 	for _, entry := range files {
 		if !entry.IsDir() {
 			inPath := fmt.Sprintf("%s/%s", dirname, entry.Name())
-			outPath := fmt.Sprintf("%s/%s", tmpdir, entry.Name())
+			outPath := fmt.Sprintf("%s/%s", tempdir, entry.Name())
 
 			log.WithField("path", inPath).Trace("Reading file")
 			payload, err := content.ReadFile(inPath)
@@ -77,7 +77,7 @@ func createTempKustomizeDirectory(content *embed.FS, fs filesys.FileSystem, tmpd
 			log.WithField("outPath", outPath).Trace("Writing content")
 			err = fs.WriteFile(outPath, payload)
 			if err != nil {
-				return errors.Wrapf(err, "While writing %s to temp dir %s", entry.Name(), tmpdir)
+				return errors.Wrapf(err, "While writing %s to temp dir %s", entry.Name(), tempdir)
 			}
 		}
 	}
@@ -94,6 +94,7 @@ func applyResmap(resources resmap.ResMap) (err error) {
 	buffer.Write(out)
 
 	cmd := exec.Command(constants.KubectlCmd, "apply", "-f", "-")
+	cmd.Env = append(cmd.Env, "KUBECONFIG=/root/.kube/config")
 	cmd.Stdin = &buffer
 	out, err = cmd.CombinedOutput()
 	log.Trace(string(out))
@@ -159,7 +160,7 @@ func ApplyEmbeddedKustomizations(content *embed.FS, dirname string, data interfa
 }
 
 func EnablePlugins(opts *krusty.Options) *krusty.Options {
-	opts.PluginConfig = types.EnabledPluginConfig(types.BploUseStaticallyLinked)
+	opts.PluginConfig = types.EnabledPluginConfig(types.BploUseStaticallyLinked) // cSpell: disable-line
 	opts.PluginConfig.FnpLoadingOptions.EnableExec = true
 	opts.PluginConfig.FnpLoadingOptions.AsCurrentUser = true
 	opts.PluginConfig.HelmConfig.Command = "helm"

@@ -15,6 +15,7 @@ limitations under the License.
 */
 package cmd
 
+// cSpell: disable
 import (
 	"fmt"
 	"net"
@@ -32,6 +33,8 @@ import (
 	"github.com/spf13/viper"
 	"github.com/txn2/txeh"
 )
+
+// cSpell: enable
 
 // startCmd represents the start command
 var startCmd = &cobra.Command{
@@ -69,6 +72,8 @@ func init() {
 	startCmd.Flags().String("domain-name", domain_name, "Domain name of the cluster")
 	startCmd.Flags().Bool("enable-mdns", wsl, "Enable mDNS publication of domain name")
 	startCmd.Flags().StringVar(&k8s.KubernetesVersion, "kubernetes-version", k8s.KubernetesVersion, "Kubernetes version to install")
+	startCmd.Flags().Bool("openrc", false, "Run in OpenRC (assume OpenRC and CRI-O available)")
+	viper.BindPFlag("openrc", startCmd.Flags().Lookup("openrc"))
 
 	initializeKustomization(startCmd)
 }
@@ -88,6 +93,7 @@ func perform(cmd *cobra.Command, args []string) {
 	clusterConfig := &k8s.KubeadmConfig{}
 	// Cannot use Unmarshal. Look here: https://github.com/spf13/viper/issues/368
 	err := mapstructure.Decode(viper.AllSettings()["cluster"], clusterConfig)
+	standalone := !viper.GetBool("openrc")
 	cobra.CheckErr(err)
 
 	// Allow forwarding (kubeadm requirement)
@@ -117,26 +123,14 @@ func perform(cmd *cobra.Command, args []string) {
 			"ip":         clusterConfig.Ip,
 			"domainName": clusterConfig.DomainName,
 		}).Info("Check domain name to IP mapping...")
-		ips, err := net.LookupIP(clusterConfig.DomainName)
-		contains := false
-		if err != nil {
-			ips = []net.IP{}
-		} else {
-			for _, existing := range ips {
-				if existing.String() == clusterConfig.Ip {
-					contains = true
-					break
-				}
-			}
-		}
 
-		if !contains {
+		if contains, ips := alpine.IsHostMapped(clusterConfig.Ip, clusterConfig.DomainName); !contains {
 			log.WithFields(log.Fields{
 				"ip":         clusterConfig.Ip,
 				"domainName": clusterConfig.DomainName,
 			}).Info("Mapping not found, creating...")
 
-			cobra.CheckErr(alpine.AddIpMapping(&txeh.HostsConfig{}, clusterConfig.Ip, clusterConfig.DomainName, ips))
+			cobra.CheckErr(alpine.AddIpMapping(&txeh.HostsConfig{}, clusterConfig.Ip, clusterConfig.DomainName, ips)) // cSpell: disable-line
 		}
 	}
 
@@ -164,23 +158,27 @@ func perform(cmd *cobra.Command, args []string) {
 		}
 	}
 
-	// Start OpenRC
-	cobra.CheckErr(alpine.StartOpenRC())
+	if standalone {
+		// Start OpenRC
+		cobra.CheckErr(alpine.StartOpenRC())
+		cobra.CheckErr(alpine.EnableService(constants.CrioServiceName))
+		cobra.CheckErr(alpine.StartService(constants.CrioServiceName))
+	}
 
 	// Enable the services
-	cobra.CheckErr(alpine.EnableService(constants.CrioServiceName))
 	cobra.CheckErr(alpine.EnableService(constants.KubeletServiceName))
-	cobra.CheckErr(alpine.StartService(constants.CrioServiceName))
 	if clusterConfig.EnableMDNS {
 		cobra.CheckErr(alpine.EnableService(constants.MDNSServiceName))
 		cobra.CheckErr(alpine.StartService(constants.MDNSServiceName))
 	}
 
-	// CRI-O is started by OpenRC
-	available, err := crio.WaitForCrio()
-	cobra.CheckErr(err)
-	if !available {
-		log.Fatal("CRI-O not available")
+	if standalone || !exist {
+		// CRI-O is started by OpenRC
+		available, err := crio.WaitForCrio()
+		cobra.CheckErr(err)
+		if !available {
+			log.Fatal("CRI-O not available")
+		}
 	}
 
 	if !exist {
@@ -195,19 +193,22 @@ func perform(cmd *cobra.Command, args []string) {
 			log.Info("Restart kube-proxy")
 			cobra.CheckErr(config.RestartProxy())
 		}
-	} else {
+		// We copy the configuration where the root user expects it
+		cobra.CheckErr(config.RenameConfig(ClusterName).WriteToFile(constants.KubernetesRootConfig))
+	} else if standalone {
 		// The service should have been started by OpenRC
 		log.Info("Waiting for service to start...")
-		cobra.CheckErr(config.CheckClusterRunning(10, 2, 2))
+		cobra.CheckErr(config.CheckClusterRunning(10, 2, 500))
 	}
 
-	// We copy the configuration where the root user expects it
-	cobra.CheckErr(config.RenameConfig(ClusterName).WriteToFile(constants.KubernetesRootConfig))
-
-	// Perform the configuration. Not done in case it's already done
-	force, err := cmd.Flags().GetBool("force-config")
-	cobra.CheckErr(err)
-	cobra.CheckErr(doConfiguration(clusterIP, config, force))
+	if standalone {
+		// Perform the configuration. Not done in case it's already done
+		force, err := cmd.Flags().GetBool("force-config")
+		cobra.CheckErr(err)
+		cobra.CheckErr(doConfiguration(clusterIP, config, force))
+	} else {
+		cobra.CheckErr(alpine.EnableService(constants.ConfigureServiceName))
+	}
 
 	log.Info("executed")
 }

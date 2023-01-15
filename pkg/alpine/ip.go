@@ -91,3 +91,19 @@ func AddIpMapping(hostConfig *txeh.HostsConfig, ip string, domainName string, to
 	err = hosts.Save()
 	return
 }
+
+func IsHostMapped(Ip string, DomainName string) (bool, []net.IP) {
+	ips, err := net.LookupIP(DomainName)
+	contains := false
+	if err != nil {
+		ips = []net.IP{}
+	} else {
+		for _, existing := range ips {
+			if existing.String() == Ip {
+				contains = true
+				break
+			}
+		}
+	}
+	return contains, ips
+}

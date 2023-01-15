@@ -91,9 +91,9 @@ func (config *Config) IsConfigServerAddress(address string) bool {
 
 // Client returns a clientset for config.
 func (config *Config) Client() (client *kubernetes.Clientset, err error) {
-	clientconfig := clientcmd.NewDefaultClientConfig(api.Config(*config), nil)
+	clientConfig := clientcmd.NewDefaultClientConfig(api.Config(*config), nil)
 	var rest *rest.Config
-	rest, err = clientconfig.ClientConfig()
+	rest, err = clientConfig.ClientConfig()
 	if err != nil {
 		return
 	}
@@ -102,17 +102,17 @@ func (config *Config) Client() (client *kubernetes.Clientset, err error) {
 }
 
 // CheckClusterRunning checks that the cluster is running by requesting the
-// API server /readyz endpoint. It checks retries times and waits for waittime
-// seconds between each check. It needs at least okresponses good responses from
-// the server.
-func (config *Config) CheckClusterRunning(retries, okresponses, waittime int) error {
+// API server /readyz endpoint. It checks retries times and waits for waitTime
+// milliseconds between each check. It needs at least okResponses good responses
+// from the server.
+func (config *Config) CheckClusterRunning(retries, okResponses, waitTime int) error {
 
 	client, err := config.Client()
 	if err != nil {
 		return err
 	}
 
-	oktries := 0
+	okTries := 0
 	query := client.Discovery().RESTClient().Get().AbsPath("/readyz")
 	for retries > 0 {
 		content, err := query.DoRaw(context.Background())
@@ -122,14 +122,14 @@ func (config *Config) CheckClusterRunning(retries, okresponses, waittime int) er
 				err = fmt.Errorf("cluster health API returned: %s", contentStr)
 				log.WithError(err).Debug("Bad response")
 			} else {
-				oktries = oktries + 1
-				log.WithField("oktries", oktries).Trace("Ok response from server")
-				if oktries == okresponses {
+				okTries = okTries + 1
+				log.WithField("okTries", okTries).Trace("Ok response from server")
+				if okTries == okResponses {
 					break
 				}
 			}
 		} else {
-			log.WithError(err).Debug("while querying cluster readyness")
+			log.WithError(err).Debug("while querying cluster readiness")
 		}
 
 		retries = retries - 1
@@ -139,8 +139,8 @@ func (config *Config) CheckClusterRunning(retries, okresponses, waittime int) er
 		} else {
 			log.WithFields(log.Fields{
 				"err":       err,
-				"wait_time": waittime}).Debug("Waiting...")
-			time.Sleep(time.Duration(waittime) * time.Second)
+				"wait_time": waitTime}).Debug("Waiting...")
+			time.Sleep(time.Duration(waitTime) * time.Millisecond)
 		}
 	}
 
