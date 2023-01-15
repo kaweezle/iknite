@@ -53,6 +53,10 @@
       </ul>
     </li>
     <li><a href="#usage">Usage</a></li>
+      <ul>
+        <li><a href="#alternative-start-through-openrc">Alternative: Start through OpenRC</a></li>
+      </ul>
+    </li>
     <li><a href="#roadmap">Roadmap</a></li>
     <li><a href="#contributing">Contributing</a></li>
     <li><a href="#license">License</a></li>
@@ -256,6 +260,33 @@ metallb-system       speaker-4p5b2                            1/1     Running   
 You can now deploy anything on the cluster. As in contains
 [MetalLB](https://metallb.universe.tf/), Any ingress controller (Traefik, for
 instance) can be installed and be available locally.
+
+<!-- markdownlint-disable-line --><p align="right">(<a href="#top">back to top</a>)</p>
+
+### Alternative: Start through OpenRC
+
+Instead of running `iknite` to start the cluster, you can enable the
+`iknite-init` and `iknite-config` services:
+
+```powershell
+PS> wsl -d kwsl rc-update add iknite-init default
+PS> wsl -d kwsl rc-update add iknite-config default
+```
+
+And then the cluster is started and restarted with:
+
+```powershell
+PS>  wsl -d kwsl openrc default
+ * Caching service dependencies ...                                       [ ok ]
+ * /var/log/crio: creating directory
+ * /var/log/crio/crio.log: creating file
+ * Starting crio ...                                                      [ ok ]
+ * Running iknite start ...                                               [ ok ]
+ * Running iknite config ...                                              [ ok ]
+```
+
+This is useful to integrate iknite in a VM or to add other downstream services
+to OpenRC.
 
 <!-- markdownlint-disable-line --><p align="right">(<a href="#top">back to top</a>)</p>
 
