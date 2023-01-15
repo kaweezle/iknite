@@ -15,6 +15,7 @@ limitations under the License.
 */
 package cmd
 
+// cSpell: disable
 import (
 	"fmt"
 	"net"
@@ -32,6 +33,8 @@ import (
 	"github.com/spf13/viper"
 	"github.com/txn2/txeh"
 )
+
+// cSpell: enable
 
 // startCmd represents the start command
 var startCmd = &cobra.Command{
@@ -127,7 +130,7 @@ func perform(cmd *cobra.Command, args []string) {
 				"domainName": clusterConfig.DomainName,
 			}).Info("Mapping not found, creating...")
 
-			cobra.CheckErr(alpine.AddIpMapping(&txeh.HostsConfig{}, clusterConfig.Ip, clusterConfig.DomainName, ips))
+			cobra.CheckErr(alpine.AddIpMapping(&txeh.HostsConfig{}, clusterConfig.Ip, clusterConfig.DomainName, ips)) // cSpell: disable-line
 		}
 	}
 

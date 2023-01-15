@@ -91,9 +91,9 @@ func (config *Config) IsConfigServerAddress(address string) bool {
 
 // Client returns a clientset for config.
 func (config *Config) Client() (client *kubernetes.Clientset, err error) {
-	clientconfig := clientcmd.NewDefaultClientConfig(api.Config(*config), nil)
+	clientConfig := clientcmd.NewDefaultClientConfig(api.Config(*config), nil)
 	var rest *rest.Config
-	rest, err = clientconfig.ClientConfig()
+	rest, err = clientConfig.ClientConfig()
 	if err != nil {
 		return
 	}

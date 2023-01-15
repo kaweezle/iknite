@@ -73,12 +73,12 @@ Kaweezle allows running a Kubernetes cluster on Windows using Windows Subsystem
 for Linux 2 (WSL 2).
 
 It is a small go based executable. It can be run from the command line or as an
-openrc based service (Soon).
+openrc based service.
 
-It is packaged as an APK that is published in its own repository:
-https://kaweezle.com/repo/
+It is packaged as an APK that is published in its
+[own repository](https://kaweezle.com/repo/).
 
-It used by the [kaweelze-rootfs](https://github.com/kaweezle/kaweezle-rootfs)
+It used by the [kaweezle-rootfs](https://github.com/kaweezle/kaweezle-rootfs)
 project (now deprecated) and is included in the WSL root filesystem available
 with each release (see below).
 
@@ -126,7 +126,7 @@ Please refer to the
 [kaweezle readme](https://github.com/kaweezle/kaweezle/README.md) for
 installation instructions.
 
-The follwing sections gives instuctions on how to use the root filesystem
+The following sections gives instructions on how to use the root filesystem
 without the `kaweezle` windows command.
 
 ### Prerequisites
@@ -155,9 +155,9 @@ To use the kubernetes cluster, you will need to have kubectl installed:
 > scoop install kubectl
 ```
 
-**(Optional)** Other tools might be of insterest, like `k9s`, `kubectx`,
-`kubens` or `stern`. All are available through scoop. You can install all of
-them at once with the following command:
+**(Optional)** Other tools might be of interest, like `k9s`, `kubectx`, `kubens`
+or `stern`. All are available through scoop. You can install all of them at once
+with the following command:
 
 ```powershell
 > scoop install k9s kubectx kubens stern
@@ -228,6 +228,8 @@ The distribution is now running:
 
 Now the kubernetes cluster can be accessed:
 
+<!-- cSpell:disable -->
+
 ```powershell
 ❯ $env:KUBECONFIG="\\wsl$\kwsl\root\.kube\config"
 ❯ kubectl get nodes
@@ -249,6 +251,8 @@ metallb-system       controller-577b5bdfcc-8grxd              1/1     Running   
 metallb-system       speaker-4p5b2                            1/1     Running   0               3m43s
 ```
 
+<!-- cSpell:enable -->
+
 You can now deploy anything on the cluster. As in contains
 [MetalLB](https://metallb.universe.tf/), Any ingress controller (Traefik, for
 instance) can be installed and be available locally.
@@ -262,7 +266,7 @@ instance) can be installed and be available locally.
 See the [open issues](https://github.com/kaweezle/iknite/issues) for a full list
 of proposed features (and known issues).
 
-<p align="right">(<a href="#top">back to top</a>)</p>
+<!-- markdownlint-disable-line --><p align="right">(<a href="#top">back to top</a>)</p>
 
 <!-- CONTRIBUTING -->
 
