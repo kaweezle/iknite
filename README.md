@@ -266,10 +266,9 @@ instance) can be installed and be available locally.
 ### Alternative: Start through OpenRC
 
 Instead of running `iknite` to start the cluster, you can enable the
-`iknite-init` and `iknite-config` services:
+`iknite-config` service with OpenRC:
 
 ```powershell
-PS> wsl -d kwsl rc-update add iknite-init default
 PS> wsl -d kwsl rc-update add iknite-config default
 ```
 

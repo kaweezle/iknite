@@ -5,6 +5,7 @@ description="Configure Kubernetes after initialization"
 
 
 depend() {
+    need iknite-init
     after iknite-init
     after kubelet
 }
