@@ -1,3 +1,4 @@
+# cSpell: disable
 name: goreleaser
 
 on:
@@ -38,6 +39,7 @@ jobs:
           path: |
             dist/*.apk
             dist/metadata.json
+            dist/SHA256SUMS
       - name: Trigger APK repo build
         uses: peter-evans/repository-dispatch@v1
         with:
@@ -92,12 +94,15 @@ jobs:
              --cache-from type=local,src=/tmp/.buildx-cache \
              --cache-to type=local,dest=/tmp/.buildx-cache-new \
              --output type=tar . | gzip >kaweezle.rootfs.tar.gz
+          sha256sum kaweezle.rootfs.tar.gz >> ../packages/SHA256SUMS
 
       - name: Upload root fs artifact
         uses: actions/upload-artifact@v3
         with:
           name: rootfs
-          path: "${{ github.workspace }}/rootfs/kaweezle.rootfs.tar.gz"
+          path: |
+            rootfs/kaweezle.rootfs.tar.gz
+            packages/SHA256SUMS
 
       - name: Move cache
         run: |
@@ -109,5 +114,6 @@ jobs:
         with:
           files: |
             rootfs/kaweezle.rootfs.tar.gz
+            packages/SHA256SUMS
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
