@@ -3,6 +3,8 @@
 name="Iknite Kubernetes starter"
 description="Ensure the environment is correct and start kubeadm"
 
+IKNITE_VERBOSITY="${IKNITE_VERBOSITY:-info}"
+
 depend() {
     after net
     need crio
@@ -11,6 +13,10 @@ depend() {
 
 start() {
     ebegin "Running iknite start"
-    /sbin/iknite -v debug start --openrc >>/var/log/iknite.log 2>&1
+
+    $IKNITE_ENV /sbin/iknite -v $IKNITE_VERBOSITY start \
+        --openrc \
+        ${IKNITE_OPTS} \
+        >>/var/log/iknite.log 2>&1
     eend $?
 }

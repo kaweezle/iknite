@@ -1,0 +1,25 @@
+# Verbosity levels. Possible levels are: debug, info, warn, error, fatal, panic
+#IKNITE_VERBOSITY=info
+
+# Number of retries to access the Cluster API
+#IKNITE_CLUSTER_CHECK_RETRIES=10
+
+# Number of /healthz ok responses before proceeding with the configuration
+# On first initialization, accessing the API server after the first ok will fail.
+#IKNITE_CLUSTER_CHECK_OK_RESPONSES=2
+
+# The kustomization directory to use for configuration
+# Can be a URL. For instance:
+# IKNITE_KUSTOMIZE_DIRECTORY="https://github.com/antoinemartin/autocloud//packages/argocd/?ref=deploy/citest"
+#
+# (Note the double slash // to separate the git repo from the path)
+#IKNITE_KUSTOMIZE_DIRECTORY=/etc/iknite.d
+
+# Environment variables to pass to the configure command.
+# For instance:
+# IKNITE_ENV="SOPS_AGE_KEY_FILE=/mnt/wsl/age.txt"
+IKNITE_ENV=""
+
+# Additional parameters
+IKNITE_OPTS=""
+
