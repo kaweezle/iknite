@@ -92,7 +92,7 @@ nfpms:
       - src: apk/conf.d/iknite-config
         dst: /etc/conf.d/iknite-config
       - src: apk/iknite-killall.sh
-        dst: /sbin/apk/iknite-killall.sh
+        dst: /sbin/iknite-killall.sh
     apk:
       signature:
         key_file: gpg_key.asc
