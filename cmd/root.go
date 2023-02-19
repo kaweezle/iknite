@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+	http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -43,7 +43,7 @@ var rootCmd = &cobra.Command{
 Makes the appropriate initialization of a WSL 2 Alpine distribution for running
 kubernetes.`,
 	Example: `> iknite start`,
-	Version: "v0.2.2", // <---VERSION--->
+	Version: "v0.2.3", // <---VERSION--->
 	// Uncomment the following line if your bare application
 	// has an action associated with it:
 	// Run: func(cmd *cobra.Command, args []string) { },
