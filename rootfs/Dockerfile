@@ -1,12 +1,12 @@
 # syntax=docker/dockerfile:1.3-labs
-FROM alpine:3.17
+FROM alpine:3.19
 
 ARG IKNITE_VERSION=0.2.0
 ARG IKNITE_LAST_TAG=0.2.0
 ARG IKNITE_REPO_URL=https://kaweezle.com/repo/
 ARG IKNITE_KEY_NAME=kaweezle-devel@kaweezle.com-c9d89864.rsa.pub
 ARG IKNITE_BASE_URL=https://github.com/kaweezle/iknite/releases/download
-ARG KUBERNETES_VERSION=1.26.0
+ARG KUBERNETES_VERSION=1.28.4
 
 # Add the dependencies
 RUN --mount=type=bind,target=/apks  \
@@ -50,18 +50,17 @@ COPY --chown=root:root ./p10k.zsh /root/.p10k.zsh
 RUN --security=insecure apk add podman fuse-overlayfs && \
     sed -ie 's/^#mount_program/mount_program/' /etc/containers/storage.conf && \
     podman image pull \
-        registry.k8s.io/pause:3.6 \
         registry.k8s.io/pause:3.8 \
         registry.k8s.io/pause:3.9 \
         registry.k8s.io/kube-controller-manager:v${KUBERNETES_VERSION} \
-        registry.k8s.io/etcd:3.5.6-0 \
+        registry.k8s.io/etcd:3.5.9-0 \
         registry.k8s.io/kube-proxy:v${KUBERNETES_VERSION} \
         registry.k8s.io/kube-scheduler:v${KUBERNETES_VERSION} \
-        registry.k8s.io/coredns/coredns:v1.9.3 \
+        registry.k8s.io/coredns/coredns:v1.10.1 \
         registry.k8s.io/kube-apiserver:v${KUBERNETES_VERSION} \
         docker.io/rancher/local-path-provisioner:master-head \
-        docker.io/rancher/mirrored-flannelcni-flannel-cni-plugin:v1.1.0 \
-        rancher/mirrored-flannelcni-flannel:v0.20.2 \
+        docker.io/flannel/flannel-cni-plugin:v1.4.0-flannel1 \
+        docker.io/flannel/flannel:v0.25.1 \
         quay.io/metallb/controller:v0.13.7 \
         quay.io/metallb/speaker:v0.13.7 \
         k8s.gcr.io/metrics-server/metrics-server:v0.6.2 \

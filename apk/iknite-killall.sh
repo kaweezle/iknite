@@ -7,7 +7,7 @@ set -x
 # /sbin/openrc boot
 
 /etc/init.d/kubelet stop
-/etc/init.d/crio stop
+/etc/init.d/containerd stop
 /etc/init.d/iknite-config stop
 /etc/init.d/iknite-init stop
 
@@ -36,7 +36,7 @@ killtree() {
 }
 
 getshims() {
-    ps -e -o pid= -o args= | sed -e 's/^ *//; s/\s\s*/\t/;' | grep -w '/usr/b[i]n/conmon' | cut -f1
+    ps -e -o pid= -o args= | sed -e 's/^ *//; s/\s\s*/\t/;' | grep -w '/usr/bin/containerd-shim-runc' | cut -f1
 }
 
 killtree $({ set +x; } 2>/dev/null; getshims; set -x)
@@ -57,10 +57,12 @@ do_unmount() {
     set -x
 }
 
-do_unmount '/var/lib/containers/storage'
+# do_unmount '/var/lib/containers/storage'
 do_unmount '/var/lib/kubelet/pods'
 do_unmount '/var/lib/kubelet/plugins'
-do_unmount_and_remove '/run/containers/storage'
+do_unmount '/var/lib/kubelet'
+# do_unmount_and_remove '/run/containers/storage'
+do_unmount_and_remove '/run/containerd'
 do_unmount_and_remove '/run/netns'
 do_unmount_and_remove '/run/ipcns'
 do_unmount_and_remove '/run/utsns'

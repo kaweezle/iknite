@@ -92,9 +92,10 @@ with each release (see below).
 
 Under the hood, iknite uses
 [kubeadm](https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/)
-to install the cluster, and [CRI-O](https://github.com/cri-o/cri-o) as the
-container runtime. The APK package contains the relevant Alpine dependencies so
-everything is already available when iknite is first launched.
+to install the cluster, and
+[containerd](https://github.com/containerd/containerd) as the container runtime.
+The APK package contains the relevant Alpine dependencies so everything is
+already available when iknite is first launched.
 
 With kubeadm, you get a vanilla Kubernetes installation, with its pros and cons.
 There are more moving parts than in other light distributions but you won't be
@@ -277,9 +278,7 @@ And then the cluster is started and restarted with:
 ```powershell
 PS>  wsl -d kwsl openrc default
  * Caching service dependencies ...                                       [ ok ]
- * /var/log/crio: creating directory
- * /var/log/crio/crio.log: creating file
- * Starting crio ...                                                      [ ok ]
+ * Starting containerd ...                                                [ ok ]
  * Running iknite start ...                                               [ ok ]
  * Running iknite config ...                                              [ ok ]
 ```
