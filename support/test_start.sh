@@ -10,4 +10,5 @@ apk --update add krmfnbuiltin k9s openssl nerdctl
 apk add --allow-untrusted --no-cache /mnt/wsl/iknite-*.x86_64.apk
 
 # Start the cluster and deploy the basic components
+openrc -n default
 iknite -v debug -w 120 start
