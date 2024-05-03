@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+	http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -25,17 +25,22 @@ import (
 )
 
 const (
-	openRCDirectory = "/run/openrc"
-	servicesDir     = "/etc/init.d"
-	runLevelDir     = "/etc/runlevels/default"
+	openRCSourceDirectory   = "/lib/rc/init.d"
+	openRCDirectory         = "/run/openrc"
+	servicesDir             = "/etc/init.d"
+	runLevelDir             = "/etc/runlevels/default"
+	flannelDirectory        = "/run/flannel"
+	flannelSourceDirectory  = "/lib/iknite/flannel"
+	flannelSubnetFile       = "/run/flannel/subnet.env"
+	flannelSourceSubnetFile = "/lib/iknite/flannel/subnet.env"
 )
 
 var startedServicesDir = path.Join(openRCDirectory, "started")
 
 func StartOpenRC() (err error) {
-	err = utils.ExecuteIfNotExist(openRCDirectory, func() error {
+	err = utils.ExecuteIfNotExist(startedServicesDir, func() error {
 		log.Info("Starting openrc...")
-		if out, err := utils.Exec.Run(true, "/sbin/openrc", "default"); err == nil {
+		if out, err := utils.Exec.Run(true, "/sbin/openrc", "-n", "default"); err == nil {
 			log.Trace(string(out))
 			return nil
 		} else {
@@ -122,8 +127,27 @@ func StopService(serviceName string) error {
 
 func PretendServiceStarted(serviceName string) error {
 	var networkSource = path.Join(servicesDir, serviceName)
-	var networkDestination = path.Join(openRCDirectory, "started", serviceName)
+	var networkDestination = path.Join(startedServicesDir, serviceName)
 	return utils.ExecuteIfNotExist(networkDestination, func() error {
 		return os.Symlink(networkSource, networkDestination)
 	})
+}
+
+func EnsureOpenRCDirectory() error {
+	return utils.ExecuteIfNotExist(openRCDirectory, func() error {
+		return os.Symlink(openRCSourceDirectory, openRCDirectory)
+	})
+}
+
+func EnsureFlannelDirectory() (err error) {
+	// The directory may be there but not the file
+	err = utils.ExecuteIfNotExist(flannelDirectory, func() error {
+		return os.Symlink(flannelSourceDirectory, flannelDirectory)
+	})
+	if err != nil {
+		err = utils.ExecuteIfNotExist(flannelSubnetFile, func() error {
+			return os.Symlink(flannelSourceSubnetFile, flannelSubnetFile)
+		})
+	}
+	return
 }

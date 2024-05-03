@@ -64,11 +64,13 @@ nfpms:
     dependencies:
       - openrc
       - ip6tables
-      - cri-o
+      - containerd
       - kubelet
       - kubeadm
       - kubectl
-      - cri-o-contrib-cni
+      - cni-plugins
+      - cni-plugin-flannel
+      - flannel
       - git
       - util-linux-misc
     bindir: /sbin
@@ -93,6 +95,10 @@ nfpms:
         dst: /etc/conf.d/iknite-config
       - src: apk/iknite-killall.sh
         dst: /sbin/iknite-killall.sh
+      - src: apk/flannel/10-flannel.conflist
+        dst: /etc/cni/net.d/10-flannel.conflist
+      - src: apk/flannel/subnet.env
+        dst: /lib/iknite/flannel/subnet.env
     apk:
       signature:
         key_file: gpg_key.asc

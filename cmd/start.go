@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+	http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -23,7 +23,7 @@ import (
 
 	"github.com/kaweezle/iknite/pkg/alpine"
 	"github.com/kaweezle/iknite/pkg/constants"
-	"github.com/kaweezle/iknite/pkg/crio"
+	"github.com/kaweezle/iknite/pkg/cri"
 	"github.com/kaweezle/iknite/pkg/k8s"
 	"github.com/kaweezle/iknite/pkg/utils"
 	"github.com/mitchellh/mapstructure"
@@ -43,7 +43,7 @@ var startCmd = &cobra.Command{
 	Long: `Starts the cluster. Performs the following operations:
 
 - Starts OpenRC,
-- Starts CRI-O,
+- Starts containerd,
 - If Kubelet has never been started, execute kubeadm init to provision
   the cluster,
 - Allows the use of kubectl from the root account,
@@ -72,7 +72,7 @@ func init() {
 	startCmd.Flags().String("domain-name", domain_name, "Domain name of the cluster")
 	startCmd.Flags().Bool("enable-mdns", wsl, "Enable mDNS publication of domain name")
 	startCmd.Flags().StringVar(&k8s.KubernetesVersion, "kubernetes-version", k8s.KubernetesVersion, "Kubernetes version to install")
-	startCmd.Flags().Bool("openrc", false, "Run in OpenRC (assume OpenRC and CRI-O available)")
+	startCmd.Flags().Bool("openrc", false, "Run in OpenRC (assume OpenRC and containerd available)")
 	viper.BindPFlag("openrc", startCmd.Flags().Lookup("openrc"))
 
 	initializeKustomization(startCmd)
@@ -100,6 +100,11 @@ func perform(cmd *cobra.Command, args []string) {
 	utils.WriteFile("/proc/sys/net/ipv4/ip_forward", []byte("1\n"), os.FileMode(int(0644)))
 
 	cobra.CheckErr(alpine.EnsureNetFilter())
+
+	// Make bridge use ip-tables
+	utils.WriteFile("/proc/sys/net/bridge/bridge-nf-call-iptables", []byte("1\n"), os.FileMode(int(0644)))
+
+	cobra.CheckErr(alpine.EnsureMachineID())
 
 	clusterIP := net.ParseIP(clusterConfig.Ip)
 	if clusterIP == nil {
@@ -160,9 +165,13 @@ func perform(cmd *cobra.Command, args []string) {
 
 	if standalone {
 		// Start OpenRC
+		cobra.CheckErr(alpine.EnsureOpenRCDirectory())
 		cobra.CheckErr(alpine.StartOpenRC())
-		cobra.CheckErr(alpine.EnableService(constants.CrioServiceName))
-		cobra.CheckErr(alpine.StartService(constants.CrioServiceName))
+		cobra.CheckErr(alpine.EnsureFlannelDirectory())
+		cobra.CheckErr(alpine.EnableService(constants.FlannelServiceName))
+		cobra.CheckErr(alpine.StartService(constants.FlannelServiceName))
+		cobra.CheckErr(alpine.EnableService(constants.ContainerServiceName))
+		cobra.CheckErr(alpine.StartService(constants.ContainerServiceName))
 	}
 
 	// Enable the services
@@ -173,11 +182,11 @@ func perform(cmd *cobra.Command, args []string) {
 	}
 
 	if standalone || !exist {
-		// CRI-O is started by OpenRC
-		available, err := crio.WaitForCrio()
+		// CRI service is started by OpenRC
+		available, err := cri.WaitForContainerService()
 		cobra.CheckErr(err)
 		if !available {
-			log.Fatal("CRI-O not available")
+			log.Fatal("CRI Service not available")
 		}
 	}
 
@@ -197,7 +206,7 @@ func perform(cmd *cobra.Command, args []string) {
 		cobra.CheckErr(config.RenameConfig(ClusterName).WriteToFile(constants.KubernetesRootConfig))
 	} else if standalone {
 		// The service should have been started by OpenRC
-		log.Info("Waiting for service to start...")
+		log.Info("Waiting for kubelet service to start...")
 		cobra.CheckErr(config.CheckClusterRunning(10, 2, 500))
 	}
 

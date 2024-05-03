@@ -7,7 +7,7 @@ IKNITE_VERBOSITY="${IKNITE_VERBOSITY:-info}"
 
 depend() {
     after net
-    need crio
+    need containerd
     # before kubelet
 }
 
