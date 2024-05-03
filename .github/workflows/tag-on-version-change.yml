@@ -2,7 +2,7 @@ on:
   push:
     branches: [main]
 
-name: Create Git Tag
+name: Create Git Tag when version changes in code
 jobs:
   versioner:
     name: Create a tag if version has changed
