@@ -165,7 +165,11 @@ func perform(cmd *cobra.Command, args []string) {
 
 	if standalone {
 		// Start OpenRC
+		cobra.CheckErr(alpine.EnsureOpenRCDirectory())
 		cobra.CheckErr(alpine.StartOpenRC())
+		cobra.CheckErr(alpine.EnsureFlannelDirectory())
+		cobra.CheckErr(alpine.EnableService(constants.FlannelServiceName))
+		cobra.CheckErr(alpine.StartService(constants.FlannelServiceName))
 		cobra.CheckErr(alpine.EnableService(constants.ContainerServiceName))
 		cobra.CheckErr(alpine.StartService(constants.ContainerServiceName))
 	}

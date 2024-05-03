@@ -62,7 +62,7 @@ func WaitForContainerService() (bool, error) {
 					falseConditions := 0
 					for _, v := range response.Status.Conditions {
 						conditions += 1
-						if !v.Status && v.Type != "NetworkReady" { // Network will be created by flannel
+						if !v.Status {
 							falseConditions += 1
 						}
 					}

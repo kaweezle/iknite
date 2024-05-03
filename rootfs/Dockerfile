@@ -10,8 +10,8 @@ ARG KUBERNETES_VERSION=1.29.3
 
 # Add the dependencies
 RUN --mount=type=bind,target=/apks  \
-    echo "http://dl-cdn.alpinelinux.org/alpine/edge/community/" >> /etc/apk/repositories && \
-    echo "http://dl-cdn.alpinelinux.org/alpine/edge/testing/" >> /etc/apk/repositories && \
+    echo "https://dl-cdn.alpinelinux.org/alpine/edge/community/" >> /etc/apk/repositories && \
+    echo "https://dl-cdn.alpinelinux.org/alpine/edge/testing/" >> /etc/apk/repositories && \
     echo "${IKNITE_REPO_URL}" >> /etc/apk/repositories && \
     wget -O /etc/apk/keys/${IKNITE_KEY_NAME} "${IKNITE_BASE_URL}/${IKNITE_LAST_TAG}/${IKNITE_KEY_NAME}" && \
     apk update --quiet && \

@@ -18,6 +18,7 @@ package constants
 const (
 	KubectlCmd                    = "/usr/bin/kubectl"
 	ContainerServiceSock          = "/run/containerd/containerd.sock"
+	FlannelServiceName            = "flanneld"
 	ContainerServiceName          = "containerd"
 	KubeletServiceName            = "kubelet"
 	MDNSServiceName               = "iknite-mdns"

@@ -28,20 +28,18 @@ export CONTAINERD_SNAPSHOTTER=fuse-overlayfs
 containerd >/var/log/containerd.log 2>&1 &
 sleep 3
 
-nerdctl --namespace=k8s.io pull -q registry.k8s.io/pause:3.8 
-nerdctl --namespace=k8s.io pull -q registry.k8s.io/pause:3.9 
+nerdctl --namespace=k8s.io pull -q registry.k8s.io/pause:3.8
+nerdctl --namespace=k8s.io pull -q registry.k8s.io/pause:3.9
 nerdctl --namespace=k8s.io pull -q registry.k8s.io/kube-controller-manager:v${KUBERNETES_VERSION} 
-nerdctl --namespace=k8s.io pull -q registry.k8s.io/etcd:3.5.9-0 
+nerdctl --namespace=k8s.io pull -q registry.k8s.io/etcd:3.5.12-0 
 nerdctl --namespace=k8s.io pull -q registry.k8s.io/kube-proxy:v${KUBERNETES_VERSION} 
 nerdctl --namespace=k8s.io pull -q registry.k8s.io/kube-scheduler:v${KUBERNETES_VERSION} 
-nerdctl --namespace=k8s.io pull -q registry.k8s.io/coredns/coredns:v1.10.1 
+nerdctl --namespace=k8s.io pull -q registry.k8s.io/coredns/coredns:v1.11.1 
 nerdctl --namespace=k8s.io pull -q registry.k8s.io/kube-apiserver:v${KUBERNETES_VERSION} 
 nerdctl --namespace=k8s.io pull -q docker.io/rancher/local-path-provisioner:master-head 
-nerdctl --namespace=k8s.io pull -q docker.io/flannel/flannel-cni-plugin:v1.4.0-flannel1 
-nerdctl --namespace=k8s.io pull -q docker.io/flannel/flannel:v0.25.1 
-nerdctl --namespace=k8s.io pull -q quay.io/metallb/controller:v0.13.7 
-nerdctl --namespace=k8s.io pull -q quay.io/metallb/speaker:v0.13.7 
-nerdctl --namespace=k8s.io pull -q k8s.gcr.io/metrics-server/metrics-server:v0.6.2 
+nerdctl --namespace=k8s.io pull -q quay.io/metallb/controller:v0.14.5
+nerdctl --namespace=k8s.io pull -q quay.io/metallb/speaker:v0.14.5 
+nerdctl --namespace=k8s.io pull -q registry.k8s.io/metrics-server/metrics-server:v0.7.1
 nerdctl --namespace=k8s.io pull -q docker.io/boxboat/kubectl:${KUBERNETES_VERSION}
 
 kill %1 %2
