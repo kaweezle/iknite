@@ -96,7 +96,17 @@ func perform(cmd *cobra.Command, args []string) {
 	standalone := !viper.GetBool("openrc")
 	cobra.CheckErr(err)
 
+	log.WithFields(log.Fields{
+		"ip":                 clusterConfig.Ip,
+		"kubernetes_version": clusterConfig.KubernetesVersion,
+		"domain_name":        clusterConfig.DomainName,
+		"create_ip":          clusterConfig.CreateIp,
+		"network_interface":  clusterConfig.NetworkInterface,
+		"enable_mdns":        clusterConfig.EnableMDNS,
+	}).Info("Starting cluster")
+
 	// Allow forwarding (kubeadm requirement)
+	log.Info("Ensuring basic settings...")
 	utils.WriteFile("/proc/sys/net/ipv4/ip_forward", []byte("1\n"), os.FileMode(int(0644)))
 
 	cobra.CheckErr(alpine.EnsureNetFilter())
@@ -146,11 +156,13 @@ func perform(cmd *cobra.Command, args []string) {
 	config, err := k8s.LoadFromDefault()
 	if err == nil {
 		if config.IsConfigServerAddress(clusterConfig.GetApiEndPoint()) {
+			log.Info("Kubeconfig already exists")
 			exist = true
 		} else {
 			// If the configuration has changed, we stop and disable the kubelet
 			// that may be started and clean the configuration, i.e. delete
 			// certificates and manifests.
+			log.Info("Kubernetes configuration has changed. Cleaning...")
 			cobra.CheckErr(alpine.StopService(constants.KubeletServiceName))
 			cobra.CheckErr(alpine.DisableService(constants.KubeletServiceName))
 			cobra.CheckErr(k8s.CleanConfig())
@@ -161,15 +173,19 @@ func perform(cmd *cobra.Command, args []string) {
 		if !os.IsNotExist(err) {
 			cobra.CheckErr(errors.Wrap(err, "While loading existing kubeconfig"))
 		}
+		log.Info("No current configuration found. Initializing...")
 	}
 
 	if standalone {
 		// Start OpenRC
+		log.Info("Ensuring OpenRC...")
 		cobra.CheckErr(alpine.EnsureOpenRCDirectory())
 		cobra.CheckErr(alpine.StartOpenRC())
+		log.Info("Ensuring Flannel...")
 		cobra.CheckErr(alpine.EnsureFlannelDirectory())
 		cobra.CheckErr(alpine.EnableService(constants.FlannelServiceName))
 		cobra.CheckErr(alpine.StartService(constants.FlannelServiceName))
+		log.Info("Ensuring CRI...")
 		cobra.CheckErr(alpine.EnableService(constants.ContainerServiceName))
 		cobra.CheckErr(alpine.StartService(constants.ContainerServiceName))
 	}
@@ -177,12 +193,14 @@ func perform(cmd *cobra.Command, args []string) {
 	// Enable the services
 	cobra.CheckErr(alpine.EnableService(constants.KubeletServiceName))
 	if clusterConfig.EnableMDNS {
+		log.Info("Ensuring MDNS...")
 		cobra.CheckErr(alpine.EnableService(constants.MDNSServiceName))
 		cobra.CheckErr(alpine.StartService(constants.MDNSServiceName))
 	}
 
 	if standalone || !exist {
 		// CRI service is started by OpenRC
+		log.Info("Checking CRI is ready...")
 		available, err := cri.WaitForContainerService()
 		cobra.CheckErr(err)
 		if !available {
@@ -195,6 +213,9 @@ func perform(cmd *cobra.Command, args []string) {
 		// - First initialization
 		// - After a configuration change. In this case, we expect kubeadm to
 		//   recreate the certificates and the manifests for the control plane.
+		log.WithFields(log.Fields{
+			"config": clusterConfig,
+		}).Info("Running kubeadm init")
 		cobra.CheckErr(k8s.RunKubeadmInit(clusterConfig))
 		config, err = k8s.LoadFromDefault()
 		cobra.CheckErr(err)
@@ -206,7 +227,7 @@ func perform(cmd *cobra.Command, args []string) {
 		cobra.CheckErr(config.RenameConfig(ClusterName).WriteToFile(constants.KubernetesRootConfig))
 	} else if standalone {
 		// The service should have been started by OpenRC
-		log.Info("Waiting for kubelet service to start...")
+		log.Info("Checking kubelet...")
 		cobra.CheckErr(config.CheckClusterRunning(10, 2, 500))
 	}
 
@@ -216,6 +237,7 @@ func perform(cmd *cobra.Command, args []string) {
 		cobra.CheckErr(err)
 		cobra.CheckErr(doConfiguration(clusterIP, config, force))
 	} else {
+		log.Info("Enabling ", constants.ConfigureServiceName)
 		cobra.CheckErr(alpine.EnableService(constants.ConfigureServiceName))
 	}
 

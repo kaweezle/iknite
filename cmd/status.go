@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+	http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -23,6 +23,7 @@ import (
 	"github.com/kaweezle/iknite/pkg/constants"
 	"github.com/kaweezle/iknite/pkg/k8s"
 	"github.com/pkg/errors"
+	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"k8s.io/apimachinery/pkg/util/runtime"
 )
@@ -79,6 +80,9 @@ func callback(ok bool, count int, ready []*k8s.WorkloadState, unready []*k8s.Wor
 func performStatus(cmd *cobra.Command, args []string) {
 
 	runtime.ErrorHandlers = runtime.ErrorHandlers[:0]
+	log.WithFields(log.Fields{
+		"config": constants.KubernetesRootConfig,
+	}).Info("Loading kube config...")
 
 	// We need to get it from root as we will apply configuration
 	config, err := k8s.LoadFromFile(constants.KubernetesRootConfig)
