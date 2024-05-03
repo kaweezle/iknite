@@ -43,7 +43,7 @@ var rootCmd = &cobra.Command{
 Makes the appropriate initialization of a WSL 2 Alpine distribution for running
 kubernetes.`,
 	Example: `> iknite start`,
-	Version: "v0.3.0", // <---VERSION--->
+	Version: "v0.3.1", // <---VERSION--->
 	// Uncomment the following line if your bare application
 	// has an action associated with it:
 	// Run: func(cmd *cobra.Command, args []string) { },
@@ -57,6 +57,7 @@ func Execute() {
 
 func init() {
 	cobra.OnInitialize(initConfig)
+	cobra.EnableTraverseRunHooks = true
 
 	// Here you will define your flags and configuration settings.
 	// Cobra supports persistent flags, which, if defined here,
