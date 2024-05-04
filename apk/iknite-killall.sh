@@ -7,6 +7,7 @@ set -x
 # /sbin/openrc boot
 
 /etc/init.d/kubelet stop
+crictl rm -f $(crictl ps -aq)
 /etc/init.d/containerd stop
 /etc/init.d/iknite-config stop
 /etc/init.d/iknite-init stop

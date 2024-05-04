@@ -70,7 +70,6 @@ nfpms:
       - kubectl
       - cni-plugins
       - cni-plugin-flannel
-      - flannel
       - git
       - util-linux-misc
     bindir: /sbin
@@ -83,6 +82,8 @@ nfpms:
         dst: /etc/iknite.d/base/kustomization.yaml
       - src: apk/iknite.d/base/metallb-addresspool.yaml
         dst: /etc/iknite.d/base/metallb-addresspool.yaml
+      - src: apk/iknite.d/base/kube-flannel.yaml
+        dst: /etc/iknite.d/base/kube-flannel.yaml
       - src: apk/init.d/iknite-mdns
         dst: /etc/init.d/iknite-mdns
       - src: apk/init.d/iknite-init

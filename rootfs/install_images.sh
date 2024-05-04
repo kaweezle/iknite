@@ -40,6 +40,7 @@ nerdctl --namespace=k8s.io pull -q docker.io/rancher/local-path-provisioner:mast
 nerdctl --namespace=k8s.io pull -q quay.io/metallb/controller:v0.14.5
 nerdctl --namespace=k8s.io pull -q quay.io/metallb/speaker:v0.14.5 
 nerdctl --namespace=k8s.io pull -q registry.k8s.io/metrics-server/metrics-server:v0.7.1
+nerdctl --namespace=k8s.io pull -q docker.io/flannel/flannel:v0.25.1
 nerdctl --namespace=k8s.io pull -q docker.io/boxboat/kubectl:${KUBERNETES_VERSION}
 
 kill %1 %2
