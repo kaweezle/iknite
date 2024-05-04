@@ -25,14 +25,10 @@ import (
 )
 
 const (
-	openRCSourceDirectory   = "/lib/rc/init.d"
-	openRCDirectory         = "/run/openrc"
-	servicesDir             = "/etc/init.d"
-	runLevelDir             = "/etc/runlevels/default"
-	flannelDirectory        = "/run/flannel"
-	flannelSourceDirectory  = "/lib/iknite/flannel"
-	flannelSubnetFile       = "/run/flannel/subnet.env"
-	flannelSourceSubnetFile = "/lib/iknite/flannel/subnet.env"
+	openRCSourceDirectory = "/lib/rc/init.d"
+	openRCDirectory       = "/run/openrc"
+	servicesDir           = "/etc/init.d"
+	runLevelDir           = "/etc/runlevels/default"
 )
 
 var startedServicesDir = path.Join(openRCDirectory, "started")
@@ -137,17 +133,4 @@ func EnsureOpenRCDirectory() error {
 	return utils.ExecuteIfNotExist(openRCDirectory, func() error {
 		return os.Symlink(openRCSourceDirectory, openRCDirectory)
 	})
-}
-
-func EnsureFlannelDirectory() (err error) {
-	// The directory may be there but not the file
-	err = utils.ExecuteIfNotExist(flannelDirectory, func() error {
-		return os.Symlink(flannelSourceDirectory, flannelDirectory)
-	})
-	if err != nil {
-		err = utils.ExecuteIfNotExist(flannelSubnetFile, func() error {
-			return os.Symlink(flannelSourceSubnetFile, flannelSubnetFile)
-		})
-	}
-	return
 }

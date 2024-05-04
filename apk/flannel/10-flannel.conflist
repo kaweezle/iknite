@@ -4,6 +4,7 @@
   "plugins": [
     {
       "type": "flannel",
+      "subnetFile": "/lib/iknite/flannel/subnet.env",
       "delegate": {
         "hairpinMode": true,
         "isDefaultGateway": true
