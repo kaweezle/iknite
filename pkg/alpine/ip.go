@@ -79,6 +79,16 @@ func removeIpAddresses(hosts *txeh.Hosts, toRemove []net.IP) {
 	}
 }
 
+func IpMappingForHost(hosts *txeh.Hosts, domainName string) (net.IP, error) {
+
+	found, address, _ := hosts.HostAddressLookup(domainName, txeh.IPFamilyV4)
+	if !found {
+		return nil, fmt.Errorf("no IP address found for %s", domainName)
+	} else {
+		return net.ParseIP(address), nil
+	}
+}
+
 func AddIpMapping(hostConfig *txeh.HostsConfig, ip string, domainName string, toRemove []net.IP) (err error) {
 	var hosts *txeh.Hosts
 	hosts, err = txeh.NewHosts(hostConfig)
