@@ -89,7 +89,7 @@ func IpMappingForHost(hosts *txeh.Hosts, domainName string) (net.IP, error) {
 	}
 }
 
-func AddIpMapping(hostConfig *txeh.HostsConfig, ip string, domainName string, toRemove []net.IP) (err error) {
+func AddIpMapping(hostConfig *txeh.HostsConfig, ip net.IP, domainName string, toRemove []net.IP) (err error) {
 	var hosts *txeh.Hosts
 	hosts, err = txeh.NewHosts(hostConfig)
 	if err != nil {
@@ -97,19 +97,19 @@ func AddIpMapping(hostConfig *txeh.HostsConfig, ip string, domainName string, to
 	}
 	removeIpAddresses(hosts, toRemove)
 
-	hosts.AddHost(ip, domainName)
+	hosts.AddHost(ip.String(), domainName)
 	err = hosts.Save()
 	return
 }
 
-func IsHostMapped(Ip string, DomainName string) (bool, []net.IP) {
+func IsHostMapped(Ip net.IP, DomainName string) (bool, []net.IP) {
 	ips, err := net.LookupIP(DomainName)
 	contains := false
 	if err != nil {
 		ips = []net.IP{}
 	} else {
 		for _, existing := range ips {
-			if existing.String() == Ip {
+			if existing.Equal(Ip) {
 				contains = true
 				break
 			}

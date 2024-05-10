@@ -17,6 +17,7 @@ package k8s
 
 import (
 	"io"
+	"net"
 	"os"
 	"path"
 	"path/filepath"
@@ -39,7 +40,7 @@ const (
 var KubernetesVersion = "1.29.3"
 
 type KubeadmConfig struct {
-	Ip                string `mapstructure:"ip"`
+	Ip                net.IP `mapstructure:"ip"`
 	KubernetesVersion string `mapstructure:"kubernetes_version"`
 	DomainName        string `mapstructure:"domain_name"`
 	CreateIp          bool   `mapstructure:"create_ip"`
@@ -51,7 +52,7 @@ func (c *KubeadmConfig) GetApiEndPoint() string {
 	if c.DomainName != "" {
 		return c.DomainName
 	}
-	return c.Ip
+	return c.Ip.String()
 }
 
 const kubeadmConfigTemplate = `
@@ -139,7 +140,8 @@ func CleanConfig() (err error) {
 		WithField("dir", kubernetesConfigurationDirectory).
 		Info("Cleaning Kubernetes configuration directory")
 	configGlob := path.Join(kubernetesConfigurationDirectory, configurationPattern)
-	if files, err := filepath.Glob(configGlob); err == nil {
+	var files []string
+	if files, err = filepath.Glob(configGlob); err == nil {
 		for _, file := range files {
 			log.WithField("file", file).Trace("Removing configuration file")
 			err = os.Remove(file)
@@ -152,7 +154,7 @@ func CleanConfig() (err error) {
 
 	if err == nil {
 		manifestsGlob := path.Join(kubernetesConfigurationDirectory, manifestsSubdirectory, "*.yaml")
-		if files, err := filepath.Glob(manifestsGlob); err == nil {
+		if files, err = filepath.Glob(manifestsGlob); err == nil {
 			for _, file := range files {
 				log.WithField("file", file).Trace("Removing manifest file")
 				err = os.Remove(file)

@@ -151,7 +151,7 @@ func killTree(pid string) error {
 	if err != nil {
 		return err
 	}
-	s.Exec(fmt.Sprintf("/sbin/pgrep -P %s", pid)).FilterLine(func(s string) string {
+	s.Exec(fmt.Sprintf("/usr/bin/pgrep -P %s", pid)).FilterLine(func(s string) string {
 		killTree(s)
 		return s
 	}).Wait()

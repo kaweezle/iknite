@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+	http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,18 +18,24 @@ package k8s
 import (
 	"context"
 	"fmt"
+	"net"
 	"time"
 
 	"github.com/kaweezle/iknite/pkg/constants"
+	"github.com/kaweezle/iknite/pkg/provision"
+	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
+	"github.com/spf13/viper"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	k8Errors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/clientcmd/api"
+	"sigs.k8s.io/kustomize/kyaml/resid"
 )
 
 type Config api.Config
@@ -179,9 +185,54 @@ func (config *Config) RestartProxy() (err error) {
 	return
 }
 
+func (config *Config) DoConfiguration(ip net.IP, force bool, waitTimeout int) error {
+	client, err := config.Client()
+	if err != nil {
+		return err
+	}
+	cm, err := GetIkniteConfigMap(client)
+	if err != nil {
+		return err
+	}
+	if cm.Data["configured"] == "true" && !force {
+		log.Info("configuration has already occurred. Use -C to force.")
+	} else {
+		context := log.Fields{
+			"OutboundIP": ip,
+		}
+		var ids []resid.ResId
+		var err error
+		kustomizeDirectory := viper.GetString("kustomize_directory")
+		if ids, err = provision.ApplyBaseKustomizations(kustomizeDirectory, context); err != nil {
+			return err
+		}
+
+		cm.Data["configured"] = "true"
+		_, err = WriteIkniteConfigMap(client, cm)
+		if err != nil {
+			return errors.Wrap(err, "While writing configuration")
+		}
+
+		log.WithFields(log.Fields{
+			"directory": kustomizeDirectory,
+			"resources": ids,
+		}).Info("Configuration applied")
+
+	}
+
+	if waitTimeout > 0 {
+		log.Infof("Waiting for workloads for %d seconds...", waitTimeout)
+		runtime.ErrorHandlers = runtime.ErrorHandlers[:0]
+		return config.WaitForWorkloads(time.Second*time.Duration(waitTimeout), nil)
+	}
+
+	return nil
+
+}
+
 func GetIkniteConfigMap(client *kubernetes.Clientset) (cm *corev1.ConfigMap, err error) {
 	cm, err = client.CoreV1().ConfigMaps("kube-system").Get(context.TODO(), "iknite-config", metav1.GetOptions{})
-	if errors.IsNotFound(err) {
+	if k8Errors.IsNotFound(err) {
 		err = nil
 		cm = &corev1.ConfigMap{
 			TypeMeta:   metav1.TypeMeta{Kind: "ConfigMap", APIVersion: "v1"},
