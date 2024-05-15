@@ -7,6 +7,7 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/pion/mdns"
 	log "github.com/sirupsen/logrus"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 )
@@ -19,7 +20,7 @@ func NewDaemonizePhase() workflow.Phase {
 	}
 }
 
-func WaitForKubelet(cmd *exec.Cmd) error {
+func WaitForKubelet(cmd *exec.Cmd, conn *mdns.Conn) error {
 
 	// Wait for SIGTERM and SIGKILL signals
 	stop := make(chan os.Signal, 1)
@@ -32,6 +33,7 @@ func WaitForKubelet(cmd *exec.Cmd) error {
 
 	var err error
 	// Wait for the signals or for the child process to stop
+	log.Info("Waiting for the kubelet to stop or receive a stop signal...")
 	for alive := true; alive; {
 		select {
 		case <-stop:
@@ -40,11 +42,20 @@ func WaitForKubelet(cmd *exec.Cmd) error {
 			err = cmd.Process.Signal(syscall.SIGTERM)
 			if err == nil {
 				cmd.Wait()
+				if conn != nil {
+					log.Info("Stopping the mdns responder...")
+					err = conn.Close()
+				}
 			}
+
 			alive = false
 		case <-cmdDone:
 			// Child process has stopped
 			log.Infof("Kubelet stopped with state: %s", cmd.ProcessState.String())
+			if conn != nil {
+				log.Info("Stopping the mdns responder...")
+				err = conn.Close()
+			}
 			alive = false
 		}
 
@@ -63,7 +74,9 @@ func runDaemonize(c workflow.RunData) error {
 	if cmd == nil {
 		return nil
 	}
-	err := WaitForKubelet(cmd)
+	conn := data.MDnsConn()
+
+	err := WaitForKubelet(cmd, conn)
 	if err == nil {
 		// Prevent double stop
 		data.SetKubeletCmd(nil)

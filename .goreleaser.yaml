@@ -84,16 +84,10 @@ nfpms:
         dst: /etc/iknite.d/base/metallb-addresspool.yaml
       - src: apk/iknite.d/base/kube-flannel.yaml
         dst: /etc/iknite.d/base/kube-flannel.yaml
-      - src: apk/init.d/iknite-mdns
-        dst: /etc/init.d/iknite-mdns
-      - src: apk/init.d/iknite-init
-        dst: /etc/init.d/iknite-init
-      - src: apk/init.d/iknite-config
-        dst: /etc/init.d/iknite-config
-      - src: apk/conf.d/iknite-init
-        dst: /etc/conf.d/iknite-init
-      - src: apk/conf.d/iknite-config
-        dst: /etc/conf.d/iknite-config
+      - src: apk/init.d/iknite
+        dst: /etc/init.d/iknite
+      - src: apk/conf.d/iknite
+        dst: /etc/conf.d/iknite
       - src: apk/flannel/10-flannel.conflist
         dst: /etc/cni/net.d/10-flannel.conflist
       - src: apk/flannel/subnet.env

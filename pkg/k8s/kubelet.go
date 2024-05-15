@@ -24,7 +24,6 @@ const (
 	kubeletPidFile        = "/run/kubelet.pid"
 	kubeletLogDir         = "/var/log/kubelet"
 	kubeletLogFile        = "/var/log/kubelet/kubelet.log"
-	iknitePidFile         = "/run/iknite.pid"
 	kubeletArgsEnv        = "command_args"
 	kubeletKubeadmArgsEnv = "KUBELET_KUBEADM_ARGS"
 )
@@ -112,22 +111,11 @@ func StartKubelet() (*exec.Cmd, error) {
 		}).Warn("Failed to write kubelet PID file")
 	}
 
-	// Write the current PID to the /run/iknite.pid file
-	err = os.WriteFile(iknitePidFile, []byte(fmt.Sprintf("%d", os.Getpid())), 0644)
-	if err != nil {
-		log.WithFields(log.Fields{
-			"pid":     os.Getpid(),
-			"err":     err,
-			"pidFile": iknitePidFile,
-		}).Warn("Failed to write ikinte PID file")
-	}
-
 	return cmd, nil
 }
 
 func RemovePidFiles() {
 	os.Remove(kubeletPidFile)
-	os.Remove(iknitePidFile)
 }
 
 func StartAndConfigureKubelet(kubeConfig *IkniteConfig) error {

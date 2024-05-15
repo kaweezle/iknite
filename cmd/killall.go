@@ -59,6 +59,7 @@ func init() {
 	rootCmd.AddCommand(killallCmd)
 
 	initializeKillall(killallCmd)
+	configureClusterCommand(killallCmd.Flags(), ikniteConfig)
 }
 
 func performKillall(cmd *cobra.Command, args []string) {
@@ -71,8 +72,8 @@ func performKillall(cmd *cobra.Command, args []string) {
 	}
 
 	if stopServices {
-		log.Info("Stopping kubelet...")
-		cobra.CheckErr(alpine.StopService("kubelet"))
+		log.Info("Stopping iknite...")
+		cobra.CheckErr(alpine.StopService("iknite"))
 
 		if stopContainers {
 			log.Info("Stopping all containers...")
@@ -83,10 +84,6 @@ func performKillall(cmd *cobra.Command, args []string) {
 
 		log.Info("Stopping containerd...")
 		cobra.CheckErr(alpine.StopService("containerd"))
-		log.Info("Stopping iknite-config...")
-		cobra.CheckErr(alpine.StopService("iknite-config"))
-		log.Info("Stopping iknite-init...")
-		cobra.CheckErr(alpine.StopService("iknite-init"))
 	}
 
 	if deleteShims {
@@ -122,11 +119,11 @@ func performKillall(cmd *cobra.Command, args []string) {
 		cobra.CheckErr(err)
 	}
 
-	if resetIpAddress {
+	if resetIpAddress && ikniteConfig.CreateIp {
 		log.Info("Resetting IP address...")
 		hosts, err := txeh.NewHosts(&txeh.HostsConfig{})
 		cobra.CheckErr(err)
-		ip, err := alpine.IpMappingForHost(hosts, "kaweezle.local")
+		ip, err := alpine.IpMappingForHost(hosts, ikniteConfig.DomainName)
 		cobra.CheckErr(err)
 		ones, _ := ip.DefaultMask().Size()
 		ipWithMask := fmt.Sprintf("%v/%d", ip, ones)
@@ -137,7 +134,7 @@ func performKillall(cmd *cobra.Command, args []string) {
 		}).ExecForEach(fmt.Sprintf("ip addr del %s dev {{.}}", ipWithMask))
 		p.Wait()
 		cobra.CheckErr(p.Error())
-		hosts.RemoveHost("kaweezle.local")
+		hosts.RemoveHost(ikniteConfig.DomainName)
 		cobra.CheckErr(hosts.Save())
 	}
 }

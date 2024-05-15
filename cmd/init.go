@@ -24,6 +24,7 @@ import (
 	"path/filepath"
 	"syscall"
 
+	"github.com/pion/mdns"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	flag "github.com/spf13/pflag"
@@ -106,6 +107,7 @@ type initData struct {
 	adminKubeConfigBootstrapped bool
 	ikniteConfig                *k8s.IkniteConfig
 	kubeletCmd                  *exec.Cmd
+	mdnsConn                    *mdns.Conn
 }
 
 func init() {
@@ -197,6 +199,7 @@ func newCmdInit(out io.Writer, initOptions *initOptions) *cobra.Command {
 	initRunner.AppendPhase(phases.NewBootstrapTokenPhase())
 	initRunner.AppendPhase(phases.NewKubeletFinalizePhase())
 	initRunner.AppendPhase(phases.NewAddonPhase())
+	initRunner.AppendPhase(iknphase.NewMDnsPublishPhase())
 	initRunner.AppendPhase(iknphase.NewConfigureClusterPhase())
 	initRunner.AppendPhase(iknphase.NewDaemonizePhase())
 	// initRunner.AppendPhase(phases.NewShowJoinCommandPhase())
@@ -694,4 +697,12 @@ func (d *initData) KubeletCmd() *exec.Cmd {
 
 func (d *initData) SetKubeletCmd(cmd *exec.Cmd) {
 	d.kubeletCmd = cmd
+}
+
+func (d *initData) SetMDnsConn(conn *mdns.Conn) {
+	d.mdnsConn = conn
+}
+
+func (d *initData) MDnsConn() *mdns.Conn {
+	return d.mdnsConn
 }
