@@ -190,6 +190,7 @@ func (config *Config) DoConfiguration(ip net.IP, force bool, waitTimeout int) er
 	if err != nil {
 		return err
 	}
+
 	cm, err := GetIkniteConfigMap(client)
 	if err != nil {
 		return err
@@ -217,7 +218,6 @@ func (config *Config) DoConfiguration(ip net.IP, force bool, waitTimeout int) er
 			"directory": kustomizeDirectory,
 			"resources": ids,
 		}).Info("Configuration applied")
-
 	}
 
 	if waitTimeout > 0 {
@@ -230,7 +230,7 @@ func (config *Config) DoConfiguration(ip net.IP, force bool, waitTimeout int) er
 
 }
 
-func GetIkniteConfigMap(client *kubernetes.Clientset) (cm *corev1.ConfigMap, err error) {
+func GetIkniteConfigMap(client kubernetes.Interface) (cm *corev1.ConfigMap, err error) {
 	cm, err = client.CoreV1().ConfigMaps("kube-system").Get(context.TODO(), "iknite-config", metav1.GetOptions{})
 	if k8Errors.IsNotFound(err) {
 		err = nil
@@ -245,7 +245,7 @@ func GetIkniteConfigMap(client *kubernetes.Clientset) (cm *corev1.ConfigMap, err
 	return
 }
 
-func WriteIkniteConfigMap(client *kubernetes.Clientset, cm *corev1.ConfigMap) (res *corev1.ConfigMap, err error) {
+func WriteIkniteConfigMap(client kubernetes.Interface, cm *corev1.ConfigMap) (res *corev1.ConfigMap, err error) {
 	if cm.UID != "" {
 		res, err = client.CoreV1().ConfigMaps("kube-system").Update(context.TODO(), cm, metav1.UpdateOptions{})
 	} else {

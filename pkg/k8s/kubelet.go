@@ -29,7 +29,7 @@ const (
 	kubeletKubeadmArgsEnv = "KUBELET_KUBEADM_ARGS"
 )
 
-func StartKubelet(kubeConfig *KubeadmConfig) error {
+func StartKubelet(kubeConfig *IkniteConfig) error {
 
 	// Check if a process with the value contained in kubeletPidFile exists
 	pidBytes, err := os.ReadFile(kubeletPidFile)

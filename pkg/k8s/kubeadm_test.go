@@ -2,6 +2,7 @@ package k8s
 
 import (
 	"bytes"
+	"net"
 	"testing"
 
 	tu "github.com/kaweezle/iknite/pkg/testutils"
@@ -54,8 +55,8 @@ nodeRegistration:
 
 func (s *KubeadmTestSuite) TestCreateKubeadmConfig() {
 	assert := s.Require()
-	var config = KubeadmConfig{
-		Ip:                "192.168.99.2",
+	var config = IkniteConfig{
+		Ip:                net.ParseIP("192.168.99.2"),
 		KubernetesVersion: "1.26.0",
 		DomainName:        "kaweezle.local",
 		CreateIp:          true,
@@ -92,8 +93,8 @@ func (s *KubeadmTestSuite) TestCreateKubeadmConfigVM() {
         - DirAvailable--var-lib-etcd
         - Swap
     `)
-	var config = KubeadmConfig{
-		Ip:                "192.168.99.2",
+	var config = IkniteConfig{
+		Ip:                net.ParseIP("192.168.99.2"),
 		KubernetesVersion: "1.26.0",
 		CreateIp:          false,
 		NetworkInterface:  "eth0",
@@ -129,8 +130,8 @@ func (s *KubeadmTestSuite) TestWriteKubeadmConfiguration() {
         - DirAvailable--var-lib-etcd
         - Swap
     `)
-	var config = KubeadmConfig{
-		Ip:                "192.168.99.2",
+	var config = IkniteConfig{
+		Ip:                net.ParseIP("192.168.99.2"),
 		KubernetesVersion: "1.26.0",
 		CreateIp:          false,
 		NetworkInterface:  "eth0",
@@ -151,8 +152,8 @@ func (s *KubeadmTestSuite) TestWriteKubeadmConfiguration() {
 func (s *KubeadmTestSuite) TestRunKubeadmInit() {
 
 	require := s.Require()
-	var config = KubeadmConfig{
-		Ip:                "192.168.99.2",
+	var config = IkniteConfig{
+		Ip:                net.ParseIP("192.168.99.2"),
 		KubernetesVersion: "1.26.0",
 		DomainName:        "kaweezle.local",
 		CreateIp:          true,

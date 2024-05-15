@@ -88,6 +88,7 @@ func performStatus(cmd *cobra.Command, args []string) {
 	config, err := k8s.LoadFromFile(constants.KubernetesRootConfig)
 	cobra.CheckErr(errors.Wrap(err, "While loading local cluster configuration"))
 
-	cobra.CheckErr(config.WaitForWorkloads(time.Second*time.Duration(0), callback))
+	cobra.CheckErr(errors.Wrap(err, "While getting client"))
 
+	cobra.CheckErr(config.WaitForWorkloads(time.Second*time.Duration(0), callback))
 }

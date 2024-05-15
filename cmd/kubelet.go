@@ -20,12 +20,11 @@ The kubelet is started and monitored. The following operations are performed:
 
 func init() {
 	rootCmd.AddCommand(kubeletCmd)
-	configureClusterCommand(kubeletCmd)
+	configureClusterCommand(kubeletCmd.Flags(), ikniteConfig)
 	initializeKustomization(kubeletCmd)
 }
 
 func performKubelet(cmd *cobra.Command, args []string) {
-	clusterConfig, err := PrepareKubernetesEnvironment()
-	cobra.CheckErr(err)
-	cobra.CheckErr(k8s.StartKubelet(clusterConfig))
+	cobra.CheckErr(k8s.PrepareKubernetesEnvironment(ikniteConfig))
+	cobra.CheckErr(k8s.StartKubelet(ikniteConfig))
 }

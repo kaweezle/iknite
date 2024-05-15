@@ -17,21 +17,17 @@ package cmd
 
 // cSpell: disable
 import (
-	"fmt"
-	"net"
 	"os"
 
 	"github.com/kaweezle/iknite/pkg/alpine"
 	"github.com/kaweezle/iknite/pkg/constants"
 	"github.com/kaweezle/iknite/pkg/cri"
 	"github.com/kaweezle/iknite/pkg/k8s"
-	"github.com/kaweezle/iknite/pkg/utils"
-	"github.com/mitchellh/mapstructure"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+	flag "github.com/spf13/pflag"
 	"github.com/spf13/viper"
-	"github.com/txn2/txeh"
 )
 
 // cSpell: enable
@@ -53,33 +49,27 @@ var startCmd = &cobra.Command{
 	Run:              perform,
 }
 
+var ikniteConfig *k8s.IkniteConfig = &k8s.IkniteConfig{}
+
 func init() {
 	rootCmd.AddCommand(startCmd)
 
-	configureClusterCommand(startCmd)
+	configureClusterCommand(startCmd.Flags(), ikniteConfig)
 	startCmd.Flags().Bool("openrc", false, "Run in OpenRC (assume OpenRC and containerd available)")
 	viper.BindPFlag("openrc", startCmd.Flags().Lookup("openrc"))
 
 	initializeKustomization(startCmd)
 }
 
-func configureClusterCommand(cmd *cobra.Command) {
-	ip, err := utils.GetOutboundIP()
-	cobra.CheckErr(errors.Wrap(err, "While getting IP address"))
-	domain_name := ""
+func configureClusterCommand(flagSet *flag.FlagSet, ikniteConfig *k8s.IkniteConfig) {
+	k8s.SetDefaults_IkniteConfig(ikniteConfig)
 
-	wsl := utils.IsOnWSL()
-	if wsl {
-		ip = net.ParseIP(constants.WSLIPAddress)
-		domain_name = constants.WSLHostName
-	}
-
-	cmd.Flags().IP("ip", ip, "Cluster IP address")
-	cmd.Flags().Bool("ip-create", wsl, "Add IP address if it doesn't exist")
-	cmd.Flags().String("ip-network-interface", "eth0", "Interface to which add IP")
-	cmd.Flags().String("domain-name", domain_name, "Domain name of the cluster")
-	cmd.Flags().Bool("enable-mdns", wsl, "Enable mDNS publication of domain name")
-	cmd.Flags().StringVar(&k8s.KubernetesVersion, "kubernetes-version", k8s.KubernetesVersion, "Kubernetes version to install")
+	flagSet.IPVar(&ikniteConfig.Ip, "ip", ikniteConfig.Ip, "Cluster IP address")
+	flagSet.BoolVar(&ikniteConfig.CreateIp, "ip-create", ikniteConfig.CreateIp, "Add IP address if it doesn't exist")
+	flagSet.StringVar(&ikniteConfig.NetworkInterface, "ip-network-interface", ikniteConfig.NetworkInterface, "Interface to which add IP")
+	flagSet.StringVar(&ikniteConfig.DomainName, "domain-name", ikniteConfig.DomainName, "Domain name of the cluster")
+	flagSet.BoolVar(&ikniteConfig.EnableMDNS, "enable-mdns", ikniteConfig.EnableMDNS, "Enable mDNS publication of domain name")
+	flagSet.StringVar(&ikniteConfig.KubernetesVersion, "kubernetes-version", ikniteConfig.KubernetesVersion, "Kubernetes version to install")
 }
 
 func startPersistentPreRun(cmd *cobra.Command, args []string) {
@@ -92,76 +82,9 @@ func startPersistentPreRun(cmd *cobra.Command, args []string) {
 	viper.BindPFlag("cluster.enable_mdns", cmd.Flags().Lookup("enable-mdns"))
 }
 
-func PrepareKubernetesEnvironment() (*k8s.KubeadmConfig, error) {
-
-	clusterConfig := &k8s.KubeadmConfig{}
-	// Cannot use Unmarshal. Look here: https://github.com/spf13/viper/issues/368
-	decoderConfig := mapstructure.DecoderConfig{
-		DecodeHook:       mapstructure.StringToIPHookFunc(),
-		WeaklyTypedInput: true,
-		Result:           clusterConfig,
-		Metadata:         nil,
-	}
-
-	decoder, err := mapstructure.NewDecoder(&decoderConfig)
-	cobra.CheckErr(err)
-
-	cobra.CheckErr(decoder.Decode(viper.AllSettings()["cluster"]))
-
-	log.WithFields(log.Fields{
-		"ip":                 clusterConfig.Ip.String(),
-		"kubernetes_version": clusterConfig.KubernetesVersion,
-		"domain_name":        clusterConfig.DomainName,
-		"create_ip":          clusterConfig.CreateIp,
-		"network_interface":  clusterConfig.NetworkInterface,
-		"enable_mdns":        clusterConfig.EnableMDNS,
-	}).Info("Cluster configuration")
-
-	// Allow forwarding (kubeadm requirement)
-	log.Info("Ensuring basic settings...")
-	utils.WriteFile("/proc/sys/net/ipv4/ip_forward", []byte("1\n"), os.FileMode(int(0644)))
-
-	cobra.CheckErr(alpine.EnsureNetFilter())
-
-	// Make bridge use ip-tables
-	utils.WriteFile("/proc/sys/net/bridge/bridge-nf-call-iptables", []byte("1\n"), os.FileMode(int(0644)))
-
-	cobra.CheckErr(alpine.EnsureMachineID())
-
-	// Check that the IP address we are targeting is bound to an interface
-	ipExists, err := alpine.CheckIpExists(clusterConfig.Ip)
-	cobra.CheckErr(errors.Wrap(err, "While getting local ip addresses"))
-	if !ipExists {
-		if clusterConfig.CreateIp {
-			cobra.CheckErr(alpine.AddIpAddress(clusterConfig.NetworkInterface, clusterConfig.Ip))
-		} else {
-			cobra.CheckErr(fmt.Errorf("ip address %v is not available locally", clusterConfig.Ip))
-		}
-	}
-
-	// Check that the domain name is bound
-	if clusterConfig.DomainName != "" {
-		log.WithFields(log.Fields{
-			"ip":         clusterConfig.Ip,
-			"domainName": clusterConfig.DomainName,
-		}).Info("Check domain name to IP mapping...")
-
-		if contains, ips := alpine.IsHostMapped(clusterConfig.Ip, clusterConfig.DomainName); !contains {
-			log.WithFields(log.Fields{
-				"ip":         clusterConfig.Ip,
-				"domainName": clusterConfig.DomainName,
-			}).Info("Mapping not found, creating...")
-
-			cobra.CheckErr(alpine.AddIpMapping(&txeh.HostsConfig{}, clusterConfig.Ip, clusterConfig.DomainName, ips)) // cSpell: disable-line
-		}
-	}
-	return clusterConfig, nil
-}
-
 func perform(cmd *cobra.Command, args []string) {
 
-	clusterConfig, err := PrepareKubernetesEnvironment()
-	cobra.CheckErr(err)
+	cobra.CheckErr(k8s.PrepareKubernetesEnvironment(ikniteConfig))
 
 	standalone := !viper.GetBool("openrc")
 
@@ -171,7 +94,7 @@ func perform(cmd *cobra.Command, args []string) {
 	// Changed.
 	config, err := k8s.LoadFromDefault()
 	if err == nil {
-		if config.IsConfigServerAddress(clusterConfig.GetApiEndPoint()) {
+		if config.IsConfigServerAddress(ikniteConfig.GetApiEndPoint()) {
 			log.Info("Kubeconfig already exists")
 			exist = true
 		} else {
@@ -204,7 +127,7 @@ func perform(cmd *cobra.Command, args []string) {
 
 	// Enable the services
 	cobra.CheckErr(alpine.EnableService(constants.KubeletServiceName))
-	if clusterConfig.EnableMDNS {
+	if ikniteConfig.EnableMDNS {
 		log.Info("Ensuring MDNS...")
 		cobra.CheckErr(alpine.EnableService(constants.MDNSServiceName))
 		cobra.CheckErr(alpine.StartService(constants.MDNSServiceName))
@@ -226,9 +149,9 @@ func perform(cmd *cobra.Command, args []string) {
 		// - After a configuration change. In this case, we expect kubeadm to
 		//   recreate the certificates and the manifests for the control plane.
 		log.WithFields(log.Fields{
-			"config": clusterConfig,
+			"config": ikniteConfig,
 		}).Info("Running kubeadm init")
-		cobra.CheckErr(k8s.RunKubeadmInit(clusterConfig))
+		cobra.CheckErr(k8s.RunKubeadmInit(ikniteConfig))
 		config, err = k8s.LoadFromDefault()
 		cobra.CheckErr(err)
 		if restartProxy {
@@ -247,7 +170,7 @@ func perform(cmd *cobra.Command, args []string) {
 		// Perform the configuration. Not done in case it's already done
 		force, err := cmd.Flags().GetBool("force-config")
 		cobra.CheckErr(err)
-		cobra.CheckErr(config.DoConfiguration(clusterConfig.Ip, force, waitTimeout))
+		cobra.CheckErr(config.DoConfiguration(ikniteConfig.Ip, force, waitTimeout))
 	} else {
 		log.Info("Enabling ", constants.ConfigureServiceName)
 		cobra.CheckErr(alpine.EnableService(constants.ConfigureServiceName))
