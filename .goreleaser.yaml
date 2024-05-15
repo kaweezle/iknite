@@ -2,7 +2,7 @@
 # Make sure to check the documentation at https://goreleaser.com
 # cSpell: disable
 env:
-  - KUBERNETES_VERSION=1.26.0
+  - KUBERNETES_VERSION=1.29.3
 before:
   hooks:
     - go mod tidy

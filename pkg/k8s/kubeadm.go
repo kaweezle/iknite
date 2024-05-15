@@ -49,6 +49,7 @@ type IkniteConfig struct {
 	CreateIp          bool   `mapstructure:"create_ip"`
 	NetworkInterface  string `mapstructure:"network_interface"`
 	EnableMDNS        bool   `mapstructure:"enable_mdns"`
+	ClusterName       string `mapstructure:"cluster_name"`
 }
 
 func SetDefaults_IkniteConfig(obj *IkniteConfig) {
@@ -71,6 +72,9 @@ func SetDefaults_IkniteConfig(obj *IkniteConfig) {
 		obj.NetworkInterface = "eth0"
 	}
 	obj.CreateIp = wsl
+	if obj.ClusterName == "" {
+		obj.ClusterName = constants.DefaultClusterName
+	}
 }
 
 func (c *IkniteConfig) GetApiEndPoint() string {

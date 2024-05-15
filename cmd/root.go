@@ -20,7 +20,6 @@ import (
 	"io"
 	"os"
 
-	"github.com/kaweezle/iknite/pkg/constants"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -29,10 +28,9 @@ import (
 )
 
 var (
-	cfgFile     string
-	v           string
-	jsonLogs    bool
-	ClusterName string
+	cfgFile  string
+	v        string
+	jsonLogs bool
 )
 
 // rootCmd represents the base command when called without any subcommands
@@ -72,7 +70,6 @@ func init() {
 
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.config/iknite/iknite.yaml or /etc/iknite.d/iknite.yaml)")
 	rootCmd.PersistentFlags().StringVarP(&v, "verbosity", "v", logrus.WarnLevel.String(), "Log level (debug, info, warn, error, fatal, panic)")
-	rootCmd.PersistentFlags().StringVarP(&ClusterName, "name", "n", constants.DefaultClusterName, "Cluster name")
 	rootCmd.PersistentFlags().BoolVar(&jsonLogs, "json", false, "Log messages in JSON")
 
 	// Cobra also supports local flags, which will only run

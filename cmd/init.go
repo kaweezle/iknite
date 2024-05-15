@@ -20,7 +20,9 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"syscall"
 
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
@@ -103,6 +105,7 @@ type initData struct {
 	patchesDir                  string
 	adminKubeConfigBootstrapped bool
 	ikniteConfig                *k8s.IkniteConfig
+	kubeletCmd                  *exec.Cmd
 }
 
 func init() {
@@ -137,6 +140,28 @@ func newCmdInit(out io.Writer, initOptions *initOptions) *cobra.Command {
 			return initRunner.Run(args)
 		},
 		Args: cobra.NoArgs,
+		PostRunE: func(cmd *cobra.Command, args []string) error {
+			c, err := initRunner.InitData(args)
+			if err != nil {
+				return err
+			}
+			data, ok := c.(*initData)
+			if !ok {
+				return errors.New("invalid data struct")
+			}
+			// Stop the kubelet process if it was started
+			kubeletCmd := data.KubeletCmd()
+			if kubeletCmd != nil {
+				err = kubeletCmd.Process.Signal(syscall.SIGTERM)
+				if err != nil {
+					return errors.Wrapf(err, "failed to terminate the kublet process %d", kubeletCmd.Process.Pid)
+				}
+				kubeletCmd.Wait()
+			}
+			k8s.RemovePidFiles()
+
+			return nil
+		},
 	}
 
 	// add flags to the init command.
@@ -164,15 +189,16 @@ func newCmdInit(out io.Writer, initOptions *initOptions) *cobra.Command {
 	initRunner.AppendPhase(phases.NewKubeConfigPhase())
 	initRunner.AppendPhase(phases.NewEtcdPhase())
 	initRunner.AppendPhase(phases.NewControlPlanePhase())
-	initRunner.AppendPhase(phases.NewKubeletStartPhase())
+	initRunner.AppendPhase(iknphase.NewKubeletStartPhase())
 	initRunner.AppendPhase(phases.NewWaitControlPlanePhase())
 	initRunner.AppendPhase(phases.NewUploadConfigPhase())
 	initRunner.AppendPhase(phases.NewUploadCertsPhase())
 	// initRunner.AppendPhase(phases.NewMarkControlPlanePhase())
 	initRunner.AppendPhase(phases.NewBootstrapTokenPhase())
 	initRunner.AppendPhase(phases.NewKubeletFinalizePhase())
+	initRunner.AppendPhase(phases.NewAddonPhase())
 	initRunner.AppendPhase(iknphase.NewConfigureClusterPhase())
-	// initRunner.AppendPhase(phases.NewAddonPhase())
+	initRunner.AppendPhase(iknphase.NewDaemonizePhase())
 	// initRunner.AppendPhase(phases.NewShowJoinCommandPhase())
 
 	// sets the data builder function, that will be used by the runner
@@ -309,7 +335,7 @@ func newInitOptions() *initOptions {
 		kubeconfigPath:        kubeadmconstants.GetAdminKubeConfigPath(),
 		uploadCerts:           false,
 		ikniteCfg:             &ikniteConfig,
-		ignorePreflightErrors: []string{"DirAvailable--var-lib-etcd", "Swap"},
+		ignorePreflightErrors: []string{"DirAvailable--var-lib-etcd", "Swap", "Hostname", "Service-Kubelet"},
 	}
 }
 
@@ -407,11 +433,10 @@ func newInitData(cmd *cobra.Command, args []string, initOptions *initOptions, ou
 	}
 
 	// Apply the IkniteConfig to the InitConfiguration
-	cfg.KubernetesVersion = initOptions.ikniteCfg.KubernetesVersion
+	cfg.KubernetesVersion = fmt.Sprintf("v%s", initOptions.ikniteCfg.KubernetesVersion)
 	if initOptions.ikniteCfg.DomainName != "" {
 		cfg.ClusterConfiguration.ControlPlaneEndpoint = initOptions.ikniteCfg.DomainName
 		cfg.ControlPlaneEndpoint = initOptions.ikniteCfg.DomainName
-		cfg.NodeRegistration.Name = initOptions.ikniteCfg.DomainName
 	}
 	// Apply configured IP to the configuration
 	ips := initOptions.ikniteCfg.Ip.String()
@@ -661,4 +686,12 @@ func isPhaseInSkipPhases(phase string, skipPhases []string) bool {
 
 func (d *initData) IkniteConfig() *k8s.IkniteConfig {
 	return d.ikniteConfig
+}
+
+func (d *initData) KubeletCmd() *exec.Cmd {
+	return d.kubeletCmd
+}
+
+func (d *initData) SetKubeletCmd(cmd *exec.Cmd) {
+	d.kubeletCmd = cmd
 }

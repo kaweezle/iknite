@@ -33,7 +33,7 @@ func (s *KubeadmTestSuite) TeardownTest() {
 const WSLKubeadmConfig = `
 apiVersion: kubeadm.k8s.io/v1beta3
 kind: ClusterConfiguration
-kubernetesVersion: "1.26.0"
+kubernetesVersion: "1.29.3"
 networking:
   podSubnet: 10.244.0.0/16
 controlPlaneEndpoint: kaweezle.local
@@ -57,7 +57,7 @@ func (s *KubeadmTestSuite) TestCreateKubeadmConfig() {
 	assert := s.Require()
 	var config = IkniteConfig{
 		Ip:                net.ParseIP("192.168.99.2"),
-		KubernetesVersion: "1.26.0",
+		KubernetesVersion: "1.29.3",
 		DomainName:        "kaweezle.local",
 		CreateIp:          true,
 		NetworkInterface:  "eth0",
@@ -76,7 +76,7 @@ func (s *KubeadmTestSuite) TestCreateKubeadmConfigVM() {
 	expected := dedent.Dedent(`
     apiVersion: kubeadm.k8s.io/v1beta3
     kind: ClusterConfiguration
-    kubernetesVersion: "1.26.0"
+    kubernetesVersion: "1.29.3"
     networking:
       podSubnet: 10.244.0.0/16
     ---
@@ -95,7 +95,7 @@ func (s *KubeadmTestSuite) TestCreateKubeadmConfigVM() {
     `)
 	var config = IkniteConfig{
 		Ip:                net.ParseIP("192.168.99.2"),
-		KubernetesVersion: "1.26.0",
+		KubernetesVersion: "1.29.3",
 		CreateIp:          false,
 		NetworkInterface:  "eth0",
 	}
@@ -113,7 +113,7 @@ func (s *KubeadmTestSuite) TestWriteKubeadmConfiguration() {
 	expected := dedent.Dedent(`
     apiVersion: kubeadm.k8s.io/v1beta3
     kind: ClusterConfiguration
-    kubernetesVersion: "1.26.0"
+    kubernetesVersion: "1.29.3"
     networking:
       podSubnet: 10.244.0.0/16
     ---
@@ -132,7 +132,7 @@ func (s *KubeadmTestSuite) TestWriteKubeadmConfiguration() {
     `)
 	var config = IkniteConfig{
 		Ip:                net.ParseIP("192.168.99.2"),
-		KubernetesVersion: "1.26.0",
+		KubernetesVersion: "1.29.3",
 		CreateIp:          false,
 		NetworkInterface:  "eth0",
 	}
@@ -154,7 +154,7 @@ func (s *KubeadmTestSuite) TestRunKubeadmInit() {
 	require := s.Require()
 	var config = IkniteConfig{
 		Ip:                net.ParseIP("192.168.99.2"),
-		KubernetesVersion: "1.26.0",
+		KubernetesVersion: "1.29.3",
 		DomainName:        "kaweezle.local",
 		CreateIp:          true,
 		NetworkInterface:  "eth0",

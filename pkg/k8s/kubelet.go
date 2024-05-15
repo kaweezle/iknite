@@ -29,8 +29,7 @@ const (
 	kubeletKubeadmArgsEnv = "KUBELET_KUBEADM_ARGS"
 )
 
-func StartKubelet(kubeConfig *IkniteConfig) error {
-
+func StartKubelet() (*exec.Cmd, error) {
 	// Check if a process with the value contained in kubeletPidFile exists
 	pidBytes, err := os.ReadFile(kubeletPidFile)
 	if err == nil {
@@ -41,7 +40,7 @@ func StartKubelet(kubeConfig *IkniteConfig) error {
 		} else {
 			process, err := os.FindProcess(pid)
 			if err == nil && process.Signal(syscall.Signal(0)) == nil {
-				return fmt.Errorf("kubelet is already running with pid: %d", pid)
+				return nil, fmt.Errorf("kubelet is already running with pid: %d", pid)
 			}
 		}
 	}
@@ -51,7 +50,7 @@ func StartKubelet(kubeConfig *IkniteConfig) error {
 
 	envData, err := godotenv.Read(kubeletEnvFile, kubeAdmFlagsFile)
 	if err != nil {
-		return errors.WithMessagef(err, "Failed to read environment file %s", kubeletEnvFile)
+		return nil, errors.WithMessagef(err, "Failed to read environment file %s", kubeletEnvFile)
 	}
 
 	args := make([]string, 0)
@@ -75,13 +74,13 @@ func StartKubelet(kubeConfig *IkniteConfig) error {
 	// Create the kubelet log directory if it doesn't exist
 	err = os.MkdirAll(kubeletLogDir, os.ModePerm)
 	if err != nil {
-		return errors.WithMessagef(err, "Failed to create kubelet log directory %s", kubeletLogDir)
+		return nil, errors.WithMessagef(err, "Failed to create kubelet log directory %s", kubeletLogDir)
 	}
 
 	// Open the kubelet log file for writing
 	logFile, err := os.OpenFile(kubeletLogFile, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0644)
 	if err != nil {
-		return errors.WithMessagef(err, "Failed to open kubelet log file %s", kubeletLogFile)
+		return nil, errors.WithMessagef(err, "Failed to open kubelet log file %s", kubeletLogFile)
 	}
 	defer logFile.Close()
 
@@ -100,19 +99,42 @@ func StartKubelet(kubeConfig *IkniteConfig) error {
 	// Start the subprocess and get the PID
 	err = cmd.Start()
 	if err != nil {
-		return errors.WithMessage(err, "Failed to start subprocess")
+		return nil, errors.WithMessage(err, "Failed to start subprocess")
 	}
 
 	// Write the PID to the /run/kubelet.pid file
 	err = os.WriteFile(kubeletPidFile, []byte(fmt.Sprintf("%d", cmd.Process.Pid)), 0644)
 	if err != nil {
-		return errors.WithMessage(err, "Failed to write PID file")
+		log.WithFields(log.Fields{
+			"pid":     cmd.Process.Pid,
+			"err":     err,
+			"pidFile": kubeletPidFile,
+		}).Warn("Failed to write kubelet PID file")
 	}
 
 	// Write the current PID to the /run/iknite.pid file
 	err = os.WriteFile(iknitePidFile, []byte(fmt.Sprintf("%d", os.Getpid())), 0644)
 	if err != nil {
-		return errors.WithMessage(err, "Failed to write PID file")
+		log.WithFields(log.Fields{
+			"pid":     os.Getpid(),
+			"err":     err,
+			"pidFile": iknitePidFile,
+		}).Warn("Failed to write ikinte PID file")
+	}
+
+	return cmd, nil
+}
+
+func RemovePidFiles() {
+	os.Remove(kubeletPidFile)
+	os.Remove(iknitePidFile)
+}
+
+func StartAndConfigureKubelet(kubeConfig *IkniteConfig) error {
+
+	cmd, err := StartKubelet()
+	if err != nil {
+		return errors.Wrap(err, "Failed to start kubelet")
 	}
 
 	// Wait for SIGTERM and SIGKILL signals
@@ -129,10 +151,7 @@ func StartKubelet(kubeConfig *IkniteConfig) error {
 		kubeletHealthz <- CheckKubeletRunning(10, 3, 1000)
 	}()
 
-	defer func() {
-		os.Remove(kubeletPidFile)
-		os.Remove(iknitePidFile)
-	}()
+	defer RemovePidFiles()
 
 	// Wait for the signals or for the child process to stop
 	for alive := true; alive; {

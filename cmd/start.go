@@ -70,6 +70,7 @@ func configureClusterCommand(flagSet *flag.FlagSet, ikniteConfig *k8s.IkniteConf
 	flagSet.StringVar(&ikniteConfig.DomainName, "domain-name", ikniteConfig.DomainName, "Domain name of the cluster")
 	flagSet.BoolVar(&ikniteConfig.EnableMDNS, "enable-mdns", ikniteConfig.EnableMDNS, "Enable mDNS publication of domain name")
 	flagSet.StringVar(&ikniteConfig.KubernetesVersion, "kubernetes-version", ikniteConfig.KubernetesVersion, "Kubernetes version to install")
+	flagSet.StringVar(&ikniteConfig.ClusterName, "cluster-name", ikniteConfig.ClusterName, "Cluster name")
 }
 
 func startPersistentPreRun(cmd *cobra.Command, args []string) {
@@ -80,6 +81,7 @@ func startPersistentPreRun(cmd *cobra.Command, args []string) {
 	viper.BindPFlag("cluster.domain_name", cmd.Flags().Lookup("domain-name"))
 	viper.BindPFlag("cluster.kubernetes_version", cmd.Flags().Lookup("kubernetes-version"))
 	viper.BindPFlag("cluster.enable_mdns", cmd.Flags().Lookup("enable-mdns"))
+	viper.BindPFlag("cluster.cluster_name", cmd.Flags().Lookup("cluster-name"))
 }
 
 func perform(cmd *cobra.Command, args []string) {
@@ -159,7 +161,7 @@ func perform(cmd *cobra.Command, args []string) {
 			cobra.CheckErr(config.RestartProxy())
 		}
 		// We copy the configuration where the root user expects it
-		cobra.CheckErr(config.RenameConfig(ClusterName).WriteToFile(constants.KubernetesRootConfig))
+		cobra.CheckErr(config.RenameConfig(ikniteConfig.ClusterName).WriteToFile(constants.KubernetesRootConfig))
 	} else if standalone {
 		// The service should have been started by OpenRC
 		log.Info("Checking kubelet...")

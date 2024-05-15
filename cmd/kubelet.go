@@ -26,5 +26,5 @@ func init() {
 
 func performKubelet(cmd *cobra.Command, args []string) {
 	cobra.CheckErr(k8s.PrepareKubernetesEnvironment(ikniteConfig))
-	cobra.CheckErr(k8s.StartKubelet(ikniteConfig))
+	cobra.CheckErr(k8s.StartAndConfigureKubelet(ikniteConfig))
 }
