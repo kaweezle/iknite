@@ -338,7 +338,7 @@ func newInitOptions() *initOptions {
 		kubeconfigPath:        kubeadmconstants.GetAdminKubeConfigPath(),
 		uploadCerts:           false,
 		ikniteCfg:             &ikniteConfig,
-		ignorePreflightErrors: []string{"DirAvailable--var-lib-etcd", "Swap", "Hostname", "Service-Kubelet"},
+		ignorePreflightErrors: []string{"all"},
 	}
 }
 

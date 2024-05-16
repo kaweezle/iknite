@@ -7,6 +7,7 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/kaweezle/iknite/pkg/k8s"
 	"github.com/pion/mdns"
 	log "github.com/sirupsen/logrus"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
@@ -42,23 +43,20 @@ func WaitForKubelet(cmd *exec.Cmd, conn *mdns.Conn) error {
 			err = cmd.Process.Signal(syscall.SIGTERM)
 			if err == nil {
 				cmd.Wait()
-				if conn != nil {
-					log.Info("Stopping the mdns responder...")
-					err = conn.Close()
-				}
 			}
 
 			alive = false
 		case <-cmdDone:
 			// Child process has stopped
 			log.Infof("Kubelet stopped with state: %s", cmd.ProcessState.String())
-			if conn != nil {
-				log.Info("Stopping the mdns responder...")
-				err = conn.Close()
-			}
 			alive = false
 		}
 
+	}
+
+	if err == nil && conn != nil {
+		log.Info("Stopping the mdns responder...")
+		err = conn.Close()
 	}
 
 	return err
@@ -81,5 +79,6 @@ func runDaemonize(c workflow.RunData) error {
 		// Prevent double stop
 		data.SetKubeletCmd(nil)
 	}
+	k8s.CleanAll(data.IkniteConfig())
 	return err
 }

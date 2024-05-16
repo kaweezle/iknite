@@ -3,7 +3,6 @@ package cmd
 import (
 	"fmt"
 	"os"
-	"strconv"
 	"strings"
 
 	s "github.com/bitfield/script"
@@ -20,7 +19,6 @@ var (
 	unmountPaths   = true
 	resetCni       = true
 	resetIptables  = true
-	deleteShims    = true
 	resetKubelet   = false
 	resetIpAddress = false
 
@@ -50,7 +48,6 @@ func initializeKillall(cmd *cobra.Command) {
 	cmd.Flags().BoolVar(&unmountPaths, "unmount-paths", unmountPaths, "Unmount paths")
 	cmd.Flags().BoolVar(&resetCni, "reset-cni", resetCni, "Reset CNI")
 	cmd.Flags().BoolVar(&resetIptables, "reset-iptables", resetIptables, "Reset iptables")
-	cmd.Flags().BoolVar(&deleteShims, "delete-shims", deleteShims, "Delete shims")
 	cmd.Flags().BoolVar(&resetKubelet, "reset-kubelet", resetKubelet, "Reset kubelet")
 	cmd.Flags().BoolVar(&resetIpAddress, "reset-ip-address", resetIpAddress, "Reset IP address")
 }
@@ -77,22 +74,13 @@ func performKillall(cmd *cobra.Command, args []string) {
 
 		if stopContainers {
 			log.Info("Stopping all containers...")
-			if _, err := s.Exec("/bin/zsh -c 'export CONTAINER_RUNTIME_ENDPOINT=unix:///run/containerd/containerd.sock;crictl rm -f $(crictl ps -qa)'").String(); err != nil {
+			if _, err := s.Exec("/bin/zsh -c 'export CONTAINER_RUNTIME_ENDPOINT=unix:///run/containerd/containerd.sock;crictl rmp -f $(crictl pods -q)'").String(); err != nil {
 				log.WithError(err).Warn("Error stopping all containers")
 			}
 		}
 
 		log.Info("Stopping containerd...")
 		cobra.CheckErr(alpine.StopService("containerd"))
-	}
-
-	if deleteShims {
-		log.Info("Deleting shims...")
-		shims, err := getShims()
-		cobra.CheckErr(err)
-		for _, shim := range shims {
-			cobra.CheckErr(killTree(shim))
-		}
 	}
 
 	if unmountPaths {
@@ -103,6 +91,12 @@ func performKillall(cmd *cobra.Command, args []string) {
 		for _, path := range pathsToUnmountAndRemove {
 			cobra.CheckErr(doUnmountAndRemove(path))
 		}
+	}
+
+	if stopServices {
+		log.Info("Removing kubelet files in /var/lib/kubelet...")
+		_, err := s.Exec("sh -c 'rm -rf /var/lib/kubelet/{cpu_manager_state,memory_manager_state} /var/lib/kubelet/pods/*'").String()
+		cobra.CheckErr(err)
 	}
 
 	if resetCni {
@@ -137,28 +131,6 @@ func performKillall(cmd *cobra.Command, args []string) {
 		hosts.RemoveHost(ikniteConfig.DomainName)
 		cobra.CheckErr(hosts.Save())
 	}
-}
-
-func killTree(pid string) error {
-	realPid, err := strconv.Atoi(pid)
-	if err != nil {
-		return err
-	}
-	process, err := os.FindProcess(realPid)
-	if err != nil {
-		return err
-	}
-	s.Exec(fmt.Sprintf("/usr/bin/pgrep -P %s", pid)).FilterLine(func(s string) string {
-		killTree(s)
-		return s
-	}).Wait()
-
-	log.WithField("pid", pid).Debug("Killing process...")
-	return process.Kill()
-}
-
-func getShims() ([]string, error) {
-	return s.Exec("ps -e -o pid,args").Exec("sed -e 's/^ *//'").Match("/usr/bin/containerd-shim-runc").Column(1).Slice()
 }
 
 func processMounts(path string, command string, message string) error {
