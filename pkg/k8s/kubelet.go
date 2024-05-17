@@ -15,6 +15,7 @@ import (
 	s "github.com/bitfield/script"
 	"github.com/joho/godotenv"
 	"github.com/kaweezle/iknite/pkg/alpine"
+	"github.com/kaweezle/iknite/pkg/config"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
@@ -197,7 +198,7 @@ func StartAndConfigureKubelet(kubeConfig *IkniteConfig) error {
 			} else {
 				log.Info("API server is healthy")
 				go func() {
-					force_config := viper.GetBool("force_config")
+					force_config := viper.GetBool(config.ForceConfig)
 					config, err := LoadFromDefault()
 					if err != nil {
 						configErr <- err

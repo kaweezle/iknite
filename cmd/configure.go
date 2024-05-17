@@ -16,11 +16,14 @@ limitations under the License.
 package cmd
 
 import (
+	"github.com/kaweezle/iknite/cmd/options"
+	"github.com/kaweezle/iknite/pkg/config"
 	"github.com/kaweezle/iknite/pkg/constants"
 	"github.com/kaweezle/iknite/pkg/k8s"
 	"github.com/kaweezle/iknite/pkg/utils"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
+	flag "github.com/spf13/pflag"
 	"github.com/spf13/viper"
 )
 
@@ -51,22 +54,22 @@ applies the Embedded configuration that installs the following components:
 	Run: performConfigure,
 }
 
-func initializeKustomization(cmd *cobra.Command) {
-	cmd.Flags().StringVarP(&kustomizationDirectory, "kustomize-directory", "d", constants.DefaultKustomizationDirectory,
+func initializeKustomization(flagSet *flag.FlagSet) {
+	flagSet.StringVarP(&kustomizationDirectory, options.KustomizeDirectory, "d", constants.DefaultKustomizationDirectory,
 		"The directory to look for kustomization. Can be an URL")
-	viper.BindPFlag("kustomize_directory", cmd.Flags().Lookup("kustomize-directory"))
-	cmd.Flags().IntVarP(&waitTimeout, "wait", "w", waitTimeout, "Wait n seconds for all pods to settle")
-	cmd.Flags().BoolP("force-config", "C", false, "Force configuration even if it has already occurred")
-	viper.BindPFlag("force_config", cmd.Flags().Lookup("force-config"))
-	cmd.Flags().IntVar(&clusterCheckWaitMilliseconds, "cluster-check-wait", clusterCheckWaitMilliseconds, "Milliseconds to wait between each cluster check")
-	cmd.Flags().IntVar(&clusterCheckRetries, "cluster-check-retries", clusterCheckRetries, "Number of tries to access the cluster")
-	cmd.Flags().IntVar(&clusterCheckOkResponses, "cluster-check-ok-responses", clusterCheckOkResponses, "Number of Ok response to receive before proceeding")
+	viper.BindPFlag(config.KustomizeDirectory, flagSet.Lookup(options.KustomizeDirectory))
+	flagSet.IntVarP(&waitTimeout, options.Wait, "w", waitTimeout, "Wait n seconds for all pods to settle")
+	flagSet.BoolP(options.ForceConfig, "C", false, "Force configuration even if it has already occurred")
+	viper.BindPFlag(config.ForceConfig, flagSet.Lookup(options.ForceConfig))
+	flagSet.IntVar(&clusterCheckWaitMilliseconds, options.ClusterCheckWait, clusterCheckWaitMilliseconds, "Milliseconds to wait between each cluster check")
+	flagSet.IntVar(&clusterCheckRetries, options.ClusterCheckRetries, clusterCheckRetries, "Number of tries to access the cluster")
+	flagSet.IntVar(&clusterCheckOkResponses, options.ClusterCheckOkResponses, clusterCheckOkResponses, "Number of Ok response to receive before proceeding")
 }
 
 func init() {
 	rootCmd.AddCommand(configureCmd)
 
-	initializeKustomization(configureCmd)
+	initializeKustomization(configureCmd.Flags())
 }
 
 func performConfigure(cmd *cobra.Command, args []string) {
@@ -75,10 +78,10 @@ func performConfigure(cmd *cobra.Command, args []string) {
 	cobra.CheckErr(errors.Wrap(err, "While getting IP address"))
 
 	// We need to get it from root as we will apply configuration
-	config, err := k8s.LoadFromFile(constants.KubernetesRootConfig)
+	kubeConfig, err := k8s.LoadFromFile(constants.KubernetesRootConfig)
 	cobra.CheckErr(errors.Wrap(err, "While loading local cluster configuration"))
-	cobra.CheckErr(config.CheckClusterRunning(clusterCheckRetries, clusterCheckOkResponses, clusterCheckWaitMilliseconds))
+	cobra.CheckErr(kubeConfig.CheckClusterRunning(clusterCheckRetries, clusterCheckOkResponses, clusterCheckWaitMilliseconds))
 
-	force := viper.GetBool("force_config")
-	cobra.CheckErr(config.DoConfiguration(ip, force, waitTimeout))
+	force := viper.GetBool(config.ForceConfig)
+	cobra.CheckErr(kubeConfig.DoConfiguration(ip, force, waitTimeout))
 }

@@ -19,7 +19,9 @@ package cmd
 import (
 	"os"
 
+	"github.com/kaweezle/iknite/cmd/options"
 	"github.com/kaweezle/iknite/pkg/alpine"
+	"github.com/kaweezle/iknite/pkg/config"
 	"github.com/kaweezle/iknite/pkg/constants"
 	"github.com/kaweezle/iknite/pkg/k8s"
 	"github.com/pkg/errors"
@@ -27,6 +29,7 @@ import (
 	"github.com/spf13/cobra"
 	flag "github.com/spf13/pflag"
 	"github.com/spf13/viper"
+	koptions "k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 )
 
 // cSpell: enable
@@ -55,30 +58,31 @@ func init() {
 
 	configureClusterCommand(startCmd.Flags(), ikniteConfig)
 
-	initializeKustomization(startCmd)
+	initializeKustomization(startCmd.Flags())
 }
 
 func configureClusterCommand(flagSet *flag.FlagSet, ikniteConfig *k8s.IkniteConfig) {
 	k8s.SetDefaults_IkniteConfig(ikniteConfig)
 
-	flagSet.IPVar(&ikniteConfig.Ip, "ip", ikniteConfig.Ip, "Cluster IP address")
-	flagSet.BoolVar(&ikniteConfig.CreateIp, "ip-create", ikniteConfig.CreateIp, "Add IP address if it doesn't exist")
-	flagSet.StringVar(&ikniteConfig.NetworkInterface, "ip-network-interface", ikniteConfig.NetworkInterface, "Interface to which add IP")
-	flagSet.StringVar(&ikniteConfig.DomainName, "domain-name", ikniteConfig.DomainName, "Domain name of the cluster")
-	flagSet.BoolVar(&ikniteConfig.EnableMDNS, "enable-mdns", ikniteConfig.EnableMDNS, "Enable mDNS publication of domain name")
-	flagSet.StringVar(&ikniteConfig.KubernetesVersion, "kubernetes-version", ikniteConfig.KubernetesVersion, "Kubernetes version to install")
-	flagSet.StringVar(&ikniteConfig.ClusterName, "cluster-name", ikniteConfig.ClusterName, "Cluster name")
+	flagSet.IPVar(&ikniteConfig.Ip, options.Ip, ikniteConfig.Ip, "Cluster IP address")
+	flagSet.BoolVar(&ikniteConfig.CreateIp, options.IpCreate, ikniteConfig.CreateIp, "Add IP address if it doesn't exist")
+	flagSet.StringVar(&ikniteConfig.NetworkInterface, options.IpNetworkInterface, ikniteConfig.NetworkInterface, "Interface to which add IP")
+	flagSet.StringVar(&ikniteConfig.DomainName, options.DomainName, ikniteConfig.DomainName, "Domain name of the cluster")
+	flagSet.BoolVar(&ikniteConfig.EnableMDNS, options.EnableMDNS, ikniteConfig.EnableMDNS, "Enable mDNS publication of domain name")
+	flagSet.StringVar(&ikniteConfig.KubernetesVersion, koptions.KubernetesVersion, ikniteConfig.KubernetesVersion, "Kubernetes version to install")
+	flagSet.StringVar(&ikniteConfig.ClusterName, options.ClusterName, ikniteConfig.ClusterName, "Cluster name")
 }
 
 func startPersistentPreRun(cmd *cobra.Command, args []string) {
 
-	viper.BindPFlag("cluster.ip", cmd.Flags().Lookup("ip"))
-	viper.BindPFlag("cluster.create_ip", cmd.Flags().Lookup("ip-create"))
-	viper.BindPFlag("cluster.network_interface", cmd.Flags().Lookup("ip-network-interface"))
-	viper.BindPFlag("cluster.domain_name", cmd.Flags().Lookup("domain-name"))
-	viper.BindPFlag("cluster.kubernetes_version", cmd.Flags().Lookup("kubernetes-version"))
-	viper.BindPFlag("cluster.enable_mdns", cmd.Flags().Lookup("enable-mdns"))
-	viper.BindPFlag("cluster.cluster_name", cmd.Flags().Lookup("cluster-name"))
+	flags := cmd.Flags()
+	viper.BindPFlag(config.IP, flags.Lookup(options.Ip))
+	viper.BindPFlag(config.IPCreate, flags.Lookup(options.IpCreate))
+	viper.BindPFlag(config.IPNetworkInterface, flags.Lookup(options.IpNetworkInterface))
+	viper.BindPFlag(config.DomainName, flags.Lookup(options.DomainName))
+	viper.BindPFlag(config.KubernetesVersion, flags.Lookup(koptions.KubernetesVersion))
+	viper.BindPFlag(config.EnableMDNS, flags.Lookup(options.EnableMDNS))
+	viper.BindPFlag(config.ClusterName, flags.Lookup(options.ClusterName))
 }
 
 func perform(cmd *cobra.Command, args []string) {

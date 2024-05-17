@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+	http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -19,6 +19,8 @@ import (
 	"net"
 	"os"
 
+	"github.com/kaweezle/iknite/cmd/options"
+	"github.com/kaweezle/iknite/pkg/config"
 	"github.com/kaweezle/iknite/pkg/constants"
 	"github.com/kaweezle/iknite/pkg/utils"
 	"github.com/pion/mdns"
@@ -49,11 +51,11 @@ func init() {
 	if utils.IsOnWSL() {
 		hostname = constants.WSLHostName
 	}
-	mdnsCmd.Flags().String("domain-name", hostname, "Domain name of the cluster")
+	mdnsCmd.Flags().String(options.DomainName, hostname, "Domain name of the cluster")
 }
 
 func mdnsPersistentPreRun(cmd *cobra.Command, args []string) {
-	viper.BindPFlag("cluster.domain_name", cmd.Flags().Lookup("domain-name"))
+	viper.BindPFlag(config.DomainName, cmd.Flags().Lookup(options.DomainName))
 }
 
 func performMdns(cmd *cobra.Command, args []string) {
@@ -65,7 +67,7 @@ func performMdns(cmd *cobra.Command, args []string) {
 	cobra.CheckErr(errors.Wrap(err, "Cannot Listen on default address"))
 
 	_, err = mdns.Server(ipv4.NewPacketConn(l), &mdns.Config{
-		LocalNames: []string{viper.GetString("cluster.domain_name")},
+		LocalNames: []string{viper.GetString(config.DomainName)},
 	})
 	cobra.CheckErr(errors.Wrap(err, "Cannot create server"))
 	select {}

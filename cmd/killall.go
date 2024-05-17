@@ -6,10 +6,12 @@ import (
 	"strings"
 
 	s "github.com/bitfield/script"
+	"github.com/kaweezle/iknite/cmd/options"
 	"github.com/kaweezle/iknite/pkg/alpine"
 	"github.com/kaweezle/iknite/pkg/constants"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+	flag "github.com/spf13/pflag"
 	"github.com/txn2/txeh"
 )
 
@@ -42,20 +44,20 @@ This command must be run as root.
 	Run: performKillall,
 }
 
-func initializeKillall(cmd *cobra.Command) {
-	cmd.Flags().BoolVar(&stopServices, "stop-services", stopServices, "Stop the services")
-	cmd.Flags().BoolVar(&stopContainers, "stop-containers", stopContainers, "Stop containers")
-	cmd.Flags().BoolVar(&unmountPaths, "unmount-paths", unmountPaths, "Unmount paths")
-	cmd.Flags().BoolVar(&resetCni, "reset-cni", resetCni, "Reset CNI")
-	cmd.Flags().BoolVar(&resetIptables, "reset-iptables", resetIptables, "Reset iptables")
-	cmd.Flags().BoolVar(&resetKubelet, "reset-kubelet", resetKubelet, "Reset kubelet")
-	cmd.Flags().BoolVar(&resetIpAddress, "reset-ip-address", resetIpAddress, "Reset IP address")
+func initializeKillall(flags *flag.FlagSet) {
+	flags.BoolVar(&stopServices, options.StopServices, stopServices, "Stop the services")
+	flags.BoolVar(&stopContainers, options.StopContainers, stopContainers, "Stop containers")
+	flags.BoolVar(&unmountPaths, options.UnmountPaths, unmountPaths, "Unmount paths")
+	flags.BoolVar(&resetCni, options.ResetCNI, resetCni, "Reset CNI")
+	flags.BoolVar(&resetIptables, options.ResetIPTables, resetIptables, "Reset iptables")
+	flags.BoolVar(&resetKubelet, options.ResetKubelet, resetKubelet, "Reset kubelet")
+	flags.BoolVar(&resetIpAddress, options.ResetIPAddress, resetIpAddress, "Reset IP address")
 }
 
 func init() {
 	rootCmd.AddCommand(killallCmd)
 
-	initializeKillall(killallCmd)
+	initializeKillall(killallCmd.Flags())
 	configureClusterCommand(killallCmd.Flags(), ikniteConfig)
 }
 
@@ -69,8 +71,8 @@ func performKillall(cmd *cobra.Command, args []string) {
 	}
 
 	if stopServices {
-		log.Info("Stopping iknite...")
-		cobra.CheckErr(alpine.StopService("iknite"))
+		log.Infof("Stopping %s...", constants.IkniteService)
+		cobra.CheckErr(alpine.StopService(constants.IkniteService))
 
 		if stopContainers {
 			log.Info("Stopping all containers...")
@@ -79,8 +81,8 @@ func performKillall(cmd *cobra.Command, args []string) {
 			}
 		}
 
-		log.Info("Stopping containerd...")
-		cobra.CheckErr(alpine.StopService("containerd"))
+		log.Infof("Stopping %s...", constants.ContainerServiceName)
+		cobra.CheckErr(alpine.StopService(constants.ContainerServiceName))
 	}
 
 	if unmountPaths {

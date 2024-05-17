@@ -21,6 +21,7 @@ import (
 	"net"
 	"time"
 
+	vconfig "github.com/kaweezle/iknite/pkg/config"
 	"github.com/kaweezle/iknite/pkg/constants"
 	"github.com/kaweezle/iknite/pkg/provision"
 	"github.com/pkg/errors"
@@ -203,7 +204,7 @@ func (config *Config) DoConfiguration(ip net.IP, force bool, waitTimeout int) er
 		}
 		var ids []resid.ResId
 		var err error
-		kustomizeDirectory := viper.GetString("kustomize_directory")
+		kustomizeDirectory := viper.GetString(vconfig.KustomizeDirectory)
 		if ids, err = provision.ApplyBaseKustomizations(kustomizeDirectory, context); err != nil {
 			return err
 		}

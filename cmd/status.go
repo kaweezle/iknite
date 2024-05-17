@@ -20,6 +20,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/kaweezle/iknite/cmd/options"
 	"github.com/kaweezle/iknite/pkg/constants"
 	"github.com/kaweezle/iknite/pkg/k8s"
 	"github.com/pkg/errors"
@@ -45,7 +46,7 @@ var waitReadiness = false
 
 func init() {
 	rootCmd.AddCommand(statusCmd)
-	statusCmd.Flags().BoolVarP(&waitReadiness, "wait", "w", waitReadiness, "Wait n seconds for all pods to settle")
+	statusCmd.Flags().BoolVarP(&waitReadiness, options.Wait, "w", waitReadiness, "Wait n seconds for all pods to settle")
 }
 
 var callbackCount = 0
@@ -81,7 +82,7 @@ func performStatus(cmd *cobra.Command, args []string) {
 
 	runtime.ErrorHandlers = runtime.ErrorHandlers[:0]
 	log.WithFields(log.Fields{
-		"config": constants.KubernetesRootConfig,
+		options.Config: constants.KubernetesRootConfig,
 	}).Info("Loading kube config...")
 
 	// We need to get it from root as we will apply configuration

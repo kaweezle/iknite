@@ -3,6 +3,7 @@ package phases
 import (
 	"fmt"
 
+	"github.com/kaweezle/iknite/pkg/config"
 	"github.com/kaweezle/iknite/pkg/constants"
 	"github.com/kaweezle/iknite/pkg/k8s"
 	"github.com/pkg/errors"
@@ -28,7 +29,7 @@ func runConfigure(c workflow.RunData) error {
 	}
 	ikniteConfig := data.IkniteConfig()
 
-	force_config := viper.GetBool("force_config")
+	force_config := viper.GetBool(config.ForceConfig)
 	log.Info("Performing kustomize configuration")
 
 	config, err := k8s.LoadFromDefault()

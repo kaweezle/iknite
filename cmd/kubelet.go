@@ -21,7 +21,7 @@ The kubelet is started and monitored. The following operations are performed:
 func init() {
 	rootCmd.AddCommand(kubeletCmd)
 	configureClusterCommand(kubeletCmd.Flags(), ikniteConfig)
-	initializeKustomization(kubeletCmd)
+	initializeKustomization(kubeletCmd.Flags())
 }
 
 func performKubelet(cmd *cobra.Command, args []string) {
