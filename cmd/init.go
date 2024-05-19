@@ -447,6 +447,8 @@ func newInitData(cmd *cobra.Command, args []string, initOptions *initOptions, ou
 	arg := &kubeadmapi.Arg{Name: "node-ip", Value: ips}
 	cfg.NodeRegistration.KubeletExtraArgs = append(cfg.NodeRegistration.KubeletExtraArgs, *arg)
 
+	DecodeIkniteConfig(initOptions.ikniteCfg)
+
 	return &initData{
 		cfg:                     cfg,
 		certificatesDir:         cfg.CertificatesDir,

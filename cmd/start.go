@@ -24,6 +24,7 @@ import (
 	"github.com/kaweezle/iknite/pkg/config"
 	"github.com/kaweezle/iknite/pkg/constants"
 	"github.com/kaweezle/iknite/pkg/k8s"
+	"github.com/mitchellh/mapstructure"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -85,8 +86,28 @@ func startPersistentPreRun(cmd *cobra.Command, args []string) {
 	viper.BindPFlag(config.ClusterName, flags.Lookup(options.ClusterName))
 }
 
+// DecodeIkniteConfig decodes the configuration from the viper configuration.
+// This allows providing configuration values as environment variables.
+func DecodeIkniteConfig(ikniteConfig *k8s.IkniteConfig) error {
+	// Cannot use Unmarshal. Look here: https://github.com/spf13/viper/issues/368
+	decoderConfig := mapstructure.DecoderConfig{
+		DecodeHook:       mapstructure.StringToIPHookFunc(),
+		WeaklyTypedInput: true,
+		Result:           ikniteConfig,
+		Metadata:         nil,
+	}
+
+	decoder, err := mapstructure.NewDecoder(&decoderConfig)
+	if err != nil {
+		return errors.Wrap(err, "While creating decoder")
+	}
+
+	return decoder.Decode(viper.AllSettings()["cluster"])
+}
+
 func perform(cmd *cobra.Command, args []string) {
 
+	cobra.CheckErr(DecodeIkniteConfig(ikniteConfig))
 	cobra.CheckErr(k8s.PrepareKubernetesEnvironment(ikniteConfig))
 
 	// If Kubernetes is already installed, check that the configuration has not
@@ -114,9 +135,7 @@ func perform(cmd *cobra.Command, args []string) {
 	log.Info("Ensuring Iknite...")
 	cobra.CheckErr(alpine.EnableService(constants.IkniteService))
 	log.Info("Ensuring OpenRC...")
-	cobra.CheckErr(alpine.EnsureOpenRCDirectory())
 	cobra.CheckErr(alpine.StartOpenRC())
-	cobra.CheckErr(alpine.StartService(constants.IkniteService))
 
 	log.Info("executed")
 }
