@@ -224,7 +224,7 @@ func (config *Config) DoConfiguration(ip net.IP, force bool, waitTimeout int) er
 	if waitTimeout > 0 {
 		log.Infof("Waiting for workloads for %d seconds...", waitTimeout)
 		runtime.ErrorHandlers = runtime.ErrorHandlers[:0]
-		return config.WaitForWorkloads(time.Second*time.Duration(waitTimeout), nil)
+		return config.WaitForWorkloads(context.Background(), time.Second*time.Duration(waitTimeout), nil)
 	}
 
 	return nil

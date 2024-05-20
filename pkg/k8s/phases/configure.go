@@ -27,7 +27,7 @@ func runConfigure(c workflow.RunData) error {
 	if !ok {
 		return fmt.Errorf("configure phase invoked with an invalid data struct. ")
 	}
-	ikniteConfig := data.IkniteConfig()
+	ikniteConfig := data.IkniteCluster().Spec
 
 	force_config := viper.GetBool(config.ForceConfig)
 	log.Info("Performing kustomize configuration")

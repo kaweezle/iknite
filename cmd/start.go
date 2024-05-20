@@ -21,6 +21,7 @@ import (
 
 	"github.com/kaweezle/iknite/cmd/options"
 	"github.com/kaweezle/iknite/pkg/alpine"
+	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
 	"github.com/kaweezle/iknite/pkg/config"
 	"github.com/kaweezle/iknite/pkg/constants"
 	"github.com/kaweezle/iknite/pkg/k8s"
@@ -52,7 +53,7 @@ var startCmd = &cobra.Command{
 	Run:              perform,
 }
 
-var ikniteConfig *k8s.IkniteConfig = &k8s.IkniteConfig{}
+var ikniteConfig *v1alpha1.IkniteClusterSpec = &v1alpha1.IkniteClusterSpec{}
 
 func init() {
 	rootCmd.AddCommand(startCmd)
@@ -62,8 +63,8 @@ func init() {
 	initializeKustomization(startCmd.Flags())
 }
 
-func configureClusterCommand(flagSet *flag.FlagSet, ikniteConfig *k8s.IkniteConfig) {
-	k8s.SetDefaults_IkniteConfig(ikniteConfig)
+func configureClusterCommand(flagSet *flag.FlagSet, ikniteConfig *v1alpha1.IkniteClusterSpec) {
+	v1alpha1.SetDefaults_IkniteClusterSpec(ikniteConfig)
 
 	flagSet.IPVar(&ikniteConfig.Ip, options.Ip, ikniteConfig.Ip, "Cluster IP address")
 	flagSet.BoolVar(&ikniteConfig.CreateIp, options.IpCreate, ikniteConfig.CreateIp, "Add IP address if it doesn't exist")
@@ -88,7 +89,7 @@ func startPersistentPreRun(cmd *cobra.Command, args []string) {
 
 // DecodeIkniteConfig decodes the configuration from the viper configuration.
 // This allows providing configuration values as environment variables.
-func DecodeIkniteConfig(ikniteConfig *k8s.IkniteConfig) error {
+func DecodeIkniteConfig(ikniteConfig *v1alpha1.IkniteClusterSpec) error {
 	// Cannot use Unmarshal. Look here: https://github.com/spf13/viper/issues/368
 	decoderConfig := mapstructure.DecoderConfig{
 		DecodeHook:       mapstructure.StringToIPHookFunc(),

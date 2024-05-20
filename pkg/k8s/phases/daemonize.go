@@ -1,12 +1,14 @@
 package phases
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
 	"os/signal"
 	"syscall"
 
+	"github.com/kaweezle/iknite/pkg/apis/iknite"
 	"github.com/kaweezle/iknite/pkg/k8s"
 	"github.com/pion/mdns"
 	log "github.com/sirupsen/logrus"
@@ -21,7 +23,7 @@ func NewDaemonizePhase() workflow.Phase {
 	}
 }
 
-func WaitForKubelet(cmd *exec.Cmd, conn *mdns.Conn) error {
+func WaitForKubelet(cmd *exec.Cmd, conn *mdns.Conn, cancel context.CancelFunc) error {
 
 	// Wait for SIGTERM and SIGKILL signals
 	stop := make(chan os.Signal, 1)
@@ -59,6 +61,11 @@ func WaitForKubelet(cmd *exec.Cmd, conn *mdns.Conn) error {
 		err = conn.Close()
 	}
 
+	if err == nil && cancel != nil {
+		log.Info("Cancelling the context...")
+		cancel()
+	}
+
 	return err
 }
 
@@ -73,12 +80,17 @@ func runDaemonize(c workflow.RunData) error {
 		return nil
 	}
 	conn := data.MDnsConn()
+	_, cancel := data.ContextWithCancel()
 
-	err := WaitForKubelet(cmd, conn)
+	err := WaitForKubelet(cmd, conn, cancel)
+
+	data.IkniteCluster().Update(iknite.Stopping, "stop", nil, nil)
 	if err == nil {
 		// Prevent double stop
 		data.SetKubeletCmd(nil)
 	}
-	k8s.CleanAll(data.IkniteConfig())
+	data.IkniteCluster().Update(iknite.Cleaning, "clean", nil, nil)
+	k8s.CleanAll(&data.IkniteCluster().Spec)
+	data.IkniteCluster().Update(iknite.Stopped, "", nil, nil)
 	return err
 }

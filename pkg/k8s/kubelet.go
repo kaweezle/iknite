@@ -15,6 +15,7 @@ import (
 	s "github.com/bitfield/script"
 	"github.com/joho/godotenv"
 	"github.com/kaweezle/iknite/pkg/alpine"
+	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
 	"github.com/kaweezle/iknite/pkg/config"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
@@ -127,7 +128,7 @@ func RemovePidFiles() {
 	os.Remove(kubeletPidFile)
 }
 
-func StartAndConfigureKubelet(kubeConfig *IkniteConfig) error {
+func StartAndConfigureKubelet(kubeConfig *v1alpha1.IkniteClusterSpec) error {
 
 	cmd, err := StartKubelet()
 	if err != nil {
@@ -266,7 +267,7 @@ func CheckKubeletRunning(retries, okResponses, waitTime int) (err error) {
 	return err
 }
 
-func ResetIPAddress(ikniteConfig *IkniteConfig) error {
+func ResetIPAddress(ikniteConfig *v1alpha1.IkniteClusterSpec) error {
 	if !ikniteConfig.CreateIp {
 		return nil
 	}
@@ -295,7 +296,7 @@ func ResetIPAddress(ikniteConfig *IkniteConfig) error {
 	return hosts.Save()
 }
 
-func CleanAll(ikniteConfig *IkniteConfig) {
+func CleanAll(ikniteConfig *v1alpha1.IkniteClusterSpec) {
 
 	var err error
 	log.Info("Stopping all containers...")
@@ -349,8 +350,6 @@ func CleanAll(ikniteConfig *IkniteConfig) {
 	if err != nil {
 		log.WithError(err).Warn("Error resetting IP address")
 	}
-
-	ResetIPAddress(ikniteConfig)
 }
 
 func processMounts(path string, command string, message string) error {

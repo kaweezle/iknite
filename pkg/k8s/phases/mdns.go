@@ -24,7 +24,7 @@ func runMDnsPublish(c workflow.RunData) error {
 	if !ok {
 		return fmt.Errorf("prepare phase invoked with an invalid data struct. ")
 	}
-	ikniteConfig := data.IkniteConfig()
+	ikniteConfig := data.IkniteCluster().Spec
 
 	if !ikniteConfig.EnableMDNS {
 		return nil

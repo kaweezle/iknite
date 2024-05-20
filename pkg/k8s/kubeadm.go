@@ -18,7 +18,6 @@ package k8s
 import (
 	"fmt"
 	"io"
-	"net"
 	"os"
 	"path"
 	"path/filepath"
@@ -26,12 +25,13 @@ import (
 	"text/template"
 
 	"github.com/kaweezle/iknite/pkg/alpine"
-	"github.com/kaweezle/iknite/pkg/constants"
 	"github.com/kaweezle/iknite/pkg/utils"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
 	"github.com/txn2/txeh"
+
+	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
 )
 
 const (
@@ -39,50 +39,7 @@ const (
 	configurationPattern             = "*.conf"
 	pkiSubdirectory                  = "pki"
 	manifestsSubdirectory            = "manifests"
-	KubernetesVersion                = "1.29.3"
 )
-
-type IkniteConfig struct {
-	Ip                net.IP `mapstructure:"ip"`
-	KubernetesVersion string `mapstructure:"kubernetes_version"`
-	DomainName        string `mapstructure:"domain_name"`
-	CreateIp          bool   `mapstructure:"create_ip"`
-	NetworkInterface  string `mapstructure:"network_interface"`
-	EnableMDNS        bool   `mapstructure:"enable_mdns"`
-	ClusterName       string `mapstructure:"cluster_name"`
-}
-
-func SetDefaults_IkniteConfig(obj *IkniteConfig) {
-	wsl := utils.IsOnWSL()
-	if obj.Ip == nil {
-		if wsl {
-			obj.Ip = net.ParseIP(constants.WSLIPAddress)
-		} else {
-			obj.Ip, _ = utils.GetOutboundIP()
-		}
-	}
-	if obj.DomainName == "" && wsl {
-		obj.DomainName = constants.WSLHostName
-	}
-	obj.EnableMDNS = wsl
-	if obj.KubernetesVersion == "" {
-		obj.KubernetesVersion = KubernetesVersion
-	}
-	if obj.NetworkInterface == "" {
-		obj.NetworkInterface = "eth0"
-	}
-	obj.CreateIp = wsl
-	if obj.ClusterName == "" {
-		obj.ClusterName = constants.DefaultClusterName
-	}
-}
-
-func (c *IkniteConfig) GetApiEndPoint() string {
-	if c.DomainName != "" {
-		return c.DomainName
-	}
-	return c.Ip.String()
-}
 
 const kubeadmConfigTemplate = `
 apiVersion: kubeadm.k8s.io/v1beta3
@@ -111,7 +68,7 @@ nodeRegistration:
     - Swap
 `
 
-func CreateKubeadmConfiguration(wr io.Writer, config *IkniteConfig) error {
+func CreateKubeadmConfiguration(wr io.Writer, config *v1alpha1.IkniteClusterSpec) error {
 	tmpl, err := template.New("config").Parse(kubeadmConfigTemplate)
 	if err != nil {
 		return err
@@ -120,7 +77,7 @@ func CreateKubeadmConfiguration(wr io.Writer, config *IkniteConfig) error {
 	return tmpl.Execute(wr, config)
 }
 
-func WriteKubeadmConfiguration(fs afero.Fs, config *IkniteConfig) (f afero.File, err error) {
+func WriteKubeadmConfiguration(fs afero.Fs, config *v1alpha1.IkniteClusterSpec) (f afero.File, err error) {
 	afs := &afero.Afero{Fs: fs}
 	f, err = afs.TempFile("", "config*.yaml")
 	if err != nil {
@@ -147,7 +104,7 @@ func RunKubeadm(parameters []string) (err error) {
 	return
 }
 
-func PrepareKubernetesEnvironment(ikniteConfig *IkniteConfig) error {
+func PrepareKubernetesEnvironment(ikniteConfig *v1alpha1.IkniteClusterSpec) error {
 
 	log.WithFields(log.Fields{
 		"ip":                 ikniteConfig.Ip.String(),
@@ -209,7 +166,7 @@ func PrepareKubernetesEnvironment(ikniteConfig *IkniteConfig) error {
 	return nil
 }
 
-func RunKubeadmInit(config *IkniteConfig) error {
+func RunKubeadmInit(config *v1alpha1.IkniteClusterSpec) error {
 
 	fs := afero.NewOsFs()
 	f, err := WriteKubeadmConfiguration(fs, config)

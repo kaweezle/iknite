@@ -5,6 +5,7 @@ import (
 	"net"
 	"testing"
 
+	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
 	tu "github.com/kaweezle/iknite/pkg/testutils"
 	"github.com/kaweezle/iknite/pkg/utils"
 	"github.com/lithammer/dedent"
@@ -55,7 +56,7 @@ nodeRegistration:
 
 func (s *KubeadmTestSuite) TestCreateKubeadmConfig() {
 	assert := s.Require()
-	var config = IkniteConfig{
+	var config = v1alpha1.IkniteClusterSpec{
 		Ip:                net.ParseIP("192.168.99.2"),
 		KubernetesVersion: "1.29.3",
 		DomainName:        "kaweezle.local",
@@ -93,7 +94,7 @@ func (s *KubeadmTestSuite) TestCreateKubeadmConfigVM() {
         - DirAvailable--var-lib-etcd
         - Swap
     `)
-	var config = IkniteConfig{
+	var config = v1alpha1.IkniteClusterSpec{
 		Ip:                net.ParseIP("192.168.99.2"),
 		KubernetesVersion: "1.29.3",
 		CreateIp:          false,
@@ -130,7 +131,7 @@ func (s *KubeadmTestSuite) TestWriteKubeadmConfiguration() {
         - DirAvailable--var-lib-etcd
         - Swap
     `)
-	var config = IkniteConfig{
+	var config = v1alpha1.IkniteClusterSpec{
 		Ip:                net.ParseIP("192.168.99.2"),
 		KubernetesVersion: "1.29.3",
 		CreateIp:          false,
@@ -152,7 +153,7 @@ func (s *KubeadmTestSuite) TestWriteKubeadmConfiguration() {
 func (s *KubeadmTestSuite) TestRunKubeadmInit() {
 
 	require := s.Require()
-	var config = IkniteConfig{
+	var config = v1alpha1.IkniteClusterSpec{
 		Ip:                net.ParseIP("192.168.99.2"),
 		KubernetesVersion: "1.29.3",
 		DomainName:        "kaweezle.local",
