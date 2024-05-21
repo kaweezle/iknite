@@ -44,11 +44,16 @@ var statusCmd = &cobra.Command{
 	Run: performStatus,
 }
 
-var waitReadiness = false
+var (
+	waitReadiness = false
+	timeout       = 0
+)
 
 func init() {
 	rootCmd.AddCommand(statusCmd)
-	statusCmd.Flags().BoolVarP(&waitReadiness, options.Wait, "w", waitReadiness, "Wait n seconds for all pods to settle")
+	flags := statusCmd.Flags()
+	flags.BoolVarP(&waitReadiness, options.Wait, "w", waitReadiness, "Wait for all pods to settle")
+	flags.IntVarP(&timeout, options.Timeout, "t", timeout, "Wait timeout in seconds")
 }
 
 var callbackCount = 0
@@ -91,5 +96,5 @@ func performStatus(cmd *cobra.Command, args []string) {
 	config, err := k8s.LoadFromFile(constants.KubernetesRootConfig)
 	cobra.CheckErr(errors.Wrap(err, "While loading local cluster configuration"))
 
-	cobra.CheckErr(config.WaitForWorkloads(context.Background(), time.Second*time.Duration(0), callback))
+	cobra.CheckErr(config.WaitForWorkloads(context.Background(), time.Second*time.Duration(timeout), callback))
 }

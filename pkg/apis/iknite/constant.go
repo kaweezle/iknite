@@ -55,7 +55,7 @@ func (s *ClusterState) Set(value string) {
 	case "Initializing":
 		*s = Initializing
 	case "Stabilizing":
-		*s = Initializing
+		*s = Stabilizing
 	case "Running":
 		*s = Running
 	case "Stopping":

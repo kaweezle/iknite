@@ -5,6 +5,7 @@ const (
 	Config    = "config"
 	Verbosity = "verbosity"
 	Json      = "json"
+	Timeout   = "timeout"
 
 	// Kustomization
 	KustomizeDirectory      = "kustomize-directory"

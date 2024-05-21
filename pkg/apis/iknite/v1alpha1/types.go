@@ -109,3 +109,17 @@ func (ikniteCluster IkniteCluster) Persist() {
 		log.WithError(err).Warn("Failed to marshal status.json")
 	}
 }
+
+func LoadIkniteCluster() (*IkniteCluster, error) {
+	ikniteCluster := &IkniteCluster{}
+	ikniteClusterJSON, err := os.ReadFile(constants.StatusFile)
+	if err == nil {
+		err = json.Unmarshal(ikniteClusterJSON, ikniteCluster)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		return nil, err
+	}
+	return ikniteCluster, nil
+}

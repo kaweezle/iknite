@@ -17,10 +17,13 @@ package cmd
 
 // cSpell: disable
 import (
+	"context"
 	"os"
+	"time"
 
 	"github.com/kaweezle/iknite/cmd/options"
 	"github.com/kaweezle/iknite/pkg/alpine"
+	"github.com/kaweezle/iknite/pkg/apis/iknite"
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
 	"github.com/kaweezle/iknite/pkg/config"
 	"github.com/kaweezle/iknite/pkg/constants"
@@ -31,6 +34,7 @@ import (
 	"github.com/spf13/cobra"
 	flag "github.com/spf13/pflag"
 	"github.com/spf13/viper"
+	"k8s.io/apimachinery/pkg/util/wait"
 	koptions "k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 )
 
@@ -57,10 +61,11 @@ var ikniteConfig *v1alpha1.IkniteClusterSpec = &v1alpha1.IkniteClusterSpec{}
 
 func init() {
 	rootCmd.AddCommand(startCmd)
+	flags := startCmd.Flags()
 
-	configureClusterCommand(startCmd.Flags(), ikniteConfig)
-
-	initializeKustomization(startCmd.Flags())
+	flags.IntVarP(&timeout, options.Timeout, "t", timeout, "Wait timeout in seconds")
+	configureClusterCommand(flags, ikniteConfig)
+	initializeKustomization(flags)
 }
 
 func configureClusterCommand(flagSet *flag.FlagSet, ikniteConfig *v1alpha1.IkniteClusterSpec) {
@@ -106,6 +111,37 @@ func DecodeIkniteConfig(ikniteConfig *v1alpha1.IkniteClusterSpec) error {
 	return decoder.Decode(viper.AllSettings()["cluster"])
 }
 
+func IsIkinteReady(ctx context.Context) (bool, error) {
+
+	cluster, err := v1alpha1.LoadIkniteCluster()
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return false, err
+	}
+	if errors.Is(err, os.ErrNotExist) {
+		return false, nil
+	}
+	log.WithFields(log.Fields{
+		"state":   cluster.Status.State.String(),
+		"phase":   cluster.Status.CurrentPhase,
+		"total":   cluster.Status.WorkloadsState.Count,
+		"ready":   cluster.Status.WorkloadsState.ReadyCount,
+		"unready": cluster.Status.WorkloadsState.UnreadyCount,
+	}).Infof(
+		"status=%s, phase=%s, Workloads total=%d, ready=%d, unready=%d",
+		cluster.Status.State.String(),
+		cluster.Status.CurrentPhase,
+		cluster.Status.WorkloadsState.Count,
+		cluster.Status.WorkloadsState.ReadyCount,
+		cluster.Status.WorkloadsState.UnreadyCount,
+	)
+
+	if cluster.Status.State > iknite.Initializing && cluster.Status.WorkloadsState.Count > 0 {
+		return true, nil
+	}
+
+	return false, nil
+}
+
 func perform(cmd *cobra.Command, args []string) {
 
 	cobra.CheckErr(DecodeIkniteConfig(ikniteConfig))
@@ -138,5 +174,13 @@ func perform(cmd *cobra.Command, args []string) {
 	log.Info("Ensuring OpenRC...")
 	cobra.CheckErr(alpine.StartOpenRC())
 
-	log.Info("executed")
+	ctx := context.Background()
+	if timeout > 0 {
+		err = wait.PollUntilContextTimeout(ctx, time.Second*time.Duration(2), time.Duration(timeout), true, IsIkinteReady)
+	} else {
+		err = wait.PollUntilContextCancel(ctx, time.Second*time.Duration(2), true, IsIkinteReady)
+	}
+
+	cobra.CheckErr(err)
+	log.Info("Cluster is ready")
 }
