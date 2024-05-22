@@ -1,11 +1,13 @@
 package k8s
 
 import (
+	"context"
 	"fmt"
 	"sort"
 	"strings"
 	"time"
 
+	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
 	log "github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -57,30 +59,6 @@ func (r *RESTClientGetter) ToRESTMapper() (meta.RESTMapper, error) {
 
 func (r *RESTClientGetter) ToRawKubeConfigLoader() clientcmd.ClientConfig {
 	return r.clientconfig
-}
-
-type WorkloadState struct {
-	Namespace string
-	Name      string
-	Ok        bool
-	Message   string
-}
-
-func OkString(b bool) string {
-	if b {
-		return "🟩"
-	}
-	return "🟥"
-}
-
-func (r *WorkloadState) LongString() string {
-
-	return fmt.Sprintf("%s %-20s %-54s %s", OkString(r.Ok), r.Namespace, r.Name, r.Message)
-}
-
-func (r *WorkloadState) String() string {
-
-	return fmt.Sprintf("%s/%s:%s", r.Namespace, r.Name, OkString(r.Ok))
 }
 
 var ApplicationSchemaGroupVersionKind = schema.GroupVersionKind{Group: "argoproj.io", Version: "v1alpha1", Kind: "Application"}
@@ -150,8 +128,8 @@ func (client *RESTClientGetter) HasApplications() (has bool, err error) {
 	return
 }
 
-func (client *RESTClientGetter) AllWorkloadStates() (result []*WorkloadState, err error) {
-	var _result []*WorkloadState
+func (client *RESTClientGetter) AllWorkloadStates() (result []*v1alpha1.WorkloadState, err error) {
+	var _result []*v1alpha1.WorkloadState
 
 	var resourceTypes = "deployments,statefulsets,daemonsets"
 	var hasApplications bool
@@ -192,7 +170,7 @@ func (client *RESTClientGetter) AllWorkloadStates() (result []*WorkloadState, er
 		if msg, ok, err = v.Status(&unstructured.Unstructured{Object: u}, 0); err != nil {
 			return
 		}
-		_result = append(_result, &WorkloadState{info.Namespace, info.ObjectName(), ok, strings.TrimSuffix(msg, "\n")})
+		_result = append(_result, &v1alpha1.WorkloadState{Namespace: info.Namespace, Name: info.ObjectName(), Ok: ok, Message: strings.TrimSuffix(msg, "\n")})
 	}
 	sort.SliceStable(_result, func(i, j int) bool {
 		return _result[i].String() < _result[j].String()
@@ -201,17 +179,17 @@ func (client *RESTClientGetter) AllWorkloadStates() (result []*WorkloadState, er
 	return
 }
 
-type WorkloadStateCallbackFunc func(state bool, total int, ready []*WorkloadState, unready []*WorkloadState)
+type WorkloadStateCallbackFunc func(state bool, total int, ready []*v1alpha1.WorkloadState, unready []*v1alpha1.WorkloadState)
 
-func AreWorkloadsReady(config *Config, callback WorkloadStateCallbackFunc) wait.ConditionFunc {
+func AreWorkloadsReady(config *Config, callback WorkloadStateCallbackFunc) wait.ConditionWithContextFunc {
 	client := config.RESTClient()
-	return func() (bool, error) {
+	return func(ctx context.Context) (bool, error) {
 		states, err := client.AllWorkloadStates()
 		if err != nil {
 			return false, err
 		}
 		var result bool = true
-		var ready, unready []*WorkloadState
+		var ready, unready []*v1alpha1.WorkloadState
 		for _, state := range states {
 			if !state.Ok {
 				result = false
@@ -234,6 +212,11 @@ func AreWorkloadsReady(config *Config, callback WorkloadStateCallbackFunc) wait.
 	}
 }
 
-func (config *Config) WaitForWorkloads(timeout time.Duration, callback WorkloadStateCallbackFunc) error {
-	return wait.PollImmediate(time.Second*time.Duration(2), timeout, AreWorkloadsReady(config, callback))
+func (config *Config) WaitForWorkloads(ctx context.Context, timeout time.Duration, callback WorkloadStateCallbackFunc) error {
+	if timeout > 0 {
+		return wait.PollUntilContextTimeout(ctx, time.Second*time.Duration(2), timeout, true, AreWorkloadsReady(config, callback))
+	} else {
+		return wait.PollUntilContextCancel(ctx, time.Second*time.Duration(2), true, AreWorkloadsReady(config, callback))
+	}
+
 }

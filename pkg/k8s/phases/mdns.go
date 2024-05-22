@@ -1,0 +1,54 @@
+package phases
+
+import (
+	"fmt"
+	"net"
+
+	"github.com/pion/mdns"
+	"github.com/pkg/errors"
+	"golang.org/x/net/ipv4"
+	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
+)
+
+func NewMDnsPublishPhase() workflow.Phase {
+	return workflow.Phase{
+		Name:  "mdns-publish",
+		Short: "Publish the cluster domain with mdns.",
+		Run:   runMDnsPublish,
+	}
+}
+
+// runPrepare executes the node initialization process.
+func runMDnsPublish(c workflow.RunData) error {
+	data, ok := c.(IkniteInitData)
+	if !ok {
+		return fmt.Errorf("prepare phase invoked with an invalid data struct. ")
+	}
+	ikniteConfig := data.IkniteCluster().Spec
+
+	if !ikniteConfig.EnableMDNS {
+		return nil
+	}
+
+	addr, err := net.ResolveUDPAddr("udp", mdns.DefaultAddress)
+	if err != nil {
+		return errors.Wrap(err, "Cannot resolve default address")
+	}
+
+	l, err := net.ListenUDP("udp4", addr)
+	if err != nil {
+		return errors.Wrap(err, "Cannot Listen on default address")
+	}
+
+	var conn *mdns.Conn
+	fmt.Println("[mdns-publish] Starting the mdns reponder...")
+	conn, err = mdns.Server(ipv4.NewPacketConn(l), &mdns.Config{
+		LocalNames: []string{ikniteConfig.DomainName},
+	})
+	if err != nil {
+		return errors.Wrap(err, "Cannot create server")
+	}
+	data.SetMDnsConn(conn)
+
+	return nil
+}

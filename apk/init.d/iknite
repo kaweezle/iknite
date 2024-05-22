@@ -1,0 +1,20 @@
+#!/sbin/openrc-run
+
+supervisor=supervise-daemon
+name="Iknite Kubernetes starter"
+description="Ensure the environment is correct and start kubeadm & kubelet"
+
+IKNITE_VERBOSITY="${IKNITE_VERBOSITY:-debug}"
+
+command="/sbin/iknite"
+command_args="-v $IKNITE_VERBOSITY init"
+# command_background="yes"
+pidfile="${IKNITE_PIDFILE:-/run/${RC_SVCNAME}.pid}"
+: ${output_log:=/var/log/$RC_SVCNAME.log}
+: ${error_log:=/var/log/$RC_SVCNAME.log}
+
+depend() {
+        after net
+        need cgroups
+        need containerd
+}

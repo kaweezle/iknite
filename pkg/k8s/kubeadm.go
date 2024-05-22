@@ -16,6 +16,7 @@ limitations under the License.
 package k8s
 
 import (
+	"fmt"
 	"io"
 	"os"
 	"path"
@@ -23,10 +24,14 @@ import (
 	"strings"
 	"text/template"
 
+	"github.com/kaweezle/iknite/pkg/alpine"
 	"github.com/kaweezle/iknite/pkg/utils"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
+	"github.com/txn2/txeh"
+
+	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
 )
 
 const (
@@ -35,24 +40,6 @@ const (
 	pkiSubdirectory                  = "pki"
 	manifestsSubdirectory            = "manifests"
 )
-
-var KubernetesVersion = "1.29.3"
-
-type KubeadmConfig struct {
-	Ip                string `mapstructure:"ip"`
-	KubernetesVersion string `mapstructure:"kubernetes_version"`
-	DomainName        string `mapstructure:"domain_name"`
-	CreateIp          bool   `mapstructure:"create_ip"`
-	NetworkInterface  string `mapstructure:"network_interface"`
-	EnableMDNS        bool   `mapstructure:"enable_mdns"`
-}
-
-func (c *KubeadmConfig) GetApiEndPoint() string {
-	if c.DomainName != "" {
-		return c.DomainName
-	}
-	return c.Ip
-}
 
 const kubeadmConfigTemplate = `
 apiVersion: kubeadm.k8s.io/v1beta3
@@ -81,7 +68,7 @@ nodeRegistration:
     - Swap
 `
 
-func CreateKubeadmConfiguration(wr io.Writer, config *KubeadmConfig) error {
+func CreateKubeadmConfiguration(wr io.Writer, config *v1alpha1.IkniteClusterSpec) error {
 	tmpl, err := template.New("config").Parse(kubeadmConfigTemplate)
 	if err != nil {
 		return err
@@ -90,7 +77,7 @@ func CreateKubeadmConfiguration(wr io.Writer, config *KubeadmConfig) error {
 	return tmpl.Execute(wr, config)
 }
 
-func WriteKubeadmConfiguration(fs afero.Fs, config *KubeadmConfig) (f afero.File, err error) {
+func WriteKubeadmConfiguration(fs afero.Fs, config *v1alpha1.IkniteClusterSpec) (f afero.File, err error) {
 	afs := &afero.Afero{Fs: fs}
 	f, err = afs.TempFile("", "config*.yaml")
 	if err != nil {
@@ -117,7 +104,69 @@ func RunKubeadm(parameters []string) (err error) {
 	return
 }
 
-func RunKubeadmInit(config *KubeadmConfig) error {
+func PrepareKubernetesEnvironment(ikniteConfig *v1alpha1.IkniteClusterSpec) error {
+
+	log.WithFields(log.Fields{
+		"ip":                 ikniteConfig.Ip.String(),
+		"kubernetes_version": ikniteConfig.KubernetesVersion,
+		"domain_name":        ikniteConfig.DomainName,
+		"create_ip":          ikniteConfig.CreateIp,
+		"network_interface":  ikniteConfig.NetworkInterface,
+		"enable_mdns":        ikniteConfig.EnableMDNS,
+	}).Info("Cluster configuration")
+
+	// Allow forwarding (kubeadm requirement)
+	log.Info("Ensuring basic settings...")
+	utils.WriteFile("/proc/sys/net/ipv4/ip_forward", []byte("1\n"), os.FileMode(int(0644)))
+
+	if err := alpine.EnsureNetFilter(); err != nil {
+		return errors.Wrap(err, "While ensuring netfilter")
+	}
+
+	// Make bridge use ip-tables
+	utils.WriteFile("/proc/sys/net/bridge/bridge-nf-call-iptables", []byte("1\n"), os.FileMode(int(0644)))
+
+	if err := alpine.EnsureMachineID(); err != nil {
+		return errors.Wrap(err, "While ensuring machine ID")
+	}
+
+	// Check that the IP address we are targeting is bound to an interface
+	ipExists, err := alpine.CheckIpExists(ikniteConfig.Ip)
+	if err != nil {
+		return errors.Wrap(err, "While getting local ip addresses")
+	}
+	if !ipExists {
+		if ikniteConfig.CreateIp {
+			if err := alpine.AddIpAddress(ikniteConfig.NetworkInterface, ikniteConfig.Ip); err != nil {
+				return errors.Wrapf(err, "While adding ip address %v to interface %v", ikniteConfig.Ip, ikniteConfig.NetworkInterface)
+			}
+		} else {
+			return fmt.Errorf("ip address %v is not available locally", ikniteConfig.Ip)
+		}
+	}
+
+	// Check that the domain name is bound
+	if ikniteConfig.DomainName != "" {
+		log.WithFields(log.Fields{
+			"ip":         ikniteConfig.Ip,
+			"domainName": ikniteConfig.DomainName,
+		}).Info("Check domain name to IP mapping...")
+
+		if contains, ips := alpine.IsHostMapped(ikniteConfig.Ip, ikniteConfig.DomainName); !contains {
+			log.WithFields(log.Fields{
+				"ip":         ikniteConfig.Ip,
+				"domainName": ikniteConfig.DomainName,
+			}).Info("Mapping not found, creating...")
+
+			if err := alpine.AddIpMapping(&txeh.HostsConfig{}, ikniteConfig.Ip, ikniteConfig.DomainName, ips); err != nil { // cSpell: disable-line
+				return errors.Wrapf(err, "While adding domain name %s to hosts file with ip %s", ikniteConfig.DomainName, ikniteConfig.Ip)
+			}
+		}
+	}
+	return nil
+}
+
+func RunKubeadmInit(config *v1alpha1.IkniteClusterSpec) error {
 
 	fs := afero.NewOsFs()
 	f, err := WriteKubeadmConfiguration(fs, config)
@@ -139,7 +188,8 @@ func CleanConfig() (err error) {
 		WithField("dir", kubernetesConfigurationDirectory).
 		Info("Cleaning Kubernetes configuration directory")
 	configGlob := path.Join(kubernetesConfigurationDirectory, configurationPattern)
-	if files, err := filepath.Glob(configGlob); err == nil {
+	var files []string
+	if files, err = filepath.Glob(configGlob); err == nil {
 		for _, file := range files {
 			log.WithField("file", file).Trace("Removing configuration file")
 			err = os.Remove(file)
@@ -152,7 +202,7 @@ func CleanConfig() (err error) {
 
 	if err == nil {
 		manifestsGlob := path.Join(kubernetesConfigurationDirectory, manifestsSubdirectory, "*.yaml")
-		if files, err := filepath.Glob(manifestsGlob); err == nil {
+		if files, err = filepath.Glob(manifestsGlob); err == nil {
 			for _, file := range files {
 				log.WithField("file", file).Trace("Removing manifest file")
 				err = os.Remove(file)

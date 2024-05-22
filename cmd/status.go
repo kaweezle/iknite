@@ -16,10 +16,13 @@ limitations under the License.
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"time"
 
+	"github.com/kaweezle/iknite/cmd/options"
+	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
 	"github.com/kaweezle/iknite/pkg/constants"
 	"github.com/kaweezle/iknite/pkg/k8s"
 	"github.com/pkg/errors"
@@ -41,16 +44,21 @@ var statusCmd = &cobra.Command{
 	Run: performStatus,
 }
 
-var waitReadiness = false
+var (
+	waitReadiness = false
+	timeout       = 0
+)
 
 func init() {
 	rootCmd.AddCommand(statusCmd)
-	statusCmd.Flags().BoolVarP(&waitReadiness, "wait", "w", waitReadiness, "Wait n seconds for all pods to settle")
+	flags := statusCmd.Flags()
+	flags.BoolVarP(&waitReadiness, options.Wait, "w", waitReadiness, "Wait for all pods to settle")
+	flags.IntVarP(&timeout, options.Timeout, "t", timeout, "Wait timeout in seconds")
 }
 
 var callbackCount = 0
 
-func callback(ok bool, count int, ready []*k8s.WorkloadState, unready []*k8s.WorkloadState) {
+func callback(ok bool, count int, ready []*v1alpha1.WorkloadState, unready []*v1alpha1.WorkloadState) {
 	if callbackCount == 0 {
 		fmt.Printf("\n%d workloads, %d ready, %d unready\n", count, len(ready), len(unready))
 		for _, state := range ready {
@@ -81,13 +89,12 @@ func performStatus(cmd *cobra.Command, args []string) {
 
 	runtime.ErrorHandlers = runtime.ErrorHandlers[:0]
 	log.WithFields(log.Fields{
-		"config": constants.KubernetesRootConfig,
+		options.Config: constants.KubernetesRootConfig,
 	}).Info("Loading kube config...")
 
 	// We need to get it from root as we will apply configuration
 	config, err := k8s.LoadFromFile(constants.KubernetesRootConfig)
 	cobra.CheckErr(errors.Wrap(err, "While loading local cluster configuration"))
 
-	cobra.CheckErr(config.WaitForWorkloads(time.Second*time.Duration(0), callback))
-
+	cobra.CheckErr(config.WaitForWorkloads(context.Background(), time.Second*time.Duration(timeout), callback))
 }

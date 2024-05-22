@@ -1,5 +1,13 @@
 # Verbosity levels. Possible levels are: debug, info, warn, error, fatal, panic
-#IKNITE_VERBOSITY=info
+# IKNITE_VERBOSITY=info
+
+# Environment variables to pass to the configure command.
+# For instance:
+# IKNITE_ENV="SOPS_AGE_KEY_FILE=/mnt/wsl/age.txt"
+IKNITE_ENV=""
+
+# Additional parameters
+IKNITE_OPTS=""
 
 # Number of retries to access the Cluster API
 #IKNITE_CLUSTER_CHECK_RETRIES=10
@@ -14,12 +22,3 @@
 #
 # (Note the double slash // to separate the git repo from the path)
 #IKNITE_KUSTOMIZE_DIRECTORY=/etc/iknite.d
-
-# Environment variables to pass to the configure command.
-# For instance:
-# IKNITE_ENV="SOPS_AGE_KEY_FILE=/mnt/wsl/age.txt"
-IKNITE_ENV=""
-
-# Additional parameters
-IKNITE_OPTS=""
-

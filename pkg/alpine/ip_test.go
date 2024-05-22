@@ -87,7 +87,7 @@ func (s *IPTestSuite) TestAddIpMapping() {
 		WriteFilePath: f.Name(),
 	}
 
-	ip := "192.168.99.2"
+	ip := net.ParseIP("192.168.99.2")
 	domainName := "kaweezle.local"
 
 	err = AddIpMapping(&config, ip, domainName, []net.IP{})

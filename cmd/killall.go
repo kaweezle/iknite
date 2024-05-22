@@ -3,14 +3,15 @@ package cmd
 import (
 	"fmt"
 	"os"
-	"strconv"
 	"strings"
 
 	s "github.com/bitfield/script"
+	"github.com/kaweezle/iknite/cmd/options"
 	"github.com/kaweezle/iknite/pkg/alpine"
 	"github.com/kaweezle/iknite/pkg/constants"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+	flag "github.com/spf13/pflag"
 	"github.com/txn2/txeh"
 )
 
@@ -20,7 +21,6 @@ var (
 	unmountPaths   = true
 	resetCni       = true
 	resetIptables  = true
-	deleteShims    = true
 	resetKubelet   = false
 	resetIpAddress = false
 
@@ -44,21 +44,21 @@ This command must be run as root.
 	Run: performKillall,
 }
 
-func initializeKillall(cmd *cobra.Command) {
-	cmd.Flags().BoolVar(&stopServices, "stop-services", stopServices, "Stop the services")
-	cmd.Flags().BoolVar(&stopContainers, "stop-containers", stopContainers, "Stop containers")
-	cmd.Flags().BoolVar(&unmountPaths, "unmount-paths", unmountPaths, "Unmount paths")
-	cmd.Flags().BoolVar(&resetCni, "reset-cni", resetCni, "Reset CNI")
-	cmd.Flags().BoolVar(&resetIptables, "reset-iptables", resetIptables, "Reset iptables")
-	cmd.Flags().BoolVar(&deleteShims, "delete-shims", deleteShims, "Delete shims")
-	cmd.Flags().BoolVar(&resetKubelet, "reset-kubelet", resetKubelet, "Reset kubelet")
-	cmd.Flags().BoolVar(&resetIpAddress, "reset-ip-address", resetIpAddress, "Reset IP address")
+func initializeKillall(flags *flag.FlagSet) {
+	flags.BoolVar(&stopServices, options.StopServices, stopServices, "Stop the services")
+	flags.BoolVar(&stopContainers, options.StopContainers, stopContainers, "Stop containers")
+	flags.BoolVar(&unmountPaths, options.UnmountPaths, unmountPaths, "Unmount paths")
+	flags.BoolVar(&resetCni, options.ResetCNI, resetCni, "Reset CNI")
+	flags.BoolVar(&resetIptables, options.ResetIPTables, resetIptables, "Reset iptables")
+	flags.BoolVar(&resetKubelet, options.ResetKubelet, resetKubelet, "Reset kubelet")
+	flags.BoolVar(&resetIpAddress, options.ResetIPAddress, resetIpAddress, "Reset IP address")
 }
 
 func init() {
 	rootCmd.AddCommand(killallCmd)
 
-	initializeKillall(killallCmd)
+	initializeKillall(killallCmd.Flags())
+	configureClusterCommand(killallCmd.Flags(), ikniteConfig)
 }
 
 func performKillall(cmd *cobra.Command, args []string) {
@@ -71,31 +71,18 @@ func performKillall(cmd *cobra.Command, args []string) {
 	}
 
 	if stopServices {
-		log.Info("Stopping kubelet...")
-		cobra.CheckErr(alpine.StopService("kubelet"))
+		log.Infof("Stopping %s...", constants.IkniteService)
+		cobra.CheckErr(alpine.StopService(constants.IkniteService))
 
 		if stopContainers {
 			log.Info("Stopping all containers...")
-			if _, err := s.Exec("/bin/zsh -c 'export CONTAINER_RUNTIME_ENDPOINT=unix:///run/containerd/containerd.sock;crictl rm -f $(crictl ps -qa)'").String(); err != nil {
+			if _, err := s.Exec("/bin/zsh -c 'export CONTAINER_RUNTIME_ENDPOINT=unix:///run/containerd/containerd.sock;crictl rmp -f $(crictl pods -q)'").String(); err != nil {
 				log.WithError(err).Warn("Error stopping all containers")
 			}
 		}
 
-		log.Info("Stopping containerd...")
-		cobra.CheckErr(alpine.StopService("containerd"))
-		log.Info("Stopping iknite-config...")
-		cobra.CheckErr(alpine.StopService("iknite-config"))
-		log.Info("Stopping iknite-init...")
-		cobra.CheckErr(alpine.StopService("iknite-init"))
-	}
-
-	if deleteShims {
-		log.Info("Deleting shims...")
-		shims, err := getShims()
-		cobra.CheckErr(err)
-		for _, shim := range shims {
-			cobra.CheckErr(killTree(shim))
-		}
+		log.Infof("Stopping %s...", constants.ContainerServiceName)
+		cobra.CheckErr(alpine.StopService(constants.ContainerServiceName))
 	}
 
 	if unmountPaths {
@@ -106,6 +93,12 @@ func performKillall(cmd *cobra.Command, args []string) {
 		for _, path := range pathsToUnmountAndRemove {
 			cobra.CheckErr(doUnmountAndRemove(path))
 		}
+	}
+
+	if stopServices {
+		log.Info("Removing kubelet files in /var/lib/kubelet...")
+		_, err := s.Exec("sh -c 'rm -rf /var/lib/kubelet/{cpu_manager_state,memory_manager_state} /var/lib/kubelet/pods/*'").String()
+		cobra.CheckErr(err)
 	}
 
 	if resetCni {
@@ -122,11 +115,11 @@ func performKillall(cmd *cobra.Command, args []string) {
 		cobra.CheckErr(err)
 	}
 
-	if resetIpAddress {
+	if resetIpAddress && ikniteConfig.CreateIp {
 		log.Info("Resetting IP address...")
 		hosts, err := txeh.NewHosts(&txeh.HostsConfig{})
 		cobra.CheckErr(err)
-		ip, err := alpine.IpMappingForHost(hosts, "kaweezle.local")
+		ip, err := alpine.IpMappingForHost(hosts, ikniteConfig.DomainName)
 		cobra.CheckErr(err)
 		ones, _ := ip.DefaultMask().Size()
 		ipWithMask := fmt.Sprintf("%v/%d", ip, ones)
@@ -137,31 +130,9 @@ func performKillall(cmd *cobra.Command, args []string) {
 		}).ExecForEach(fmt.Sprintf("ip addr del %s dev {{.}}", ipWithMask))
 		p.Wait()
 		cobra.CheckErr(p.Error())
-		hosts.RemoveHost("kaweezle.local")
+		hosts.RemoveHost(ikniteConfig.DomainName)
 		cobra.CheckErr(hosts.Save())
 	}
-}
-
-func killTree(pid string) error {
-	realPid, err := strconv.Atoi(pid)
-	if err != nil {
-		return err
-	}
-	process, err := os.FindProcess(realPid)
-	if err != nil {
-		return err
-	}
-	s.Exec(fmt.Sprintf("/sbin/pgrep -P %s", pid)).FilterLine(func(s string) string {
-		killTree(s)
-		return s
-	}).Wait()
-
-	log.WithField("pid", pid).Debug("Killing process...")
-	return process.Kill()
-}
-
-func getShims() ([]string, error) {
-	return s.Exec("ps -e -o pid,args").Exec("sed -e 's/^ *//'").Match("/usr/bin/containerd-shim-runc").Column(1).Slice()
 }
 
 func processMounts(path string, command string, message string) error {
