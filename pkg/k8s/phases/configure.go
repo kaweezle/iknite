@@ -30,7 +30,10 @@ func runConfigure(c workflow.RunData) error {
 	ikniteConfig := data.IkniteCluster().Spec
 
 	force_config := viper.GetBool(config.ForceConfig)
-	log.Info("Performing kustomize configuration")
+	log.WithFields(log.Fields{
+		"force_config":        force_config,
+		"kustomize_directory": viper.GetString(config.KustomizeDirectory),
+	}).Info("Performing kustomize configuration")
 
 	config, err := k8s.LoadFromDefault()
 	if err != nil {
