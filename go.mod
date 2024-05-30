@@ -27,8 +27,8 @@ require (
 	k8s.io/code-generator v0.30.1
 	k8s.io/kubectl v0.30.1
 	k8s.io/kubernetes v1.30.1
-	sigs.k8s.io/kustomize/api v0.17.1
-	sigs.k8s.io/kustomize/kyaml v0.17.0
+	sigs.k8s.io/kustomize/api v0.17.2
+	sigs.k8s.io/kustomize/kyaml v0.17.1
 
 )
 
