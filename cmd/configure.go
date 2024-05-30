@@ -52,15 +52,18 @@ applies the Embedded configuration that installs the following components:
 
 `,
 	Run: performConfigure,
+	PreRun: func(cmd *cobra.Command, args []string) {
+		flags := cmd.Flags()
+		viper.BindPFlag(config.KustomizeDirectory, flags.Lookup(options.KustomizeDirectory))
+		viper.BindPFlag(config.ForceConfig, flags.Lookup(options.ForceConfig))
+	},
 }
 
 func initializeKustomization(flagSet *flag.FlagSet) {
 	flagSet.StringVarP(&kustomizationDirectory, options.KustomizeDirectory, "d", constants.DefaultKustomizationDirectory,
 		"The directory to look for kustomization. Can be an URL")
-	viper.BindPFlag(config.KustomizeDirectory, flagSet.Lookup(options.KustomizeDirectory))
 	flagSet.IntVarP(&waitTimeout, options.Wait, "w", waitTimeout, "Wait n seconds for all pods to settle")
 	flagSet.BoolP(options.ForceConfig, "C", false, "Force configuration even if it has already occurred")
-	viper.BindPFlag(config.ForceConfig, flagSet.Lookup(options.ForceConfig))
 	flagSet.IntVar(&clusterCheckWaitMilliseconds, options.ClusterCheckWait, clusterCheckWaitMilliseconds, "Milliseconds to wait between each cluster check")
 	flagSet.IntVar(&clusterCheckRetries, options.ClusterCheckRetries, clusterCheckRetries, "Number of tries to access the cluster")
 	flagSet.IntVar(&clusterCheckOkResponses, options.ClusterCheckOkResponses, clusterCheckOkResponses, "Number of Ok response to receive before proceeding")

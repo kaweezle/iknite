@@ -15,7 +15,7 @@ RUN --mount=type=bind,target=/apks  \
     echo "${IKNITE_REPO_URL}" >> /etc/apk/repositories && \
     wget -O /etc/apk/keys/${IKNITE_KEY_NAME} "${IKNITE_BASE_URL}/${IKNITE_LAST_TAG}/${IKNITE_KEY_NAME}" && \
     apk update --quiet && \
-    apk add --no-progress --no-cache openrc zsh nerdctl krmfnsops && \
+    apk add --no-progress --no-cache openrc zsh nerdctl krmfnbuiltin openssh && \
     apk add --no-progress --no-cache /apks/iknite-${IKNITE_VERSION}.x86_64.apk && \
     rm -rf `find /var/cache/apk/ -type f`
 

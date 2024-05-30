@@ -205,6 +205,10 @@ func (config *Config) DoConfiguration(ip net.IP, force bool, waitTimeout int) er
 		var ids []resid.ResId
 		var err error
 		kustomizeDirectory := viper.GetString(vconfig.KustomizeDirectory)
+		log.WithFields(log.Fields{
+			"directory": kustomizeDirectory,
+		}).Info("Performing configuration")
+
 		if ids, err = provision.ApplyBaseKustomizations(kustomizeDirectory, context); err != nil {
 			return err
 		}

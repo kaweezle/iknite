@@ -71,6 +71,7 @@ nfpms:
       - cni-plugins
       - cni-plugin-flannel
       - git
+      - openssh
       - util-linux-misc
     bindir: /sbin
     contents:
