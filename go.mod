@@ -21,10 +21,10 @@ require (
 	github.com/txn2/txeh v1.5.5
 	golang.org/x/net v0.26.0
 	k8s.io/api v0.30.1
-	k8s.io/apimachinery v0.30.1
+	k8s.io/apimachinery v0.30.2
 	k8s.io/cli-runtime v0.30.1
 	k8s.io/client-go v0.30.1
-	k8s.io/code-generator v0.30.1
+	k8s.io/code-generator v0.30.2
 	k8s.io/kubectl v0.30.1
 	k8s.io/kubernetes v1.30.2
 	sigs.k8s.io/kustomize/api v0.17.2
