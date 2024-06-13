@@ -17,4 +17,5 @@ depend() {
         after net
         need cgroups
         need containerd
+        want buildkitd
 }

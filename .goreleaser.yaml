@@ -73,6 +73,9 @@ nfpms:
       - git
       - openssh
       - util-linux-misc
+      - buildkit
+      - buildctl
+      - nerdctl
     bindir: /sbin
     contents:
       - src: apk/crictl.sh
@@ -93,6 +96,8 @@ nfpms:
         dst: /etc/cni/net.d/10-flannel.conflist
       - src: apk/flannel/subnet.env
         dst: /lib/iknite/flannel/subnet.env
+      - src: apk/buildkit/buildkitd.toml
+        dst: /etc/buildkit/buildkitd.toml
     apk:
       signature:
         key_file: gpg_key.asc

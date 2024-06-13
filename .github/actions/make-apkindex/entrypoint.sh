@@ -22,6 +22,8 @@ if  [[ -z "$INPUT_SIGNATURE_KEY" ]]; then
 else
     signature_file="/root/$INPUT_SIGNATURE_KEY_NAME"
     printf "$INPUT_SIGNATURE_KEY" > "$signature_file"
+    # Makes signature file trusted
+    openssl rsa -in $signature_file -pubout -out "/etc/apk/keys/${INPUT_SIGNATURE_KEY_NAME}.pub"
 fi
 
 if [[ -z "$INPUT_DESTINATION" ]]; then
@@ -76,7 +78,9 @@ echo "::group::Creating indexes"
 for arch in $archs; do
     arch_directory="${INPUT_DESTINATION}/$arch"
     index_file="${arch_directory}/APKINDEX.tar.gz"
-    apk index -o "${index_file}" "${arch_directory}"/*.apk 2>/dev/null
+    echo "Running apk index -o ${index_file} ${arch_directory}/*.apk..."
+    apk index -o "${index_file}" "${arch_directory}"/*.apk
+    echo "Signing ${index_file} with ${signature_file}..."
     abuild-sign -k "${signature_file}" "${index_file}"
 done
 
