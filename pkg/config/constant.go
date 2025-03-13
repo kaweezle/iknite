@@ -1,8 +1,7 @@
 package config
 
 const (
-	KustomizeDirectory = "kustomize_directory"
-	ForceConfig        = "force_config"
+	ForceConfig = "force_config"
 
 	IP                 = "cluster.ip"
 	IPCreate           = "cluster.create_ip"
@@ -11,4 +10,5 @@ const (
 	KubernetesVersion  = "cluster.kubernetes_version"
 	EnableMDNS         = "cluster.enable_mdns"
 	ClusterName        = "cluster.cluster_name"
+	Kustomization      = "cluster.kustomization"
 )

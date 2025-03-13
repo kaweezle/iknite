@@ -36,6 +36,8 @@ type IkniteClusterSpec struct {
 	EnableMDNS bool `json:"enableMDNS,omitempty" protobuf:"bytes,6,opt,name=enableMDNS" mapstructure:"enable_mdns"`
 	// +optional
 	ClusterName string `json:"clusterName,omitempty" protobuf:"bytes,7,opt,name=clusterName" mapstructure:"cluster_name"`
+	// +optional
+	Kustomization string `json:"kustomization,omitempty" protobuf:"bytes,8,opt,name=kustomization"`
 }
 
 func (c *IkniteClusterSpec) GetApiEndPoint() string {

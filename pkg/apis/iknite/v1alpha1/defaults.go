@@ -37,6 +37,9 @@ func SetDefaults_IkniteClusterSpec(obj *IkniteClusterSpec) {
 	if obj.ClusterName == "" {
 		obj.ClusterName = constants.DefaultClusterName
 	}
+	if obj.Kustomization == "" {
+		obj.Kustomization = constants.DefaultKustomization
+	}
 }
 
 func SetDefautls_IkniteClusterStatus(obj *IkniteClusterStatus) {

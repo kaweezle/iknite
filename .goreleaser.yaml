@@ -3,7 +3,7 @@
 # cSpell: disable
 version: 2
 env:
-  - KUBERNETES_VERSION=1.29.3
+  - KUBERNETES_VERSION=1.32.3
 before:
   hooks:
     - go mod tidy

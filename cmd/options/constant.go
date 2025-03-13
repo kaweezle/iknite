@@ -8,7 +8,7 @@ const (
 	Timeout   = "timeout"
 
 	// Kustomization
-	KustomizeDirectory      = "kustomize-directory"
+	Kustomization           = "kustomization"
 	Wait                    = "wait"
 	ForceConfig             = "force-config"
 	ClusterCheckWait        = "cluster-check-wait"

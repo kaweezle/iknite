@@ -78,6 +78,7 @@ func configureClusterCommand(flagSet *flag.FlagSet, ikniteConfig *v1alpha1.Iknit
 	flagSet.BoolVar(&ikniteConfig.EnableMDNS, options.EnableMDNS, ikniteConfig.EnableMDNS, "Enable mDNS publication of domain name")
 	flagSet.StringVar(&ikniteConfig.KubernetesVersion, koptions.KubernetesVersion, ikniteConfig.KubernetesVersion, "Kubernetes version to install")
 	flagSet.StringVar(&ikniteConfig.ClusterName, options.ClusterName, ikniteConfig.ClusterName, "Cluster name")
+	flagSet.StringVar(&ikniteConfig.Kustomization, options.Kustomization, ikniteConfig.Kustomization, "Kustomization location (URL or directory)")
 }
 
 func startPersistentPreRun(cmd *cobra.Command, args []string) {
@@ -90,6 +91,7 @@ func startPersistentPreRun(cmd *cobra.Command, args []string) {
 	viper.BindPFlag(config.KubernetesVersion, flags.Lookup(koptions.KubernetesVersion))
 	viper.BindPFlag(config.EnableMDNS, flags.Lookup(options.EnableMDNS))
 	viper.BindPFlag(config.ClusterName, flags.Lookup(options.ClusterName))
+	viper.BindPFlag(config.Kustomization, flags.Lookup(options.Kustomization))
 }
 
 // DecodeIkniteConfig decodes the configuration from the viper configuration.

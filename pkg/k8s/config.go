@@ -21,12 +21,10 @@ import (
 	"net"
 	"time"
 
-	vconfig "github.com/kaweezle/iknite/pkg/config"
 	"github.com/kaweezle/iknite/pkg/constants"
 	"github.com/kaweezle/iknite/pkg/provision"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
-	"github.com/spf13/viper"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	k8Errors "k8s.io/apimachinery/pkg/api/errors"
@@ -186,7 +184,7 @@ func (config *Config) RestartProxy() (err error) {
 	return
 }
 
-func (config *Config) DoConfiguration(ip net.IP, force bool, waitTimeout int) error {
+func (config *Config) DoConfiguration(ip net.IP, kustomization string, force bool, waitTimeout int) error {
 	client, err := config.Client()
 	if err != nil {
 		return err
@@ -204,13 +202,16 @@ func (config *Config) DoConfiguration(ip net.IP, force bool, waitTimeout int) er
 		}
 		var ids []resid.ResId
 		var err error
-		kustomizeDirectory := viper.GetString(vconfig.KustomizeDirectory)
-		log.WithFields(log.Fields{
-			"directory": kustomizeDirectory,
-		}).Info("Performing configuration")
+		if kustomization == "" {
+			log.Warn("Empty kustomization.")
+		} else {
+			log.WithFields(log.Fields{
+				"kustomization": kustomization,
+			}).Info("Performing configuration")
 
-		if ids, err = provision.ApplyBaseKustomizations(kustomizeDirectory, context); err != nil {
-			return err
+			if ids, err = provision.ApplyBaseKustomizations(kustomization, context); err != nil {
+				return err
+			}
 		}
 
 		cm.Data["configured"] = "true"
@@ -220,8 +221,8 @@ func (config *Config) DoConfiguration(ip net.IP, force bool, waitTimeout int) er
 		}
 
 		log.WithFields(log.Fields{
-			"directory": kustomizeDirectory,
-			"resources": ids,
+			"kustomization": kustomization,
+			"resources":     ids,
 		}).Info("Configuration applied")
 	}
 

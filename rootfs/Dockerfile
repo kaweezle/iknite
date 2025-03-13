@@ -1,12 +1,12 @@
 # syntax=docker/dockerfile:1.3-labs
-FROM alpine:3.19
+FROM alpine:3.21
 
 ARG IKNITE_VERSION=0.2.5-devel
 ARG IKNITE_LAST_TAG=v0.2.4
 ARG IKNITE_REPO_URL=https://kaweezle.com/repo/
 ARG IKNITE_KEY_NAME=kaweezle-devel@kaweezle.com-c9d89864.rsa.pub
 ARG IKNITE_BASE_URL=https://github.com/kaweezle/iknite/releases/download
-ARG KUBERNETES_VERSION=1.29.3
+ARG KUBERNETES_VERSION=1.32.3
 
 # Add the dependencies
 RUN --mount=type=bind,target=/apks  \

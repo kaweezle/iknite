@@ -28,7 +28,7 @@ import (
 )
 
 var (
-	kustomizationDirectory       = constants.DefaultKustomizationDirectory
+	kustomization                = constants.DefaultKustomization
 	waitTimeout                  = 0
 	clusterCheckWaitMilliseconds = 500
 	clusterCheckRetries          = 1
@@ -54,14 +54,12 @@ applies the Embedded configuration that installs the following components:
 	Run: performConfigure,
 	PreRun: func(cmd *cobra.Command, args []string) {
 		flags := cmd.Flags()
-		viper.BindPFlag(config.KustomizeDirectory, flags.Lookup(options.KustomizeDirectory))
+		viper.BindPFlag(config.Kustomization, flags.Lookup(options.Kustomization))
 		viper.BindPFlag(config.ForceConfig, flags.Lookup(options.ForceConfig))
 	},
 }
 
 func initializeKustomization(flagSet *flag.FlagSet) {
-	flagSet.StringVarP(&kustomizationDirectory, options.KustomizeDirectory, "d", constants.DefaultKustomizationDirectory,
-		"The directory to look for kustomization. Can be an URL")
 	flagSet.IntVarP(&waitTimeout, options.Wait, "w", waitTimeout, "Wait n seconds for all pods to settle")
 	flagSet.BoolP(options.ForceConfig, "C", false, "Force configuration even if it has already occurred")
 	flagSet.IntVar(&clusterCheckWaitMilliseconds, options.ClusterCheckWait, clusterCheckWaitMilliseconds, "Milliseconds to wait between each cluster check")
@@ -73,6 +71,8 @@ func init() {
 	rootCmd.AddCommand(configureCmd)
 
 	initializeKustomization(configureCmd.Flags())
+	configureCmd.Flags().StringVarP(&kustomization, options.Kustomization, "d", constants.DefaultKustomization,
+		"The directory to look for kustomization. Can be an URL")
 }
 
 func performConfigure(cmd *cobra.Command, args []string) {
@@ -86,5 +86,6 @@ func performConfigure(cmd *cobra.Command, args []string) {
 	cobra.CheckErr(kubeConfig.CheckClusterRunning(clusterCheckRetries, clusterCheckOkResponses, clusterCheckWaitMilliseconds))
 
 	force := viper.GetBool(config.ForceConfig)
-	cobra.CheckErr(kubeConfig.DoConfiguration(ip, force, waitTimeout))
+	kustomization := viper.GetString(config.Kustomization)
+	cobra.CheckErr(kubeConfig.DoConfiguration(ip, kustomization, force, waitTimeout))
 }

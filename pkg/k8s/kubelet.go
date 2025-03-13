@@ -204,7 +204,7 @@ func StartAndConfigureKubelet(kubeConfig *v1alpha1.IkniteClusterSpec) error {
 					if err != nil {
 						configErr <- err
 					} else {
-						configErr <- config.DoConfiguration(kubeConfig.Ip, force_config, 0)
+						configErr <- config.DoConfiguration(kubeConfig.Ip, kubeConfig.Kustomization, force_config, 0)
 					}
 				}()
 			}

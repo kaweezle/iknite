@@ -31,8 +31,8 @@ func runConfigure(c workflow.RunData) error {
 
 	force_config := viper.GetBool(config.ForceConfig)
 	log.WithFields(log.Fields{
-		"force_config":        force_config,
-		"kustomize_directory": viper.GetString(config.KustomizeDirectory),
+		"force_config":  force_config,
+		"kustomization": ikniteConfig.Kustomization,
 	}).Info("Performing kustomize configuration")
 
 	config, err := k8s.LoadFromDefault()
@@ -44,5 +44,5 @@ func runConfigure(c workflow.RunData) error {
 	if err != nil {
 		return errors.Wrap(err, "failed to write configuration")
 	}
-	return config.DoConfiguration(ikniteConfig.Ip, force_config, 0)
+	return config.DoConfiguration(ikniteConfig.Ip, ikniteConfig.Kustomization, force_config, 0)
 }

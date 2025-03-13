@@ -18,7 +18,7 @@ IKNITE_OPTS=""
 
 # The kustomization directory to use for configuration
 # Can be a URL. For instance:
-# IKNITE_KUSTOMIZE_DIRECTORY="https://github.com/antoinemartin/autocloud//packages/argocd/?ref=deploy/citest"
+# IKNITE_CLUSTER_KUSTOMIZATION="https://github.com/antoinemartin/autocloud//packages/argocd/?ref=deploy/citest"
 #
 # (Note the double slash // to separate the git repo from the path)
-#IKNITE_KUSTOMIZE_DIRECTORY=/etc/iknite.d
+#IKNITE_CLUSTER_KUSTOMIZATION=/etc/iknite.d
