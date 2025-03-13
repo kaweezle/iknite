@@ -1,6 +1,7 @@
 # This is an example .goreleaser.yml file with some sensible defaults.
 # Make sure to check the documentation at https://goreleaser.com
 # cSpell: disable
+version: 2
 env:
   - KUBERNETES_VERSION=1.29.3
 before:
@@ -34,7 +35,7 @@ archives:
 checksum:
   name_template: SHA256SUMS
 snapshot:
-  name_template: "{{ incpatch .Version }}-devel"
+  version_template: "{{ incpatch .Version }}-devel"
 changelog:
   sort: asc
   filters:
