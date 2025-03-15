@@ -6,8 +6,8 @@ import (
 	"strings"
 
 	s "github.com/bitfield/script"
-	"github.com/kaweezle/iknite/cmd/options"
 	"github.com/kaweezle/iknite/pkg/alpine"
+	"github.com/kaweezle/iknite/pkg/cmd/options"
 	"github.com/kaweezle/iknite/pkg/constants"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -38,7 +38,7 @@ var killallCmd = &cobra.Command{
 This command stops all the services and removes the configuration files. It also
 removes the network interfaces and the IP address assigned to the cluster.
 
-This command must be run as root. 
+This command must be run as root.
 
 `,
 	Run: performKillall,

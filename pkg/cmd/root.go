@@ -21,7 +21,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/kaweezle/iknite/cmd/options"
+	"github.com/kaweezle/iknite/pkg/cmd/options"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"

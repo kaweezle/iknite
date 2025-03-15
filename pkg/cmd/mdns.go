@@ -19,7 +19,7 @@ import (
 	"net"
 	"os"
 
-	"github.com/kaweezle/iknite/cmd/options"
+	"github.com/kaweezle/iknite/pkg/cmd/options"
 	"github.com/kaweezle/iknite/pkg/config"
 	"github.com/kaweezle/iknite/pkg/constants"
 	"github.com/kaweezle/iknite/pkg/utils"
