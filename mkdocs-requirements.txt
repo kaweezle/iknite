@@ -1,0 +1,4 @@
+mkdocs-build-plantuml-plugin~=1.11
+mkdocs-git-revision-date-localized-plugin~=1.4
+mkdocs-glightbox~=0.4
+mkdocs-material~=9.6
