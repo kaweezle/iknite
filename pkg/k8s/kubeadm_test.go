@@ -194,6 +194,65 @@ func (s *KubeadmTestSuite) TestRunKubeadmInit() {
 	require.Equal(WSLKubeadmConfig, configContent, "Kubeadm configuration is not what expected")
 }
 
+func (s *KubeadmTestSuite) TestPreventKubeletServiceFromStarting() {
+	rcConfFileContent := dedent.Dedent(`
+    rc_sys="prefix"
+    rc_controller_cgroups="NO"
+    rc_depend_strict="NO"
+    rc_need="!net !dev !udev-mount !sysfs !checkfs !fsck !netmount !logger !clock !modules"
+    `)
+
+	require := s.Require()
+	fs := afero.NewOsFs()
+	afs := &afero.Afero{Fs: fs}
+
+	tempFile, err := afero.TempFile(fs, "", "rc.conf")
+	require.NoError(err)
+	defer tempFile.Close()
+
+	_, err = tempFile.WriteString(rcConfFileContent)
+	require.NoError(err)
+
+	confFilePath := tempFile.Name()
+
+	err = PreventKubeletServiceFromStarting(confFilePath)
+	require.NoError(err)
+
+	content, err := afs.ReadFile(confFilePath)
+	require.NoError(err)
+	require.Equal(rcConfFileContent+rcConfPreventKubeletRunning+"\n", string(content))
+}
+
+func (s *KubeadmTestSuite) TestPreventKubeletServiceFromStartingWhenLineIsPresent() {
+	existingContent := dedent.Dedent(`
+    rc_sys="prefix"
+    rc_controller_cgroups="NO"
+    rc_depend_strict="NO"
+    rc_need="!net !dev !udev-mount !sysfs !checkfs !fsck !netmount !logger !clock !modules"
+    rc_kubelet_need="non-existing-service"
+    `)
+
+	require := s.Require()
+	fs := afero.NewOsFs()
+	afs := &afero.Afero{Fs: fs}
+
+	tempFile, err := afero.TempFile(fs, "", "rc.conf")
+	require.NoError(err)
+	defer tempFile.Close()
+
+	_, err = tempFile.WriteString(existingContent)
+	require.NoError(err)
+
+	confFilePath := tempFile.Name()
+
+	err = PreventKubeletServiceFromStarting(confFilePath)
+	require.NoError(err)
+
+	content, err := afs.ReadFile(confFilePath)
+	require.NoError(err)
+	require.Equal(existingContent, string(content))
+}
+
 func TestKubeadm(t *testing.T) {
 	suite.Run(t, new(KubeadmTestSuite))
 }

@@ -24,6 +24,7 @@ import (
 	"strings"
 	"text/template"
 
+	"github.com/bitfield/script"
 	"github.com/kaweezle/iknite/pkg/alpine"
 	"github.com/kaweezle/iknite/pkg/utils"
 	"github.com/pkg/errors"
@@ -39,6 +40,8 @@ const (
 	configurationPattern             = "*.conf"
 	pkiSubdirectory                  = "pki"
 	manifestsSubdirectory            = "manifests"
+	rcConfFile                       = "/etc/rc.conf"
+	rcConfPreventKubeletRunning      = "rc_kubelet_need=\"non-existing-service\""
 )
 
 const kubeadmConfigTemplate = `
@@ -104,6 +107,27 @@ func RunKubeadm(parameters []string) (err error) {
 	return
 }
 
+// PreventKubeletServiceFromStarting ensures that the kubelet service is not started
+// by the OpenRC init system. It does so by adding a line to the confFilePath file.
+func PreventKubeletServiceFromStarting(confFilePath string) error {
+	if present, err := script.File(confFilePath).Match(rcConfPreventKubeletRunning).CountLines(); err == nil {
+		if present == 0 {
+			log.Info("Preventing kubelet from running")
+			if lines, err := script.File(confFilePath).Slice(); err == nil {
+				lines = append(lines, rcConfPreventKubeletRunning)
+				if _, err := script.Slice(lines).WriteFile(confFilePath); err != nil {
+					return errors.Wrapf(err, "While writing %s", confFilePath)
+				}
+			} else {
+				return errors.Wrapf(err, "While reading %s", confFilePath)
+			}
+		}
+	} else {
+		return errors.Wrapf(err, "While checking %s", confFilePath)
+	}
+	return nil
+}
+
 func PrepareKubernetesEnvironment(ikniteConfig *v1alpha1.IkniteClusterSpec) error {
 
 	log.WithFields(log.Fields{
@@ -113,6 +137,8 @@ func PrepareKubernetesEnvironment(ikniteConfig *v1alpha1.IkniteClusterSpec) erro
 		"create_ip":          ikniteConfig.CreateIp,
 		"network_interface":  ikniteConfig.NetworkInterface,
 		"enable_mdns":        ikniteConfig.EnableMDNS,
+		"cluster_name":       ikniteConfig.ClusterName,
+		"kustomization":      ikniteConfig.Kustomization,
 	}).Info("Cluster configuration")
 
 	// Allow forwarding (kubeadm requirement)
@@ -162,6 +188,10 @@ func PrepareKubernetesEnvironment(ikniteConfig *v1alpha1.IkniteClusterSpec) erro
 				return errors.Wrapf(err, "While adding domain name %s to hosts file with ip %s", ikniteConfig.DomainName, ikniteConfig.Ip)
 			}
 		}
+	}
+
+	if err := PreventKubeletServiceFromStarting(rcConfFile); err != nil {
+		return errors.Wrap(err, "While preventing kubelet service from starting")
 	}
 	return nil
 }
