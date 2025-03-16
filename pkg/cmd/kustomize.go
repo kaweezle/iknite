@@ -35,12 +35,11 @@ var (
 	clusterCheckOkResponses      = 1
 )
 
-func NewConfigureCmd() *cobra.Command {
+func NewKustomizeCmd() *cobra.Command {
 
-	// configureCmd represents the start command
-	var configureCmd = &cobra.Command{
-		Use:   "configure",
-		Short: "Configure the cluster",
+	var kustomizeCmd = &cobra.Command{
+		Use:   "kustomize",
+		Short: "Kustomize the cluster",
 		Long: `Apply the configuration to the cluster using kustomize.
 
 Checks if a /etc/iknite.d/kustomization.yaml file exists. In this case, it
@@ -53,7 +52,7 @@ applies the Embedded configuration that installs the following components:
 - metrics-server to make resources work on payloads.
 
 `,
-		Run: performConfigure,
+		Run: performKustomize,
 		PreRun: func(cmd *cobra.Command, args []string) {
 			flags := cmd.Flags()
 			viper.BindPFlag(config.Kustomization, flags.Lookup(options.Kustomization))
@@ -61,11 +60,11 @@ applies the Embedded configuration that installs the following components:
 		},
 	}
 
-	initializeKustomization(configureCmd.Flags())
-	configureCmd.Flags().StringVarP(&kustomization, options.Kustomization, "d", constants.DefaultKustomization,
+	initializeKustomization(kustomizeCmd.Flags())
+	kustomizeCmd.Flags().StringVarP(&kustomization, options.Kustomization, "d", constants.DefaultKustomization,
 		"The directory to look for kustomization. Can be an URL")
 
-	return configureCmd
+	return kustomizeCmd
 }
 
 func initializeKustomization(flagSet *flag.FlagSet) {
@@ -76,7 +75,7 @@ func initializeKustomization(flagSet *flag.FlagSet) {
 	flagSet.IntVar(&clusterCheckOkResponses, options.ClusterCheckOkResponses, clusterCheckOkResponses, "Number of Ok response to receive before proceeding")
 }
 
-func performConfigure(cmd *cobra.Command, args []string) {
+func performKustomize(cmd *cobra.Command, args []string) {
 
 	ip, err := utils.GetOutboundIP()
 	cobra.CheckErr(errors.Wrap(err, "While getting IP address"))
@@ -88,5 +87,5 @@ func performConfigure(cmd *cobra.Command, args []string) {
 
 	force := viper.GetBool(config.ForceConfig)
 	kustomization := viper.GetString(config.Kustomization)
-	cobra.CheckErr(kubeConfig.DoConfiguration(ip, kustomization, force, waitTimeout))
+	cobra.CheckErr(kubeConfig.DoKustomization(ip, kustomization, force, waitTimeout))
 }

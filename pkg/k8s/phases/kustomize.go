@@ -16,16 +16,16 @@ import (
 
 // cSpell: enable
 
-func NewConfigureClusterPhase() workflow.Phase {
+func NewKustomizeClusterPhase() workflow.Phase {
 	return workflow.Phase{
 		Name:  "kustomize-cluster",
 		Short: "Configure the cluster with base Kustomization.",
-		Run:   runConfigure,
+		Run:   runKustomize,
 	}
 }
 
-// runPrepare executes the node initialization process.
-func runConfigure(c workflow.RunData) error {
+// runKustomize is a phase that configures the cluster with base Kustomization.
+func runKustomize(c workflow.RunData) error {
 	data, ok := c.(IkniteInitData)
 	if !ok {
 		return fmt.Errorf("configure phase invoked with an invalid data struct. ")
@@ -47,5 +47,5 @@ func runConfigure(c workflow.RunData) error {
 	if err != nil {
 		return errors.Wrap(err, "failed to write configuration")
 	}
-	return config.DoConfiguration(ikniteConfig.Ip, ikniteConfig.Kustomization, force_config, 0)
+	return config.DoKustomization(ikniteConfig.Ip, ikniteConfig.Kustomization, force_config, 0)
 }

@@ -208,7 +208,7 @@ func newCmdInit(out io.Writer, initOptions *initOptions) *cobra.Command {
 	initRunner.AppendPhase(WrapPhase(phases.NewKubeletFinalizePhase(), ikniteApi.Initializing, nil))
 	initRunner.AppendPhase(WrapPhase(phases.NewAddonPhase(), ikniteApi.Initializing, nil))
 	initRunner.AppendPhase(WrapPhase(iknitePhase.NewMDnsPublishPhase(), ikniteApi.Stabilizing, nil))
-	initRunner.AppendPhase(WrapPhase(iknitePhase.NewConfigureClusterPhase(), ikniteApi.Stabilizing, nil))
+	initRunner.AppendPhase(WrapPhase(iknitePhase.NewKustomizeClusterPhase(), ikniteApi.Stabilizing, nil))
 	initRunner.AppendPhase(WrapPhase(iknitePhase.NewWorkloadsPhase(), ikniteApi.Stabilizing, nil))
 	initRunner.AppendPhase(WrapPhase(iknitePhase.NewDaemonizePhase(), ikniteApi.Stabilizing, nil))
 	// initRunner.AppendPhase(phases.NewShowJoinCommandPhase())

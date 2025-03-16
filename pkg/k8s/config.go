@@ -188,7 +188,7 @@ func (config *Config) RestartProxy() (err error) {
 	return
 }
 
-func (config *Config) DoConfiguration(ip net.IP, kustomization string, force bool, waitTimeout int) error {
+func (config *Config) DoKustomization(ip net.IP, kustomization string, force bool, waitTimeout int) error {
 	client, err := config.Client()
 	if err != nil {
 		return err

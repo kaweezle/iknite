@@ -73,7 +73,7 @@ kubernetes.`,
 	flags.StringVarP(&v, options.Verbosity, "v", log.WarnLevel.String(), "Log level (debug, info, warn, error, fatal, panic)")
 	flags.BoolVar(&jsonLogs, options.Json, false, "Log messages in JSON")
 
-	rootCmd.AddCommand(NewConfigureCmd())
+	rootCmd.AddCommand(NewKustomizeCmd())
 	rootCmd.AddCommand(newCmdInit(os.Stdout, nil))
 	rootCmd.AddCommand(NewCmdKillall())
 	rootCmd.AddCommand(NewKubeletCmd())
