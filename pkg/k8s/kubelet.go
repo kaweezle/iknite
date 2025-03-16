@@ -1,5 +1,7 @@
 package k8s
 
+// cSpell:words godotenv txeh
+// cSpell: disable
 import (
 	"fmt"
 	"io"
@@ -23,6 +25,8 @@ import (
 	"github.com/txn2/txeh"
 )
 
+// cSpell: enable
+
 const (
 	kubeletEnvFile        = "/etc/conf.d/kubelet"
 	kubeAdmFlagsFile      = "/var/lib/kubelet/kubeadm-flags.env"
@@ -33,10 +37,13 @@ const (
 	kubeletKubeadmArgsEnv = "KUBELET_KUBEADM_ARGS"
 )
 
+// cSpell: disable
 var (
 	pathsToUnmount          = []string{"/var/lib/kubelet/pods", "/var/lib/kubelet/plugins", "/var/lib/kubelet"}
 	pathsToUnmountAndRemove = []string{"/run/containerd", "/run/netns", "/run/ipcns", "/run/utsns"}
 )
+
+// cSpell: enable
 
 func StartKubelet() (*exec.Cmd, error) {
 	// Read the environment variables from /var/lib/kubelet/kubeadm-flags.env
@@ -166,7 +173,7 @@ func StartAndConfigureKubelet(kubeConfig *v1alpha1.IkniteClusterSpec) error {
 		select {
 		case <-stop:
 			// Stop the cmd process
-			log.Info("Recevied TERM Signal. Stopping kubelet...")
+			log.Info("Received TERM Signal. Stopping kubelet...")
 			err = cmd.Process.Signal(syscall.SIGTERM)
 			if err != nil {
 				log.Fatalf("Failed to stop subprocess: %v", err)

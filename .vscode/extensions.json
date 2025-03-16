@@ -30,6 +30,7 @@
         "redhat.vscode-xml",
         "redhat.vscode-yaml",
         "tamasfe.even-better-toml",
+        "streetsidesoftware.code-spell-checker",
         // Project related
         "ms-kubernetes-tools.vscode-kubernetes-tools",
         "golang.Go",

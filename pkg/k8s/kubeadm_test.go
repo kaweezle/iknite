@@ -1,5 +1,6 @@
 package k8s
 
+// cSpell: disable
 import (
 	"bytes"
 	"net"
@@ -14,6 +15,8 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 )
+
+// cSpell: enable
 
 type KubeadmTestSuite struct {
 	suite.Suite
@@ -195,12 +198,14 @@ func (s *KubeadmTestSuite) TestRunKubeadmInit() {
 }
 
 func (s *KubeadmTestSuite) TestPreventKubeletServiceFromStarting() {
+	// cSpell: disable
 	rcConfFileContent := dedent.Dedent(`
     rc_sys="prefix"
     rc_controller_cgroups="NO"
     rc_depend_strict="NO"
     rc_need="!net !dev !udev-mount !sysfs !checkfs !fsck !netmount !logger !clock !modules"
     `)
+	// cSpell: enable
 
 	require := s.Require()
 	fs := afero.NewOsFs()
@@ -224,6 +229,7 @@ func (s *KubeadmTestSuite) TestPreventKubeletServiceFromStarting() {
 }
 
 func (s *KubeadmTestSuite) TestPreventKubeletServiceFromStartingWhenLineIsPresent() {
+	// cSpell: disable
 	existingContent := dedent.Dedent(`
     rc_sys="prefix"
     rc_controller_cgroups="NO"
@@ -231,6 +237,7 @@ func (s *KubeadmTestSuite) TestPreventKubeletServiceFromStartingWhenLineIsPresen
     rc_need="!net !dev !udev-mount !sysfs !checkfs !fsck !netmount !logger !clock !modules"
     rc_kubelet_need="non-existing-service"
     `)
+	// cSpell: enable
 
 	require := s.Require()
 	fs := afero.NewOsFs()

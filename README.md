@@ -2,6 +2,8 @@
 <div id="top"></div>
 <!-- markdownlint-enable MD033 MD041-->
 
+<!-- cSpell:words logrus goreleaser kubectx kubens rootfs wsldl kwsl LOCALAPPDATA iface -->
+
 <!-- PROJECT SHIELDS -->
 
 [![Go Version][go-version]][go-version]

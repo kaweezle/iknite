@@ -1,5 +1,6 @@
 package phases
 
+// cSpell: disable
 import (
 	"fmt"
 
@@ -12,6 +13,8 @@ import (
 
 	log "github.com/sirupsen/logrus"
 )
+
+// cSpell: enable
 
 func NewConfigureClusterPhase() workflow.Phase {
 	return workflow.Phase{

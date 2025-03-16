@@ -15,6 +15,8 @@ limitations under the License.
 */
 package alpine
 
+// cSpell: words runlevel runlevels
+// cSpell: disable
 import (
 	"os"
 	"path"
@@ -23,6 +25,8 @@ import (
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 )
+
+// cSpell: enable
 
 const (
 	openRCSourceDirectory = "/lib/rc/init.d"

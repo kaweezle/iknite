@@ -1,10 +1,14 @@
+// cSpell: words testutils
 package testutils
 
+// cSpell: disable
 import (
 	"io"
 
 	"github.com/stretchr/testify/mock"
 )
+
+// cSpell: enable
 
 type MockExecutor struct {
 	mock.Mock

@@ -28,14 +28,10 @@ import (
 	"github.com/kaweezle/iknite/pkg/config"
 	"github.com/kaweezle/iknite/pkg/constants"
 	"github.com/kaweezle/iknite/pkg/k8s"
-	"github.com/mitchellh/mapstructure"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
-	flag "github.com/spf13/pflag"
-	"github.com/spf13/viper"
 	"k8s.io/apimachinery/pkg/util/wait"
-	koptions "k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 )
 
 // cSpell: enable
@@ -57,64 +53,19 @@ func NewStartCmd() *cobra.Command {
 - Allows the use of kubectl from the root account,
 - Installs flannel, metal-lb and local-path-provisioner.
 `,
-		PersistentPreRun: startPersistentPreRun,
+		PersistentPreRun: config.StartPersistentPreRun,
 		Run:              perform,
 	}
 	flags := startCmd.Flags()
 
 	flags.IntVarP(&timeout, options.Timeout, "t", timeout, "Wait timeout in seconds")
-	configureClusterCommand(flags, ikniteConfig)
+	config.ConfigureClusterCommand(flags, ikniteConfig)
 	initializeKustomization(flags)
 
 	return startCmd
 }
 
-func configureClusterCommand(flagSet *flag.FlagSet, ikniteConfig *v1alpha1.IkniteClusterSpec) {
-	v1alpha1.SetDefaults_IkniteClusterSpec(ikniteConfig)
-
-	flagSet.IPVar(&ikniteConfig.Ip, options.Ip, ikniteConfig.Ip, "Cluster IP address")
-	flagSet.BoolVar(&ikniteConfig.CreateIp, options.IpCreate, ikniteConfig.CreateIp, "Add IP address if it doesn't exist")
-	flagSet.StringVar(&ikniteConfig.NetworkInterface, options.IpNetworkInterface, ikniteConfig.NetworkInterface, "Interface to which add IP")
-	flagSet.StringVar(&ikniteConfig.DomainName, options.DomainName, ikniteConfig.DomainName, "Domain name of the cluster")
-	flagSet.BoolVar(&ikniteConfig.EnableMDNS, options.EnableMDNS, ikniteConfig.EnableMDNS, "Enable mDNS publication of domain name")
-	flagSet.StringVar(&ikniteConfig.KubernetesVersion, koptions.KubernetesVersion, ikniteConfig.KubernetesVersion, "Kubernetes version to install")
-	flagSet.StringVar(&ikniteConfig.ClusterName, options.ClusterName, ikniteConfig.ClusterName, "Cluster name")
-	flagSet.StringVar(&ikniteConfig.Kustomization, options.Kustomization, ikniteConfig.Kustomization, "Kustomization location (URL or directory)")
-}
-
-func startPersistentPreRun(cmd *cobra.Command, args []string) {
-
-	flags := cmd.Flags()
-	viper.BindPFlag(config.IP, flags.Lookup(options.Ip))
-	viper.BindPFlag(config.IPCreate, flags.Lookup(options.IpCreate))
-	viper.BindPFlag(config.IPNetworkInterface, flags.Lookup(options.IpNetworkInterface))
-	viper.BindPFlag(config.DomainName, flags.Lookup(options.DomainName))
-	viper.BindPFlag(config.KubernetesVersion, flags.Lookup(koptions.KubernetesVersion))
-	viper.BindPFlag(config.EnableMDNS, flags.Lookup(options.EnableMDNS))
-	viper.BindPFlag(config.ClusterName, flags.Lookup(options.ClusterName))
-	viper.BindPFlag(config.Kustomization, flags.Lookup(options.Kustomization))
-}
-
-// DecodeIkniteConfig decodes the configuration from the viper configuration.
-// This allows providing configuration values as environment variables.
-func DecodeIkniteConfig(ikniteConfig *v1alpha1.IkniteClusterSpec) error {
-	// Cannot use Unmarshal. Look here: https://github.com/spf13/viper/issues/368
-	decoderConfig := mapstructure.DecoderConfig{
-		DecodeHook:       mapstructure.StringToIPHookFunc(),
-		WeaklyTypedInput: true,
-		Result:           ikniteConfig,
-		Metadata:         nil,
-	}
-
-	decoder, err := mapstructure.NewDecoder(&decoderConfig)
-	if err != nil {
-		return errors.Wrap(err, "While creating decoder")
-	}
-
-	return decoder.Decode(viper.AllSettings()["cluster"])
-}
-
-func IsIkinteReady(ctx context.Context) (bool, error) {
+func IsIkniteReady(ctx context.Context) (bool, error) {
 
 	cluster, err := v1alpha1.LoadIkniteCluster()
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
@@ -147,7 +98,7 @@ func IsIkinteReady(ctx context.Context) (bool, error) {
 
 func perform(cmd *cobra.Command, args []string) {
 
-	cobra.CheckErr(DecodeIkniteConfig(ikniteConfig))
+	cobra.CheckErr(config.DecodeIkniteConfig(ikniteConfig))
 	cobra.CheckErr(k8s.PrepareKubernetesEnvironment(ikniteConfig))
 
 	// If Kubernetes is already installed, check that the configuration has not
@@ -179,9 +130,9 @@ func perform(cmd *cobra.Command, args []string) {
 
 	ctx := context.Background()
 	if timeout > 0 {
-		err = wait.PollUntilContextTimeout(ctx, time.Second*time.Duration(2), time.Duration(timeout), true, IsIkinteReady)
+		err = wait.PollUntilContextTimeout(ctx, time.Second*time.Duration(2), time.Duration(timeout), true, IsIkniteReady)
 	} else {
-		err = wait.PollUntilContextCancel(ctx, time.Second*time.Duration(2), true, IsIkinteReady)
+		err = wait.PollUntilContextCancel(ctx, time.Second*time.Duration(2), true, IsIkniteReady)
 	}
 
 	cobra.CheckErr(err)

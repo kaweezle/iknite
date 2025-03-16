@@ -1,5 +1,6 @@
 package phases
 
+// cSpell: disable
 import (
 	"fmt"
 	"time"
@@ -13,10 +14,12 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 )
 
+// cSpell: enable
+
 func NewWorkloadsPhase() workflow.Phase {
 	return workflow.Phase{
 		Name:  "workloads",
-		Short: "Monitor the cluster worklaods.",
+		Short: "Monitor the cluster workloads.",
 		Run:   runMonitorWorkloads,
 	}
 }

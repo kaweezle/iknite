@@ -41,7 +41,7 @@ func runMDnsPublish(c workflow.RunData) error {
 	}
 
 	var conn *mdns.Conn
-	fmt.Println("[mdns-publish] Starting the mdns reponder...")
+	fmt.Println("[mdns-publish] Starting the mdns responder...")
 	conn, err = mdns.Server(ipv4.NewPacketConn(l), &mdns.Config{
 		LocalNames: []string{ikniteConfig.DomainName},
 	})

@@ -1,20 +1,24 @@
 package v1alpha1
 
+// cSpell: disable
 import (
 	"encoding/json"
 	"fmt"
 	"net"
 	"os"
 
-	ikniteapi "github.com/kaweezle/iknite/pkg/apis/iknite"
+	ikniteApi "github.com/kaweezle/iknite/pkg/apis/iknite"
 	"github.com/kaweezle/iknite/pkg/constants"
 	log "github.com/sirupsen/logrus"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metaV1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+// cSpell: enable
+
+// cSpell: disable-next-line
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type IkniteCluster struct {
-	metav1.TypeMeta `json:",inline"`
+	metaV1.TypeMeta `json:",inline"`
 
 	Spec IkniteClusterSpec `json:"spec" protobuf:"bytes,2,opt,name=spec"`
 	// +optional
@@ -48,8 +52,8 @@ func (c *IkniteClusterSpec) GetApiEndPoint() string {
 }
 
 type IkniteClusterStatus struct {
-	LastUpdateTimeStamp metav1.Time            `json:"lastUpdateTimeStamp" protobuf:"bytes,1,opt,name=lastUpdateTimeStamp"`
-	State               ikniteapi.ClusterState `json:"state" protobuf:"bytes,1,opt,name=state"`
+	LastUpdateTimeStamp metaV1.Time            `json:"lastUpdateTimeStamp" protobuf:"bytes,1,opt,name=lastUpdateTimeStamp"`
+	State               ikniteApi.ClusterState `json:"state" protobuf:"bytes,1,opt,name=state"`
 	CurrentPhase        string                 `json:"currentPhase" protobuf:"bytes,2,opt,name=currentPhase"`
 	WorkloadsState      ClusterWorkloadsState  `json:"workloadsState" protobuf:"bytes,3,opt,name=workloadsState"`
 }
@@ -86,10 +90,10 @@ func OkString(b bool) string {
 	return "🟥"
 }
 
-func (ikniteCluster *IkniteCluster) Update(state ikniteapi.ClusterState, phase string, ready, unready []*WorkloadState) {
+func (ikniteCluster *IkniteCluster) Update(state ikniteApi.ClusterState, phase string, ready, unready []*WorkloadState) {
 	ikniteCluster.Status.State = state
 	ikniteCluster.Status.CurrentPhase = phase
-	ikniteCluster.Status.LastUpdateTimeStamp = metav1.Now()
+	ikniteCluster.Status.LastUpdateTimeStamp = metaV1.Now()
 	ikniteCluster.Status.WorkloadsState.Count = len(ready) + len(unready)
 	ikniteCluster.Status.WorkloadsState.Ready = ready
 	ikniteCluster.Status.WorkloadsState.ReadyCount = len(ready)

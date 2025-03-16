@@ -15,6 +15,8 @@ limitations under the License.
 */
 package k8s
 
+// cSpell: words tmpl netfilter
+// cSpell: disable
 import (
 	"fmt"
 	"io"
@@ -34,6 +36,8 @@ import (
 
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
 )
+
+// cSpell: enable
 
 const (
 	kubernetesConfigurationDirectory = "/etc/kubernetes"

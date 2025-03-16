@@ -1,5 +1,7 @@
 package k8s
 
+// cSpell: words clientcmd clientconfig restconfig casttype metav1 polymorphichelpers restmapper
+// cSpell: disable
 import (
 	"context"
 	"fmt"
@@ -24,6 +26,8 @@ import (
 	"k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/kubectl/pkg/polymorphichelpers"
 )
+
+// cSpell: enable
 
 type RESTClientGetter struct {
 	clientconfig clientcmd.ClientConfig

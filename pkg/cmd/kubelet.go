@@ -1,11 +1,12 @@
 package cmd
 
 import (
+	"github.com/kaweezle/iknite/pkg/config"
 	"github.com/kaweezle/iknite/pkg/k8s"
 	"github.com/spf13/cobra"
 )
 
-func NewKubletCmd() *cobra.Command {
+func NewKubeletCmd() *cobra.Command {
 
 	var kubeletCmd = &cobra.Command{
 		Use:   "kubelet",
@@ -17,10 +18,10 @@ The kubelet is started and monitored. The following operations are performed:
 - Monitors the kubelet,
 `,
 		Run:              performKubelet,
-		PersistentPreRun: startPersistentPreRun,
+		PersistentPreRun: config.StartPersistentPreRun,
 	}
 
-	configureClusterCommand(kubeletCmd.Flags(), ikniteConfig)
+	config.ConfigureClusterCommand(kubeletCmd.Flags(), ikniteConfig)
 	initializeKustomization(kubeletCmd.Flags())
 
 	return kubeletCmd

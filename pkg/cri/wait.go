@@ -15,6 +15,7 @@ limitations under the License.
 */
 package cri
 
+// cSpell: disable
 import (
 	"encoding/json"
 	"time"
@@ -25,6 +26,8 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
 )
+
+// cSpell: enable
 
 type CRICondition struct {
 	Type    string `json:"type"`

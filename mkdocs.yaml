@@ -1,5 +1,6 @@
 # The project configuration is at the bottom of the file.
 # Look for the `Project configuration` comment.
+# cSpell: disable
 theme:
   name: "material"
   language: en
@@ -122,6 +123,8 @@ extra_css:
 
 extra_javascript:
   - "js/termynal.js"
+
+# cspell: enable
 
 ##############################################################################
 # Project configuration

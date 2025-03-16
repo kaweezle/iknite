@@ -1,5 +1,7 @@
 package alpine
 
+// cSpell: words iface ifaces txeh
+// cSpell: disable
 import (
 	"fmt"
 	"net"
@@ -9,6 +11,8 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/txn2/txeh"
 )
+
+// cSpell: enable
 
 func CheckIpExists(ip net.IP) (result bool, err error) {
 	result = false

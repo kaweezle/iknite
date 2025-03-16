@@ -16,6 +16,7 @@ limitations under the License.
 
 package cmd
 
+// cSpell: disable
 import (
 	"context"
 	"fmt"
@@ -34,29 +35,32 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
 
-	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
-	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
+	kubeadmApi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	kubeadmScheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
+	kubeadmApiV1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	phases "k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/init"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
-	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
-	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	cmdUtil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
+	kubeadmConstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
-	certsphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
-	kubeconfigphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubeconfig"
-	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
-	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
-	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
+	certsPhase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
+	kubeconfigPhase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubeconfig"
+	apiClient "k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
+	configUtil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
+	kubeConfigUtil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 
-	ikniteapi "github.com/kaweezle/iknite/pkg/apis/iknite"
+	ikniteApi "github.com/kaweezle/iknite/pkg/apis/iknite"
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
+	"github.com/kaweezle/iknite/pkg/config"
 	"github.com/kaweezle/iknite/pkg/constants"
 	"github.com/kaweezle/iknite/pkg/k8s"
-	iknphase "github.com/kaweezle/iknite/pkg/k8s/phases"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	iknitePhase "github.com/kaweezle/iknite/pkg/k8s/phases"
+	metaV1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
+
+// cSpell: enable
 
 // initOptions defines all the init options exposed via flags by kubeadm init.
 // Please note that this structure includes the public kubeadm config API, but only a subset of the options
@@ -70,8 +74,8 @@ type initOptions struct {
 	featureGatesString      string
 	ignorePreflightErrors   []string
 	bto                     *options.BootstrapTokenOptions
-	externalInitCfg         *kubeadmapiv1.InitConfiguration
-	externalClusterCfg      *kubeadmapiv1.ClusterConfiguration
+	externalInitCfg         *kubeadmApiV1.InitConfiguration
+	externalClusterCfg      *kubeadmApiV1.ClusterConfiguration
 	uploadCerts             bool
 	skipCertificateKeyPrint bool
 	patchesDir              string
@@ -80,10 +84,10 @@ type initOptions struct {
 }
 
 const (
-	// CoreDNSPhase is the name of CoreDNS subphase in "kubeadm init"
+	// CoreDNSPhase is the name of CoreDNS sub phase in "kubeadm init"
 	coreDNSPhase = "addon/coredns"
 
-	// KubeProxyPhase is the name of kube-proxy subphase during "kubeadm init"
+	// KubeProxyPhase is the name of kube-proxy sub phase during "kubeadm init"
 	kubeProxyPhase = "addon/kube-proxy"
 
 	// AddonPhase is the name of addon phase during "kubeadm init"
@@ -96,7 +100,7 @@ var _ phases.InitData = &initData{}
 // initData defines all the runtime information used when running the kubeadm init workflow;
 // this data is shared across all the phases that are included in the workflow.
 type initData struct {
-	cfg                         *kubeadmapi.InitConfiguration
+	cfg                         *kubeadmApi.InitConfiguration
 	skipTokenPrint              bool
 	dryRun                      bool
 	kubeconfigDir               string
@@ -160,7 +164,7 @@ func newCmdInit(out io.Writer, initOptions *initOptions) *cobra.Command {
 			if kubeletCmd != nil {
 				err = kubeletCmd.Process.Signal(syscall.SIGTERM)
 				if err != nil {
-					return errors.Wrapf(err, "failed to terminate the kublet process %d", kubeletCmd.Process.Pid)
+					return errors.Wrapf(err, "failed to terminate the kubelet process %d", kubeletCmd.Process.Pid)
 				}
 				kubeletCmd.Wait()
 			}
@@ -178,7 +182,7 @@ func newCmdInit(out io.Writer, initOptions *initOptions) *cobra.Command {
 	initOptions.bto.AddTokenFlag(cmd.Flags())
 	initOptions.bto.AddTTLFlag(cmd.Flags())
 	options.AddImageMetaFlags(cmd.Flags(), &initOptions.externalClusterCfg.ImageRepository)
-	configureClusterCommand(cmd.Flags(), initOptions.ikniteCfg)
+	config.ConfigureClusterCommand(cmd.Flags(), initOptions.ikniteCfg)
 
 	// defines additional flag that are not used by the init command but that could be eventually used
 	// by the sub-commands automatically generated for phases
@@ -189,24 +193,24 @@ func newCmdInit(out io.Writer, initOptions *initOptions) *cobra.Command {
 	})
 
 	// initialize the workflow runner with the list of phases
-	initRunner.AppendPhase(WrapPhase(iknphase.NewPrepareHostPhase(), ikniteapi.Started, nil))
-	initRunner.AppendPhase(WrapPhase(phases.NewPreflightPhase(), ikniteapi.Initializing, nil))
-	initRunner.AppendPhase(WrapPhase(phases.NewCertsPhase(), ikniteapi.Initializing, nil))
-	initRunner.AppendPhase(WrapPhase(phases.NewKubeConfigPhase(), ikniteapi.Initializing, nil))
-	initRunner.AppendPhase(WrapPhase(phases.NewEtcdPhase(), ikniteapi.Initializing, nil))
-	initRunner.AppendPhase(WrapPhase(phases.NewControlPlanePhase(), ikniteapi.Initializing, nil))
-	initRunner.AppendPhase(WrapPhase(iknphase.NewKubeletStartPhase(), ikniteapi.Initializing, nil))
-	initRunner.AppendPhase(WrapPhase(phases.NewWaitControlPlanePhase(), ikniteapi.Initializing, nil))
-	initRunner.AppendPhase(WrapPhase(phases.NewUploadConfigPhase(), ikniteapi.Initializing, nil))
-	initRunner.AppendPhase(WrapPhase(phases.NewUploadCertsPhase(), ikniteapi.Initializing, nil))
+	initRunner.AppendPhase(WrapPhase(iknitePhase.NewPrepareHostPhase(), ikniteApi.Started, nil))
+	initRunner.AppendPhase(WrapPhase(phases.NewPreflightPhase(), ikniteApi.Initializing, nil))
+	initRunner.AppendPhase(WrapPhase(phases.NewCertsPhase(), ikniteApi.Initializing, nil))
+	initRunner.AppendPhase(WrapPhase(phases.NewKubeConfigPhase(), ikniteApi.Initializing, nil))
+	initRunner.AppendPhase(WrapPhase(phases.NewEtcdPhase(), ikniteApi.Initializing, nil))
+	initRunner.AppendPhase(WrapPhase(phases.NewControlPlanePhase(), ikniteApi.Initializing, nil))
+	initRunner.AppendPhase(WrapPhase(iknitePhase.NewKubeletStartPhase(), ikniteApi.Initializing, nil))
+	initRunner.AppendPhase(WrapPhase(phases.NewWaitControlPlanePhase(), ikniteApi.Initializing, nil))
+	initRunner.AppendPhase(WrapPhase(phases.NewUploadConfigPhase(), ikniteApi.Initializing, nil))
+	initRunner.AppendPhase(WrapPhase(phases.NewUploadCertsPhase(), ikniteApi.Initializing, nil))
 	// initRunner.AppendPhase(phases.NewMarkControlPlanePhase())
-	initRunner.AppendPhase(WrapPhase(phases.NewBootstrapTokenPhase(), ikniteapi.Initializing, nil))
-	initRunner.AppendPhase(WrapPhase(phases.NewKubeletFinalizePhase(), ikniteapi.Initializing, nil))
-	initRunner.AppendPhase(WrapPhase(phases.NewAddonPhase(), ikniteapi.Initializing, nil))
-	initRunner.AppendPhase(WrapPhase(iknphase.NewMDnsPublishPhase(), ikniteapi.Stabilizing, nil))
-	initRunner.AppendPhase(WrapPhase(iknphase.NewConfigureClusterPhase(), ikniteapi.Stabilizing, nil))
-	initRunner.AppendPhase(WrapPhase(iknphase.NewWorkloadsPhase(), ikniteapi.Stabilizing, nil))
-	initRunner.AppendPhase(WrapPhase(iknphase.NewDaemonizePhase(), ikniteapi.Stabilizing, nil))
+	initRunner.AppendPhase(WrapPhase(phases.NewBootstrapTokenPhase(), ikniteApi.Initializing, nil))
+	initRunner.AppendPhase(WrapPhase(phases.NewKubeletFinalizePhase(), ikniteApi.Initializing, nil))
+	initRunner.AppendPhase(WrapPhase(phases.NewAddonPhase(), ikniteApi.Initializing, nil))
+	initRunner.AppendPhase(WrapPhase(iknitePhase.NewMDnsPublishPhase(), ikniteApi.Stabilizing, nil))
+	initRunner.AppendPhase(WrapPhase(iknitePhase.NewConfigureClusterPhase(), ikniteApi.Stabilizing, nil))
+	initRunner.AppendPhase(WrapPhase(iknitePhase.NewWorkloadsPhase(), ikniteApi.Stabilizing, nil))
+	initRunner.AppendPhase(WrapPhase(iknitePhase.NewDaemonizePhase(), ikniteApi.Stabilizing, nil))
 	// initRunner.AppendPhase(phases.NewShowJoinCommandPhase())
 
 	// sets the data builder function, that will be used by the runner
@@ -238,7 +242,7 @@ func newCmdInit(out io.Writer, initOptions *initOptions) *cobra.Command {
 }
 
 // AddInitConfigFlags adds init flags bound to the config to the specified flagset
-func AddInitConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiv1.InitConfiguration) {
+func AddInitConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmApiV1.InitConfiguration) {
 	flagSet.StringVar(
 		&cfg.LocalAPIEndpoint.AdvertiseAddress, options.APIServerAdvertiseAddress, cfg.LocalAPIEndpoint.AdvertiseAddress,
 		"The IP address the API Server will advertise it's listening on. If not set the default network interface will be used.",
@@ -255,11 +259,11 @@ func AddInitConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiv1.InitConfigurati
 		&cfg.CertificateKey, options.CertificateKey, "",
 		"Key used to encrypt the control-plane certificates in the kubeadm-certs Secret. The certificate key is a hex encoded string that is an AES key of size 32 bytes.",
 	)
-	cmdutil.AddCRISocketFlag(flagSet, &cfg.NodeRegistration.CRISocket)
+	cmdUtil.AddCRISocketFlag(flagSet, &cfg.NodeRegistration.CRISocket)
 }
 
 // AddClusterConfigFlags adds cluster flags bound to the config to the specified flagset
-func AddClusterConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiv1.ClusterConfiguration, featureGatesString *string) {
+func AddClusterConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmApiV1.ClusterConfiguration, featureGatesString *string) {
 	flagSet.StringVar(
 		&cfg.Networking.ServiceSubnet, options.NetworkingServiceSubnet, cfg.Networking.ServiceSubnet,
 		"Use alternative range of IP address for service VIPs.",
@@ -270,7 +274,7 @@ func AddClusterConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiv1.ClusterConfi
 	)
 	flagSet.StringVar(
 		&cfg.Networking.DNSDomain, options.NetworkingDNSDomain, cfg.Networking.DNSDomain,
-		`Use alternative domain for services, e.g. "myorg.internal".`,
+		`Use alternative domain for services, e.g. "my-organization.internal".`,
 	)
 
 	flagSet.StringVar(
@@ -321,11 +325,11 @@ func AddInitOtherFlags(flagSet *flag.FlagSet, initOptions *initOptions) {
 // newInitOptions returns a struct ready for being used for creating cmd init flags.
 func newInitOptions() *initOptions {
 	// initialize the public kubeadm config API by applying defaults
-	externalInitCfg := &kubeadmapiv1.InitConfiguration{}
-	kubeadmscheme.Scheme.Default(externalInitCfg)
+	externalInitCfg := &kubeadmApiV1.InitConfiguration{}
+	kubeadmScheme.Scheme.Default(externalInitCfg)
 
-	externalClusterCfg := &kubeadmapiv1.ClusterConfiguration{}
-	kubeadmscheme.Scheme.Default(externalClusterCfg)
+	externalClusterCfg := &kubeadmApiV1.ClusterConfiguration{}
+	kubeadmScheme.Scheme.Default(externalClusterCfg)
 	externalClusterCfg.Networking.PodSubnet = constants.PodSubnet
 
 	// Create the options object for the bootstrap token-related flags, and override the default value for .Description
@@ -339,8 +343,8 @@ func newInitOptions() *initOptions {
 		externalInitCfg:       externalInitCfg,
 		externalClusterCfg:    externalClusterCfg,
 		bto:                   bto,
-		kubeconfigDir:         kubeadmconstants.KubernetesDir,
-		kubeconfigPath:        kubeadmconstants.GetAdminKubeConfigPath(),
+		kubeconfigDir:         kubeadmConstants.KubernetesDir,
+		kubeconfigPath:        kubeadmConstants.GetAdminKubeConfigPath(),
 		uploadCerts:           false,
 		ikniteCfg:             ikniteConfig,
 		ignorePreflightErrors: []string{"all"},
@@ -350,20 +354,20 @@ func newInitOptions() *initOptions {
 // newInitData returns a new initData struct to be used for the execution of the kubeadm init workflow.
 // This func takes care of validating initOptions passed to the command, and then it converts
 // options into the internal InitConfiguration type that is used as input all the phases in the kubeadm init workflow
-func newInitData(cmd *cobra.Command, args []string, initOptions *initOptions, out io.Writer) (*initData, error) {
+func newInitData(cmd *cobra.Command, _ []string, initOptions *initOptions, out io.Writer) (*initData, error) {
 	// Re-apply defaults to the public kubeadm API (this will set only values not exposed/not set as a flags)
-	kubeadmscheme.Scheme.Default(initOptions.externalInitCfg)
-	kubeadmscheme.Scheme.Default(initOptions.externalClusterCfg)
+	kubeadmScheme.Scheme.Default(initOptions.externalInitCfg)
+	kubeadmScheme.Scheme.Default(initOptions.externalClusterCfg)
 
 	// Retrieve information from environment variables and apply them to the configuration
-	DecodeIkniteConfig(initOptions.ikniteCfg)
+	config.DecodeIkniteConfig(initOptions.ikniteCfg)
 
 	ikniteCluster := &v1alpha1.IkniteCluster{}
-	ikniteCluster.TypeMeta = metav1.TypeMeta{
-		Kind:       ikniteapi.IkniteClusterKind,
+	ikniteCluster.TypeMeta = metaV1.TypeMeta{
+		Kind:       ikniteApi.IkniteClusterKind,
 		APIVersion: v1alpha1.SchemeGroupVersion.String(),
 	}
-	kubeadmscheme.Scheme.Default(ikniteCluster)
+	kubeadmScheme.Scheme.Default(ikniteCluster)
 	ikniteCluster.Spec = *initOptions.ikniteCfg
 
 	// Validate standalone flags values and/or combination of flags and then assigns
@@ -383,7 +387,7 @@ func newInitData(cmd *cobra.Command, args []string, initOptions *initOptions, ou
 
 	// Either use the config file if specified, or convert public kubeadm API to the internal InitConfiguration
 	// and validates InitConfiguration
-	cfg, err := configutil.LoadOrDefaultInitConfiguration(initOptions.cfgPath, initOptions.externalInitCfg, initOptions.externalClusterCfg, configutil.LoadOrDefaultConfigurationOptions{
+	cfg, err := configUtil.LoadOrDefaultInitConfiguration(initOptions.cfgPath, initOptions.externalInitCfg, initOptions.externalClusterCfg, configUtil.LoadOrDefaultConfigurationOptions{
 		SkipCRIDetect: initOptions.skipCRIDetect,
 	})
 	if err != nil {
@@ -402,7 +406,7 @@ func newInitData(cmd *cobra.Command, args []string, initOptions *initOptions, ou
 		cfg.NodeRegistration.Name = initOptions.externalInitCfg.NodeRegistration.Name
 	}
 
-	if err := configutil.VerifyAPIServerBindAddress(cfg.LocalAPIEndpoint.AdvertiseAddress); err != nil {
+	if err := configUtil.VerifyAPIServerBindAddress(cfg.LocalAPIEndpoint.AdvertiseAddress); err != nil {
 		return nil, err
 	}
 	if err := features.ValidateVersion(features.InitFeatureGates, cfg.FeatureGates, cfg.KubernetesVersion); err != nil {
@@ -415,13 +419,13 @@ func newInitData(cmd *cobra.Command, args []string, initOptions *initOptions, ou
 		// the KUBEADM_INIT_DRYRUN_DIR environment variable allows overriding the dry-run temporary
 		// directory from the command line. This makes it possible to run "kubeadm init" integration
 		// tests without root.
-		if dryRunDir, err = kubeadmconstants.CreateTempDirForKubeadm(os.Getenv("KUBEADM_INIT_DRYRUN_DIR"), "kubeadm-init-dryrun"); err != nil {
+		if dryRunDir, err = kubeadmConstants.CreateTempDirForKubeadm(os.Getenv("KUBEADM_INIT_DRYRUN_DIR"), "kubeadm-init-dryrun"); err != nil {
 			return nil, errors.Wrap(err, "couldn't create a temporary directory")
 		}
 	}
 
 	// Checks if an external CA is provided by the user (when the CA Cert is present but the CA Key is not)
-	externalCA, err := certsphase.UsingExternalCA(&cfg.ClusterConfiguration)
+	externalCA, err := certsPhase.UsingExternalCA(&cfg.ClusterConfiguration)
 	if externalCA {
 		// In case the certificates signed by CA (that should be provided by the user) are missing or invalid,
 		// returns, because kubeadm can't regenerate them without the CA Key
@@ -432,13 +436,13 @@ func newInitData(cmd *cobra.Command, args []string, initOptions *initOptions, ou
 		// Validate that also the required kubeconfig files exists and are invalid, because
 		// kubeadm can't regenerate them without the CA Key
 		kubeconfigDir := initOptions.kubeconfigDir
-		if err := kubeconfigphase.ValidateKubeconfigsForExternalCA(kubeconfigDir, cfg); err != nil {
+		if err := kubeconfigPhase.ValidateKubeconfigsForExternalCA(kubeconfigDir, cfg); err != nil {
 			return nil, err
 		}
 	}
 
 	// Checks if an external Front-Proxy CA is provided by the user (when the Front-Proxy CA Cert is present but the Front-Proxy CA Key is not)
-	externalFrontProxyCA, err := certsphase.UsingExternalFrontProxyCA(&cfg.ClusterConfiguration)
+	externalFrontProxyCA, err := certsPhase.UsingExternalFrontProxyCA(&cfg.ClusterConfiguration)
 	if externalFrontProxyCA {
 		// In case the certificates signed by Front-Proxy CA (that should be provided by the user) are missing or invalid,
 		// returns, because kubeadm can't regenerate them without the Front-Proxy CA Key
@@ -460,7 +464,7 @@ func newInitData(cmd *cobra.Command, args []string, initOptions *initOptions, ou
 	// Apply configured IP to the configuration
 	ips := initOptions.ikniteCfg.Ip.String()
 	cfg.LocalAPIEndpoint.AdvertiseAddress = ips
-	arg := &kubeadmapi.Arg{Name: "node-ip", Value: ips}
+	arg := &kubeadmApi.Arg{Name: "node-ip", Value: ips}
 	cfg.NodeRegistration.KubeletExtraArgs = append(cfg.NodeRegistration.KubeletExtraArgs, *arg)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -469,7 +473,7 @@ func newInitData(cmd *cobra.Command, args []string, initOptions *initOptions, ou
 		cfg:                     cfg,
 		certificatesDir:         cfg.CertificatesDir,
 		skipTokenPrint:          initOptions.skipTokenPrint,
-		dryRun:                  cmdutil.ValueFromFlagsOrConfig(cmd.Flags(), options.DryRun, cfg.DryRun, initOptions.dryRun).(bool),
+		dryRun:                  cmdUtil.ValueFromFlagsOrConfig(cmd.Flags(), options.DryRun, cfg.DryRun, initOptions.dryRun).(bool),
 		dryRunDir:               dryRunDir,
 		kubeconfigDir:           initOptions.kubeconfigDir,
 		kubeconfigPath:          initOptions.kubeconfigPath,
@@ -485,7 +489,7 @@ func newInitData(cmd *cobra.Command, args []string, initOptions *initOptions, ou
 	}, nil
 }
 
-// UploadCerts returns Uploadcerts flag.
+// UploadCerts returns UploadCerts flag.
 func (d *initData) UploadCerts() bool {
 	return d.uploadCerts
 }
@@ -506,7 +510,7 @@ func (d *initData) SkipCertificateKeyPrint() bool {
 }
 
 // Cfg returns initConfiguration.
-func (d *initData) Cfg() *kubeadmapi.InitConfiguration {
+func (d *initData) Cfg() *kubeadmApi.InitConfiguration {
 	return d.cfg
 }
 
@@ -549,7 +553,7 @@ func (d *initData) KubeConfigDir() string {
 // KubeConfigPath returns the path to the kubeconfig file to use for connecting to Kubernetes
 func (d *initData) KubeConfigPath() string {
 	if d.dryRun {
-		d.kubeconfigPath = filepath.Join(d.dryRunDir, kubeadmconstants.AdminKubeConfigFileName)
+		d.kubeconfigPath = filepath.Join(d.dryRunDir, kubeadmConstants.AdminKubeConfigFileName)
 	}
 	return d.kubeconfigPath
 }
@@ -559,7 +563,7 @@ func (d *initData) ManifestDir() string {
 	if d.dryRun {
 		return d.dryRunDir
 	}
-	return kubeadmconstants.GetStaticPodDirectory()
+	return kubeadmConstants.GetStaticPodDirectory()
 }
 
 // KubeletDir returns path of the kubelet configuration folder or the temporary folder in case of DryRun.
@@ -567,7 +571,7 @@ func (d *initData) KubeletDir() string {
 	if d.dryRun {
 		return d.dryRunDir
 	}
-	return kubeadmconstants.KubeletRunDirectory
+	return kubeadmConstants.KubeletRunDirectory
 }
 
 // ExternalCA returns true if an external CA is provided by the user.
@@ -582,12 +586,12 @@ func (d *initData) OutputWriter() io.Writer {
 
 // getDryRunClient creates a fake client that answers some GET calls in order to be able to do the full init flow in dry-run mode.
 func getDryRunClient(d *initData) (clientset.Interface, error) {
-	svcSubnetCIDR, err := kubeadmconstants.GetKubernetesServiceCIDR(d.cfg.Networking.ServiceSubnet)
+	svcSubnetCIDR, err := kubeadmConstants.GetKubernetesServiceCIDR(d.cfg.Networking.ServiceSubnet)
 	if err != nil {
 		return nil, errors.Wrapf(err, "unable to get internal Kubernetes Service IP from the given service CIDR (%s)", d.cfg.Networking.ServiceSubnet)
 	}
-	dryRunGetter := apiclient.NewInitDryRunGetter(d.cfg.NodeRegistration.Name, svcSubnetCIDR.String())
-	return apiclient.NewDryRunClient(dryRunGetter, os.Stdout), nil
+	dryRunGetter := apiClient.NewInitDryRunGetter(d.cfg.NodeRegistration.Name, svcSubnetCIDR.String())
+	return apiClient.NewDryRunClient(dryRunGetter, os.Stdout), nil
 }
 
 // Client returns a Kubernetes client to be used by kubeadm.
@@ -602,19 +606,19 @@ func (d *initData) Client() (clientset.Interface, error) {
 				return nil, err
 			}
 		} else { // Use a real client
-			isDefaultKubeConfigPath := d.KubeConfigPath() == kubeadmconstants.GetAdminKubeConfigPath()
+			isDefaultKubeConfigPath := d.KubeConfigPath() == kubeadmConstants.GetAdminKubeConfigPath()
 			// Only bootstrap the admin.conf if it's used by the user (i.e. --kubeconfig has its default value)
 			// and if the bootstrapping was not already done
 			if !d.adminKubeConfigBootstrapped && isDefaultKubeConfigPath {
 				// Call EnsureAdminClusterRoleBinding() to obtain a working client from admin.conf.
-				d.client, err = kubeconfigphase.EnsureAdminClusterRoleBinding(kubeadmconstants.KubernetesDir, nil)
+				d.client, err = kubeconfigPhase.EnsureAdminClusterRoleBinding(kubeadmConstants.KubernetesDir, nil)
 				if err != nil {
-					return nil, errors.Wrapf(err, "could not bootstrap the admin user in file %s", kubeadmconstants.AdminKubeConfigFileName)
+					return nil, errors.Wrapf(err, "could not bootstrap the admin user in file %s", kubeadmConstants.AdminKubeConfigFileName)
 				}
 				d.adminKubeConfigBootstrapped = true
 			} else {
 				// Alternatively, just load the config pointed at the --kubeconfig path
-				d.client, err = kubeconfigutil.ClientSetFromFile(d.KubeConfigPath())
+				d.client, err = kubeConfigUtil.ClientSetFromFile(d.KubeConfigPath())
 				if err != nil {
 					return nil, err
 				}
@@ -638,7 +642,7 @@ func (d *initData) ClientWithoutBootstrap() (clientset.Interface, error) {
 			return nil, err
 		}
 	} else { // Use a real client
-		client, err = kubeconfigutil.ClientSetFromFile(d.KubeConfigPath())
+		client, err = kubeConfigUtil.ClientSetFromFile(d.KubeConfigPath())
 		if err != nil {
 			return nil, err
 		}
@@ -668,7 +672,7 @@ func (d *initData) PatchesDir() string {
 }
 
 // manageSkippedAddons syncs proxy and DNS "Disabled" status and skipPhases.
-func manageSkippedAddons(cfg *kubeadmapi.ClusterConfiguration, skipPhases []string) []string {
+func manageSkippedAddons(cfg *kubeadmApi.ClusterConfiguration, skipPhases []string) []string {
 	var (
 		skipDNSPhase   = false
 		skipProxyPhase = false
@@ -740,7 +744,7 @@ func PhaseName(p workflow.Phase, parentPhases *[]workflow.Phase) string {
 	return fmt.Sprintf("%s/%s", PhaseName(parentPhaseName, &grandParentPhases), p.Name)
 }
 
-func WrapPhase(p workflow.Phase, state ikniteapi.ClusterState, parentPhases *[]workflow.Phase) workflow.Phase {
+func WrapPhase(p workflow.Phase, state ikniteApi.ClusterState, parentPhases *[]workflow.Phase) workflow.Phase {
 	var newRun func(c workflow.RunData) error
 	var newChildPhases []workflow.Phase
 	if parentPhases == nil {

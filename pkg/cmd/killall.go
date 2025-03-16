@@ -1,5 +1,7 @@
 package cmd
 
+// cSpell:words txeh
+// cSpell: disable
 import (
 	"fmt"
 	"os"
@@ -8,12 +10,15 @@ import (
 	s "github.com/bitfield/script"
 	"github.com/kaweezle/iknite/pkg/alpine"
 	"github.com/kaweezle/iknite/pkg/cmd/options"
+	"github.com/kaweezle/iknite/pkg/config"
 	"github.com/kaweezle/iknite/pkg/constants"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	flag "github.com/spf13/pflag"
 	"github.com/txn2/txeh"
 )
+
+// cSpell: enable
 
 var (
 	stopServices   = true
@@ -24,7 +29,8 @@ var (
 	resetKubelet   = false
 	resetIpAddress = false
 
-	pathsToUnmount          = []string{"/var/lib/kubelet/pods", "/var/lib/kubelet/plugins", "/var/lib/kubelet"}
+	pathsToUnmount = []string{"/var/lib/kubelet/pods", "/var/lib/kubelet/plugins", "/var/lib/kubelet"}
+	// cSpell: disable-next-line
 	pathsToUnmountAndRemove = []string{"/run/containerd", "/run/netns", "/run/ipcns", "/run/utsns"}
 )
 
@@ -45,7 +51,7 @@ This command must be run as root.
 	}
 
 	initializeKillall(killallCmd.Flags())
-	configureClusterCommand(killallCmd.Flags(), ikniteConfig)
+	config.ConfigureClusterCommand(killallCmd.Flags(), ikniteConfig)
 
 	return killallCmd
 }

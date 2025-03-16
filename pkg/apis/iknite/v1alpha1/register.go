@@ -1,11 +1,15 @@
 package v1alpha1
 
+// cSpell: words metav1 ikniteapi
+// cSpell: disable
 import (
 	ikniteapi "github.com/kaweezle/iknite/pkg/apis/iknite"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
+
+// cSpell: enable
 
 // SchemeGroupVersion is group version used to register these objects
 var SchemeGroupVersion = schema.GroupVersion{Group: ikniteapi.GroupName, Version: ikniteapi.V1alpha1Version}

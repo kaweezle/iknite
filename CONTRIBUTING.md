@@ -1,5 +1,7 @@
 # Contributing to Octave Cloud Platform
 
+<!-- cspell:ignore venv mvenv -->
+
 !!! wip "Work in progress"
 
     This documentation is in draft form and may change frequently.
@@ -88,7 +90,7 @@ An Epic is a subject matter of the project, that will be relevant for several
 Stories and will cross multiple Milestones. A good example is for instance
 _Authentication_. There will be several Stories related to it. Creating an Epic
 titled `Epic: Security` allows to present and discuss the principles related to
-the feature And link the varkious stories and bugs related to it.
+the feature And link the various stories and bugs related to it.
 
 For most if not all of them, it is interesting to also create a Label and a
 Documentation page. The former is an easier way to group issues related to the
@@ -100,7 +102,7 @@ it and have a conversation about it.
 
 As the term _Issue_ covers also the stories and epics, we are left with _Bug_
 for describing real issues in the project. They can be real bugs, but also
-crashes and anoyments.
+crashes and other annoyances.
 
 I don't like to be too specific on the contents of a Bug, but please try to
 follow at least these guidelines:
@@ -108,8 +110,8 @@ follow at least these guidelines:
 - Describe how to reproduce.
 - Describe what happens.
 - Describe **what is expected** and how this is different from what happens.
-- Describe the context as thorougly as possible. In particular, give information
-  about: OS, device model, user context
+- Describe the context as thoroughly as possible. In particular, give
+  information about: OS, device model, user context
 
 ## Commit guidelines
 
@@ -127,7 +129,7 @@ Please follow these rules in your commits:
   files if they don't need to.
 - When you fix a test in a latter commit, please squash it with the preceding
   one.
-- Remove empty commits occuring from rebase.
+- Remove empty commits occurring from rebase.
 
 ### Commit messages
 
@@ -152,7 +154,7 @@ case of the current project, good references are
 [Effective Go](https://go.dev/doc/effective_go) and
 [The Go Style Guide](https://google.github.io/styleguide/go/).
 
-Here is some dos and donts:
+Here is some dos and don'ts:
 
 - Use something to separate words: case, underscore... Use what you see in the
   constructs of the language and use this pattern **consistently**.
@@ -191,13 +193,13 @@ You can add categories inside the `/mkdocs.yml` file.
 
 You can see and browse the documentation while you're editing it by installing
 [MkDocs](https://www.mkdocs.org/) locally and serving the documentation (In the
-following we assme that you are either on Linux or MacOS with python3
+following we assume that you are either on Linux or MacOS with python3
 installed):
 
 ```console
 $ python3 -mvenv .venv
 $ source .venv/bin/activate
-(env) $ pip intall -r mkdocs-requirements.txt
+(env) $ pip install -r mkdocs-requirements.txt
 (env) $ mkdocs serve
 INFO    -  Building documentation...
 INFO    -  Cleaning site directory

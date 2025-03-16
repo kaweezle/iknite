@@ -15,6 +15,8 @@ limitations under the License.
 */
 package k8s
 
+// cSpell: words clientcmd readyz
+// cSpell: disable
 import (
 	"context"
 	"fmt"
@@ -25,10 +27,10 @@ import (
 	"github.com/kaweezle/iknite/pkg/provision"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
-	appsv1 "k8s.io/api/apps/v1"
-	corev1 "k8s.io/api/core/v1"
+	appsV1 "k8s.io/api/apps/v1"
+	coreV1 "k8s.io/api/core/v1"
 	k8Errors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metaV1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -36,6 +38,8 @@ import (
 	"k8s.io/client-go/tools/clientcmd/api"
 	"sigs.k8s.io/kustomize/kyaml/resid"
 )
+
+// cSpell: enable
 
 type Config api.Config
 
@@ -170,8 +174,8 @@ func (config *Config) RestartProxy() (err error) {
 
 	ctx := context.Background()
 
-	var ds *appsv1.DaemonSet
-	if ds, err = client.AppsV1().DaemonSets("kube-system").Get(ctx, "kube-proxy", metav1.GetOptions{}); err != nil {
+	var ds *appsV1.DaemonSet
+	if ds, err = client.AppsV1().DaemonSets("kube-system").Get(ctx, "kube-proxy", metaV1.GetOptions{}); err != nil {
 		return
 	}
 
@@ -180,7 +184,7 @@ func (config *Config) RestartProxy() (err error) {
 	}
 	ds.Spec.Template.ObjectMeta.Annotations["kubectl.kubernetes.io/restartedAt"] = time.Now().Format(time.RFC3339)
 
-	_, err = client.AppsV1().DaemonSets("kube-system").Update(ctx, ds, metav1.UpdateOptions{})
+	_, err = client.AppsV1().DaemonSets("kube-system").Update(ctx, ds, metaV1.UpdateOptions{})
 	return
 }
 
@@ -236,13 +240,13 @@ func (config *Config) DoConfiguration(ip net.IP, kustomization string, force boo
 
 }
 
-func GetIkniteConfigMap(client kubernetes.Interface) (cm *corev1.ConfigMap, err error) {
-	cm, err = client.CoreV1().ConfigMaps("kube-system").Get(context.TODO(), "iknite-config", metav1.GetOptions{})
+func GetIkniteConfigMap(client kubernetes.Interface) (cm *coreV1.ConfigMap, err error) {
+	cm, err = client.CoreV1().ConfigMaps("kube-system").Get(context.TODO(), "iknite-config", metaV1.GetOptions{})
 	if k8Errors.IsNotFound(err) {
 		err = nil
-		cm = &corev1.ConfigMap{
-			TypeMeta:   metav1.TypeMeta{Kind: "ConfigMap", APIVersion: "v1"},
-			ObjectMeta: metav1.ObjectMeta{Name: "iknite-config", Namespace: "kube-system"},
+		cm = &coreV1.ConfigMap{
+			TypeMeta:   metaV1.TypeMeta{Kind: "ConfigMap", APIVersion: "v1"},
+			ObjectMeta: metaV1.ObjectMeta{Name: "iknite-config", Namespace: "kube-system"},
 			Immutable:  new(bool),
 			Data:       map[string]string{"configured": "false"},
 			BinaryData: map[string][]byte{},
@@ -251,11 +255,11 @@ func GetIkniteConfigMap(client kubernetes.Interface) (cm *corev1.ConfigMap, err 
 	return
 }
 
-func WriteIkniteConfigMap(client kubernetes.Interface, cm *corev1.ConfigMap) (res *corev1.ConfigMap, err error) {
+func WriteIkniteConfigMap(client kubernetes.Interface, cm *coreV1.ConfigMap) (res *coreV1.ConfigMap, err error) {
 	if cm.UID != "" {
-		res, err = client.CoreV1().ConfigMaps("kube-system").Update(context.TODO(), cm, metav1.UpdateOptions{})
+		res, err = client.CoreV1().ConfigMaps("kube-system").Update(context.TODO(), cm, metaV1.UpdateOptions{})
 	} else {
-		res, err = client.CoreV1().ConfigMaps("kube-system").Create(context.TODO(), cm, metav1.CreateOptions{})
+		res, err = client.CoreV1().ConfigMaps("kube-system").Create(context.TODO(), cm, metaV1.CreateOptions{})
 	}
 
 	return

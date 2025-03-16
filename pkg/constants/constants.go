@@ -25,7 +25,7 @@ const (
 	DefaultClusterName    = "kaweezle"
 	DefaultKustomization  = "/etc/iknite.d"
 	WSLHostName           = "kaweezle.local"
-	WSLIPAddress          = "192.168.99.2"
+	WslIPAddress          = "192.168.99.2"
 	KubernetesVersion     = "1.32.3"
 	NetworkInterface      = "eth0"
 	PodSubnet             = "10.244.0.0/16"

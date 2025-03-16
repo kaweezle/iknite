@@ -15,6 +15,7 @@ limitations under the License.
 */
 package cmd
 
+// cSpell: disable
 import (
 	"fmt"
 	"io"
@@ -23,11 +24,13 @@ import (
 
 	"github.com/kaweezle/iknite/pkg/cmd/options"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
 	"github.com/spf13/viper"
 )
+
+// cSpell: enable
 
 var (
 	cfgFile  string
@@ -44,7 +47,7 @@ func NewRootCmd() *cobra.Command {
 	var rootCmd = &cobra.Command{
 		Use:   "iknite",
 		Short: "Start kubernetes in Alpine",
-		Long: `Initializes Kuberentes in a WSL 2 Alpine distribution.
+		Long: `Initializes Kubernetes in a WSL 2 Alpine distribution.
 Makes the appropriate initialization of a WSL 2 Alpine distribution for running
 kubernetes.`,
 		Example: `> iknite start`,
@@ -67,13 +70,13 @@ kubernetes.`,
 	flags := rootCmd.PersistentFlags()
 
 	flags.StringVar(&cfgFile, options.Config, "", "config file (default is $HOME/.config/iknite/iknite.yaml or /etc/iknite.d/iknite.yaml)")
-	flags.StringVarP(&v, options.Verbosity, "v", logrus.WarnLevel.String(), "Log level (debug, info, warn, error, fatal, panic)")
+	flags.StringVarP(&v, options.Verbosity, "v", log.WarnLevel.String(), "Log level (debug, info, warn, error, fatal, panic)")
 	flags.BoolVar(&jsonLogs, options.Json, false, "Log messages in JSON")
 
 	rootCmd.AddCommand(NewConfigureCmd())
 	rootCmd.AddCommand(newCmdInit(os.Stdout, nil))
 	rootCmd.AddCommand(NewCmdKillall())
-	rootCmd.AddCommand(NewKubletCmd())
+	rootCmd.AddCommand(NewKubeletCmd())
 	rootCmd.AddCommand(NewMdnsCmd())
 	rootCmd.AddCommand(NewStartCmd())
 	rootCmd.AddCommand(NewStatusCmd())
@@ -105,14 +108,14 @@ func initConfig() {
 }
 
 func SetUpLogs(out io.Writer, level string, json bool) error {
-	logrus.SetOutput(out)
+	log.SetOutput(out)
 	if json {
-		logrus.SetFormatter(&logrus.JSONFormatter{})
+		log.SetFormatter(&log.JSONFormatter{})
 	}
-	lvl, err := logrus.ParseLevel(v)
+	lvl, err := log.ParseLevel(v)
 	if err != nil {
 		return errors.Wrap(err, "parsing log level")
 	}
-	logrus.SetLevel(lvl)
+	log.SetLevel(lvl)
 	return nil
 }

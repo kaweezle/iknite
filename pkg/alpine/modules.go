@@ -1,5 +1,7 @@
 package alpine
 
+// cSpell: words netfilter conntrack
+// cSpell: disable
 import (
 	"os"
 
@@ -8,6 +10,8 @@ import (
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 )
+
+// cSpell: enable
 
 const (
 	netfilter_module = "br_netfilter"

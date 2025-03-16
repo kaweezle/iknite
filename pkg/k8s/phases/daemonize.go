@@ -1,5 +1,6 @@
 package phases
 
+// cSpell: disable
 import (
 	"context"
 	"fmt"
@@ -14,6 +15,8 @@ import (
 	log "github.com/sirupsen/logrus"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 )
+
+// cSpell: enable
 
 func NewDaemonizePhase() workflow.Phase {
 	return workflow.Phase{
@@ -41,7 +44,7 @@ func WaitForKubelet(cmd *exec.Cmd, conn *mdns.Conn, cancel context.CancelFunc) e
 		select {
 		case <-stop:
 			// Stop the cmd process
-			log.Info("Recevied TERM Signal. Stopping kubelet...")
+			log.Info("Received TERM Signal. Stopping kubelet...")
 			err = cmd.Process.Signal(syscall.SIGTERM)
 			if err == nil {
 				cmd.Wait()
