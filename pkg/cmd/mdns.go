@@ -30,21 +30,20 @@ import (
 	"golang.org/x/net/ipv4"
 )
 
-// configureCmd represents the start command
-var mdnsCmd = &cobra.Command{
-	Use:   "mdns",
-	Short: "Publish cluster hostname through mdns",
-	Long: `On WSL, publishing the localhost over mdns allows avoiding messing
+func NewMdnsCmd() *cobra.Command {
+
+	// configureCmd represents the start command
+	var mdnsCmd = &cobra.Command{
+		Use:   "mdns",
+		Short: "Publish cluster hostname through mdns",
+		Long: `On WSL, publishing the localhost over mdns allows avoiding messing
 with the DNS on the Windows side.
 
 It assumes that mDNS is not use elsewhere inside WSL.
 `,
-	PersistentPreRun: mdnsPersistentPreRun,
-	Run:              performMdns,
-}
-
-func init() {
-	rootCmd.AddCommand(mdnsCmd)
+		PersistentPreRun: mdnsPersistentPreRun,
+		Run:              performMdns,
+	}
 
 	hostname, err := os.Hostname()
 	cobra.CheckErr(err)
@@ -52,6 +51,8 @@ func init() {
 		hostname = constants.WSLHostName
 	}
 	mdnsCmd.Flags().String(options.DomainName, hostname, "Domain name of the cluster")
+
+	return mdnsCmd
 }
 
 func mdnsPersistentPreRun(cmd *cobra.Command, args []string) {

@@ -28,12 +28,12 @@ var (
 	pathsToUnmountAndRemove = []string{"/run/containerd", "/run/netns", "/run/ipcns", "/run/utsns"}
 )
 
-const ()
+func NewCmdKillall() *cobra.Command {
 
-var killallCmd = &cobra.Command{
-	Use:   "killall",
-	Short: "Kill the cluster and clean up the environment",
-	Long: `Kill the cluster and clean up the environment.
+	var killallCmd = &cobra.Command{
+		Use:   "killall",
+		Short: "Kill the cluster and clean up the environment",
+		Long: `Kill the cluster and clean up the environment.
 
 This command stops all the services and removes the configuration files. It also
 removes the network interfaces and the IP address assigned to the cluster.
@@ -41,7 +41,13 @@ removes the network interfaces and the IP address assigned to the cluster.
 This command must be run as root.
 
 `,
-	Run: performKillall,
+		Run: performKillall,
+	}
+
+	initializeKillall(killallCmd.Flags())
+	configureClusterCommand(killallCmd.Flags(), ikniteConfig)
+
+	return killallCmd
 }
 
 func initializeKillall(flags *flag.FlagSet) {
@@ -52,13 +58,6 @@ func initializeKillall(flags *flag.FlagSet) {
 	flags.BoolVar(&resetIptables, options.ResetIPTables, resetIptables, "Reset iptables")
 	flags.BoolVar(&resetKubelet, options.ResetKubelet, resetKubelet, "Reset kubelet")
 	flags.BoolVar(&resetIpAddress, options.ResetIPAddress, resetIpAddress, "Reset IP address")
-}
-
-func init() {
-	rootCmd.AddCommand(killallCmd)
-
-	initializeKillall(killallCmd.Flags())
-	configureClusterCommand(killallCmd.Flags(), ikniteConfig)
 }
 
 func performKillall(cmd *cobra.Command, args []string) {

@@ -35,29 +35,24 @@ var (
 	jsonLogs bool
 )
 
-// rootCmd represents the base command when called without any subcommands
-var rootCmd = &cobra.Command{
-	Use:   "iknite",
-	Short: "Start kubernetes in Alpine",
-	Long: `Initializes Kuberentes in a WSL 2 Alpine distribution.
-Makes the appropriate initialization of a WSL 2 Alpine distribution for running
-kubernetes.`,
-	Example: `> iknite start`,
-	Version: "v0.4.2", // <---VERSION--->
-	// Uncomment the following line if your bare application
-	// has an action associated with it:
-	// Run: func(cmd *cobra.Command, args []string) { },
-}
-
-// Execute adds all child commands to the root command and sets flags appropriately.
-// This is called by main.main(). It only needs to happen once to the rootCmd.
-func Execute() {
-	cobra.CheckErr(rootCmd.Execute())
-}
-
-func init() {
+// NewRootCmd creates a new root command
+func NewRootCmd() *cobra.Command {
 	cobra.OnInitialize(initConfig)
 	cobra.EnableTraverseRunHooks = true
+
+	// rootCmd represents the base command when called without any subcommands
+	var rootCmd = &cobra.Command{
+		Use:   "iknite",
+		Short: "Start kubernetes in Alpine",
+		Long: `Initializes Kuberentes in a WSL 2 Alpine distribution.
+Makes the appropriate initialization of a WSL 2 Alpine distribution for running
+kubernetes.`,
+		Example: `> iknite start`,
+		Version: "v0.4.2", // <---VERSION--->
+		// Uncomment the following line if your bare application
+		// has an action associated with it:
+		// Run: func(cmd *cobra.Command, args []string) { },
+	}
 
 	// Here you will define your flags and configuration settings.
 	// Cobra supports persistent flags, which, if defined here,
@@ -74,6 +69,16 @@ func init() {
 	flags.StringVar(&cfgFile, options.Config, "", "config file (default is $HOME/.config/iknite/iknite.yaml or /etc/iknite.d/iknite.yaml)")
 	flags.StringVarP(&v, options.Verbosity, "v", logrus.WarnLevel.String(), "Log level (debug, info, warn, error, fatal, panic)")
 	flags.BoolVar(&jsonLogs, options.Json, false, "Log messages in JSON")
+
+	rootCmd.AddCommand(NewConfigureCmd())
+	rootCmd.AddCommand(newCmdInit(os.Stdout, nil))
+	rootCmd.AddCommand(NewCmdKillall())
+	rootCmd.AddCommand(NewKubletCmd())
+	rootCmd.AddCommand(NewMdnsCmd())
+	rootCmd.AddCommand(NewStartCmd())
+	rootCmd.AddCommand(NewStatusCmd())
+
+	return rootCmd
 }
 
 // initConfig reads in config file and ENV variables if set.

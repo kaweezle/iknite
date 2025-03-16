@@ -35,11 +35,13 @@ var (
 	clusterCheckOkResponses      = 1
 )
 
-// configureCmd represents the start command
-var configureCmd = &cobra.Command{
-	Use:   "configure",
-	Short: "Configure the cluster",
-	Long: `Apply the configuration to the cluster using kustomize.
+func NewConfigureCmd() *cobra.Command {
+
+	// configureCmd represents the start command
+	var configureCmd = &cobra.Command{
+		Use:   "configure",
+		Short: "Configure the cluster",
+		Long: `Apply the configuration to the cluster using kustomize.
 
 Checks if a /etc/iknite.d/kustomization.yaml file exists. In this case, it
 applies the configuration in this directory. If there is no kustomization, it
@@ -51,12 +53,19 @@ applies the Embedded configuration that installs the following components:
 - metrics-server to make resources work on payloads.
 
 `,
-	Run: performConfigure,
-	PreRun: func(cmd *cobra.Command, args []string) {
-		flags := cmd.Flags()
-		viper.BindPFlag(config.Kustomization, flags.Lookup(options.Kustomization))
-		viper.BindPFlag(config.ForceConfig, flags.Lookup(options.ForceConfig))
-	},
+		Run: performConfigure,
+		PreRun: func(cmd *cobra.Command, args []string) {
+			flags := cmd.Flags()
+			viper.BindPFlag(config.Kustomization, flags.Lookup(options.Kustomization))
+			viper.BindPFlag(config.ForceConfig, flags.Lookup(options.ForceConfig))
+		},
+	}
+
+	initializeKustomization(configureCmd.Flags())
+	configureCmd.Flags().StringVarP(&kustomization, options.Kustomization, "d", constants.DefaultKustomization,
+		"The directory to look for kustomization. Can be an URL")
+
+	return configureCmd
 }
 
 func initializeKustomization(flagSet *flag.FlagSet) {
@@ -65,14 +74,6 @@ func initializeKustomization(flagSet *flag.FlagSet) {
 	flagSet.IntVar(&clusterCheckWaitMilliseconds, options.ClusterCheckWait, clusterCheckWaitMilliseconds, "Milliseconds to wait between each cluster check")
 	flagSet.IntVar(&clusterCheckRetries, options.ClusterCheckRetries, clusterCheckRetries, "Number of tries to access the cluster")
 	flagSet.IntVar(&clusterCheckOkResponses, options.ClusterCheckOkResponses, clusterCheckOkResponses, "Number of Ok response to receive before proceeding")
-}
-
-func init() {
-	rootCmd.AddCommand(configureCmd)
-
-	initializeKustomization(configureCmd.Flags())
-	configureCmd.Flags().StringVarP(&kustomization, options.Kustomization, "d", constants.DefaultKustomization,
-		"The directory to look for kustomization. Can be an URL")
 }
 
 func performConfigure(cmd *cobra.Command, args []string) {

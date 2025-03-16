@@ -31,32 +31,33 @@ import (
 	"k8s.io/apimachinery/pkg/util/runtime"
 )
 
-// configureCmd represents the start command
-var statusCmd = &cobra.Command{
-	Use:   "status",
-	Short: "Gives status information on the cluster",
-	Long: `Gives status information of the deployed workloads:
+var (
+	waitReadiness = false
+	timeout       = 0
+	callbackCount = 0
+)
+
+func NewStatusCmd() *cobra.Command {
+
+	// configureCmd represents the start command
+	var statusCmd = &cobra.Command{
+		Use:   "status",
+		Short: "Gives status information on the cluster",
+		Long: `Gives status information of the deployed workloads:
 
 - Deployments
 - Daemonsets
 - Statefulsets
 `,
-	Run: performStatus,
-}
+		Run: performStatus,
+	}
 
-var (
-	waitReadiness = false
-	timeout       = 0
-)
-
-func init() {
-	rootCmd.AddCommand(statusCmd)
 	flags := statusCmd.Flags()
 	flags.BoolVarP(&waitReadiness, options.Wait, "w", waitReadiness, "Wait for all pods to settle")
 	flags.IntVarP(&timeout, options.Timeout, "t", timeout, "Wait timeout in seconds")
-}
 
-var callbackCount = 0
+	return statusCmd
+}
 
 func callback(ok bool, count int, ready []*v1alpha1.WorkloadState, unready []*v1alpha1.WorkloadState) {
 	if callbackCount == 0 {

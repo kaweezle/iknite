@@ -118,10 +118,6 @@ type initData struct {
 	ctxCancel                   context.CancelFunc
 }
 
-func init() {
-	rootCmd.AddCommand(newCmdInit(os.Stdout, nil))
-}
-
 // newCmdInit returns "kubeadm init" command.
 // NB. initOptions is exposed as parameter for allowing unit testing of
 // the newInitOptions method, that implements all the command options validation logic

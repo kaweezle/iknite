@@ -40,11 +40,15 @@ import (
 
 // cSpell: enable
 
-// startCmd represents the start command
-var startCmd = &cobra.Command{
-	Use:   "start",
-	Short: "Creates or starts the cluster",
-	Long: `Starts the cluster. Performs the following operations:
+var ikniteConfig *v1alpha1.IkniteClusterSpec = &v1alpha1.IkniteClusterSpec{}
+
+func NewStartCmd() *cobra.Command {
+
+	// startCmd represents the start command
+	var startCmd = &cobra.Command{
+		Use:   "start",
+		Short: "Creates or starts the cluster",
+		Long: `Starts the cluster. Performs the following operations:
 
 - Starts OpenRC,
 - Starts containerd,
@@ -53,19 +57,16 @@ var startCmd = &cobra.Command{
 - Allows the use of kubectl from the root account,
 - Installs flannel, metal-lb and local-path-provisioner.
 `,
-	PersistentPreRun: startPersistentPreRun,
-	Run:              perform,
-}
-
-var ikniteConfig *v1alpha1.IkniteClusterSpec = &v1alpha1.IkniteClusterSpec{}
-
-func init() {
-	rootCmd.AddCommand(startCmd)
+		PersistentPreRun: startPersistentPreRun,
+		Run:              perform,
+	}
 	flags := startCmd.Flags()
 
 	flags.IntVarP(&timeout, options.Timeout, "t", timeout, "Wait timeout in seconds")
 	configureClusterCommand(flags, ikniteConfig)
 	initializeKustomization(flags)
+
+	return startCmd
 }
 
 func configureClusterCommand(flagSet *flag.FlagSet, ikniteConfig *v1alpha1.IkniteClusterSpec) {
