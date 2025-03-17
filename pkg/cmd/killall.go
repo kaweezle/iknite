@@ -3,9 +3,7 @@ package cmd
 // cSpell:words txeh
 // cSpell: disable
 import (
-	"fmt"
 	"os"
-	"strings"
 
 	s "github.com/bitfield/script"
 	"github.com/kaweezle/iknite/pkg/alpine"
@@ -13,10 +11,10 @@ import (
 	"github.com/kaweezle/iknite/pkg/cmd/options"
 	"github.com/kaweezle/iknite/pkg/config"
 	"github.com/kaweezle/iknite/pkg/constants"
+	"github.com/kaweezle/iknite/pkg/k8s"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	flag "github.com/spf13/pflag"
-	"github.com/txn2/txeh"
 )
 
 // cSpell: enable
@@ -29,10 +27,6 @@ var (
 	resetIptables  = true
 	resetKubelet   = false
 	resetIpAddress = false
-
-	pathsToUnmount = []string{"/var/lib/kubelet/pods", "/var/lib/kubelet/plugins", "/var/lib/kubelet"}
-	// cSpell: disable-next-line
-	pathsToUnmountAndRemove = []string{"/run/containerd", "/run/netns", "/run/ipcns", "/run/utsns"}
 )
 
 func NewCmdKillall(ikniteConfig *v1alpha1.IkniteClusterSpec) *cobra.Command {
@@ -83,8 +77,7 @@ func performKillall(ikniteConfig *v1alpha1.IkniteClusterSpec) {
 		cobra.CheckErr(alpine.StopService(constants.IkniteService))
 
 		if stopContainers {
-			log.Info("Stopping all containers...")
-			if _, err := s.Exec("/bin/zsh -c 'export CONTAINER_RUNTIME_ENDPOINT=unix:///run/containerd/containerd.sock;crictl rmp -f $(crictl pods -q)'").String(); err != nil {
+			if err := k8s.StopAllContainers(); err != nil {
 				log.WithError(err).Warn("Error stopping all containers")
 			}
 		}
@@ -94,111 +87,23 @@ func performKillall(ikniteConfig *v1alpha1.IkniteClusterSpec) {
 	}
 
 	if unmountPaths {
-		for _, path := range pathsToUnmount {
-			cobra.CheckErr(doUnmount(path))
-		}
-
-		for _, path := range pathsToUnmountAndRemove {
-			cobra.CheckErr(doUnmountAndRemove(path))
-		}
+		cobra.CheckErr(k8s.UnmountPaths(true))
 	}
 
 	if stopServices {
-		log.Info("Removing kubelet files in /var/lib/kubelet...")
-		_, err := s.Exec("sh -c 'rm -rf /var/lib/kubelet/{cpu_manager_state,memory_manager_state} /var/lib/kubelet/pods/*'").String()
-		cobra.CheckErr(err)
+		cobra.CheckErr(k8s.RemoveKubeletFiles())
 	}
 
 	if resetCni {
-		cobra.CheckErr(deleteCniNamespaces())
-		cobra.CheckErr(deleteNetworkInterfaces())
+		cobra.CheckErr(k8s.DeleteCniNamespaces())
+		cobra.CheckErr(k8s.DeleteNetworkInterfaces())
 	}
 
 	if resetIptables {
-		log.Info("Cleaning up iptables rules...")
-		_, err := s.Exec("iptables-save").Reject("KUBE-").Reject("CNI-").Reject("FLANNEL").Exec("iptables-restore").String()
-		cobra.CheckErr(err)
-		log.Info("Cleaning up ip6tables rules...")
-		_, err = s.Exec("ip6tables-save").Reject("KUBE-").Reject("CNI-").Reject("FLANNEL").Exec("ip6tables-restore").String()
-		cobra.CheckErr(err)
+		cobra.CheckErr(k8s.ResetIPTables())
 	}
 
-	if resetIpAddress && ikniteConfig.CreateIp {
-		log.Info("Resetting IP address...")
-		hosts, err := txeh.NewHosts(&txeh.HostsConfig{})
-		cobra.CheckErr(err)
-		ip, err := alpine.IpMappingForHost(hosts, ikniteConfig.DomainName)
-		cobra.CheckErr(err)
-		ones, _ := ip.DefaultMask().Size()
-		ipWithMask := fmt.Sprintf("%v/%d", ip, ones)
-
-		p := s.Exec("ip -br -4 a sh").Match(ipWithMask).Column(1).FilterLine(func(s string) string {
-			log.WithField("interface", s).WithField("ip", ipWithMask).Debug("Deleting IP address...")
-			return s
-		}).ExecForEach(fmt.Sprintf("ip addr del %s dev {{.}}", ipWithMask))
-		p.Wait()
-		cobra.CheckErr(p.Error())
-		hosts.RemoveHost(ikniteConfig.DomainName)
-		cobra.CheckErr(hosts.Save())
+	if resetIpAddress {
+		cobra.CheckErr(k8s.ResetIPAddress(ikniteConfig))
 	}
-}
-
-func processMounts(path string, command string, message string) error {
-	fields := log.Fields{
-		"path":    path,
-		"command": command,
-	}
-	log.WithFields(fields).Info(message)
-
-	p := s.File("/proc/self/mounts").Column(2).Match(path).FilterLine(func(s string) string {
-		log.WithField("mount", s).Debug(message)
-		return s
-	}).ExecForEach(command)
-	p.Wait()
-	return p.Error()
-}
-
-func doUnmountAndRemove(path string) error {
-	return processMounts(path, "sh -c 'umount \"{{.}}\" && rm -rf \"{{.}}\"'", "Unmounting and removing")
-}
-
-func doUnmount(path string) error {
-	return processMounts(path, "umount {{.}}", "Unmounting")
-}
-
-func deleteCniNamespaces() error {
-	log.Info("Deleting CNI namespaces...")
-	p := s.Exec("ip netns show").Column(1).FilterLine(func(s string) string {
-		log.WithField("namespace", s).Debug("Deleting namespace...")
-		return s
-	}).ExecForEach("ip netns delete {{.}}")
-	p.Wait()
-	return p.Error()
-}
-
-func deleteNetworkInterfaces() error {
-	log.Info("Deleting pods network interfaces...")
-	p := s.Exec("ip link show").Match("master cni0").Column(2).FilterLine(func(s string) string {
-		result := strings.Split(s, "@")[0]
-		log.WithField("interface", result).Debug("Deleting interface...")
-		return result
-	}).ExecForEach("ip link delete {{.}}")
-	p.Wait()
-	err := p.Error()
-	if err != nil {
-		log.WithError(err).Error("Error deleting pods network interfaces")
-		return err
-	} else {
-		log.Infof("Deleted pods network interfaces")
-	}
-
-	log.Info("Deleting cni0 network interface...")
-	if _, err = s.Exec("ip link show").Match("cni0").ExecForEach("ip link delete cni0").Stdout(); err != nil {
-		log.WithError(err).Error("Error deleting cni0 network interface")
-		return err
-	}
-
-	log.Info("Deleting flannel.1 network interface...")
-	_, err = s.Exec("ip link show").Match("flannel.1").ExecForEach("ip link delete flannel.1").Stdout()
-	return err
 }
