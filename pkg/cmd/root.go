@@ -81,7 +81,8 @@ kubernetes.`,
 	rootCmd.AddCommand(NewCmdKillall(ikniteConfig))
 	rootCmd.AddCommand(NewKubeletCmd(ikniteConfig))
 	rootCmd.AddCommand(NewMdnsCmd())
-	rootCmd.AddCommand(NewStartCmd())
+	rootCmd.AddCommand(NewPrepareCommand(ikniteConfig))
+	rootCmd.AddCommand(NewStartCmd(ikniteConfig))
 	rootCmd.AddCommand(NewStatusCmd())
 
 	return rootCmd
