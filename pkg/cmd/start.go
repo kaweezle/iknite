@@ -123,9 +123,6 @@ func perform(cmd *cobra.Command, args []string) {
 	}
 
 	// Start OpenRC
-	log.Info("Enabling Iknite Service...")
-	cobra.CheckErr(alpine.EnableService(constants.IkniteService))
-	log.Info("Ensuring OpenRC...")
 	cobra.CheckErr(alpine.StartOpenRC())
 
 	ctx := context.Background()

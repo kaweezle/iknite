@@ -15,7 +15,7 @@ limitations under the License.
 */
 package alpine
 
-// cSpell: words runlevel runlevels
+// cSpell: words runlevel runlevels softlevel
 // cSpell: disable
 import (
 	"os"
@@ -33,6 +33,7 @@ const (
 	openRCDirectory       = "/run/openrc"
 	servicesDir           = "/etc/init.d"
 	runLevelDir           = "/etc/runlevels/default"
+	softLevelPath         = "/run/openrc/softlevel"
 )
 
 var startedServicesDir = path.Join(openRCDirectory, "started")
@@ -41,13 +42,15 @@ var startedServicesDir = path.Join(openRCDirectory, "started")
 // If one of the services is already started, it is not restarted. It one is
 // not started, it is started.
 func StartOpenRC() (err error) {
-	log.Info("Starting openrc...")
-	if out, err := utils.Exec.Run(true, "/sbin/openrc", "-n", "default"); err == nil {
-		log.Trace(string(out))
-		return nil
-	} else {
-		return errors.Wrap(err, "Error while starting openrc")
-	}
+	return utils.ExecuteIfNotExist(softLevelPath, func() error {
+		log.Info("Starting openrc...")
+		if out, err := utils.Exec.Run(true, "/sbin/openrc", "-n", "default"); err == nil {
+			log.Trace(string(out))
+			return nil
+		} else {
+			return errors.Wrap(err, "Error while starting openrc")
+		}
+	})
 }
 
 func IsServiceStarted(serviceName string) (bool, error) {

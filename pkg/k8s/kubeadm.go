@@ -28,6 +28,7 @@ import (
 
 	"github.com/bitfield/script"
 	"github.com/kaweezle/iknite/pkg/alpine"
+	"github.com/kaweezle/iknite/pkg/constants"
 	"github.com/kaweezle/iknite/pkg/utils"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
@@ -194,8 +195,14 @@ func PrepareKubernetesEnvironment(ikniteConfig *v1alpha1.IkniteClusterSpec) erro
 		}
 	}
 
+	log.Info("Preventing Kubelet from being started by OpenRC...")
 	if err := PreventKubeletServiceFromStarting(rcConfFile); err != nil {
 		return errors.Wrap(err, "While preventing kubelet service from starting")
+	}
+
+	log.Info("Ensuring Iknite is launched by OpenRC...")
+	if err := alpine.EnableService(constants.IkniteService); err != nil {
+		return errors.Wrap(err, "While enabling iknite service")
 	}
 	return nil
 }
