@@ -1,12 +1,13 @@
 package cmd
 
 import (
+	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
 	"github.com/kaweezle/iknite/pkg/config"
 	"github.com/kaweezle/iknite/pkg/k8s"
 	"github.com/spf13/cobra"
 )
 
-func NewKubeletCmd() *cobra.Command {
+func NewKubeletCmd(ikniteConfig *v1alpha1.IkniteClusterSpec) *cobra.Command {
 
 	var kubeletCmd = &cobra.Command{
 		Use:   "kubelet",
@@ -17,7 +18,7 @@ The kubelet is started and monitored. The following operations are performed:
 - Starts the kubelet,
 - Monitors the kubelet,
 `,
-		Run:              performKubelet,
+		Run:              func(cmd *cobra.Command, args []string) { performKubelet(ikniteConfig) },
 		PersistentPreRun: config.StartPersistentPreRun,
 	}
 
@@ -27,7 +28,7 @@ The kubelet is started and monitored. The following operations are performed:
 	return kubeletCmd
 }
 
-func performKubelet(cmd *cobra.Command, args []string) {
+func performKubelet(ikniteConfig *v1alpha1.IkniteClusterSpec) {
 	cobra.CheckErr(k8s.PrepareKubernetesEnvironment(ikniteConfig))
 	cobra.CheckErr(k8s.StartAndConfigureKubelet(ikniteConfig))
 }

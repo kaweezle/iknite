@@ -36,9 +36,7 @@ import (
 
 // cSpell: enable
 
-var ikniteConfig *v1alpha1.IkniteClusterSpec = &v1alpha1.IkniteClusterSpec{}
-
-func NewStartCmd() *cobra.Command {
+func NewStartCmd(ikniteConfig *v1alpha1.IkniteClusterSpec) *cobra.Command {
 
 	// startCmd represents the start command
 	var startCmd = &cobra.Command{
@@ -54,7 +52,7 @@ func NewStartCmd() *cobra.Command {
 - Installs flannel, metal-lb and local-path-provisioner.
 `,
 		PersistentPreRun: config.StartPersistentPreRun,
-		Run:              perform,
+		Run:              func(cmd *cobra.Command, args []string) { performStart(ikniteConfig) },
 	}
 	flags := startCmd.Flags()
 
@@ -96,7 +94,7 @@ func IsIkniteReady(ctx context.Context) (bool, error) {
 	return false, nil
 }
 
-func perform(cmd *cobra.Command, args []string) {
+func performStart(ikniteConfig *v1alpha1.IkniteClusterSpec) {
 
 	cobra.CheckErr(config.DecodeIkniteConfig(ikniteConfig))
 	cobra.CheckErr(k8s.PrepareKubernetesEnvironment(ikniteConfig))

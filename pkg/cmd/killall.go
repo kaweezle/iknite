@@ -9,6 +9,7 @@ import (
 
 	s "github.com/bitfield/script"
 	"github.com/kaweezle/iknite/pkg/alpine"
+	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
 	"github.com/kaweezle/iknite/pkg/cmd/options"
 	"github.com/kaweezle/iknite/pkg/config"
 	"github.com/kaweezle/iknite/pkg/constants"
@@ -34,7 +35,7 @@ var (
 	pathsToUnmountAndRemove = []string{"/run/containerd", "/run/netns", "/run/ipcns", "/run/utsns"}
 )
 
-func NewCmdKillall() *cobra.Command {
+func NewCmdKillall(ikniteConfig *v1alpha1.IkniteClusterSpec) *cobra.Command {
 
 	var killallCmd = &cobra.Command{
 		Use:   "killall",
@@ -47,7 +48,9 @@ removes the network interfaces and the IP address assigned to the cluster.
 This command must be run as root.
 
 `,
-		Run: performKillall,
+		Run: func(cmd *cobra.Command, args []string) {
+			performKillall(ikniteConfig)
+		},
 	}
 
 	initializeKillall(killallCmd.Flags())
@@ -66,7 +69,7 @@ func initializeKillall(flags *flag.FlagSet) {
 	flags.BoolVar(&resetIpAddress, options.ResetIPAddress, resetIpAddress, "Reset IP address")
 }
 
-func performKillall(cmd *cobra.Command, args []string) {
+func performKillall(ikniteConfig *v1alpha1.IkniteClusterSpec) {
 
 	if resetKubelet {
 		log.Info("Resetting kubelet...")

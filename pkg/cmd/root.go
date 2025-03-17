@@ -22,6 +22,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
 	"github.com/kaweezle/iknite/pkg/cmd/options"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
@@ -73,10 +74,12 @@ kubernetes.`,
 	flags.StringVarP(&v, options.Verbosity, "v", log.WarnLevel.String(), "Log level (debug, info, warn, error, fatal, panic)")
 	flags.BoolVar(&jsonLogs, options.Json, false, "Log messages in JSON")
 
+	var ikniteConfig *v1alpha1.IkniteClusterSpec = &v1alpha1.IkniteClusterSpec{}
+
 	rootCmd.AddCommand(NewKustomizeCmd())
 	rootCmd.AddCommand(newCmdInit(os.Stdout, nil))
-	rootCmd.AddCommand(NewCmdKillall())
-	rootCmd.AddCommand(NewKubeletCmd())
+	rootCmd.AddCommand(NewCmdKillall(ikniteConfig))
+	rootCmd.AddCommand(NewKubeletCmd(ikniteConfig))
 	rootCmd.AddCommand(NewMdnsCmd())
 	rootCmd.AddCommand(NewStartCmd())
 	rootCmd.AddCommand(NewStatusCmd())
