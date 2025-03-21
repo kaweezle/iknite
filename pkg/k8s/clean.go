@@ -63,7 +63,7 @@ func RemoveKubeletFiles() error {
 
 func StopAllContainers() error {
 	log.Info("Stopping all containers...")
-	_, err := s.Exec("/bin/zsh -c 'export CONTAINER_RUNTIME_ENDPOINT=unix:///run/containerd/containerd.sock;crictl rmp -f $(crictl pods -q)'").String()
+	_, err := s.Exec("/bin/sh -c 'crictl rmp -f $(crictl pods -q)'").String()
 	return err
 }
 
