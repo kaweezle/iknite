@@ -78,6 +78,7 @@ kubernetes.`,
 
 	rootCmd.AddCommand(NewKustomizeCmd())
 	rootCmd.AddCommand(newCmdInit(os.Stdout, nil))
+	rootCmd.AddCommand(newCmdReset(os.Stdin, os.Stdout, nil))
 	rootCmd.AddCommand(NewCmdKillall(ikniteConfig))
 	rootCmd.AddCommand(NewKubeletCmd(ikniteConfig))
 	rootCmd.AddCommand(NewMdnsCmd())

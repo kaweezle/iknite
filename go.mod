@@ -20,13 +20,16 @@ require (
 	github.com/stretchr/testify v1.9.0
 	github.com/txn2/txeh v1.5.5
 	golang.org/x/net v0.26.0
+	golang.org/x/sys v0.21.0
 	k8s.io/api v0.30.3
 	k8s.io/apimachinery v0.30.3
 	k8s.io/cli-runtime v0.30.3
 	k8s.io/client-go v0.30.3
 	k8s.io/code-generator v0.30.3
+	k8s.io/klog/v2 v2.120.1
 	k8s.io/kubectl v0.30.3
 	k8s.io/kubernetes v1.30.3
+	k8s.io/utils v0.0.0-20230726121419-3b25d923346b
 	sigs.k8s.io/kustomize/api v0.17.2
 	sigs.k8s.io/kustomize/kyaml v0.17.1
 )
@@ -111,7 +114,6 @@ require (
 	golang.org/x/mod v0.17.0 // indirect
 	golang.org/x/oauth2 v0.18.0 // indirect
 	golang.org/x/sync v0.7.0 // indirect
-	golang.org/x/sys v0.21.0 // indirect
 	golang.org/x/term v0.21.0 // indirect
 	golang.org/x/text v0.16.0 // indirect
 	golang.org/x/time v0.5.0 // indirect
@@ -132,12 +134,10 @@ require (
 	k8s.io/component-base v0.30.3 // indirect
 	k8s.io/component-helpers v0.30.3 // indirect
 	k8s.io/gengo/v2 v2.0.0-20240228010128-51d4e06bde70 // indirect
-	k8s.io/klog/v2 v2.120.1 // indirect
 	k8s.io/kube-openapi v0.0.0-20240228011516-70dd3763d340 // indirect
 	k8s.io/kube-proxy v0.30.0 // indirect
 	k8s.io/kubelet v0.30.0 // indirect
 	k8s.io/system-validators v1.8.0 // indirect
-	k8s.io/utils v0.0.0-20230726121419-3b25d923346b // indirect
 	mvdan.cc/sh/v3 v3.7.0 // indirect
 	sigs.k8s.io/json v0.0.0-20221116044647-bc3834ca7abd // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.4.1 // indirect

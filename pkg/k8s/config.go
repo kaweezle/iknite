@@ -23,7 +23,6 @@ import (
 	"net"
 	"time"
 
-	"github.com/kaweezle/iknite/pkg/constants"
 	"github.com/kaweezle/iknite/pkg/provision"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
@@ -36,6 +35,7 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/clientcmd/api"
+	kubeadmConstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"sigs.k8s.io/kustomize/kyaml/resid"
 )
 
@@ -56,7 +56,7 @@ func LoadFromFile(filename string) (*Config, error) {
 // LoadFromDefault loads the configuration from the default admin.conf file,
 // usually located at /etc/kubernetes/admin.conf.
 func LoadFromDefault() (*Config, error) {
-	return LoadFromFile(constants.KubernetesAdminConfig)
+	return LoadFromFile(kubeadmConstants.GetAdminKubeConfigPath())
 }
 
 // RenameConfig changes the name of the cluster and the context from the

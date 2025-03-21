@@ -116,15 +116,9 @@ func CleanAll(ikniteConfig *v1alpha1.IkniteClusterSpec) {
 	}
 
 	log.Info("Cleaning up iptables rules...")
-	_, err = s.Exec("iptables-save").Reject("KUBE-").Reject("CNI-").Reject("FLANNEL").Exec("iptables-restore").String()
+	err = ResetIPTables()
 	if err != nil {
 		log.WithError(err).Warn("Error cleaning up iptables rules")
-	}
-
-	log.Info("Cleaning up ip6tables rules...")
-	_, err = s.Exec("ip6tables-save").Reject("KUBE-").Reject("CNI-").Reject("FLANNEL").Exec("ip6tables-restore").String()
-	if err != nil {
-		log.WithError(err).Warn("Error cleaning up ip6tables rules")
 	}
 
 	err = ResetIPAddress(ikniteConfig)

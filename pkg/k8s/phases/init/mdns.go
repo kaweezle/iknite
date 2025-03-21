@@ -1,4 +1,4 @@
-package phases
+package init
 
 import (
 	"fmt"

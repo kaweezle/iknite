@@ -58,7 +58,7 @@ import (
 	"github.com/kaweezle/iknite/pkg/config"
 	"github.com/kaweezle/iknite/pkg/constants"
 	"github.com/kaweezle/iknite/pkg/k8s"
-	iknitePhase "github.com/kaweezle/iknite/pkg/k8s/phases"
+	iknitePhase "github.com/kaweezle/iknite/pkg/k8s/phases/init"
 	metaV1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubeadmCmd "k8s.io/kubernetes/cmd/kubeadm/app/cmd"
 )

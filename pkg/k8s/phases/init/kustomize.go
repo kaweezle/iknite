@@ -1,4 +1,4 @@
-package phases
+package init
 
 // cSpell: disable
 import (
