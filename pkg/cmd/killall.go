@@ -15,11 +15,13 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	flag "github.com/spf13/pflag"
+	kubeadmOptions "k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 )
 
 // cSpell: enable
 
 var (
+	dryRun         = false
 	stopServices   = true
 	stopContainers = true
 	unmountPaths   = true
@@ -61,6 +63,7 @@ func initializeKillall(flags *flag.FlagSet) {
 	flags.BoolVar(&resetIptables, options.ResetIPTables, resetIptables, "Reset iptables")
 	flags.BoolVar(&resetKubelet, options.ResetKubelet, resetKubelet, "Reset kubelet")
 	flags.BoolVar(&resetIpAddress, options.ResetIPAddress, resetIpAddress, "Reset IP address")
+	flags.BoolVar(&dryRun, kubeadmOptions.DryRun, dryRun, "Dry run")
 }
 
 func performKillall(ikniteConfig *v1alpha1.IkniteClusterSpec) {
@@ -73,37 +76,41 @@ func performKillall(ikniteConfig *v1alpha1.IkniteClusterSpec) {
 	}
 
 	if stopServices {
-		log.Infof("Stopping %s...", constants.IkniteService)
-		cobra.CheckErr(alpine.StopService(constants.IkniteService))
+		log.WithField("DryRun", dryRun).Infof("Stopping %s...", constants.IkniteService)
+		if !dryRun {
+			cobra.CheckErr(alpine.StopService(constants.IkniteService))
+		}
 
 		if stopContainers {
-			if err := k8s.StopAllContainers(); err != nil {
+			if err := k8s.StopAllContainers(dryRun); err != nil {
 				log.WithError(err).Warn("Error stopping all containers")
 			}
 		}
 
-		log.Infof("Stopping %s...", constants.ContainerServiceName)
-		cobra.CheckErr(alpine.StopService(constants.ContainerServiceName))
+		log.WithField("DryRun", dryRun).Infof("Stopping %s...", constants.ContainerServiceName)
+		if !dryRun {
+			cobra.CheckErr(alpine.StopService(constants.ContainerServiceName))
+		}
 	}
 
 	if unmountPaths {
-		cobra.CheckErr(k8s.UnmountPaths(true))
+		cobra.CheckErr(k8s.UnmountPaths(true, dryRun))
 	}
 
 	if stopServices {
-		cobra.CheckErr(k8s.RemoveKubeletFiles())
+		cobra.CheckErr(k8s.RemoveKubeletFiles(dryRun))
 	}
 
 	if resetCni {
-		cobra.CheckErr(k8s.DeleteCniNamespaces())
-		cobra.CheckErr(k8s.DeleteNetworkInterfaces())
+		cobra.CheckErr(k8s.DeleteCniNamespaces(dryRun))
+		cobra.CheckErr(k8s.DeleteNetworkInterfaces(dryRun))
 	}
 
 	if resetIptables {
-		cobra.CheckErr(k8s.ResetIPTables())
+		cobra.CheckErr(k8s.ResetIPTables(dryRun))
 	}
 
 	if resetIpAddress {
-		cobra.CheckErr(k8s.ResetIPAddress(ikniteConfig))
+		cobra.CheckErr(k8s.ResetIPAddress(ikniteConfig, dryRun))
 	}
 }

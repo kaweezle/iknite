@@ -24,6 +24,7 @@
         "containerd",
         "coredns",
         "crictl",
+        "Debugf",
         "deepcopy",
         "DRYRUN",
         "fontawesome",

@@ -16,25 +16,29 @@ limitations under the License.
 
 package reset
 
-// cSpell:words klog cleanupnode
+// cSpell:words klog cleanupservice
 // cSpell:disable
 import (
-	"github.com/kaweezle/iknite/pkg/k8s"
+	"fmt"
+
 	"github.com/pkg/errors"
+
+	"k8s.io/klog/v2"
 
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
+	initSystem "k8s.io/kubernetes/cmd/kubeadm/app/util/initsystem"
 )
 
 // cSpell:enable
 
 // NewCleanupNodePhase creates a kubeadm workflow phase that cleanup the node
-func NewCleanupNodePhase() workflow.Phase {
+func NewCleanupServicePhase() workflow.Phase {
 	return workflow.Phase{
-		Name:    "cleanup-node",
-		Aliases: []string{"cleanupnode"},
-		Short:   "Run cleanup node.",
-		Run:     runCleanupNode,
+		Name:    "cleanup-service",
+		Aliases: []string{"cleanupservice"},
+		Short:   "Run cleanup service.",
+		Run:     runCleanupService,
 		InheritFlags: []string{
 			options.CertificatesDir,
 			options.NodeCRISocket,
@@ -44,13 +48,29 @@ func NewCleanupNodePhase() workflow.Phase {
 	}
 }
 
-func runCleanupNode(c workflow.RunData) error {
+func runCleanupService(c workflow.RunData) error {
 	r, ok := c.(IkniteResetData)
 	if !ok {
 		return errors.New("cleanup-node phase invoked with an invalid data struct")
 	}
 
-	k8s.CleanAll(&r.IkniteCluster().Spec, r.DryRun())
+	// Try to stop the kubelet service
+	klog.V(1).Infoln("[reset] Getting init system")
+	initSystem, err := initSystem.GetInitSystem()
+	if err != nil {
+		klog.Warningln("[reset] The iknite service could not be stopped by kubeadm. Unable to detect a supported init system!")
+		klog.Warningln("[reset] Please ensure iknite is stopped manually")
+	} else {
+		if !r.DryRun() {
+			fmt.Println("[reset] Stopping the iknite service")
+			if err := initSystem.ServiceStop("iknite"); err != nil {
+				klog.Warningf("[reset] The iknite service could not be stopped by kubeadm: [%v]\n", err)
+				klog.Warningln("[reset] Please ensure iknite is stopped manually")
+			}
+		} else {
+			fmt.Println("[reset] Would stop the iknite service")
+		}
+	}
 
 	return nil
 }

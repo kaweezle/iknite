@@ -1,10 +1,11 @@
 package k8s
 
-// cSpell:words txeh
+// cSpell:words txeh netnsid ifname
 // cSpell: disable
 import (
 	"fmt"
-	"strings"
+	"os"
+	"syscall"
 
 	s "github.com/bitfield/script"
 	"github.com/kaweezle/iknite/pkg/alpine"
@@ -15,12 +16,12 @@ import (
 
 // cSpell: enable
 
-func ResetIPAddress(ikniteConfig *v1alpha1.IkniteClusterSpec) error {
+func ResetIPAddress(ikniteConfig *v1alpha1.IkniteClusterSpec, isDryRun bool) error {
 	if !ikniteConfig.CreateIp {
 		return nil
 	}
 
-	log.Info("Resetting IP address...")
+	log.WithField("isDryRun", isDryRun).Info("Resetting IP address...")
 	hosts, err := txeh.NewHosts(&txeh.HostsConfig{})
 	if err != nil {
 		return err
@@ -32,45 +33,65 @@ func ResetIPAddress(ikniteConfig *v1alpha1.IkniteClusterSpec) error {
 	ones, _ := ip.DefaultMask().Size()
 	ipWithMask := fmt.Sprintf("%v/%d", ip, ones)
 
+	prefix := ""
+	if isDryRun {
+		prefix = "echo "
+	}
+
 	p := s.Exec("ip -br -4 a sh").Match(ipWithMask).Column(1).FilterLine(func(s string) string {
 		log.WithField("interface", s).WithField("ip", ipWithMask).Debug("Deleting IP address...")
 		return s
-	}).ExecForEach(fmt.Sprintf("ip addr del %s dev {{.}}", ipWithMask))
+	}).ExecForEach(fmt.Sprintf("%sip addr del %s dev {{.}}", prefix, ipWithMask))
 	p.Wait()
 	if p.Error() != nil {
 		return p.Error()
 	}
-	hosts.RemoveHost(ikniteConfig.DomainName)
-	return hosts.Save()
-}
-
-func ResetIPTables() error {
-	log.Info("Cleaning up iptables rules...")
-	_, err := s.Exec("iptables-save").Reject("KUBE-").Reject("CNI-").Reject("FLANNEL").Exec("iptables-restore").String()
-	if err != nil {
-		return err
+	if !isDryRun {
+		hosts.RemoveHost(ikniteConfig.DomainName)
+		return hosts.Save()
 	}
-	log.Info("Cleaning up ip6tables rules...")
-	_, err = s.Exec("ip6tables-save").Reject("KUBE-").Reject("CNI-").Reject("FLANNEL").Exec("ip6tables-restore").String()
+	return nil
+}
+
+func ResetIPTables(isDryRun bool) (err error) {
+	log.WithField("isDryRun", isDryRun).Info("Cleaning up iptables rules...")
+	if !isDryRun {
+		_, err = s.Exec("iptables-save").Reject("KUBE-").Reject("CNI-").Reject("FLANNEL").Exec("iptables-restore").String()
+		if err != nil {
+			return
+		}
+	}
+	log.WithField("isDryRun", isDryRun).Info("Cleaning up ip6tables rules...")
+	if !isDryRun {
+		_, err = s.Exec("ip6tables-save").Reject("KUBE-").Reject("CNI-").Reject("FLANNEL").Exec("ip6tables-restore").String()
+	}
 	return err
 }
 
-func RemoveKubeletFiles() error {
-	log.Info("Removing kubelet files in /var/lib/kubelet...")
-	_, err := s.Exec("sh -c 'rm -rf /var/lib/kubelet/{cpu_manager_state,memory_manager_state} /var/lib/kubelet/pods/*'").String()
+func RemoveKubeletFiles(isDryRun bool) (err error) {
+	if isDryRun {
+		log.Info("Would remove kubelet files in /var/lib/kubelet...")
+	} else {
+		log.Info("Removing kubelet files in /var/lib/kubelet...")
+		_, err = s.Exec("sh -c 'rm -rf /var/lib/kubelet/{cpu_manager_state,memory_manager_state} /var/lib/kubelet/pods/*'").String()
+	}
 	return err
 }
 
-func StopAllContainers() error {
-	log.Info("Stopping all containers...")
-	_, err := s.Exec("/bin/sh -c 'crictl rmp -f $(crictl pods -q)'").String()
-	return err
+func StopAllContainers(isDryRun bool) (err error) {
+	if isDryRun {
+		log.Info("Would stop all containers with command /bin/sh -c 'crictl rmp -f $(crictl pods -q)'...")
+	} else {
+		log.Info("Stopping all containers with command /bin/sh -c 'crictl rmp -f $(crictl pods -q)'...")
+		_, err = s.Exec("/bin/sh -c 'crictl rmp -f $(crictl pods -q)'").String()
+	}
+	return
 }
 
-func UnmountPaths(failOnError bool) error {
+func UnmountPaths(failOnError bool, isDryRun bool) error {
 	var err error
 	for _, path := range pathsToUnmount {
-		err = doUnmount(path)
+		err = processMounts(path, false, "Unmounting", isDryRun)
 		if err != nil {
 			log.WithError(err).Warn("Error unmounting path")
 			if failOnError {
@@ -80,7 +101,7 @@ func UnmountPaths(failOnError bool) error {
 	}
 
 	for _, path := range pathsToUnmountAndRemove {
-		err = doUnmountAndRemove(path)
+		err = processMounts(path, true, "Unmounting and removing", isDryRun)
 		if err != nil {
 			log.WithError(err).Warn("Error unmounting and removing path")
 			if failOnError {
@@ -91,98 +112,101 @@ func UnmountPaths(failOnError bool) error {
 	return nil
 }
 
-func CleanAll(ikniteConfig *v1alpha1.IkniteClusterSpec) {
+func CleanAll(ikniteConfig *v1alpha1.IkniteClusterSpec, isDryRun bool) {
 
 	var err error
-	if err = StopAllContainers(); err != nil {
+	if err = StopAllContainers(isDryRun); err != nil {
 		log.WithError(err).Warn("Error stopping all containers")
 	}
 
-	_ = UnmountPaths(false)
+	_ = UnmountPaths(false, isDryRun)
 
-	err = RemoveKubeletFiles()
+	err = RemoveKubeletFiles(isDryRun)
 	if err != nil {
 		log.WithError(err).Warn("Error removing kubelet files")
 	}
 
-	err = DeleteCniNamespaces()
+	err = DeleteCniNamespaces(isDryRun)
 	if err != nil {
 		log.WithError(err).Warn("Error deleting CNI namespaces")
 	}
 
-	err = DeleteNetworkInterfaces()
+	err = DeleteNetworkInterfaces(isDryRun)
 	if err != nil {
 		log.WithError(err).Warn("Error deleting network interfaces")
 	}
 
 	log.Info("Cleaning up iptables rules...")
-	err = ResetIPTables()
+	err = ResetIPTables(isDryRun)
 	if err != nil {
 		log.WithError(err).Warn("Error cleaning up iptables rules")
 	}
 
-	err = ResetIPAddress(ikniteConfig)
+	err = ResetIPAddress(ikniteConfig, isDryRun)
 	if err != nil {
 		log.WithError(err).Warn("Error resetting IP address")
 	}
 }
 
-func processMounts(path string, command string, message string) error {
+func processMounts(path string, remove bool, message string, isDryRun bool) error {
 	fields := log.Fields{
-		"path":    path,
-		"command": command,
+		"path":     path,
+		"remove":   remove,
+		"isDryRun": isDryRun,
 	}
 	log.WithFields(fields).Info(message)
+	logger := log.WithField("isDryRun", isDryRun)
 
 	p := s.File("/proc/self/mounts").Column(2).Match(path).FilterLine(func(s string) string {
-		log.WithField("mount", s).Debug(message)
+		logger.WithField("mount", s).Debug(message)
+		if !isDryRun {
+			syscall.Unmount(s, 0)
+			if remove {
+				os.RemoveAll(s)
+			}
+		}
+		return s
+	})
+	p.Wait()
+	return p.Error()
+}
+
+func DeleteCniNamespaces(isDryRun bool) error {
+	log.WithField("isDryRun", isDryRun).Info("Deleting CNI namespaces...")
+	command := "ip netns delete {{.}}"
+	if isDryRun {
+		command = "echo " + command
+	}
+	logger := log.WithField("isDryRun", isDryRun)
+	p := s.Exec("ip netns show").Column(1).FilterLine(func(s string) string {
+		logger.WithField("namespace", s).Debug("Deleting namespace...")
 		return s
 	}).ExecForEach(command)
 	p.Wait()
 	return p.Error()
 }
 
-func doUnmountAndRemove(path string) error {
-	return processMounts(path, "sh -c 'umount \"{{.}}\" && rm -rf \"{{.}}\"'", "Unmounting and removing")
-}
-
-func doUnmount(path string) error {
-	return processMounts(path, "umount {{.}}", "Unmounting")
-}
-
-func DeleteCniNamespaces() error {
-	log.Info("Deleting CNI namespaces...")
-	p := s.Exec("ip netns show").Column(1).FilterLine(func(s string) string {
-		log.WithField("namespace", s).Debug("Deleting namespace...")
-		return s
-	}).ExecForEach("ip netns delete {{.}}")
-	p.Wait()
-	return p.Error()
-}
-
-func DeleteNetworkInterfaces() error {
-	log.Info("Deleting pods network interfaces...")
-	p := s.Exec("ip link show").Match("master cni0").Column(2).FilterLine(func(s string) string {
-		result := strings.Split(s, "@")[0]
-		log.WithField("interface", result).Debug("Deleting interface...")
-		return result
-	}).ExecForEach("ip link delete {{.}}")
+func DeleteNetworkInterfaces(isDryRun bool) error {
+	prefix := ""
+	if isDryRun {
+		prefix = "echo "
+	}
+	logger := log.WithField("isDryRun", isDryRun)
+	logger.Info("Deleting pods network interfaces...")
+	p := s.Exec("ip -j link show").JQ(`sort_by(.ifname)| reverse | .[] | select(has("link_netnsid") or .ifname == "cni0" or .ifname == "flannel.1") | .ifname`).FilterLine(func(s string) string {
+		ifname := s[1 : len(s)-1]
+		command := fmt.Sprintf("%s ip link delete %s", prefix, ifname)
+		logger.WithField("interface", ifname).Debugf("Deleting interface with: %s...", command)
+		return command
+	}).ExecForEach("{{ . }}")
 	p.Wait()
 	err := p.Error()
 	if err != nil {
 		log.WithError(err).Error("Error deleting pods network interfaces")
 		return err
 	} else {
-		log.Infof("Deleted pods network interfaces")
+		logger.Infof("Deleted pods network interfaces")
 	}
 
-	log.Info("Deleting cni0 network interface...")
-	if _, err = s.Exec("ip link show").Match("cni0").ExecForEach("ip link delete cni0").Stdout(); err != nil {
-		log.WithError(err).Error("Error deleting cni0 network interface")
-		return err
-	}
-
-	log.Info("Deleting flannel.1 network interface...")
-	_, err = s.Exec("ip link show").Match("flannel.1").ExecForEach("ip link delete flannel.1").Stdout()
 	return err
 }
