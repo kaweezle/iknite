@@ -204,6 +204,11 @@ func PrepareKubernetesEnvironment(ikniteConfig *v1alpha1.IkniteClusterSpec) erro
 	if err := alpine.EnableService(constants.IkniteService); err != nil {
 		return errors.Wrap(err, "While enabling iknite service")
 	}
+
+	log.Infof("Ensuring %s existence...", constants.CrictlYaml)
+	utils.ExecuteIfNotExist(constants.CrictlYaml, func() error {
+		return utils.WriteFile(constants.CrictlYaml, []byte("runtime-endpoint: unix://"+constants.ContainerServiceSock+"\n"), os.FileMode(int(0644)))
+	})
 	return nil
 }
 

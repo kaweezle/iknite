@@ -30,4 +30,5 @@ const (
 	PodSubnet            = "10.244.0.0/16"
 	StatusDirectory      = "/run/iknite"
 	StatusFile           = "/run/iknite/status.json"
+	CrictlYaml           = "/etc/crictl.yaml"
 )

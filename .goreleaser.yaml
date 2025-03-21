@@ -80,8 +80,8 @@ nfpms:
       - nerdctl
     bindir: /sbin
     contents:
-      - src: apk/crictl.sh
-        dst: /etc/profile.d/crictl.sh
+      - src: apk/crictl.yaml
+        dst: /etc/crictl.yaml
       - src: apk/iknite.d/kustomization.yaml
         dst: /etc/iknite.d/kustomization.yaml
       - src: apk/iknite.d/base/kustomization.yaml
