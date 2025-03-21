@@ -221,6 +221,7 @@ func newCmdReset(in io.Reader, out io.Writer, resetOptions *resetOptions) *cobra
 	resetRunner.AppendPhase(phases.NewPreflightPhase())
 	resetRunner.AppendPhase(phases.NewRemoveETCDMemberPhase())
 	resetRunner.AppendPhase(iknitePhases.NewCleanupNodePhase())
+	resetRunner.AppendPhase(iknitePhases.NewCleanupConfigPhase())
 
 	// sets the data builder function, that will be used by the runner
 	// both when running the entire workflow or single phases

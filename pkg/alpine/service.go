@@ -44,7 +44,7 @@ var startedServicesDir = path.Join(openRCDirectory, "started")
 func StartOpenRC() (err error) {
 	return utils.ExecuteIfNotExist(softLevelPath, func() error {
 		log.Info("Starting openrc...")
-		if out, err := utils.Exec.Run(true, "/sbin/openrc", "-n", "default"); err == nil {
+		if out, err := utils.Exec.Run(true, "/sbin/openrc", "default"); err == nil {
 			log.Trace(string(out))
 			return nil
 		} else {

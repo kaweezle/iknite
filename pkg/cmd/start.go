@@ -26,7 +26,6 @@ import (
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
 	"github.com/kaweezle/iknite/pkg/cmd/options"
 	"github.com/kaweezle/iknite/pkg/config"
-	"github.com/kaweezle/iknite/pkg/constants"
 	"github.com/kaweezle/iknite/pkg/k8s"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
@@ -109,9 +108,9 @@ func performStart(ikniteConfig *v1alpha1.IkniteClusterSpec) {
 			// If the configuration has changed, we stop and disable the kubelet
 			// that may be started and clean the configuration, i.e. delete
 			// certificates and manifests.
-			log.Info("Kubernetes configuration has changed. Cleaning...")
-			cobra.CheckErr(alpine.StopService(constants.IkniteService))
-			cobra.CheckErr(k8s.CleanConfig())
+			log.Info("Kubernetes configuration has changed. Resetting...")
+			cmd := newCmdReset(os.Stdin, os.Stdout, nil)
+			cobra.CheckErr(cmd.RunE(cmd, []string{}))
 		}
 	} else {
 		if !os.IsNotExist(err) {
