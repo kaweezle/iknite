@@ -37,7 +37,11 @@ func ConfigureClusterCommand(flagSet *flag.FlagSet, ikniteConfig *v1alpha1.Iknit
 	flagSet.StringVar(&ikniteConfig.NetworkInterface, options.IpNetworkInterface, ikniteConfig.NetworkInterface, "Interface to which add IP")
 	flagSet.StringVar(&ikniteConfig.DomainName, options.DomainName, ikniteConfig.DomainName, "Domain name of the cluster")
 	flagSet.BoolVar(&ikniteConfig.EnableMDNS, options.EnableMDNS, ikniteConfig.EnableMDNS, "Enable mDNS publication of domain name")
-	flagSet.StringVar(&ikniteConfig.KubernetesVersion, koptions.KubernetesVersion, ikniteConfig.KubernetesVersion, "Kubernetes version to install")
+
+	// This flag may already be defined by kubeadm
+	if flagSet.Lookup(koptions.KubernetesVersion) == nil {
+		flagSet.StringVar(&ikniteConfig.KubernetesVersion, koptions.KubernetesVersion, ikniteConfig.KubernetesVersion, "Kubernetes version to install")
+	}
 	flagSet.StringVar(&ikniteConfig.ClusterName, options.ClusterName, ikniteConfig.ClusterName, "Cluster name")
 	flagSet.StringVar(&ikniteConfig.Kustomization, options.Kustomization, ikniteConfig.Kustomization, "Kustomization location (URL or directory)")
 }

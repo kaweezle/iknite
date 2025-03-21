@@ -51,6 +51,8 @@ import (
 	configUtil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	kubeConfigUtil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 
+	_ "unsafe"
+
 	ikniteApi "github.com/kaweezle/iknite/pkg/apis/iknite"
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
 	"github.com/kaweezle/iknite/pkg/config"
@@ -58,6 +60,7 @@ import (
 	"github.com/kaweezle/iknite/pkg/k8s"
 	iknitePhase "github.com/kaweezle/iknite/pkg/k8s/phases"
 	metaV1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	kubeadmCmd "k8s.io/kubernetes/cmd/kubeadm/app/cmd"
 )
 
 // cSpell: enable
@@ -122,6 +125,12 @@ type initData struct {
 	ctxCancel                   context.CancelFunc
 }
 
+// HACK: This is a hack to allow the use of the unexported initOptions struct in the kubeadm codebase.
+// This is needed because the kubeadm codebase uses the unexported initOptions struct in the AddInitOtherFlags function.
+//
+//go:linkname AddInitOtherFlags k8s.io/kubernetes/cmd/kubeadm/app/cmd.AddInitOtherFlags
+func AddInitOtherFlags(flagSet *flag.FlagSet, initOptions *initOptions)
+
 // newCmdInit returns "kubeadm init" command.
 // NB. initOptions is exposed as parameter for allowing unit testing of
 // the newInitOptions method, that implements all the command options validation logic
@@ -176,9 +185,16 @@ func newCmdInit(out io.Writer, initOptions *initOptions) *cobra.Command {
 
 	// add flags to the init command.
 	// init command local flags could be eventually inherited by the sub-commands automatically generated for phases
-	AddInitConfigFlags(cmd.Flags(), initOptions.externalInitCfg)
-	AddClusterConfigFlags(cmd.Flags(), initOptions.externalClusterCfg, &initOptions.featureGatesString)
+	kubeadmCmd.AddInitConfigFlags(cmd.Flags(), initOptions.externalInitCfg)
+	kubeadmCmd.AddClusterConfigFlags(cmd.Flags(), initOptions.externalClusterCfg, &initOptions.featureGatesString)
+
+	// Keep: this is an example of how to call a method casting the unexported struct value
+	// methodVal := reflect.ValueOf(kubeadmCmd.AddInitOtherFlags)
+	// unexportedCastedValue := reflect.NewAt(methodVal.Type().In(1).Elem(), unsafe.Pointer(initOptions))
+	// methodVal.Call([]reflect.Value{reflect.ValueOf(cmd.Flags()), unexportedCastedValue})
+
 	AddInitOtherFlags(cmd.Flags(), initOptions)
+
 	initOptions.bto.AddTokenFlag(cmd.Flags())
 	initOptions.bto.AddTTLFlag(cmd.Flags())
 	options.AddImageMetaFlags(cmd.Flags(), &initOptions.externalClusterCfg.ImageRepository)
@@ -239,87 +255,6 @@ func newCmdInit(out io.Writer, initOptions *initOptions) *cobra.Command {
 	initRunner.BindToCommand(cmd)
 
 	return cmd
-}
-
-// AddInitConfigFlags adds init flags bound to the config to the specified flagset
-func AddInitConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmApiV1.InitConfiguration) {
-	flagSet.StringVar(
-		&cfg.LocalAPIEndpoint.AdvertiseAddress, options.APIServerAdvertiseAddress, cfg.LocalAPIEndpoint.AdvertiseAddress,
-		"The IP address the API Server will advertise it's listening on. If not set the default network interface will be used.",
-	)
-	flagSet.Int32Var(
-		&cfg.LocalAPIEndpoint.BindPort, options.APIServerBindPort, cfg.LocalAPIEndpoint.BindPort,
-		"Port for the API Server to bind to.",
-	)
-	flagSet.StringVar(
-		&cfg.NodeRegistration.Name, options.NodeName, cfg.NodeRegistration.Name,
-		`Specify the node name.`,
-	)
-	flagSet.StringVar(
-		&cfg.CertificateKey, options.CertificateKey, "",
-		"Key used to encrypt the control-plane certificates in the kubeadm-certs Secret. The certificate key is a hex encoded string that is an AES key of size 32 bytes.",
-	)
-	cmdUtil.AddCRISocketFlag(flagSet, &cfg.NodeRegistration.CRISocket)
-}
-
-// AddClusterConfigFlags adds cluster flags bound to the config to the specified flagset
-func AddClusterConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmApiV1.ClusterConfiguration, featureGatesString *string) {
-	flagSet.StringVar(
-		&cfg.Networking.ServiceSubnet, options.NetworkingServiceSubnet, cfg.Networking.ServiceSubnet,
-		"Use alternative range of IP address for service VIPs.",
-	)
-	flagSet.StringVar(
-		&cfg.Networking.PodSubnet, options.NetworkingPodSubnet, cfg.Networking.PodSubnet,
-		"Specify range of IP addresses for the pod network. If set, the control plane will automatically allocate CIDRs for every node.",
-	)
-	flagSet.StringVar(
-		&cfg.Networking.DNSDomain, options.NetworkingDNSDomain, cfg.Networking.DNSDomain,
-		`Use alternative domain for services, e.g. "my-organization.internal".`,
-	)
-
-	flagSet.StringVar(
-		&cfg.ControlPlaneEndpoint, options.ControlPlaneEndpoint, cfg.ControlPlaneEndpoint,
-		`Specify a stable IP address or DNS name for the control plane.`,
-	)
-
-	// options.AddKubernetesVersionFlag(flagSet, &cfg.KubernetesVersion)
-
-	flagSet.StringVar(
-		&cfg.CertificatesDir, options.CertificatesDir, cfg.CertificatesDir,
-		`The path where to save and store the certificates.`,
-	)
-	flagSet.StringSliceVar(
-		&cfg.APIServer.CertSANs, options.APIServerCertSANs, cfg.APIServer.CertSANs,
-		`Optional extra Subject Alternative Names (SANs) to use for the API Server serving certificate. Can be both IP addresses and DNS names.`,
-	)
-	options.AddFeatureGatesStringFlag(flagSet, featureGatesString)
-}
-
-// AddInitOtherFlags adds init flags that are not bound to a configuration file to the given flagset
-// Note: All flags that are not bound to the cfg object should be allowed in cmd/kubeadm/app/apis/kubeadm/validation/validation.go
-func AddInitOtherFlags(flagSet *flag.FlagSet, initOptions *initOptions) {
-	options.AddConfigFlag(flagSet, &initOptions.cfgPath)
-	flagSet.StringSliceVar(
-		&initOptions.ignorePreflightErrors, options.IgnorePreflightErrors, initOptions.ignorePreflightErrors,
-		"A list of checks whose errors will be shown as warnings. Example: 'IsPrivilegedUser,Swap'. Value 'all' ignores errors from all checks.",
-	)
-	flagSet.BoolVar(
-		&initOptions.skipTokenPrint, options.SkipTokenPrint, initOptions.skipTokenPrint,
-		"Skip printing of the default bootstrap token generated by 'kubeadm init'.",
-	)
-	flagSet.BoolVar(
-		&initOptions.dryRun, options.DryRun, initOptions.dryRun,
-		"Don't apply any changes; just output what would be done.",
-	)
-	flagSet.BoolVar(
-		&initOptions.uploadCerts, options.UploadCerts, initOptions.uploadCerts,
-		"Upload control-plane certificates to the kubeadm-certs Secret.",
-	)
-	flagSet.BoolVar(
-		&initOptions.skipCertificateKeyPrint, options.SkipCertificateKeyPrint, initOptions.skipCertificateKeyPrint,
-		"Don't print the key used to encrypt the control-plane certificates.",
-	)
-	options.AddPatchesFlag(flagSet, &initOptions.patchesDir)
 }
 
 // newInitOptions returns a struct ready for being used for creating cmd init flags.
