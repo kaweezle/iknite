@@ -120,7 +120,7 @@ func performStart(ikniteConfig *v1alpha1.IkniteClusterSpec) {
 	}
 
 	// Start OpenRC
-	cobra.CheckErr(alpine.StartOpenRC())
+	cobra.CheckErr(alpine.EnsureOpenRC("default"))
 
 	ctx := context.Background()
 	if timeout > 0 {

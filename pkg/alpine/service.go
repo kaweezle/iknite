@@ -38,18 +38,23 @@ const (
 
 var startedServicesDir = path.Join(openRCDirectory, "started")
 
+func EnsureOpenRC(level string) error {
+	log.WithField("level", level).Info("Ensuring OpenRC...")
+	if out, err := utils.Exec.Run(true, "/sbin/openrc", "default"); err == nil {
+		log.Trace(string(out))
+		return nil
+	} else {
+		return errors.Wrap(err, "Error while starting openrc")
+	}
+}
+
 // StartOpenRC starts the openrc services in the default runlevel.
 // If one of the services is already started, it is not restarted. It one is
 // not started, it is started.
 func StartOpenRC() (err error) {
 	return utils.ExecuteIfNotExist(softLevelPath, func() error {
-		log.Info("Starting openrc...")
-		if out, err := utils.Exec.Run(true, "/sbin/openrc", "default"); err == nil {
-			log.Trace(string(out))
-			return nil
-		} else {
-			return errors.Wrap(err, "Error while starting openrc")
-		}
+		EnsureOpenRC("default")
+		return nil
 	})
 }
 

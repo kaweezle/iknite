@@ -31,31 +31,30 @@ var (
 	resetIpAddress = false
 )
 
-func NewCmdKillall(ikniteConfig *v1alpha1.IkniteClusterSpec) *cobra.Command {
+func NewCmdClean(ikniteConfig *v1alpha1.IkniteClusterSpec) *cobra.Command {
 
-	var killallCmd = &cobra.Command{
-		Use:   "killall",
-		Short: "Kill the cluster and clean up the environment",
+	var cleanCmd = &cobra.Command{
+		Use:   "clean",
+		Short: "Clean up the environment, stopping all services and removing configuration files (optional)",
 		Long: `Kill the cluster and clean up the environment.
 
 This command stops all the services and removes the configuration files. It also
 removes the network interfaces and the IP address assigned to the cluster.
 
 This command must be run as root.
-
 `,
 		Run: func(cmd *cobra.Command, args []string) {
-			performKillall(ikniteConfig)
+			performClean(ikniteConfig)
 		},
 	}
 
-	initializeKillall(killallCmd.Flags())
-	config.ConfigureClusterCommand(killallCmd.Flags(), ikniteConfig)
+	initializeClean(cleanCmd.Flags())
+	config.ConfigureClusterCommand(cleanCmd.Flags(), ikniteConfig)
 
-	return killallCmd
+	return cleanCmd
 }
 
-func initializeKillall(flags *flag.FlagSet) {
+func initializeClean(flags *flag.FlagSet) {
 	flags.BoolVar(&stopServices, options.StopServices, stopServices, "Stop the services")
 	flags.BoolVar(&stopContainers, options.StopContainers, stopContainers, "Stop containers")
 	flags.BoolVar(&unmountPaths, options.UnmountPaths, unmountPaths, "Unmount paths")
@@ -66,7 +65,7 @@ func initializeKillall(flags *flag.FlagSet) {
 	flags.BoolVar(&dryRun, kubeadmOptions.DryRun, dryRun, "Dry run")
 }
 
-func performKillall(ikniteConfig *v1alpha1.IkniteClusterSpec) {
+func performClean(ikniteConfig *v1alpha1.IkniteClusterSpec) {
 
 	if resetKubelet {
 		log.Info("Resetting kubelet...")
