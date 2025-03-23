@@ -42,6 +42,78 @@ var (
 
 // cSpell: enable
 
+func CheckPidFile(service string, cmd *exec.Cmd) (int, error) {
+	pidFilePath := fmt.Sprintf("/run/%s.pid", service)
+	logger := log.WithField("pidfile", pidFilePath)
+	pidBytes, err := os.ReadFile(pidFilePath)
+	if err != nil && errors.Is(err, os.ErrNotExist) {
+		pidFilePath = fmt.Sprintf("/var/run/supervise-%s.pid", service)
+		pidBytes, err = os.ReadFile(pidFilePath)
+	}
+	if err == nil {
+		pidStr := strings.TrimSpace(string(pidBytes))
+		pid, err := strconv.Atoi(pidStr)
+		if err != nil {
+			logger.WithField("content", pidStr).Warn("Failed to convert pid file to integer")
+		} else {
+			process, err := os.FindProcess(pid)
+			if err == nil && process.Signal(syscall.Signal(0)) == nil {
+				if cmd != nil {
+					cmd.Process = process
+				}
+				return pid, nil
+			} else {
+				logger.WithField("pid", pid).Warn("Pidfile contained an invalid pid")
+				// remove kubeletPidFile
+				err = os.Remove(pidFilePath)
+				if err != nil {
+					logger.WithError(err).Warn("Failed to remove pidfile")
+				}
+			}
+		}
+	} else {
+		// only return error is the error is not a file not found error
+		if !errors.Is(err, os.ErrNotExist) {
+			return 0, err
+		}
+	}
+	return 0, nil
+}
+
+// IsKubeletRunning checks if the kubelet process is running
+func IsKubeletRunning(cmd *exec.Cmd) (int, error) {
+	pidBytes, err := os.ReadFile(kubeletPidFile)
+	if err == nil {
+		pidStr := strings.TrimSpace(string(pidBytes))
+		pid, err := strconv.Atoi(pidStr)
+		if err != nil {
+			log.WithField("pidfile", kubeletPidFile).Warnf("Failed to convert kubelet PID to integer: %s", pidStr)
+		} else {
+			process, err := os.FindProcess(pid)
+			if err == nil && process.Signal(syscall.Signal(0)) == nil {
+				log.WithField("pid", pid).Warnf("Kubelet is already running with pid: %d. Swallowing...", pid)
+				if cmd != nil {
+					cmd.Process = process
+				}
+				return pid, nil
+			} else {
+				log.WithField("pid", pid).Warnf("Kubelet pidfile contained an invalid pid: %d", pid)
+				// remove kubeletPidFile
+				err = os.Remove(kubeletPidFile)
+				if err != nil {
+					log.WithError(err).Warnf("Failed to remove kubelet pidfile: %s", kubeletPidFile)
+				}
+			}
+		}
+	} else {
+		// only return error is the error is not a file not found error
+		if !errors.Is(err, os.ErrNotExist) {
+			return 0, err
+		}
+	}
+	return 0, nil
+}
+
 func StartKubelet() (*exec.Cmd, error) {
 	// Read the environment variables from /var/lib/kubelet/kubeadm-flags.env
 	log.WithField("kubeletEnvFile", kubeletEnvFile).Info("Reading kubelet environment file")
@@ -71,27 +143,11 @@ func StartKubelet() (*exec.Cmd, error) {
 	cmd.Env = append(cmd.Env, env...)
 
 	// Check if a process with the value contained in kubeletPidFile exists
-	pidBytes, err := os.ReadFile(kubeletPidFile)
-	if err == nil {
-		pidStr := strings.TrimSpace(string(pidBytes))
-		pid, err := strconv.Atoi(pidStr)
-		if err != nil {
-			log.WithField("pidfile", kubeletPidFile).Warnf("Failed to convert kubelet PID to integer: %s", pidStr)
-		} else {
-			process, err := os.FindProcess(pid)
-			if err == nil && process.Signal(syscall.Signal(0)) == nil {
-				log.WithField("pid", pid).Warnf("Kubelet is already running with pid: %d. Swallowing...", pid)
-				cmd.Process = process
-				return cmd, nil
-			} else {
-				log.WithField("pid", pid).Warnf("Kubelet pidfile contained an invalid pid: %d", pid)
-				// remove kubeletPidFile
-				err = os.Remove(kubeletPidFile)
-				if err != nil {
-					log.WithError(err).Warnf("Failed to remove kubelet pidfile: %s", kubeletPidFile)
-				}
-			}
-		}
+	// ignore the error if for some reason the pid file is not found
+	kubeletPid, _ := CheckPidFile("kubelet", cmd)
+	if kubeletPid > 0 {
+		log.WithField("pid", kubeletPid).Warnf("Kubelet is already running with pid: %d. Swallowing...", kubeletPid)
+		return cmd, nil
 	}
 
 	// Create the kubelet log directory if it doesn't exist

@@ -183,7 +183,7 @@ func (client *RESTClientGetter) AllWorkloadStates() (result []*v1alpha1.Workload
 	return
 }
 
-type WorkloadStateCallbackFunc func(state bool, total int, ready []*v1alpha1.WorkloadState, unready []*v1alpha1.WorkloadState)
+type WorkloadStateCallbackFunc func(state bool, total int, ready []*v1alpha1.WorkloadState, unready []*v1alpha1.WorkloadState) bool
 
 func AreWorkloadsReady(config *Config, callback WorkloadStateCallbackFunc) wait.ConditionWithContextFunc {
 	client := config.RESTClient()
@@ -209,7 +209,7 @@ func AreWorkloadsReady(config *Config, callback WorkloadStateCallbackFunc) wait.
 		}).Infof("Workloads total: %d, ready: %d, unready:%d", len(states), len(ready), len(unready))
 
 		if callback != nil {
-			callback(result, len(states), ready, unready)
+			result = callback(result, len(states), ready, unready)
 		}
 
 		return result, nil

@@ -21,6 +21,7 @@ import (
 	"os"
 	"path"
 
+	"github.com/kaweezle/iknite/pkg/constants"
 	"github.com/kaweezle/iknite/pkg/utils"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
@@ -33,7 +34,6 @@ const (
 	openRCDirectory       = "/run/openrc"
 	servicesDir           = "/etc/init.d"
 	runLevelDir           = "/etc/runlevels/default"
-	softLevelPath         = "/run/openrc/softlevel"
 )
 
 var startedServicesDir = path.Join(openRCDirectory, "started")
@@ -52,7 +52,7 @@ func EnsureOpenRC(level string) error {
 // If one of the services is already started, it is not restarted. It one is
 // not started, it is started.
 func StartOpenRC() (err error) {
-	return utils.ExecuteIfNotExist(softLevelPath, func() error {
+	return utils.ExecuteIfNotExist(constants.SoftLevelPath, func() error {
 		EnsureOpenRC("default")
 		return nil
 	})

@@ -31,4 +31,6 @@ const (
 	StatusDirectory      = "/run/iknite"
 	StatusFile           = "/run/iknite/status.json"
 	CrictlYaml           = "/etc/crictl.yaml"
+	RcConfFile           = "/etc/rc.conf"
+	SoftLevelPath        = "/run/openrc/softlevel" // cSpell: disable-line
 )

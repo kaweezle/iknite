@@ -15,6 +15,7 @@ limitations under the License.
 */
 package cmd
 
+// cSpell: words termenv runlevels runlevel apiserver controllermanager healthcheck
 // cSpell: disable
 import (
 	"context"
@@ -22,25 +23,54 @@ import (
 	"os"
 	"time"
 
+	"github.com/kaweezle/iknite/pkg/alpine"
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
 	"github.com/kaweezle/iknite/pkg/cmd/options"
+	"github.com/kaweezle/iknite/pkg/config"
 	"github.com/kaweezle/iknite/pkg/constants"
 	"github.com/kaweezle/iknite/pkg/k8s"
+	"github.com/kaweezle/iknite/pkg/utils"
+	"github.com/muesli/termenv"
 	"github.com/pkg/errors"
-	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"k8s.io/apimachinery/pkg/util/runtime"
 )
 
 // cSpell: enable
 
+var pkiFiles = []string{
+	"etcd/ca.key",
+	"etcd/healthcheck-client.key",
+	"etcd/peer.key",
+	"etcd/ca.crt",
+	"etcd/healthcheck-client.crt",
+	"etcd/peer.crt",
+	"etcd/server.key",
+	"etcd/server.crt",
+	"sa.pub",
+	"front-proxy-ca.key",
+	"ca.key",
+	"apiserver-kubelet-client.crt",
+	"apiserver.crt",
+	"apiserver-etcd-client.crt",
+	"sa.key",
+	"ca.crt",
+	"front-proxy-client.crt",
+	"front-proxy-client.key",
+	"apiserver.key",
+	"apiserver-etcd-client.key",
+	"apiserver-kubelet-client.key",
+	"front-proxy-ca.crt",
+}
+
 var (
 	waitReadiness = false
 	timeout       = 0
 	callbackCount = 0
+	checkTimeout  = 10 * time.Second
 )
 
-func NewStatusCmd() *cobra.Command {
+func NewStatusCmd(ikniteConfig *v1alpha1.IkniteClusterSpec) *cobra.Command {
 
 	// configureCmd represents the start command
 	var statusCmd = &cobra.Command{
@@ -52,18 +82,20 @@ func NewStatusCmd() *cobra.Command {
 - Daemonsets
 - Statefulsets
 `,
-		Run: performStatus,
+		PersistentPreRun: config.StartPersistentPreRun,
+		Run:              func(cmd *cobra.Command, args []string) { performStatus(ikniteConfig) },
 	}
 
 	flags := statusCmd.Flags()
+	config.ConfigureClusterCommand(flags, ikniteConfig)
 	flags.BoolVarP(&waitReadiness, options.Wait, "w", waitReadiness, "Wait for all pods to settle")
 	flags.IntVarP(&timeout, options.Timeout, "t", timeout, "Wait timeout in seconds")
 
 	return statusCmd
 }
 
-func callback(ok bool, count int, ready []*v1alpha1.WorkloadState, unready []*v1alpha1.WorkloadState) {
-	if callbackCount == 0 {
+func callback(ok bool, count int, ready []*v1alpha1.WorkloadState, unready []*v1alpha1.WorkloadState) bool {
+	if callbackCount == 0 && waitReadiness {
 		fmt.Printf("\n%d workloads, %d ready, %d unready\n", count, len(ready), len(unready))
 		for _, state := range ready {
 			fmt.Println(state.LongString())
@@ -84,21 +116,237 @@ func callback(ok bool, count int, ready []*v1alpha1.WorkloadState, unready []*v1
 	}
 
 	if !waitReadiness {
-		os.Exit(0)
+		return true
 	}
 	callbackCount++
+	if callbackCount > 5 {
+		return ok
+	}
+	return false
 }
 
-func performStatus(cmd *cobra.Command, args []string) {
+func performStatus(ikniteConfig *v1alpha1.IkniteClusterSpec) {
 
-	runtime.ErrorHandlers = runtime.ErrorHandlers[:0]
-	log.WithFields(log.Fields{
-		options.Config: constants.KubernetesRootConfig,
-	}).Info("Loading kube config...")
+	// Create all checks
+	checks := []*k8s.Check{
 
-	// We need to get it from root as we will apply configuration
-	config, err := k8s.LoadFromFile(constants.KubernetesRootConfig)
-	cobra.CheckErr(errors.Wrap(err, "While loading local cluster configuration"))
+		// Phase 1: Environment
+		k8s.NewPhase("environment", "Environment configuration", []*k8s.Check{
+			k8s.SystemFileCheck("ip_forward", "Check IP forwarding is enabled", "/proc/sys/net/ipv4/ip_forward", "1\n"),
+			k8s.SystemFileCheck("bridge_nf_call_iptables", "Check IP Tables is active for bridges", "/proc/sys/net/bridge/bridge-nf-call-iptables", "1\n"),
+			k8s.SystemFileCheck("machine_id", "Check machine id is defined", "/etc/machine-id", ""),
+			k8s.SystemFileCheck("crictl_yaml", "Check crictl configuration is defined", "/etc/crictl.yaml", ""),
+			//   - Check if the kubelet service is not runnable
+			{
+				Name:        "kubelet_service",
+				Description: "Check if the kubelet service is not runnable",
+				CheckFn: func(ctx context.Context) (bool, string, error) {
+					runnable, err := k8s.IsKubeletServiceRunnable(constants.RcConfFile)
+					if err != nil {
+						return false, "", err
+					}
+					if runnable {
+						return false, "Kubelet service is runnable", nil
+					}
+					return true, "/etc/rc.conf hack preventing kubelet from running in place", nil
+				},
+			},
+			//   - Check if the iknite service is set to run in default mode
+			k8s.SystemFileCheck("iknite_service", "Check if iknite is active on default runlevel", "/etc/runlevels/default/iknite", ""),
+			//   - Check if the IP address we are targeting is bound to an interface
+			{
+				Name:        "ip_bound",
+				Description: "Check if the IP address is bound to an interface",
+				CheckFn: func(ctx context.Context) (bool, string, error) {
+					if ikniteConfig.CreateIp {
+						result, err := alpine.CheckIpExists(ikniteConfig.Ip)
+						if err != nil {
+							return false, "", err
+						} else if result {
+							return true, fmt.Sprintf("IP address %s is created", ikniteConfig.Ip.String()), nil
+						} else {
+							return false, fmt.Sprintf("IP address %s is not created", ikniteConfig.Ip.String()), nil
+						}
+					} else {
+						return true, "Don't need to create IP", nil
+					}
+				},
+			},
+			//   - Check if the domain name is set
+			{
+				Name:        "domain_name",
+				Description: "Check if the domain name is set",
+				CheckFn: func(ctx context.Context) (bool, string, error) {
+					if ikniteConfig.DomainName != "" {
+						ipString := ikniteConfig.Ip.String()
+						if contains, ips := alpine.IsHostMapped(ikniteConfig.Ip, ikniteConfig.DomainName); contains {
+							mapped := func() bool {
+								for _, ip := range ips {
+									if ip.String() == ipString {
+										return true
+									}
+								}
+								return false
+							}()
+							if mapped {
+								return true, fmt.Sprintf("Domain name %s is mapped to IP %s", ikniteConfig.DomainName, ipString), nil
+							}
+						}
+						return false, fmt.Sprintf("Domain name %s is not mapped to IP %s", ikniteConfig.DomainName, ipString), nil
+					} else {
+						return true, "Domain name is not set", nil
+					}
+				},
+			},
+		}),
 
-	cobra.CheckErr(config.WaitForWorkloads(context.Background(), time.Second*time.Duration(timeout), callback))
+		// Phase 2: Kubernetes configuration
+		k8s.NewPhase("configuration", "Kubernetes configuration", []*k8s.Check{
+			k8s.FileTreeCheck("pki", "Check PKI files", "/etc/kubernetes/pki", pkiFiles),
+			k8s.NewPhase("manifests", "Kubernetes manifests", []*k8s.Check{
+				k8s.KubernetesFileCheck("manifest_etcd", "/etc/kubernetes/manifests/etcd.yaml"),
+				k8s.KubernetesFileCheck("manifest_apiserver", "/etc/kubernetes/manifests/kube-apiserver.yaml"),
+				k8s.KubernetesFileCheck("manifest_controller", "/etc/kubernetes/manifests/kube-controller-manager.yaml"),
+				k8s.KubernetesFileCheck("manifest_scheduler", "/etc/kubernetes/manifests/kube-scheduler.yaml"),
+			}),
+			k8s.KubernetesFileCheck("kubelet_conf", "/etc/kubernetes/kubelet.conf"),
+			k8s.KubernetesFileCheck("admin_conf", "/etc/kubernetes/admin.conf"),
+			k8s.KubernetesFileCheck("kubelet_config", "/var/lib/kubelet/config.yaml"),
+			k8s.KubernetesFileCheck("kubeadm_flags", "/var/lib/kubelet/kubeadm-flags.env"),
+			// Check that the etcd data directory is present and contains data
+			{
+				Name:        "etcd_data",
+				Description: "Check that the etcd data directory (/var/lib/etcd) is present and contains data",
+				CheckFn: func(ctx context.Context) (bool, string, error) {
+					missingFiles, _, err := k8s.FileTreeDifference("/var/lib/etcd", []string{"member/snap/db"})
+					if err != nil {
+						return false, "", err
+					}
+					if len(missingFiles) > 0 {
+						return false, "/var/lib/etcd has no data file", nil
+					}
+					return true, "/var/lib/etcd has data files", nil
+				},
+			},
+		}),
+
+		// Phase 3: Runtime status
+		k8s.NewPhase("runtime", "Runtime status", []*k8s.Check{
+			// Check that openrc is started
+			{
+				Name:        "openrc",
+				Description: "Check that OpenRC is started",
+				CheckFn: func(ctx context.Context) (bool, string, error) {
+					exists, err := utils.Exists(constants.SoftLevelPath)
+					if err != nil {
+						return false, "", err
+					}
+					if !exists {
+						return false, "OpenRC is not started", nil
+					}
+					return true, "OpenRC is started", nil
+				},
+			},
+			k8s.ServiceCheck("iknite_running", "iknite"),
+			k8s.ServiceCheck("containerd_running", "containerd"),
+			k8s.ServiceCheck("buildkitd_running", "buildkitd"),
+			//  - Check if the kubelet process is running
+			{
+				Name:        "kubelet_running",
+				DependsOn:   []string{"iknite_running"},
+				Description: "Check if the kubelet process is running",
+				CheckFn: func(ctx context.Context) (bool, string, error) {
+					return k8s.CheckService("kubelet", false, true)
+				},
+			},
+			//   - Check if the kubelet api endpoint (socket) is reachable and healthy
+			{
+				Name:        "kubelet_health",
+				DependsOn:   []string{"kubelet_running"},
+				Description: "Check if the kubelet is reachable and healthy",
+				CheckFn: func(ctx context.Context) (bool, string, error) {
+					return k8s.CheckKubeletHealth(checkTimeout)
+				},
+			},
+			//   - Check if the kube-apiserver is healthy
+			{
+				Name:        "apiserver_health",
+				DependsOn:   []string{"kubelet_running"},
+				Description: "Check if the kube-apiserver is healthy",
+				CheckFn: func(ctx context.Context) (bool, string, error) {
+					return k8s.CheckApiServerHealth(checkTimeout)
+				},
+			},
+		}),
+		{
+			Name:        "workload_status",
+			Description: "Check Workload Status",
+			DependsOn:   []string{"runtime"},
+			CheckFn: func(ctx context.Context) (bool, string, error) {
+				return true, "Workload status check", nil
+			},
+		},
+	}
+
+	// Run all checks
+	ctx := context.Background()
+	executor := k8s.NewCheckExecutor(checks)
+	output := termenv.NewOutput(os.Stdout)
+	_ = executor.Run(ctx, output)
+
+	// If checks pass, check workload status
+	if waitReadiness {
+		// fmt.Printf("\n%s\n", output.String("Checking Workload Status...").Bold())
+		runtime.ErrorHandlers = runtime.ErrorHandlers[:0]
+		// log.WithFields(log.Fields{
+		// 	options.Config: constants.KubernetesRootConfig,
+		// }).Info("Loading kube config...")
+
+		config, err := k8s.LoadFromFile(constants.KubernetesRootConfig)
+		cobra.CheckErr(errors.Wrap(err, "While loading local cluster configuration"))
+
+		cobra.CheckErr(config.WaitForWorkloads(context.Background(), time.Second*time.Duration(timeout), func(state bool, total int, ready, unready []*v1alpha1.WorkloadState) bool {
+			output.ClearScreen()
+			executor.PrintResults(output)
+			return callback(state, total, ready, unready)
+		}))
+	}
 }
+
+// We should check the following:
+// - Phase 1: Environment
+//   - Check if /proc/sys/net/ipv4/ip_forward is set to 1
+//   - Check if /proc/sys/net/bridge/bridge-nf-call-iptables is set to 1
+//   - Check if the machine ID is set
+//   - Check if the IP address we are targeting is bound to an interface
+//   - Check if the domain name is set
+//   - Check if the kubelet service is not runnable
+//   - Check if the iknite service is set to run in default mode
+//   - Check if /etc/crictl.yaml exists
+// - Phase 2: Kubernetes configuration
+//   - Check if /etc/kubernetes/pki contains the certificates
+//   - Check if /etc/kubernetes/manifests contains the manifests
+//   - Check if /etc/kubernetes/{kubelet,scheduler,controller-manager}.conf exists
+//   - Check if /etc/kubernetes/{admin,super-admin}.conf exists
+//   - Check if /var/lib/etcd contains the etcd data (not empty)
+//   - Check if /var/lib/kubelet/config.yaml exists
+//   - Check if /var/lib/kubelet/kubeadm-flags.env exists
+// - Phase 3: Runtime status
+//   - Check if the iknite service is running
+//   - Check if the containerd process is running
+//   - Check if the kubelet process is running
+//   - Check if the kubelet api endpoint (socket) is reachable and healthy
+//   - Check if the etcd, kube-apiserver, kube-controller-manager, kube-scheduler pods are running
+//   - Check if etcd is healthy
+//   - Check if the kube-apiserver is healthy
+//  - Phase 4: Workload status
+//    - Check if all workloads are ready
+/*
+		   We want the checks to be run in parallel, so we will use goroutines to run them concurrently. Some checks may depend on the output of other checks, so we will need to wait for the dependent checks to complete before running the dependent checks.
+		   We want the status of each task to be displayed in the terminal while running the checks.
+		   The status needs to be displayed to the left of the check name. While running the checks, we will display a spinner to indicate that the checks are running.
+		   If a check fails, we will display an error message to the right of the check name and the spinner will be replaced with a red cross.
+		   If a check passes, we will display a success message to the right of the check name and the spinner will be replaced with a green tick.
+		   If a check is skipped, we will display a message to the right of the check name and the spinner will be replaced with a yellow exclamation mark.
+	       If a check is waiting for another check to complete, we will display a message to the right of the check name and the spinner will be replaced with a blue ellipsis.
+*/

@@ -45,7 +45,6 @@ const (
 	configurationPattern             = "*.conf"
 	pkiSubdirectory                  = "pki"
 	manifestsSubdirectory            = "manifests"
-	rcConfFile                       = "/etc/rc.conf"
 	rcConfPreventKubeletRunning      = "rc_kubelet_need=\"non-existing-service\""
 )
 
@@ -108,6 +107,14 @@ func RunKubeadm(parameters []string) (err error) {
 		return errors.Wrap(err, string(out))
 	} else {
 		log.Trace(string(out))
+	}
+	return
+}
+
+func IsKubeletServiceRunnable(confFilePath string) (present bool, err error) {
+	var lines int
+	if lines, err = script.File(confFilePath).Match(rcConfPreventKubeletRunning).CountLines(); err == nil {
+		present = lines == 0
 	}
 	return
 }
@@ -196,7 +203,7 @@ func PrepareKubernetesEnvironment(ikniteConfig *v1alpha1.IkniteClusterSpec) erro
 	}
 
 	log.Info("Preventing Kubelet from being started by OpenRC...")
-	if err := PreventKubeletServiceFromStarting(rcConfFile); err != nil {
+	if err := PreventKubeletServiceFromStarting(constants.RcConfFile); err != nil {
 		return errors.Wrap(err, "While preventing kubelet service from starting")
 	}
 
