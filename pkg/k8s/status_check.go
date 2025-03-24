@@ -1,13 +1,15 @@
 package k8s
 
-// cSpell: words termenv
+// cSpell: words termenv lipgloss
+// cSpell: disable
 import (
 	"context"
 	"fmt"
-	"time"
 
-	"github.com/muesli/termenv"
+	"github.com/charmbracelet/lipgloss"
 )
+
+// cSpell: enable
 
 type CheckStatus int
 
@@ -19,13 +21,13 @@ const (
 	StatusFailed
 )
 
-type CheckData = interface{}
+type CheckData = any
 
-type CheckDataBuilder func() (CheckData, error)
+type CheckDataBuilder func() CheckData
 
 type CheckFn func(ctx context.Context, data CheckData) (bool, string, error)
 
-type CustomResultPrinter func(result *CheckResult, prefix string, output *termenv.Output)
+type CustomResultPrinter func(result *CheckResult, prefix string, spinView string) string
 
 type Check struct {
 	Name             string
@@ -61,10 +63,17 @@ func (c *Check) NewResult() *CheckResult {
 	for _, subCheck := range c.SubChecks {
 		subResults = append(subResults, subCheck.NewResult())
 	}
+
+	var checkData CheckData
+	if c.CheckDataBuilder != nil {
+		checkData = c.CheckDataBuilder()
+	}
+
 	return &CheckResult{
 		Check:      c,
 		SubResults: subResults,
 		Done:       make(chan struct{}),
+		CheckData:  checkData,
 	}
 }
 
@@ -157,15 +166,6 @@ func (c *CheckResult) Run(ctx context.Context) {
 		defer close(c.Done)
 
 		c.Status = StatusPending
-		if c.Check.CheckDataBuilder != nil {
-			data, err := c.Check.CheckDataBuilder()
-			if err != nil {
-				c.Status = StatusFailed
-				c.Error = err
-				return
-			}
-			c.CheckData = data
-		}
 
 		// Wait for dependencies
 		if !c.waitForDependencies(ctx) {
@@ -250,89 +250,75 @@ func NewCheckExecutor(checks []*Check) *CheckExecutor {
 	return e
 }
 
-var spinnerFrames = []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
+var (
+	successStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("46"))  // Green
+	errorStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("196")) // Red
+	grayStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("240")) // Gray
+)
 
-func (result *CheckResult) PrettyStatus(output *termenv.Output) termenv.Style {
+func (result *CheckResult) StatusString(spinView string) string {
 	var status string
-	var statusColor termenv.Style
-	p := output.Profile
+	var statusStyle lipgloss.Style
 
 	switch result.Status {
 	case StatusPending:
-		status = "..."
-		statusColor = output.String(status).Foreground(p.Color("240")) // Gray
+		status = "⋯"
+		statusStyle = grayStyle
 	case StatusRunning:
-		frame := int((time.Now().UnixNano() / int64(time.Millisecond) / 250) % int64(len(spinnerFrames)))
-		status = spinnerFrames[frame]
-		statusColor = output.String(status).Foreground(p.Color("240")) // Gray
+		return spinView
 	case StatusSkipped:
 		status = "⊝"
-		statusColor = output.String(status).Foreground(p.Color("240")) // Gray
+		statusStyle = grayStyle
 	case StatusSuccess:
 		status = "✓"
-		statusColor = output.String(status).Foreground(p.Color("46")) // Green
+		statusStyle = successStyle
 	case StatusFailed:
 		status = "✗"
-		statusColor = output.String(status).Foreground(p.Color("196")) // Red
+		statusStyle = errorStyle
 	}
 
-	return statusColor
+	return statusStyle.Render(status)
 }
 
-func (result *CheckResult) PrettyPrint(prefix string, output *termenv.Output) {
-	var statusColor termenv.Style
-	p := output.Profile
+func (result *CheckResult) FormatResult(prefix string, spinView string) string {
+	status := result.StatusString(spinView)
 
-	statusColor = result.PrettyStatus(output)
-
-	description := output.String(result.Check.Description)
+	description := result.Check.Description
 	if result.Error != nil || result.Status == StatusFailed {
-		description = description.Foreground(p.Color("203")) // Light red
+		description = errorStyle.Render(description)
 	}
 
-	output.WriteString(fmt.Sprintf("%s%s %s", prefix, statusColor, description))
+	output := fmt.Sprintf("%s%s %s", prefix, status, description)
 
 	if result.Error != nil {
-		output.WriteString(fmt.Sprintf(" - %s", output.String(result.Error.Error()).Foreground(p.Color("203"))))
+		output += fmt.Sprintf(" - %s", errorStyle.Render(result.Error.Error()))
 	} else if result.Message != "" {
-		output.WriteString(fmt.Sprintf(" - %s", output.String(result.Message).Foreground(p.Color("240"))))
+		output += fmt.Sprintf(" - %s", grayStyle.Render(result.Message))
 	}
-	output.WriteString("\n")
+	output += "\n"
 
 	if len(result.SubResults) > 0 {
 		for _, subResult := range result.SubResults {
-			subResult.Print(prefix+"  ", output)
+			output += subResult.Format(prefix+"  ", spinView)
 		}
 	}
+
+	return output
 }
 
-func (result *CheckResult) Print(prefix string, output *termenv.Output) {
-	// Use custom printer if available
+func (result *CheckResult) Format(prefix string, spinView string) string {
 	if result.Check.CustomPrinter != nil {
-		result.Check.CustomPrinter(result, prefix, output)
-		return
+		return result.Check.CustomPrinter(result, prefix, spinView)
 	}
-	result.PrettyPrint(prefix, output)
-}
-
-// PrintResults prints the results
-func (e *CheckExecutor) PrintResults(output *termenv.Output) {
-	output.ClearScreen()
-	for _, result := range e.Results {
-		result.Print("", output)
-	}
+	return result.FormatResult(prefix, spinView)
 }
 
 // Run runs the checks
-func (e *CheckExecutor) Run(ctx context.Context, output *termenv.Output) []*CheckResult {
+func (e *CheckExecutor) Run(ctx context.Context) []*CheckResult {
 	// Start all top-level checks
 	for _, result := range e.Results {
 		result.Run(ctx)
 	}
-
-	// Print status every 250ms until all checks complete
-	ticker := time.NewTicker(250 * time.Millisecond)
-	defer ticker.Stop()
 
 	allDone := make(chan struct{})
 	go func() {
@@ -347,10 +333,7 @@ func (e *CheckExecutor) Run(ctx context.Context, output *termenv.Output) []*Chec
 		case <-ctx.Done():
 			return e.Results
 		case <-allDone:
-			e.PrintResults(output)
 			return e.Results
-		case <-ticker.C:
-			e.PrintResults(output)
 		}
 	}
 }

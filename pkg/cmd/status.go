@@ -15,7 +15,7 @@ limitations under the License.
 */
 package cmd
 
-// cSpell: words termenv runlevels runlevel apiserver controllermanager healthcheck logrus
+// cSpell: words runlevels runlevel apiserver controllermanager healthcheck logrus
 // cSpell: disable
 import (
 	"context"
@@ -23,13 +23,13 @@ import (
 	"os"
 	"time"
 
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/kaweezle/iknite/pkg/alpine"
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
 	"github.com/kaweezle/iknite/pkg/config"
 	"github.com/kaweezle/iknite/pkg/constants"
 	"github.com/kaweezle/iknite/pkg/k8s"
 	"github.com/kaweezle/iknite/pkg/utils"
-	"github.com/muesli/termenv"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
@@ -254,9 +254,16 @@ func performStatus(ikniteConfig *v1alpha1.IkniteClusterSpec) {
 	// Run all checks
 	ctx := context.Background()
 	executor := k8s.NewCheckExecutor(checks)
-	output := termenv.NewOutput(os.Stdout)
 	logrus.SetLevel(logrus.FatalLevel)
-	_ = executor.Run(ctx, output)
+
+	p := tea.NewProgram(k8s.NewCheckModel(ctx, executor))
+	tmp := os.Stdout
+	defer func() { os.Stdout = tmp }()
+	os.Stdout = nil
+	if _, err := p.Run(); err != nil {
+		fmt.Printf("Error running checks: %v\n", err)
+		os.Exit(1)
+	}
 }
 
 // We should check the following:

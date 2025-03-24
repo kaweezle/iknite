@@ -1,24 +1,26 @@
 package k8s
 
-// cSpell: words apiclient termenv
+// cSpell: words apiclient lipgloss
+// cSpell: disable
 import (
 	"context"
 	"fmt"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"time"
 
+	"github.com/charmbracelet/lipgloss"
 	"github.com/kaweezle/iknite/pkg/alpine"
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
 	"github.com/kaweezle/iknite/pkg/constants"
-	"github.com/muesli/termenv"
 	"github.com/pkg/errors"
 	kubeadmConstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	kubeConfigUtil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 )
+
+// cSpell: enable
 
 // SystemFileCheck checks if a file exists and has specific content
 func SystemFileCheck(name, description, path, expectedContent string) *Check {
@@ -201,11 +203,13 @@ type CheckWorkloadData interface {
 	ReadyWorkloads() []*v1alpha1.WorkloadState
 	NotReadyWorkloads() []*v1alpha1.WorkloadState
 	Iteration() int
+	Duration() time.Duration
 	SetOk(bool)
 	SetWorkloadCount(int)
 	SetReadyWorkloads([]*v1alpha1.WorkloadState)
 	SetNotReadyWorkloads([]*v1alpha1.WorkloadState)
 	SetIteration(int)
+	Start()
 }
 
 type checkWorkloadData struct {
@@ -214,6 +218,7 @@ type checkWorkloadData struct {
 	readyWorkloads    []*v1alpha1.WorkloadState
 	notReadyWorkloads []*v1alpha1.WorkloadState
 	iteration         int
+	startTime         time.Time
 }
 
 func (c *checkWorkloadData) IsOk() bool {
@@ -256,35 +261,65 @@ func (c *checkWorkloadData) SetIteration(iteration int) {
 	c.iteration = iteration
 }
 
-func CreateCheckWorkloadData() (CheckData, error) {
-	return &checkWorkloadData{}, nil
+func (c *checkWorkloadData) Start() {
+	c.startTime = time.Now()
 }
 
-func PrettyPrintWorkloadState(prefix string, r *v1alpha1.WorkloadState, output *termenv.Output) {
-	p := output.Profile
-	var statusColor termenv.Style
+func (c *checkWorkloadData) Duration() time.Duration {
+	if c.startTime.IsZero() {
+		return 0
+	}
+	return time.Since(c.startTime)
+}
+
+func CreateCheckWorkloadData() CheckData {
+	return &checkWorkloadData{}
+}
+
+var (
+	workloadLabelStyle = lipgloss.NewStyle().Width(20)
+	workloadNameStyle  = lipgloss.NewStyle().Width(54)
+	blueStyle          = lipgloss.NewStyle().Foreground(lipgloss.Color("33")) // blue
+)
+
+func PrettyPrintWorkloadState(prefix string, r *v1alpha1.WorkloadState) string {
+	var status string
+	var statusStyle lipgloss.Style
+
 	if r.Ok {
-		statusColor = output.String("✓").Foreground(p.Color("46")) // Green
+		status = "✓"
+		statusStyle = successStyle
 	} else {
-		statusColor = output.String("✗").Foreground(p.Color("196")) // Red
+		status = "✗"
+		statusStyle = errorStyle
 	}
 
-	output.WriteString(fmt.Sprintf("%s%s %-20s %-54s %s\n", prefix, statusColor, r.Namespace, r.Name, r.Message))
+	return fmt.Sprintf("%s%s %s %s %s\n",
+		prefix,
+		statusStyle.Render(status),
+		workloadLabelStyle.Render(r.Namespace),
+		workloadNameStyle.Render(r.Name),
+		r.Message,
+	)
 }
 
-func CheckWorkloadResultPrinter(result *CheckResult, prefix string, output *termenv.Output) {
+func CheckWorkloadResultPrinter(result *CheckResult, prefix string, spinView string) string {
 	data := result.CheckData.(CheckWorkloadData)
-	p := output.Profile
 
 	ready := data.ReadyWorkloads()
 	unready := data.NotReadyWorkloads()
 	count := data.WorkloadCount()
 
-	prettyCount := output.String(strconv.Itoa(count)).Foreground(p.Color("33")).Bold()           // Blue
-	prettyReady := output.String(strconv.Itoa(len(ready))).Foreground(p.Color("46")).Bold()      // Green
-	prettyUnready := output.String(strconv.Itoa(len(unready))).Foreground(p.Color("227")).Bold() // Yellow
+	prettyCount := blueStyle.Render(fmt.Sprintf("%d", count))
+	prettyReady := successStyle.Render(fmt.Sprintf("%d", len(ready)))
+	prettyUnready := errorStyle.Render(fmt.Sprintf("%d", len(unready)))
 
-	result.Message = ""
+	elapsed := data.Duration().Round(time.Millisecond)
+	if elapsed == 0 {
+		result.Message = ""
+	} else {
+		result.Message = fmt.Sprintf("%7.3fs - ", elapsed.Seconds())
+	}
 	if len(ready) > 0 {
 		result.Message += fmt.Sprintf("%s / %s workloads ready", prettyReady, prettyCount)
 	}
@@ -295,24 +330,26 @@ func CheckWorkloadResultPrinter(result *CheckResult, prefix string, output *term
 		result.Message += fmt.Sprintf("%s / %s workloads unready", prettyUnready, prettyCount)
 	}
 
-	// Print the global result
-	result.PrettyPrint(prefix, output)
+	// Format the global result first
+	output := result.FormatResult(prefix, spinView)
 	if result.Status == StatusSkipped {
-		return
+		return output
 	}
 	prefix = prefix + "  "
 
 	if len(ready) > 0 {
 		for _, state := range ready {
-			PrettyPrintWorkloadState(prefix, state, output)
+			output += PrettyPrintWorkloadState(prefix, state)
 		}
 	}
 
 	if len(unready) > 0 {
 		for _, state := range unready {
-			PrettyPrintWorkloadState(prefix, state, output)
+			output += PrettyPrintWorkloadState(prefix, state)
 		}
 	}
+
+	return output
 }
 
 func CheckWorkloads(ctx context.Context, data CheckData) (bool, string, error) {
@@ -321,6 +358,7 @@ func CheckWorkloads(ctx context.Context, data CheckData) (bool, string, error) {
 	if err != nil {
 		return false, "", errors.Wrap(err, "While loading local cluster configuration")
 	}
+	workloadData.Start()
 
 	err = config.WaitForWorkloads(context.Background(), 0, func(state bool, total int, ready, unready []*v1alpha1.WorkloadState, iteration int) bool {
 		workloadData.SetOk(state)
