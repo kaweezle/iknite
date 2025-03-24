@@ -19,15 +19,23 @@ const (
 	StatusFailed
 )
 
-type CheckFn func(ctx context.Context) (bool, string, error)
+type CheckData = interface{}
+
+type CheckDataBuilder func() (CheckData, error)
+
+type CheckFn func(ctx context.Context, data CheckData) (bool, string, error)
+
+type CustomResultPrinter func(result *CheckResult, prefix string, output *termenv.Output)
 
 type Check struct {
-	Name        string
-	Description string
-	Message     string
-	DependsOn   []string
-	SubChecks   []*Check
-	CheckFn     CheckFn
+	Name             string
+	Description      string
+	Message          string
+	DependsOn        []string
+	SubChecks        []*Check
+	CheckFn          CheckFn
+	CheckDataBuilder CheckDataBuilder
+	CustomPrinter    CustomResultPrinter
 }
 
 type CheckResult struct {
@@ -38,6 +46,7 @@ type CheckResult struct {
 	SubResults    []*CheckResult
 	ParentResults []*CheckResult
 	Done          chan struct{}
+	CheckData     CheckData
 }
 
 type CheckExecutor struct {
@@ -85,7 +94,7 @@ func (r *CheckResult) FillDependencies(resultNameMap map[string]*CheckResult) {
 
 func (c *CheckResult) CheckFn(ctx context.Context) *CheckResult {
 	if c.Check.CheckFn != nil {
-		success, message, err := c.Check.CheckFn(ctx)
+		success, message, err := c.Check.CheckFn(ctx, c.CheckData)
 		c.Message = message
 		c.Error = err
 		if success {
@@ -148,6 +157,15 @@ func (c *CheckResult) Run(ctx context.Context) {
 		defer close(c.Done)
 
 		c.Status = StatusPending
+		if c.Check.CheckDataBuilder != nil {
+			data, err := c.Check.CheckDataBuilder()
+			if err != nil {
+				c.Status = StatusFailed
+				c.Error = err
+				return
+			}
+			c.CheckData = data
+		}
 
 		// Wait for dependencies
 		if !c.waitForDependencies(ctx) {
@@ -234,7 +252,7 @@ func NewCheckExecutor(checks []*Check) *CheckExecutor {
 
 var spinnerFrames = []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
 
-func (result *CheckResult) Print(prefix string, output *termenv.Output) {
+func (result *CheckResult) PrettyStatus(output *termenv.Output) termenv.Style {
 	var status string
 	var statusColor termenv.Style
 	p := output.Profile
@@ -258,6 +276,15 @@ func (result *CheckResult) Print(prefix string, output *termenv.Output) {
 		statusColor = output.String(status).Foreground(p.Color("196")) // Red
 	}
 
+	return statusColor
+}
+
+func (result *CheckResult) PrettyPrint(prefix string, output *termenv.Output) {
+	var statusColor termenv.Style
+	p := output.Profile
+
+	statusColor = result.PrettyStatus(output)
+
 	description := output.String(result.Check.Description)
 	if result.Error != nil || result.Status == StatusFailed {
 		description = description.Foreground(p.Color("203")) // Light red
@@ -277,6 +304,15 @@ func (result *CheckResult) Print(prefix string, output *termenv.Output) {
 			subResult.Print(prefix+"  ", output)
 		}
 	}
+}
+
+func (result *CheckResult) Print(prefix string, output *termenv.Output) {
+	// Use custom printer if available
+	if result.Check.CustomPrinter != nil {
+		result.Check.CustomPrinter(result, prefix, output)
+		return
+	}
+	result.PrettyPrint(prefix, output)
 }
 
 // PrintResults prints the results

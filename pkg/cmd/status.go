@@ -15,7 +15,7 @@ limitations under the License.
 */
 package cmd
 
-// cSpell: words termenv runlevels runlevel apiserver controllermanager healthcheck
+// cSpell: words termenv runlevels runlevel apiserver controllermanager healthcheck logrus
 // cSpell: disable
 import (
 	"context"
@@ -25,15 +25,13 @@ import (
 
 	"github.com/kaweezle/iknite/pkg/alpine"
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
-	"github.com/kaweezle/iknite/pkg/cmd/options"
 	"github.com/kaweezle/iknite/pkg/config"
 	"github.com/kaweezle/iknite/pkg/constants"
 	"github.com/kaweezle/iknite/pkg/k8s"
 	"github.com/kaweezle/iknite/pkg/utils"
 	"github.com/muesli/termenv"
-	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
-	"k8s.io/apimachinery/pkg/util/runtime"
 )
 
 // cSpell: enable
@@ -64,10 +62,8 @@ var pkiFiles = []string{
 }
 
 var (
-	waitReadiness = false
-	timeout       = 0
-	callbackCount = 0
-	checkTimeout  = 10 * time.Second
+	timeout      = 0
+	checkTimeout = 10 * time.Second
 )
 
 func NewStatusCmd(ikniteConfig *v1alpha1.IkniteClusterSpec) *cobra.Command {
@@ -88,41 +84,8 @@ func NewStatusCmd(ikniteConfig *v1alpha1.IkniteClusterSpec) *cobra.Command {
 
 	flags := statusCmd.Flags()
 	config.ConfigureClusterCommand(flags, ikniteConfig)
-	flags.BoolVarP(&waitReadiness, options.Wait, "w", waitReadiness, "Wait for all pods to settle")
-	flags.IntVarP(&timeout, options.Timeout, "t", timeout, "Wait timeout in seconds")
 
 	return statusCmd
-}
-
-func callback(ok bool, count int, ready []*v1alpha1.WorkloadState, unready []*v1alpha1.WorkloadState) bool {
-	if callbackCount == 0 && waitReadiness {
-		fmt.Printf("\n%d workloads, %d ready, %d unready\n", count, len(ready), len(unready))
-		for _, state := range ready {
-			fmt.Println(state.LongString())
-		}
-	} else {
-		if len(unready) > 0 {
-			fmt.Printf("\n%d unready workloads remaining:\n", len(unready))
-		} else {
-			fmt.Printf("\n🎉 All workloads (%d) ready:\n", count)
-			for _, state := range ready {
-				fmt.Println(state.LongString())
-			}
-		}
-	}
-
-	for _, state := range unready {
-		fmt.Println(state.LongString())
-	}
-
-	if !waitReadiness {
-		return true
-	}
-	callbackCount++
-	if callbackCount > 5 {
-		return ok
-	}
-	return false
 }
 
 func performStatus(ikniteConfig *v1alpha1.IkniteClusterSpec) {
@@ -140,7 +103,7 @@ func performStatus(ikniteConfig *v1alpha1.IkniteClusterSpec) {
 			{
 				Name:        "kubelet_service",
 				Description: "Check if the kubelet service is not runnable",
-				CheckFn: func(ctx context.Context) (bool, string, error) {
+				CheckFn: func(ctx context.Context, data k8s.CheckData) (bool, string, error) {
 					runnable, err := k8s.IsKubeletServiceRunnable(constants.RcConfFile)
 					if err != nil {
 						return false, "", err
@@ -157,7 +120,7 @@ func performStatus(ikniteConfig *v1alpha1.IkniteClusterSpec) {
 			{
 				Name:        "ip_bound",
 				Description: "Check if the IP address is bound to an interface",
-				CheckFn: func(ctx context.Context) (bool, string, error) {
+				CheckFn: func(ctx context.Context, data k8s.CheckData) (bool, string, error) {
 					if ikniteConfig.CreateIp {
 						result, err := alpine.CheckIpExists(ikniteConfig.Ip)
 						if err != nil {
@@ -176,7 +139,7 @@ func performStatus(ikniteConfig *v1alpha1.IkniteClusterSpec) {
 			{
 				Name:        "domain_name",
 				Description: "Check if the domain name is set",
-				CheckFn: func(ctx context.Context) (bool, string, error) {
+				CheckFn: func(ctx context.Context, data k8s.CheckData) (bool, string, error) {
 					if ikniteConfig.DomainName != "" {
 						ipString := ikniteConfig.Ip.String()
 						if contains, ips := alpine.IsHostMapped(ikniteConfig.Ip, ikniteConfig.DomainName); contains {
@@ -217,7 +180,7 @@ func performStatus(ikniteConfig *v1alpha1.IkniteClusterSpec) {
 			{
 				Name:        "etcd_data",
 				Description: "Check that the etcd data directory (/var/lib/etcd) is present and contains data",
-				CheckFn: func(ctx context.Context) (bool, string, error) {
+				CheckFn: func(ctx context.Context, data k8s.CheckData) (bool, string, error) {
 					missingFiles, _, err := k8s.FileTreeDifference("/var/lib/etcd", []string{"member/snap/db"})
 					if err != nil {
 						return false, "", err
@@ -236,7 +199,7 @@ func performStatus(ikniteConfig *v1alpha1.IkniteClusterSpec) {
 			{
 				Name:        "openrc",
 				Description: "Check that OpenRC is started",
-				CheckFn: func(ctx context.Context) (bool, string, error) {
+				CheckFn: func(ctx context.Context, data k8s.CheckData) (bool, string, error) {
 					exists, err := utils.Exists(constants.SoftLevelPath)
 					if err != nil {
 						return false, "", err
@@ -255,7 +218,7 @@ func performStatus(ikniteConfig *v1alpha1.IkniteClusterSpec) {
 				Name:        "kubelet_running",
 				DependsOn:   []string{"iknite_running"},
 				Description: "Check if the kubelet process is running",
-				CheckFn: func(ctx context.Context) (bool, string, error) {
+				CheckFn: func(ctx context.Context, data k8s.CheckData) (bool, string, error) {
 					return k8s.CheckService("kubelet", false, true)
 				},
 			},
@@ -264,7 +227,7 @@ func performStatus(ikniteConfig *v1alpha1.IkniteClusterSpec) {
 				Name:        "kubelet_health",
 				DependsOn:   []string{"kubelet_running"},
 				Description: "Check if the kubelet is reachable and healthy",
-				CheckFn: func(ctx context.Context) (bool, string, error) {
+				CheckFn: func(ctx context.Context, data k8s.CheckData) (bool, string, error) {
 					return k8s.CheckKubeletHealth(checkTimeout)
 				},
 			},
@@ -273,18 +236,18 @@ func performStatus(ikniteConfig *v1alpha1.IkniteClusterSpec) {
 				Name:        "apiserver_health",
 				DependsOn:   []string{"kubelet_running"},
 				Description: "Check if the kube-apiserver is healthy",
-				CheckFn: func(ctx context.Context) (bool, string, error) {
+				CheckFn: func(ctx context.Context, data k8s.CheckData) (bool, string, error) {
 					return k8s.CheckApiServerHealth(checkTimeout)
 				},
 			},
 		}),
 		{
-			Name:        "workload_status",
-			Description: "Check Workload Status",
-			DependsOn:   []string{"runtime"},
-			CheckFn: func(ctx context.Context) (bool, string, error) {
-				return true, "Workload status check", nil
-			},
+			Name:             "workload_status",
+			Description:      "Check Workload Status",
+			DependsOn:        []string{"runtime"},
+			CheckFn:          k8s.CheckWorkloads,
+			CheckDataBuilder: k8s.CreateCheckWorkloadData,
+			CustomPrinter:    k8s.CheckWorkloadResultPrinter,
 		},
 	}
 
@@ -292,25 +255,8 @@ func performStatus(ikniteConfig *v1alpha1.IkniteClusterSpec) {
 	ctx := context.Background()
 	executor := k8s.NewCheckExecutor(checks)
 	output := termenv.NewOutput(os.Stdout)
+	logrus.SetLevel(logrus.FatalLevel)
 	_ = executor.Run(ctx, output)
-
-	// If checks pass, check workload status
-	if waitReadiness {
-		// fmt.Printf("\n%s\n", output.String("Checking Workload Status...").Bold())
-		runtime.ErrorHandlers = runtime.ErrorHandlers[:0]
-		// log.WithFields(log.Fields{
-		// 	options.Config: constants.KubernetesRootConfig,
-		// }).Info("Loading kube config...")
-
-		config, err := k8s.LoadFromFile(constants.KubernetesRootConfig)
-		cobra.CheckErr(errors.Wrap(err, "While loading local cluster configuration"))
-
-		cobra.CheckErr(config.WaitForWorkloads(context.Background(), time.Second*time.Duration(timeout), func(state bool, total int, ready, unready []*v1alpha1.WorkloadState) bool {
-			output.ClearScreen()
-			executor.PrintResults(output)
-			return callback(state, total, ready, unready)
-		}))
-	}
 }
 
 // We should check the following:
