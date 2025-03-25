@@ -23,12 +23,13 @@ const (
 	EnableMDNS         = "enable-mdns"
 	ClusterName        = "cluster-name"
 
-	// Killall
-	StopServices   = "stop-services"
-	StopContainers = "stop-containers"
-	UnmountPaths   = "unmount-paths"
-	ResetCNI       = "reset-cni"
-	ResetIPTables  = "reset-iptables"
-	ResetKubelet   = "reset-kubelet"
-	ResetIPAddress = "reset-ip-address"
+	// Clean
+	StopContainers     = "stop-containers"
+	UnmountPaths       = "unmount-paths"
+	CleanCNI           = "clean-cni"
+	CleanIPTables      = "clean-iptables"
+	CleanEtcd          = "clean-etcd"
+	CleanIPAddress     = "clean-ip-address"
+	CleanAll           = "clean-all"
+	CleanClusterConfig = "clean-cluster-config"
 )

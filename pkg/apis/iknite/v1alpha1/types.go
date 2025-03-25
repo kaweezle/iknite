@@ -129,3 +129,12 @@ func LoadIkniteCluster() (*IkniteCluster, error) {
 	}
 	return ikniteCluster, nil
 }
+
+func LoadIkniteClusterOrDefault() (*IkniteCluster, error) {
+	ikniteCluster, err := LoadIkniteCluster()
+	if err != nil && os.IsNotExist(err) {
+		ikniteCluster = &IkniteCluster{}
+		SetDefaults_IkniteCluster(ikniteCluster)
+	}
+	return ikniteCluster, nil
+}

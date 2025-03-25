@@ -77,3 +77,7 @@ func (s *ClusterState) UnmarshalJSON(data []byte) error {
 	s.Set(value)
 	return nil
 }
+
+func (s ClusterState) Stable() bool {
+	return s == Running || s == Stopped || s == Failed || s == Undefined
+}

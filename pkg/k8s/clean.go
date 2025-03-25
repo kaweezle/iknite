@@ -5,13 +5,18 @@ package k8s
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"syscall"
 
 	s "github.com/bitfield/script"
 	"github.com/kaweezle/iknite/pkg/alpine"
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
+	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/txn2/txeh"
+	resetPhases "k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/reset"
+	kubeadmConstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	utilStaticPod "k8s.io/kubernetes/cmd/kubeadm/app/util/staticpod"
 )
 
 // cSpell: enable
@@ -235,5 +240,32 @@ func DeleteNetworkInterfaces(isDryRun bool) error {
 		logger.Infof("Deleted pods network interfaces")
 	}
 
+	return err
+}
+
+// DeleteEtcdData deletes the etcd data directory
+func DeleteEtcdData(isDryRun bool) error {
+	etcdDataDir := "/var/lib/etcd"
+	etcdManifestPath := filepath.Join(kubeadmConstants.KubernetesDir, kubeadmConstants.ManifestsSubDirName, "etcd.yaml")
+	etcdPod, err := utilStaticPod.ReadStaticPodFromDisk(etcdManifestPath)
+	if err != nil {
+		if !os.IsNotExist(err) {
+			return errors.Wrap(err, "failed to read etcd pod from disk")
+		}
+		err = nil
+	} else {
+		for _, volume := range etcdPod.Spec.Volumes {
+			if volume.Name == "etcd-data" {
+				etcdDataDir = volume.HostPath.Path
+				break
+			}
+		}
+	}
+	if isDryRun {
+		log.WithField("path", etcdDataDir).Info("Dry run: would delete etcd data...")
+	} else {
+		log.WithField("path", etcdDataDir).Info("Deleting etcd data...")
+		err = resetPhases.CleanDir(etcdDataDir)
+	}
 	return err
 }
