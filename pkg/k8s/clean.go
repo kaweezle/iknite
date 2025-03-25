@@ -70,9 +70,9 @@ func ResetIPTables(isDryRun bool) (err error) {
 
 func RemoveKubeletFiles(isDryRun bool) (err error) {
 	if isDryRun {
-		log.Info("Would remove kubelet files in /var/lib/kubelet...")
+		log.Info("Would remove cpu_manager_state, memory_manager_state, pod/* files in /var/lib/kubelet...")
 	} else {
-		log.Info("Removing kubelet files in /var/lib/kubelet...")
+		log.Info("Removing cpu_manager_state, memory_manager_state, pod/* files in /var/lib/kubelet...")
 		_, err = s.Exec("sh -c 'rm -rf /var/lib/kubelet/{cpu_manager_state,memory_manager_state} /var/lib/kubelet/pods/*'").String()
 	}
 	return err
@@ -112,40 +112,67 @@ func UnmountPaths(failOnError bool, isDryRun bool) error {
 	return nil
 }
 
-func CleanAll(ikniteConfig *v1alpha1.IkniteClusterSpec, isDryRun bool) {
+func CleanAll(ikniteConfig *v1alpha1.IkniteClusterSpec, resetIpAddress, failOnError, isDryRun bool) error {
 
 	var err error
 	if err = StopAllContainers(isDryRun); err != nil {
 		log.WithError(err).Warn("Error stopping all containers")
+		if failOnError {
+			return err
+		}
 	}
 
-	_ = UnmountPaths(false, isDryRun)
+	err = UnmountPaths(false, isDryRun)
+	if err != nil {
+		log.WithError(err).Warn("Error unmounting paths")
+		if failOnError {
+			return err
+		}
+	}
 
 	err = RemoveKubeletFiles(isDryRun)
 	if err != nil {
 		log.WithError(err).Warn("Error removing kubelet files")
+		if failOnError {
+			return err
+		}
 	}
 
 	err = DeleteCniNamespaces(isDryRun)
 	if err != nil {
 		log.WithError(err).Warn("Error deleting CNI namespaces")
+		if failOnError {
+			return err
+		}
 	}
 
 	err = DeleteNetworkInterfaces(isDryRun)
 	if err != nil {
 		log.WithError(err).Warn("Error deleting network interfaces")
+		if failOnError {
+			return err
+		}
 	}
 
 	log.Info("Cleaning up iptables rules...")
 	err = ResetIPTables(isDryRun)
 	if err != nil {
 		log.WithError(err).Warn("Error cleaning up iptables rules")
+		if failOnError {
+			return err
+		}
 	}
 
-	err = ResetIPAddress(ikniteConfig, isDryRun)
-	if err != nil {
-		log.WithError(err).Warn("Error resetting IP address")
+	if resetIpAddress {
+		err = ResetIPAddress(ikniteConfig, isDryRun)
+		if err != nil {
+			log.WithError(err).Warn("Error resetting IP address")
+			if failOnError {
+				return err
+			}
+		}
 	}
+	return nil
 }
 
 func processMounts(path string, remove bool, message string, isDryRun bool) error {
