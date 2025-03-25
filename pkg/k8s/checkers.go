@@ -13,7 +13,6 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/kaweezle/iknite/pkg/alpine"
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
-	"github.com/kaweezle/iknite/pkg/constants"
 	"github.com/pkg/errors"
 	kubeadmConstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
@@ -354,7 +353,7 @@ func CheckWorkloadResultPrinter(result *CheckResult, prefix string, spinView str
 
 func CheckWorkloads(ctx context.Context, data CheckData) (bool, string, error) {
 	workloadData := data.(CheckWorkloadData)
-	config, err := LoadFromFile(constants.KubernetesRootConfig)
+	config, err := LoadFromFile(filepath.Join(kubeadmConstants.KubernetesDir, kubeadmConstants.AdminKubeConfigFileName))
 	if err != nil {
 		return false, "", errors.Wrap(err, "While loading local cluster configuration")
 	}
