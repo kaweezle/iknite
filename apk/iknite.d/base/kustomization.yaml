@@ -4,9 +4,9 @@ kind: Kustomization
 resources:
   - ./kube-flannel.yaml
   - https://raw.githubusercontent.com/rancher/local-path-provisioner/master/deploy/local-path-storage.yaml
-  - https://raw.githubusercontent.com/metallb/metallb/v0.14.5/config/manifests/metallb-native.yaml
+  - https://raw.githubusercontent.com/kube-vip/kube-vip-cloud-provider/main/manifest/kube-vip-cloud-controller.yaml
   - https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
-  - ./metallb-addresspool.yaml
+  - ./kube-vip-addresspool.yaml
 
 patches:
   - patch: |-

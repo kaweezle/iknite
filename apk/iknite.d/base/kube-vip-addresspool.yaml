@@ -3,8 +3,8 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   labels:
-    app: metallb
-  name: metallb:node-lister
+    app: kube-vip
+  name: kube-vip:node-lister
 rules:
   - apiGroups:
       - ""
@@ -18,9 +18,9 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
   labels:
-    app: metallb
-  name: metallb-address-pool-admin
-  namespace: metallb-system
+    app: kube-vip
+  name: kube-vip-address-pool-admin
+  namespace: kube-system
 rules:
   - apiGroups:
       - apps
@@ -31,21 +31,9 @@ rules:
       - list
       - watch
   - apiGroups:
-      - metallb.io
+      - ""
     resources:
-      - ipaddresspools
-    verbs:
-      - create
-      - delete
-      - get
-      - list
-      - patch
-      - update
-      - watch
-  - apiGroups:
-      - metallb.io
-    resources:
-      - l2advertisements
+      - configmaps
     verbs:
       - create
       - delete
@@ -59,54 +47,54 @@ apiVersion: v1
 kind: ServiceAccount
 metadata:
   labels:
-    app: metallb
-  name: metallb-address-pool-admin
-  namespace: metallb-system
+    app: kube-vip
+  name: kube-vip-address-pool-admin
+  namespace: kube-system
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
   labels:
-    app: metallb
-  name: metallb-address-pool-admin
-  namespace: metallb-system
+    app: kube-vip
+  name: kube-vip-address-pool-admin
+  namespace: kube-system
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
-  name: metallb-address-pool-admin
+  name: kube-vip-address-pool-admin
 subjects:
   - kind: ServiceAccount
-    name: metallb-address-pool-admin
-    namespace: metallb-system
+    name: kube-vip-address-pool-admin
+    namespace: kube-system
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
   labels:
-    app: metallb
-  name: metallb-address-pool-admin
+    app: kube-vip
+  name: kube-vip-address-pool-admin
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: metallb:node-lister
+  name: kube-vip:node-lister
 subjects:
   - kind: ServiceAccount
-    name: metallb-address-pool-admin
-    namespace: metallb-system
+    name: kube-vip-address-pool-admin
+    namespace: kube-system
 ---
 apiVersion: batch/v1
 kind: Job
 metadata:
   labels:
-    app: metallb
+    app: kube-vip
   name: create-address-pools
-  namespace: metallb-system
+  namespace: kube-system
 spec:
   ttlSecondsAfterFinished: 100
   backoffLimit: 3
   template:
     spec:
-      serviceAccountName: metallb-address-pool-admin
+      serviceAccountName: kube-vip-address-pool-admin
       automountServiceAccountToken: true
       restartPolicy: OnFailure
       containers:
@@ -118,22 +106,7 @@ spec:
             - -c
             - |
               set -xe
-              kubectl rollout status deployment/controller -n metallb-system
+              kubectl rollout status deployment/kube-vip-cloud-provider -n kube-system
               ip=$(kubectl get nodes -o jsonpath='{range .items[*]}{range .status.addresses[*]}{.address}{"\n"}{end}{end}' | head -1)
               sleep 3
-              cat - <<EOF | kubectl apply -f -
-              apiVersion: metallb.io/v1beta1
-              kind: IPAddressPool
-              metadata:
-                  name: node-ip-pool
-                  namespace: metallb-system
-              spec:
-                  addresses:
-                  - $ip/32
-              ---
-              apiVersion: metallb.io/v1beta1
-              kind: L2Advertisement
-              metadata:
-                  name: advertisement
-                  namespace: metallb-system
-              EOF
+              kubectl create configmap -n kube-system kubevip --from-literal cidr-global=$ip/32

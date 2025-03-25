@@ -86,8 +86,8 @@ nfpms:
         dst: /etc/iknite.d/kustomization.yaml
       - src: apk/iknite.d/base/kustomization.yaml
         dst: /etc/iknite.d/base/kustomization.yaml
-      - src: apk/iknite.d/base/metallb-addresspool.yaml
-        dst: /etc/iknite.d/base/metallb-addresspool.yaml
+      - src: apk/iknite.d/base/kube-vip-addresspool.yaml
+        dst: /etc/iknite.d/base/kube-vip-addresspool.yaml
       - src: apk/iknite.d/base/kube-flannel.yaml
         dst: /etc/iknite.d/base/kube-flannel.yaml
       - src: apk/init.d/iknite

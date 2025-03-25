@@ -214,7 +214,10 @@ func newCmdInit(out io.Writer, initOptions *initOptions) *cobra.Command {
 	initRunner.AppendPhase(WrapPhase(phases.NewCertsPhase(), ikniteApi.Initializing, nil))
 	initRunner.AppendPhase(WrapPhase(phases.NewKubeConfigPhase(), ikniteApi.Initializing, nil))
 	initRunner.AppendPhase(WrapPhase(phases.NewEtcdPhase(), ikniteApi.Initializing, nil))
-	initRunner.AppendPhase(WrapPhase(phases.NewControlPlanePhase(), ikniteApi.Initializing, nil))
+	controlPlanePhase := phases.NewControlPlanePhase()
+	controlPlanePhase.Phases = append(controlPlanePhase.Phases, iknitePhase.NewKubeVipControlPlanePhase())
+
+	initRunner.AppendPhase(WrapPhase(controlPlanePhase, ikniteApi.Initializing, nil))
 	initRunner.AppendPhase(WrapPhase(iknitePhase.NewKubeletStartPhase(), ikniteApi.Initializing, nil))
 	initRunner.AppendPhase(WrapPhase(phases.NewWaitControlPlanePhase(), ikniteApi.Initializing, nil))
 	initRunner.AppendPhase(WrapPhase(phases.NewUploadConfigPhase(), ikniteApi.Initializing, nil))
