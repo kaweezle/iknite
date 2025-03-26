@@ -23,5 +23,5 @@ func runPreCleanHost(c workflow.RunData) error {
 	}
 	ikniteConfig := &data.IkniteCluster().Spec
 
-	return k8s.CleanAll(ikniteConfig, false, true, false)
+	return k8s.CleanAll(ikniteConfig, false, false, true, false)
 }

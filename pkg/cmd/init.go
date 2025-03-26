@@ -266,6 +266,7 @@ func newInitOptions() *initOptions {
 	// initialize the public kubeadm config API by applying defaults
 	externalInitCfg := &kubeadmApiV1.InitConfiguration{}
 	kubeadmScheme.Scheme.Default(externalInitCfg)
+	externalInitCfg.SkipPhases = []string{coreDNSPhase}
 
 	externalClusterCfg := &kubeadmApiV1.ClusterConfiguration{}
 	kubeadmScheme.Scheme.Default(externalClusterCfg)

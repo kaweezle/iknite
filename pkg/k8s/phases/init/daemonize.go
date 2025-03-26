@@ -93,7 +93,7 @@ func runDaemonize(c workflow.RunData) error {
 		data.SetKubeletCmd(nil)
 	}
 	data.IkniteCluster().Update(iknite.Cleaning, "clean", nil, nil)
-	_ = k8s.CleanAll(&data.IkniteCluster().Spec, true, false, false)
+	_ = k8s.CleanAll(&data.IkniteCluster().Spec, true, false, false, false)
 	data.IkniteCluster().Update(iknite.Stopped, "", nil, nil)
 	return err
 }

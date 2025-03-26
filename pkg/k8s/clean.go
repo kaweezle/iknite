@@ -117,7 +117,7 @@ func UnmountPaths(failOnError bool, isDryRun bool) error {
 	return nil
 }
 
-func CleanAll(ikniteConfig *v1alpha1.IkniteClusterSpec, resetIpAddress, failOnError, isDryRun bool) error {
+func CleanAll(ikniteConfig *v1alpha1.IkniteClusterSpec, resetIpAddress, resetIpTables, failOnError, isDryRun bool) error {
 
 	var err error
 	if err = StopAllContainers(isDryRun); err != nil {
@@ -159,12 +159,14 @@ func CleanAll(ikniteConfig *v1alpha1.IkniteClusterSpec, resetIpAddress, failOnEr
 		}
 	}
 
-	log.Info("Cleaning up iptables rules...")
-	err = ResetIPTables(isDryRun)
-	if err != nil {
-		log.WithError(err).Warn("Error cleaning up iptables rules")
-		if failOnError {
-			return err
+	if resetIpTables {
+		log.Info("Cleaning up iptables rules...")
+		err = ResetIPTables(isDryRun)
+		if err != nil {
+			log.WithError(err).Warn("Error cleaning up iptables rules")
+			if failOnError {
+				return err
+			}
 		}
 	}
 

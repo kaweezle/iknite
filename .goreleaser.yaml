@@ -90,6 +90,8 @@ nfpms:
         dst: /etc/iknite.d/base/kube-vip-addresspool.yaml
       - src: apk/iknite.d/base/kube-flannel.yaml
         dst: /etc/iknite.d/base/kube-flannel.yaml
+      - src: apk/iknite.d/base/coredns.yaml
+        dst: /etc/iknite.d/base/coredns.yaml
       - src: apk/init.d/iknite
         dst: /etc/init.d/iknite
       - src: apk/conf.d/iknite

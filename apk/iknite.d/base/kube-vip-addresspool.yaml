@@ -109,4 +109,4 @@ spec:
               kubectl rollout status deployment/kube-vip-cloud-provider -n kube-system
               ip=$(kubectl get nodes -o jsonpath='{range .items[*]}{range .status.addresses[*]}{.address}{"\n"}{end}{end}' | head -1)
               sleep 3
-              kubectl create configmap -n kube-system kubevip --from-literal cidr-global=$ip/32
+              kubectl create configmap -n kube-system kubevip --from-literal cidr-global=$ip/32 -o yaml --dry-run=client | kubectl apply -f -
