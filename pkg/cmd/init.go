@@ -16,6 +16,7 @@ limitations under the License.
 
 package cmd
 
+// cSpell:words kubeproxyconfig
 // cSpell: disable
 import (
 	"context"
@@ -25,6 +26,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"syscall"
+	"time"
 
 	"github.com/pion/mdns"
 	"github.com/pkg/errors"
@@ -43,6 +45,7 @@ import (
 	phases "k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/init"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	cmdUtil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
+	componentConfigs "k8s.io/kubernetes/cmd/kubeadm/app/componentconfigs"
 	kubeadmConstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	certsPhase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
@@ -60,6 +63,7 @@ import (
 	"github.com/kaweezle/iknite/pkg/k8s"
 	iknitePhase "github.com/kaweezle/iknite/pkg/k8s/phases/init"
 	metaV1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	kubeproxyconfig "k8s.io/kube-proxy/config/v1alpha1"
 	kubeadmCmd "k8s.io/kubernetes/cmd/kubeadm/app/cmd"
 )
 
@@ -333,6 +337,15 @@ func newInitData(cmd *cobra.Command, _ []string, initOptions *initOptions, out i
 	if err != nil {
 		return nil, err
 	}
+
+	// Set the iptables sync duration to 10 seconds instead of 30 seconds for faster restarts
+	// In case the IP tables are reset (reboot, etc).
+	kubeProxyConfig := cfg.ClusterConfiguration.ComponentConfigs[componentConfigs.KubeProxyGroup].Get()
+	kubeProxyConfigTyped, ok := kubeProxyConfig.(*kubeproxyconfig.KubeProxyConfiguration)
+	if !ok {
+		return nil, errors.New("could not convert the KubeletConfiguration to a typed object")
+	}
+	kubeProxyConfigTyped.IPTables.SyncPeriod.Duration = 10 * time.Second
 
 	ignorePreflightErrorsSet, err := validation.ValidateIgnorePreflightErrors(initOptions.ignorePreflightErrors, cfg.NodeRegistration.IgnorePreflightErrors)
 	if err != nil {
