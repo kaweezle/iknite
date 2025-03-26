@@ -78,7 +78,11 @@ func RemoveKubeletFiles(isDryRun bool) (err error) {
 		log.Info("Would remove cpu_manager_state, memory_manager_state, pod/* files in /var/lib/kubelet...")
 	} else {
 		log.Info("Removing cpu_manager_state, memory_manager_state, pod/* files in /var/lib/kubelet...")
-		_, err = s.Exec("sh -c 'rm -rf /var/lib/kubelet/{cpu_manager_state,memory_manager_state} /var/lib/kubelet/pods/*'").String()
+		var out string
+		out, err = s.Exec("sh -c 'rm -rf /var/lib/kubelet/{cpu_manager_state,memory_manager_state} /var/lib/kubelet/pods/*'").String()
+		if err != nil {
+			err = errors.Wrapf(err, "failed to remove kubelet files: %s", out)
+		}
 	}
 	return err
 }
@@ -190,6 +194,14 @@ func processMounts(path string, remove bool, message string, isDryRun bool) erro
 	}
 	log.WithFields(fields).Info(message)
 	logger := log.WithField("isDryRun", isDryRun)
+	var err error
+	path, err = filepath.EvalSymlinks(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return errors.Wrapf(err, "failed to evaluate symlinks for path %s", path)
+	}
 
 	p := s.File("/proc/self/mounts").Column(2).Match(path).FilterLine(func(s string) string {
 		logger.WithField("mount", s).Debug(message)
