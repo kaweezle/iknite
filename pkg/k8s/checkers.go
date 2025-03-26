@@ -123,12 +123,16 @@ func difference(a, b []string) []string {
 // FileTreeDifference computes the difference between an actual path and an expected file tree
 func FileTreeDifference(path string, expectedFiles []string) ([]string, []string, error) {
 	foundFiles := []string{}
-	err := filepath.Walk(path, func(filePath string, info os.FileInfo, err error) error {
+	actualPath, err := filepath.EvalSymlinks(path)
+	if err != nil {
+		return nil, nil, err
+	}
+	err = filepath.Walk(actualPath, func(filePath string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
 		if !info.IsDir() {
-			relativePath, err := filepath.Rel(path, filePath)
+			relativePath, err := filepath.Rel(actualPath, filePath)
 			if err != nil {
 				return err
 			}
