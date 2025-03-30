@@ -19,12 +19,7 @@ package k8s
 // cSpell: disable
 import (
 	"fmt"
-	"io"
 	"os"
-	"path"
-	"path/filepath"
-	"strings"
-	"text/template"
 
 	"github.com/bitfield/script"
 	"github.com/kaweezle/iknite/pkg/alpine"
@@ -32,7 +27,6 @@ import (
 	"github.com/kaweezle/iknite/pkg/utils"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
-	"github.com/spf13/afero"
 	"github.com/txn2/txeh"
 
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
@@ -47,69 +41,6 @@ const (
 	manifestsSubdirectory            = "manifests"
 	rcConfPreventKubeletRunning      = "rc_kubelet_need=\"non-existing-service\""
 )
-
-const kubeadmConfigTemplate = `
-apiVersion: kubeadm.k8s.io/v1beta3
-kind: ClusterConfiguration
-kubernetesVersion: "{{ .KubernetesVersion }}"
-networking:
-  podSubnet: 10.244.0.0/16
-{{- if .DomainName }}
-controlPlaneEndpoint: {{ .DomainName }}
-{{- end }}
----
-apiVersion: kubeadm.k8s.io/v1beta3
-kind: InitConfiguration
-localAPIEndpoint:
-  advertiseAddress: {{ .Ip }}
-skipPhases:
-  - mark-control-plane
-nodeRegistration:
-{{- if .DomainName }}
-  name: {{ .DomainName }}
-{{- end }}
-  kubeletExtraArgs:
-    node-ip: {{ .Ip }}
-  ignorePreflightErrors:
-    - DirAvailable--var-lib-etcd
-    - Swap
-`
-
-func CreateKubeadmConfiguration(wr io.Writer, config *v1alpha1.IkniteClusterSpec) error {
-	tmpl, err := template.New("config").Parse(kubeadmConfigTemplate)
-	if err != nil {
-		return err
-	}
-
-	return tmpl.Execute(wr, config)
-}
-
-func WriteKubeadmConfiguration(fs afero.Fs, config *v1alpha1.IkniteClusterSpec) (f afero.File, err error) {
-	afs := &afero.Afero{Fs: fs}
-	f, err = afs.TempFile("", "config*.yaml")
-	if err != nil {
-		return
-	}
-	defer f.Close()
-
-	err = CreateKubeadmConfiguration(f, config)
-	if err != nil {
-		f.Close()
-		afs.Remove(f.Name())
-		f = nil
-	}
-	return
-}
-
-func RunKubeadm(parameters []string) (err error) {
-	log.Info("Running", "/usr/bin/kubeadm ", strings.Join(parameters, " "), "...")
-	if out, err := utils.Exec.Run(true, "/usr/bin/kubeadm", parameters...); err != nil {
-		return errors.Wrap(err, string(out))
-	} else {
-		log.Trace(string(out))
-	}
-	return
-}
 
 func IsKubeletServiceRunnable(confFilePath string) (present bool, err error) {
 	var lines int
@@ -217,67 +148,4 @@ func PrepareKubernetesEnvironment(ikniteConfig *v1alpha1.IkniteClusterSpec) erro
 		return utils.WriteFile(constants.CrictlYaml, []byte("runtime-endpoint: unix://"+constants.ContainerServiceSock+"\n"), os.FileMode(int(0644)))
 	})
 	return nil
-}
-
-func RunKubeadmInit(config *v1alpha1.IkniteClusterSpec) error {
-
-	fs := afero.NewOsFs()
-	f, err := WriteKubeadmConfiguration(fs, config)
-	if err != nil {
-		return err
-	}
-
-	defer fs.Remove(f.Name())
-	parameters := []string{
-		"init",
-		"--config",
-		f.Name(),
-	}
-	return RunKubeadm(parameters)
-}
-
-func CleanConfig() (err error) {
-	log.
-		WithField("dir", kubernetesConfigurationDirectory).
-		Info("Cleaning Kubernetes configuration directory")
-	configGlob := path.Join(kubernetesConfigurationDirectory, configurationPattern)
-	var files []string
-	if files, err = filepath.Glob(configGlob); err == nil {
-		for _, file := range files {
-			log.WithField("file", file).Trace("Removing configuration file")
-			err = os.Remove(file)
-			if err != nil {
-				errors.WithMessagef(err, "While removing configuration file %s", file)
-				break
-			}
-		}
-	}
-
-	if err == nil {
-		manifestsGlob := path.Join(kubernetesConfigurationDirectory, manifestsSubdirectory, "*.yaml")
-		if files, err = filepath.Glob(manifestsGlob); err == nil {
-			for _, file := range files {
-				log.WithField("file", file).Trace("Removing manifest file")
-				err = os.Remove(file)
-				if err != nil {
-					errors.WithMessagef(err, "While removing manifest file %s", file)
-					break
-				}
-			}
-		}
-	}
-
-	if err == nil {
-		certsDir := path.Join(kubernetesConfigurationDirectory, pkiSubdirectory)
-		err = utils.RemoveDirectoryContents(certsDir, func(file string) (result bool) {
-			result = file != "ca.key" && file != "ca.crt"
-			log.WithFields(log.Fields{
-				"file":   filepath.Join(certsDir, file),
-				"delete": result,
-			}).Trace("Removing certificate file or directory")
-			return
-		})
-	}
-
-	return
 }
