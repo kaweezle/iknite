@@ -2,11 +2,12 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
 resources:
+  - ./coredns.yaml
   - ./kube-flannel.yaml
   - https://raw.githubusercontent.com/rancher/local-path-provisioner/master/deploy/local-path-storage.yaml
-  - https://raw.githubusercontent.com/metallb/metallb/v0.14.5/config/manifests/metallb-native.yaml
+  - https://raw.githubusercontent.com/kube-vip/kube-vip-cloud-provider/main/manifest/kube-vip-cloud-controller.yaml
   - https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
-  - ./metallb-addresspool.yaml
+  - ./kube-vip-addresspool.yaml
 
 patches:
   - patch: |-
@@ -26,6 +27,9 @@ patches:
       - op: replace
         path: /spec/template/spec/containers/0/resources/requests/cpu
         value: "200m"
+      - op: replace
+        path: /spec/template/spec/containers/0/readinessProbe/initialDelaySeconds
+        value: 10
     target:
       kind: Deployment
       name: metrics-server

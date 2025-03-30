@@ -15,29 +15,31 @@ limitations under the License.
 */
 package k8s
 
+// cSpell: words clientcmd readyz
+// cSpell: disable
 import (
 	"context"
 	"fmt"
 	"net"
 	"time"
 
-	vconfig "github.com/kaweezle/iknite/pkg/config"
-	"github.com/kaweezle/iknite/pkg/constants"
 	"github.com/kaweezle/iknite/pkg/provision"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
-	"github.com/spf13/viper"
-	appsv1 "k8s.io/api/apps/v1"
-	corev1 "k8s.io/api/core/v1"
+	appsV1 "k8s.io/api/apps/v1"
+	coreV1 "k8s.io/api/core/v1"
 	k8Errors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metaV1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/clientcmd/api"
+	kubeadmConstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"sigs.k8s.io/kustomize/kyaml/resid"
 )
+
+// cSpell: enable
 
 type Config api.Config
 
@@ -54,7 +56,7 @@ func LoadFromFile(filename string) (*Config, error) {
 // LoadFromDefault loads the configuration from the default admin.conf file,
 // usually located at /etc/kubernetes/admin.conf.
 func LoadFromDefault() (*Config, error) {
-	return LoadFromFile(constants.KubernetesAdminConfig)
+	return LoadFromFile(kubeadmConstants.GetAdminKubeConfigPath())
 }
 
 // RenameConfig changes the name of the cluster and the context from the
@@ -172,8 +174,8 @@ func (config *Config) RestartProxy() (err error) {
 
 	ctx := context.Background()
 
-	var ds *appsv1.DaemonSet
-	if ds, err = client.AppsV1().DaemonSets("kube-system").Get(ctx, "kube-proxy", metav1.GetOptions{}); err != nil {
+	var ds *appsV1.DaemonSet
+	if ds, err = client.AppsV1().DaemonSets("kube-system").Get(ctx, "kube-proxy", metaV1.GetOptions{}); err != nil {
 		return
 	}
 
@@ -182,11 +184,11 @@ func (config *Config) RestartProxy() (err error) {
 	}
 	ds.Spec.Template.ObjectMeta.Annotations["kubectl.kubernetes.io/restartedAt"] = time.Now().Format(time.RFC3339)
 
-	_, err = client.AppsV1().DaemonSets("kube-system").Update(ctx, ds, metav1.UpdateOptions{})
+	_, err = client.AppsV1().DaemonSets("kube-system").Update(ctx, ds, metaV1.UpdateOptions{})
 	return
 }
 
-func (config *Config) DoConfiguration(ip net.IP, force bool, waitTimeout int) error {
+func (config *Config) DoKustomization(ip net.IP, kustomization string, force bool, waitTimeout int) error {
 	client, err := config.Client()
 	if err != nil {
 		return err
@@ -204,13 +206,16 @@ func (config *Config) DoConfiguration(ip net.IP, force bool, waitTimeout int) er
 		}
 		var ids []resid.ResId
 		var err error
-		kustomizeDirectory := viper.GetString(vconfig.KustomizeDirectory)
-		log.WithFields(log.Fields{
-			"directory": kustomizeDirectory,
-		}).Info("Performing configuration")
+		if kustomization == "" {
+			log.Warn("Empty kustomization.")
+		} else {
+			log.WithFields(log.Fields{
+				"kustomization": kustomization,
+			}).Info("Performing configuration")
 
-		if ids, err = provision.ApplyBaseKustomizations(kustomizeDirectory, context); err != nil {
-			return err
+			if ids, err = provision.ApplyBaseKustomizations(kustomization, context); err != nil {
+				return err
+			}
 		}
 
 		cm.Data["configured"] = "true"
@@ -220,8 +225,8 @@ func (config *Config) DoConfiguration(ip net.IP, force bool, waitTimeout int) er
 		}
 
 		log.WithFields(log.Fields{
-			"directory": kustomizeDirectory,
-			"resources": ids,
+			"kustomization": kustomization,
+			"resources":     ids,
 		}).Info("Configuration applied")
 	}
 
@@ -235,13 +240,13 @@ func (config *Config) DoConfiguration(ip net.IP, force bool, waitTimeout int) er
 
 }
 
-func GetIkniteConfigMap(client kubernetes.Interface) (cm *corev1.ConfigMap, err error) {
-	cm, err = client.CoreV1().ConfigMaps("kube-system").Get(context.TODO(), "iknite-config", metav1.GetOptions{})
+func GetIkniteConfigMap(client kubernetes.Interface) (cm *coreV1.ConfigMap, err error) {
+	cm, err = client.CoreV1().ConfigMaps("kube-system").Get(context.TODO(), "iknite-config", metaV1.GetOptions{})
 	if k8Errors.IsNotFound(err) {
 		err = nil
-		cm = &corev1.ConfigMap{
-			TypeMeta:   metav1.TypeMeta{Kind: "ConfigMap", APIVersion: "v1"},
-			ObjectMeta: metav1.ObjectMeta{Name: "iknite-config", Namespace: "kube-system"},
+		cm = &coreV1.ConfigMap{
+			TypeMeta:   metaV1.TypeMeta{Kind: "ConfigMap", APIVersion: "v1"},
+			ObjectMeta: metaV1.ObjectMeta{Name: "iknite-config", Namespace: "kube-system"},
 			Immutable:  new(bool),
 			Data:       map[string]string{"configured": "false"},
 			BinaryData: map[string][]byte{},
@@ -250,11 +255,11 @@ func GetIkniteConfigMap(client kubernetes.Interface) (cm *corev1.ConfigMap, err 
 	return
 }
 
-func WriteIkniteConfigMap(client kubernetes.Interface, cm *corev1.ConfigMap) (res *corev1.ConfigMap, err error) {
+func WriteIkniteConfigMap(client kubernetes.Interface, cm *coreV1.ConfigMap) (res *coreV1.ConfigMap, err error) {
 	if cm.UID != "" {
-		res, err = client.CoreV1().ConfigMaps("kube-system").Update(context.TODO(), cm, metav1.UpdateOptions{})
+		res, err = client.CoreV1().ConfigMaps("kube-system").Update(context.TODO(), cm, metaV1.UpdateOptions{})
 	} else {
-		res, err = client.CoreV1().ConfigMaps("kube-system").Create(context.TODO(), cm, metav1.CreateOptions{})
+		res, err = client.CoreV1().ConfigMaps("kube-system").Create(context.TODO(), cm, metaV1.CreateOptions{})
 	}
 
 	return

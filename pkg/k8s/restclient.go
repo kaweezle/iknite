@@ -1,5 +1,7 @@
 package k8s
 
+// cSpell: words clientcmd clientconfig restconfig casttype metav1 polymorphichelpers restmapper
+// cSpell: disable
 import (
 	"context"
 	"fmt"
@@ -24,6 +26,8 @@ import (
 	"k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/kubectl/pkg/polymorphichelpers"
 )
+
+// cSpell: enable
 
 type RESTClientGetter struct {
 	clientconfig clientcmd.ClientConfig
@@ -154,7 +158,7 @@ func (client *RESTClientGetter) AllWorkloadStates() (result []*v1alpha1.Workload
 	}
 
 	for _, info := range infos {
-		var u map[string]interface{}
+		var u map[string]any
 
 		if u, err = runtime.DefaultUnstructuredConverter.ToUnstructured(info.Object); err != nil {
 			return
@@ -179,10 +183,11 @@ func (client *RESTClientGetter) AllWorkloadStates() (result []*v1alpha1.Workload
 	return
 }
 
-type WorkloadStateCallbackFunc func(state bool, total int, ready []*v1alpha1.WorkloadState, unready []*v1alpha1.WorkloadState)
+type WorkloadStateCallbackFunc func(state bool, total int, ready []*v1alpha1.WorkloadState, unready []*v1alpha1.WorkloadState, iteration int) bool
 
 func AreWorkloadsReady(config *Config, callback WorkloadStateCallbackFunc) wait.ConditionWithContextFunc {
 	client := config.RESTClient()
+	iteration := 0
 	return func(ctx context.Context) (bool, error) {
 		states, err := client.AllWorkloadStates()
 		if err != nil {
@@ -205,8 +210,9 @@ func AreWorkloadsReady(config *Config, callback WorkloadStateCallbackFunc) wait.
 		}).Infof("Workloads total: %d, ready: %d, unready:%d", len(states), len(ready), len(unready))
 
 		if callback != nil {
-			callback(result, len(states), ready, unready)
+			result = callback(result, len(states), ready, unready, iteration)
 		}
+		iteration++
 
 		return result, nil
 	}

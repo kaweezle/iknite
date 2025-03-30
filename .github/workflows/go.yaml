@@ -19,7 +19,7 @@ jobs:
         id: go
 
       - name: Build
-        run: go build -v .
+        run: go build -v cmd/iknite/iknite.go
 
       - name: Test
         run: go test -v ./...

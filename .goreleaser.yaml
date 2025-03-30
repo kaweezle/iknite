@@ -1,13 +1,15 @@
 # This is an example .goreleaser.yml file with some sensible defaults.
 # Make sure to check the documentation at https://goreleaser.com
 # cSpell: disable
+version: 2
 env:
-  - KUBERNETES_VERSION=1.29.3
+  - KUBERNETES_VERSION=1.32.3
 before:
   hooks:
     - go mod tidy
 builds:
-  - env:
+  - main: ./cmd/iknite/iknite.go
+    env:
       - CGO_ENABLED=0
     goos:
       - linux
@@ -34,7 +36,7 @@ archives:
 checksum:
   name_template: SHA256SUMS
 snapshot:
-  name_template: "{{ incpatch .Version }}-devel"
+  version_template: "{{ incpatch .Version }}-devel"
 changelog:
   sort: asc
   filters:
@@ -78,16 +80,18 @@ nfpms:
       - nerdctl
     bindir: /sbin
     contents:
-      - src: apk/crictl.sh
-        dst: /etc/profile.d/crictl.sh
+      - src: apk/crictl.yaml
+        dst: /etc/crictl.yaml
       - src: apk/iknite.d/kustomization.yaml
         dst: /etc/iknite.d/kustomization.yaml
       - src: apk/iknite.d/base/kustomization.yaml
         dst: /etc/iknite.d/base/kustomization.yaml
-      - src: apk/iknite.d/base/metallb-addresspool.yaml
-        dst: /etc/iknite.d/base/metallb-addresspool.yaml
+      - src: apk/iknite.d/base/kube-vip-addresspool.yaml
+        dst: /etc/iknite.d/base/kube-vip-addresspool.yaml
       - src: apk/iknite.d/base/kube-flannel.yaml
         dst: /etc/iknite.d/base/kube-flannel.yaml
+      - src: apk/iknite.d/base/coredns.yaml
+        dst: /etc/iknite.d/base/coredns.yaml
       - src: apk/init.d/iknite
         dst: /etc/init.d/iknite
       - src: apk/conf.d/iknite

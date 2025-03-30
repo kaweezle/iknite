@@ -2,6 +2,8 @@
 <div id="top"></div>
 <!-- markdownlint-enable MD033 MD041-->
 
+<!-- cSpell:words logrus goreleaser kubectx kubens rootfs wsldl kwsl LOCALAPPDATA iface -->
+
 <!-- PROJECT SHIELDS -->
 
 [![Go Version][go-version]][go-version]
@@ -19,7 +21,7 @@
 <div align="center">
 
   <a href="https://github.com/kaweezle/iknite">
-    <img src="images/logo.svg" alt="Logo" width="80" height="80">
+    <img src="docs/img/logo.svg" alt="Logo" width="128" height="128">
   </a>
   <h3 align="center">Iknite</h3>
 
@@ -82,9 +84,8 @@ openrc based service.
 It is packaged as an APK that is published in its
 [own repository](https://kaweezle.com/repo/).
 
-It used by the [kaweezle-rootfs](https://github.com/kaweezle/kaweezle-rootfs)
-project (now deprecated) and is included in the WSL root filesystem available
-with each release (see below).
+It is included in the WSL root filesystem available with each release (see
+below).
 
 <!-- markdownlint-disable-line --><p align="right">(<a href="#top">back to top</a>)</p>
 

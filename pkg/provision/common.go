@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+	http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,6 +15,8 @@ limitations under the License.
 */
 package provision
 
+// cSpell: words kustomizer filesys crds tmpl
+// cSpell: disable
 import (
 	"bytes"
 	"embed"
@@ -35,7 +37,9 @@ import (
 	"sigs.k8s.io/kustomize/kyaml/resid"
 )
 
-func createTempKustomizeDirectory(content *embed.FS, fs filesys.FileSystem, tempdir string, dirname string, data interface{}) error {
+// cSpell: enable
+
+func createTempKustomizeDirectory(content *embed.FS, fs filesys.FileSystem, tempdir string, dirname string, data any) error {
 	log.WithFields(log.Fields{
 		"tempdir": tempdir,
 		"dirname": dirname,
@@ -147,7 +151,7 @@ func ApplyLocalKustomizations(dirname string) ([]resid.ResId, error) {
 	return ApplyKustomizations(filesys.MakeFsOnDisk(), dirname)
 }
 
-func ApplyEmbeddedKustomizations(content *embed.FS, dirname string, data interface{}) ([]resid.ResId, error) {
+func ApplyEmbeddedKustomizations(content *embed.FS, dirname string, data any) ([]resid.ResId, error) {
 	fs := filesys.MakeFsInMemory()
 	if err := fs.MkdirAll(dirname); err != nil {
 		return nil, err

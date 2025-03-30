@@ -1,5 +1,7 @@
 package k8s
 
+// cSpell:words godotenv txeh
+// cSpell: disable
 import (
 	"fmt"
 	"io"
@@ -12,16 +14,15 @@ import (
 	"syscall"
 	"time"
 
-	s "github.com/bitfield/script"
 	"github.com/joho/godotenv"
-	"github.com/kaweezle/iknite/pkg/alpine"
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
 	"github.com/kaweezle/iknite/pkg/config"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
-	"github.com/txn2/txeh"
 )
+
+// cSpell: enable
 
 const (
 	kubeletEnvFile        = "/etc/conf.d/kubelet"
@@ -33,13 +34,54 @@ const (
 	kubeletKubeadmArgsEnv = "KUBELET_KUBEADM_ARGS"
 )
 
+// cSpell: disable
 var (
 	pathsToUnmount          = []string{"/var/lib/kubelet/pods", "/var/lib/kubelet/plugins", "/var/lib/kubelet"}
 	pathsToUnmountAndRemove = []string{"/run/containerd", "/run/netns", "/run/ipcns", "/run/utsns"}
 )
 
-func StartKubelet() (*exec.Cmd, error) {
-	// Check if a process with the value contained in kubeletPidFile exists
+// cSpell: enable
+
+func CheckPidFile(service string, cmd *exec.Cmd) (int, error) {
+	pidFilePath := fmt.Sprintf("/run/%s.pid", service)
+	logger := log.WithField("pidfile", pidFilePath)
+	pidBytes, err := os.ReadFile(pidFilePath)
+	if err != nil && errors.Is(err, os.ErrNotExist) {
+		pidFilePath = fmt.Sprintf("/var/run/supervise-%s.pid", service)
+		pidBytes, err = os.ReadFile(pidFilePath)
+	}
+	if err == nil {
+		pidStr := strings.TrimSpace(string(pidBytes))
+		pid, err := strconv.Atoi(pidStr)
+		if err != nil {
+			logger.WithField("content", pidStr).Warn("Failed to convert pid file to integer")
+		} else {
+			process, err := os.FindProcess(pid)
+			if err == nil && process.Signal(syscall.Signal(0)) == nil {
+				if cmd != nil {
+					cmd.Process = process
+				}
+				return pid, nil
+			} else {
+				logger.WithField("pid", pid).Warn("Pidfile contained an invalid pid")
+				// remove kubeletPidFile
+				err = os.Remove(pidFilePath)
+				if err != nil {
+					logger.WithError(err).Warn("Failed to remove pidfile")
+				}
+			}
+		}
+	} else {
+		// only return error is the error is not a file not found error
+		if !errors.Is(err, os.ErrNotExist) {
+			return 0, err
+		}
+	}
+	return 0, nil
+}
+
+// IsKubeletRunning checks if the kubelet process is running
+func IsKubeletRunning() (*os.Process, error) {
 	pidBytes, err := os.ReadFile(kubeletPidFile)
 	if err == nil {
 		pidStr := strings.TrimSpace(string(pidBytes))
@@ -49,11 +91,27 @@ func StartKubelet() (*exec.Cmd, error) {
 		} else {
 			process, err := os.FindProcess(pid)
 			if err == nil && process.Signal(syscall.Signal(0)) == nil {
-				return nil, fmt.Errorf("kubelet is already running with pid: %d", pid)
+				log.WithField("pid", pid).Warnf("Kubelet is already running with pid: %d. Swallowing...", pid)
+				return process, nil
+			} else {
+				log.WithField("pid", pid).Warnf("Kubelet pidfile contained an invalid pid: %d", pid)
+				// remove kubeletPidFile
+				err = os.Remove(kubeletPidFile)
+				if err != nil {
+					log.WithError(err).Warnf("Failed to remove kubelet pidfile: %s", kubeletPidFile)
+				}
 			}
 		}
+	} else {
+		// only return error is the error is not a file not found error
+		if !errors.Is(err, os.ErrNotExist) {
+			return nil, err
+		}
 	}
+	return nil, nil
+}
 
+func StartKubelet() (*exec.Cmd, error) {
 	// Read the environment variables from /var/lib/kubelet/kubeadm-flags.env
 	log.WithField("kubeletEnvFile", kubeletEnvFile).Info("Reading kubelet environment file")
 
@@ -80,6 +138,15 @@ func StartKubelet() (*exec.Cmd, error) {
 	cmd.Args = append(cmd.Args, args...)
 	cmd.Env = os.Environ()
 	cmd.Env = append(cmd.Env, env...)
+
+	// Check if a process with the value contained in kubeletPidFile exists
+	// ignore the error if for some reason the pid file is not found
+	kubeletPid, _ := CheckPidFile("kubelet", cmd)
+	if kubeletPid > 0 {
+		log.WithField("pid", kubeletPid).Warnf("Kubelet is already running with pid: %d. Swallowing...", kubeletPid)
+		return cmd, nil
+	}
+
 	// Create the kubelet log directory if it doesn't exist
 	err = os.MkdirAll(kubeletLogDir, os.ModePerm)
 	if err != nil {
@@ -156,7 +223,7 @@ func StartAndConfigureKubelet(kubeConfig *v1alpha1.IkniteClusterSpec) error {
 		select {
 		case <-stop:
 			// Stop the cmd process
-			log.Info("Recevied TERM Signal. Stopping kubelet...")
+			log.Info("Received TERM Signal. Stopping kubelet...")
 			err = cmd.Process.Signal(syscall.SIGTERM)
 			if err != nil {
 				log.Fatalf("Failed to stop subprocess: %v", err)
@@ -204,7 +271,7 @@ func StartAndConfigureKubelet(kubeConfig *v1alpha1.IkniteClusterSpec) error {
 					if err != nil {
 						configErr <- err
 					} else {
-						configErr <- config.DoConfiguration(kubeConfig.Ip, force_config, 0)
+						configErr <- config.DoKustomization(kubeConfig.Ip, kubeConfig.Kustomization, force_config, 0)
 					}
 				}()
 			}
@@ -264,150 +331,5 @@ func CheckKubeletRunning(retries, okResponses, waitTime int) (err error) {
 			time.Sleep(time.Duration(waitTime) * time.Millisecond)
 		}
 	}
-	return err
-}
-
-func ResetIPAddress(ikniteConfig *v1alpha1.IkniteClusterSpec) error {
-	if !ikniteConfig.CreateIp {
-		return nil
-	}
-
-	log.Info("Resetting IP address...")
-	hosts, err := txeh.NewHosts(&txeh.HostsConfig{})
-	if err != nil {
-		return err
-	}
-	ip, err := alpine.IpMappingForHost(hosts, ikniteConfig.DomainName)
-	if err != nil {
-		return err
-	}
-	ones, _ := ip.DefaultMask().Size()
-	ipWithMask := fmt.Sprintf("%v/%d", ip, ones)
-
-	p := s.Exec("ip -br -4 a sh").Match(ipWithMask).Column(1).FilterLine(func(s string) string {
-		log.WithField("interface", s).WithField("ip", ipWithMask).Debug("Deleting IP address...")
-		return s
-	}).ExecForEach(fmt.Sprintf("ip addr del %s dev {{.}}", ipWithMask))
-	p.Wait()
-	if p.Error() != nil {
-		return p.Error()
-	}
-	hosts.RemoveHost(ikniteConfig.DomainName)
-	return hosts.Save()
-}
-
-func CleanAll(ikniteConfig *v1alpha1.IkniteClusterSpec) {
-
-	var err error
-	log.Info("Stopping all containers...")
-	if _, err = s.Exec("/bin/zsh -c 'export CONTAINER_RUNTIME_ENDPOINT=unix:///run/containerd/containerd.sock;crictl rmp -f $(crictl pods -q)'").String(); err != nil {
-		log.WithError(err).Warn("Error stopping all containers")
-	}
-
-	for _, path := range pathsToUnmount {
-		err = doUnmount(path)
-		if err != nil {
-			log.WithError(err).Warn("Error unmounting path")
-		}
-	}
-
-	for _, path := range pathsToUnmountAndRemove {
-		err = doUnmountAndRemove(path)
-		if err != nil {
-			log.WithError(err).Warn("Error unmounting and removing path")
-		}
-	}
-
-	log.Info("Removing kubelet files in /var/lib/kubelet...")
-	_, err = s.Exec("sh -c 'rm -rf /var/lib/kubelet/{cpu_manager_state,memory_manager_state} /var/lib/kubelet/pods/*'").String()
-	if err != nil {
-		log.WithError(err).Warn("Error removing kubelet files")
-	}
-
-	err = deleteCniNamespaces()
-	if err != nil {
-		log.WithError(err).Warn("Error deleting CNI namespaces")
-	}
-
-	err = deleteNetworkInterfaces()
-	if err != nil {
-		log.WithError(err).Warn("Error deleting network interfaces")
-	}
-
-	log.Info("Cleaning up iptables rules...")
-	_, err = s.Exec("iptables-save").Reject("KUBE-").Reject("CNI-").Reject("FLANNEL").Exec("iptables-restore").String()
-	if err != nil {
-		log.WithError(err).Warn("Error cleaning up iptables rules")
-	}
-
-	log.Info("Cleaning up ip6tables rules...")
-	_, err = s.Exec("ip6tables-save").Reject("KUBE-").Reject("CNI-").Reject("FLANNEL").Exec("ip6tables-restore").String()
-	if err != nil {
-		log.WithError(err).Warn("Error cleaning up ip6tables rules")
-	}
-
-	err = ResetIPAddress(ikniteConfig)
-	if err != nil {
-		log.WithError(err).Warn("Error resetting IP address")
-	}
-}
-
-func processMounts(path string, command string, message string) error {
-	fields := log.Fields{
-		"path":    path,
-		"command": command,
-	}
-	log.WithFields(fields).Info(message)
-
-	p := s.File("/proc/self/mounts").Column(2).Match(path).FilterLine(func(s string) string {
-		log.WithField("mount", s).Debug(message)
-		return s
-	}).ExecForEach(command)
-	p.Wait()
-	return p.Error()
-}
-
-func doUnmountAndRemove(path string) error {
-	return processMounts(path, "sh -c 'umount \"{{.}}\" && rm -rf \"{{.}}\"'", "Unmounting and removing")
-}
-
-func doUnmount(path string) error {
-	return processMounts(path, "umount {{.}}", "Unmounting")
-}
-
-func deleteCniNamespaces() error {
-	log.Info("Deleting CNI namespaces...")
-	p := s.Exec("ip netns show").Column(1).FilterLine(func(s string) string {
-		log.WithField("namespace", s).Debug("Deleting namespace...")
-		return s
-	}).ExecForEach("ip netns delete {{.}}")
-	p.Wait()
-	return p.Error()
-}
-
-func deleteNetworkInterfaces() error {
-	log.Info("Deleting pods network interfaces...")
-	p := s.Exec("ip link show").Match("master cni0").Column(2).FilterLine(func(s string) string {
-		result := strings.Split(s, "@")[0]
-		log.WithField("interface", result).Debug("Deleting interface...")
-		return result
-	}).ExecForEach("ip link delete {{.}}")
-	p.Wait()
-	err := p.Error()
-	if err != nil {
-		log.WithError(err).Error("Error deleting pods network interfaces")
-		return err
-	} else {
-		log.Infof("Deleted pods network interfaces")
-	}
-
-	log.Info("Deleting cni0 network interface...")
-	if _, err = s.Exec("ip link show").Match("cni0").ExecForEach("ip link delete cni0").Stdout(); err != nil {
-		log.WithError(err).Error("Error deleting cni0 network interface")
-		return err
-	}
-
-	log.Info("Deleting flannel.1 network interface...")
-	_, err = s.Exec("ip link show").Match("flannel.1").ExecForEach("ip link delete flannel.1").Stdout()
 	return err
 }

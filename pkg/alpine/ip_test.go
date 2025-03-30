@@ -1,8 +1,10 @@
 package alpine
 
+// cSpell: words RTNETLINK Nilf txeh
+// cSpell: disable
 import (
-	"io/ioutil"
 	"net"
+	"os"
 	"os/exec"
 	"regexp"
 	"testing"
@@ -14,6 +16,8 @@ import (
 	"github.com/kaweezle/iknite/pkg/utils"
 	"github.com/stretchr/testify/suite"
 )
+
+// cSpell: enable
 
 type IPTestSuite struct {
 	suite.Suite
@@ -78,7 +82,7 @@ func (s *IPTestSuite) TestAddIpMapping() {
 	fs := afero.NewOsFs()
 	afs := &afero.Afero{Fs: fs}
 
-	f, err := ioutil.TempFile("", "hosts")
+	f, err := os.CreateTemp("", "hosts")
 	require.NoError(err)
 	f.Close()
 

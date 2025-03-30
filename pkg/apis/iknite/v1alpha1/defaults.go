@@ -1,5 +1,7 @@
 package v1alpha1
 
+// cSpell: words metav1
+// cSpell: disable
 import (
 	"net"
 
@@ -10,6 +12,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
+// cSpell: enable
+
 func addDefaultingFuncs(scheme *runtime.Scheme) error {
 	return RegisterDefaults(scheme)
 }
@@ -18,7 +22,7 @@ func SetDefaults_IkniteClusterSpec(obj *IkniteClusterSpec) {
 	wsl := utils.IsOnWSL()
 	if obj.Ip == nil {
 		if wsl {
-			obj.Ip = net.ParseIP(constants.WSLIPAddress)
+			obj.Ip = net.ParseIP(constants.WslIPAddress)
 		} else {
 			obj.Ip, _ = utils.GetOutboundIP()
 		}
@@ -37,9 +41,12 @@ func SetDefaults_IkniteClusterSpec(obj *IkniteClusterSpec) {
 	if obj.ClusterName == "" {
 		obj.ClusterName = constants.DefaultClusterName
 	}
+	if obj.Kustomization == "" {
+		obj.Kustomization = constants.DefaultKustomization
+	}
 }
 
-func SetDefautls_IkniteClusterStatus(obj *IkniteClusterStatus) {
+func SetDefaults_IkniteClusterStatus(obj *IkniteClusterStatus) {
 	if obj.State == iknite.Undefined {
 		obj.State = iknite.Stopped
 	}
@@ -53,5 +60,5 @@ func SetDefautls_IkniteClusterStatus(obj *IkniteClusterStatus) {
 
 func SetDefaults_IkniteCluster(obj *IkniteCluster) {
 	SetDefaults_IkniteClusterSpec(&obj.Spec)
-	SetDefautls_IkniteClusterStatus(&obj.Status)
+	SetDefaults_IkniteClusterStatus(&obj.Status)
 }
