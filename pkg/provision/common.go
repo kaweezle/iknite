@@ -39,7 +39,7 @@ import (
 
 // cSpell: enable
 
-func createTempKustomizeDirectory(content *embed.FS, fs filesys.FileSystem, tempdir string, dirname string, data interface{}) error {
+func createTempKustomizeDirectory(content *embed.FS, fs filesys.FileSystem, tempdir string, dirname string, data any) error {
 	log.WithFields(log.Fields{
 		"tempdir": tempdir,
 		"dirname": dirname,
@@ -151,7 +151,7 @@ func ApplyLocalKustomizations(dirname string) ([]resid.ResId, error) {
 	return ApplyKustomizations(filesys.MakeFsOnDisk(), dirname)
 }
 
-func ApplyEmbeddedKustomizations(content *embed.FS, dirname string, data interface{}) ([]resid.ResId, error) {
+func ApplyEmbeddedKustomizations(content *embed.FS, dirname string, data any) ([]resid.ResId, error) {
 	fs := filesys.MakeFsInMemory()
 	if err := fs.MkdirAll(dirname); err != nil {
 		return nil, err

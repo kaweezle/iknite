@@ -32,7 +32,7 @@ import (
 //go:embed base
 var content embed.FS
 
-func ApplyBaseKustomizations(dirname string, data interface{}) ([]resid.ResId, error) {
+func ApplyBaseKustomizations(dirname string, data any) ([]resid.ResId, error) {
 
 	exists := false
 	var err error

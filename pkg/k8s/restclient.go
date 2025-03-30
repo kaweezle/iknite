@@ -158,7 +158,7 @@ func (client *RESTClientGetter) AllWorkloadStates() (result []*v1alpha1.Workload
 	}
 
 	for _, info := range infos {
-		var u map[string]interface{}
+		var u map[string]any
 
 		if u, err = runtime.DefaultUnstructuredConverter.ToUnstructured(info.Object); err != nil {
 			return
