@@ -52,7 +52,7 @@ func NewRootCmd() *cobra.Command {
 Makes the appropriate initialization of a WSL 2 Alpine distribution for running
 kubernetes.`,
 		Example: `> iknite start`,
-		Version: "v0.4.2", // <---VERSION--->
+		Version: "v0.5.0", // <---VERSION--->
 		// Uncomment the following line if your bare application
 		// has an action associated with it:
 		// Run: func(cmd *cobra.Command, args []string) { },
