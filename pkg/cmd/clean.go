@@ -4,6 +4,7 @@ package cmd
 // cSpell: disable
 import (
 	"os"
+	"syscall"
 
 	"github.com/kaweezle/iknite/pkg/alpine"
 	"github.com/kaweezle/iknite/pkg/apis/iknite"
@@ -182,6 +183,18 @@ func performClean(ikniteConfig *v1alpha1.IkniteClusterSpec, cleanOptions *cleanO
 		logger.WithField("path", constants.KubernetesRootConfig).Info("Removing kubernetes root config...")
 		if !dryRun {
 			os.RemoveAll(constants.KubernetesRootConfig)
+		}
+	}
+
+	kubeletProcess, _ := k8s.IsKubeletRunning()
+	if kubeletProcess != nil {
+		logger.WithField("pid", kubeletProcess.Pid).Info("Kubelet is still running, stopping it...")
+		if !dryRun {
+			err = kubeletProcess.Signal(syscall.SIGTERM)
+			if err == nil {
+				logger.WithField("pid", kubeletProcess.Pid).Info("Waiting for kubelet to stop...")
+				kubeletProcess.Wait()
+			}
 		}
 	}
 

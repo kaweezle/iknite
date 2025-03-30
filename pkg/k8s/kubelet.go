@@ -81,7 +81,7 @@ func CheckPidFile(service string, cmd *exec.Cmd) (int, error) {
 }
 
 // IsKubeletRunning checks if the kubelet process is running
-func IsKubeletRunning(cmd *exec.Cmd) (int, error) {
+func IsKubeletRunning() (*os.Process, error) {
 	pidBytes, err := os.ReadFile(kubeletPidFile)
 	if err == nil {
 		pidStr := strings.TrimSpace(string(pidBytes))
@@ -92,10 +92,7 @@ func IsKubeletRunning(cmd *exec.Cmd) (int, error) {
 			process, err := os.FindProcess(pid)
 			if err == nil && process.Signal(syscall.Signal(0)) == nil {
 				log.WithField("pid", pid).Warnf("Kubelet is already running with pid: %d. Swallowing...", pid)
-				if cmd != nil {
-					cmd.Process = process
-				}
-				return pid, nil
+				return process, nil
 			} else {
 				log.WithField("pid", pid).Warnf("Kubelet pidfile contained an invalid pid: %d", pid)
 				// remove kubeletPidFile
@@ -108,10 +105,10 @@ func IsKubeletRunning(cmd *exec.Cmd) (int, error) {
 	} else {
 		// only return error is the error is not a file not found error
 		if !errors.Is(err, os.ErrNotExist) {
-			return 0, err
+			return nil, err
 		}
 	}
-	return 0, nil
+	return nil, nil
 }
 
 func StartKubelet() (*exec.Cmd, error) {
