@@ -39,7 +39,7 @@ import (
 
 	kubeadmApi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmScheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
-	kubeadmApiV1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
+	kubeadmApiV1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta4"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	phases "k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/init"
@@ -50,7 +50,6 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	certsPhase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
 	kubeconfigPhase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubeconfig"
-	apiClient "k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	configUtil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	kubeConfigUtil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 
@@ -134,6 +133,9 @@ type initData struct {
 //
 //go:linkname AddInitOtherFlags k8s.io/kubernetes/cmd/kubeadm/app/cmd.AddInitOtherFlags
 func AddInitOtherFlags(flagSet *flag.FlagSet, initOptions *initOptions)
+
+//go:linkname getDryRunClient k8s.io/kubernetes/cmd/kubeadm/app/cmd.getDryRunClient
+func getDryRunClient(d *initData) (clientset.Interface, error)
 
 // newCmdInit returns "kubeadm init" command.
 // NB. initOptions is exposed as parameter for allowing unit testing of
@@ -372,7 +374,7 @@ func newInitData(cmd *cobra.Command, _ []string, initOptions *initOptions, out i
 		// the KUBEADM_INIT_DRYRUN_DIR environment variable allows overriding the dry-run temporary
 		// directory from the command line. This makes it possible to run "kubeadm init" integration
 		// tests without root.
-		if dryRunDir, err = kubeadmConstants.CreateTempDirForKubeadm(os.Getenv("KUBEADM_INIT_DRYRUN_DIR"), "kubeadm-init-dryrun"); err != nil {
+		if dryRunDir, err = kubeadmConstants.CreateTempDir(os.Getenv("KUBEADM_INIT_DRYRUN_DIR"), "kubeadm-init-dryrun"); err != nil {
 			return nil, errors.Wrap(err, "couldn't create a temporary directory")
 		}
 	}
@@ -535,16 +537,6 @@ func (d *initData) ExternalCA() bool {
 // OutputWriter returns the io.Writer used to write output to by this command.
 func (d *initData) OutputWriter() io.Writer {
 	return d.outputWriter
-}
-
-// getDryRunClient creates a fake client that answers some GET calls in order to be able to do the full init flow in dry-run mode.
-func getDryRunClient(d *initData) (clientset.Interface, error) {
-	svcSubnetCIDR, err := kubeadmConstants.GetKubernetesServiceCIDR(d.cfg.Networking.ServiceSubnet)
-	if err != nil {
-		return nil, errors.Wrapf(err, "unable to get internal Kubernetes Service IP from the given service CIDR (%s)", d.cfg.Networking.ServiceSubnet)
-	}
-	dryRunGetter := apiClient.NewInitDryRunGetter(d.cfg.NodeRegistration.Name, svcSubnetCIDR.String())
-	return apiClient.NewDryRunClient(dryRunGetter, os.Stdout), nil
 }
 
 // Client returns a Kubernetes client to be used by kubeadm.

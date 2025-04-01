@@ -21,6 +21,7 @@ package cmd
 import (
 	"errors"
 	"io"
+	"os"
 
 	ikniteApi "github.com/kaweezle/iknite/pkg/apis/iknite"
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
@@ -46,7 +47,9 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	cmdUtil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	kubeadmConstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	apiClient "k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	configUtil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
+	kubeconfigUtil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 )
 
 // cSpell: enable
@@ -123,7 +126,10 @@ func newResetData(cmd *cobra.Command, opts *resetOptions, in io.Reader, out io.W
 
 	ikniteCluster.Spec = *opts.ikniteCfg
 
-	var initCfg *kubeadmapi.InitConfiguration
+	var (
+		initCfg *kubeadmapi.InitConfiguration
+		client  clientset.Interface
+	)
 
 	// Either use the config file if specified, or convert public kubeadm API to the internal ResetConfiguration and validates cfg.
 	resetCfg, err := configUtil.LoadOrDefaultResetConfiguration(opts.cfgPath, opts.externalCfg, configUtil.LoadOrDefaultConfigurationOptions{
@@ -134,7 +140,21 @@ func newResetData(cmd *cobra.Command, opts *resetOptions, in io.Reader, out io.W
 		return nil, err
 	}
 
-	client, err := cmdUtil.GetClientSet(opts.kubeconfigPath, false)
+	dryRunFlag := cmdUtil.ValueFromFlagsOrConfig(cmd.Flags(), options.DryRun, resetCfg.DryRun, opts.externalCfg.DryRun).(bool)
+	if dryRunFlag {
+		dryRun := apiClient.NewDryRun().WithDefaultMarshalFunction().WithWriter(os.Stdout)
+		dryRun.AppendReactor(dryRun.GetKubeadmConfigReactor()).
+			AppendReactor(dryRun.GetKubeletConfigReactor()).
+			AppendReactor(dryRun.GetKubeProxyConfigReactor())
+		client = dryRun.FakeClient()
+		_, err = os.Stat(opts.kubeconfigPath)
+		if err == nil {
+			err = dryRun.WithKubeConfigFile(opts.kubeconfigPath)
+		}
+	} else {
+		client, err = kubeconfigUtil.ClientSetFromFile(opts.kubeconfigPath)
+	}
+
 	if err == nil {
 		klog.V(1).Infof("[reset] Loaded client set from kubeconfig file: %s", opts.kubeconfigPath)
 		initCfg, err = configUtil.FetchInitConfigurationFromCluster(client, nil, "reset", false, false)
@@ -182,7 +202,7 @@ func newResetData(cmd *cobra.Command, opts *resetOptions, in io.Reader, out io.W
 		cfg:                   initCfg,
 		resetCfg:              resetCfg,
 		dryRun:                cmdUtil.ValueFromFlagsOrConfig(cmd.Flags(), options.DryRun, resetCfg.DryRun, opts.externalCfg.DryRun).(bool),
-		forceReset:            cmdUtil.ValueFromFlagsOrConfig(cmd.Flags(), options.ForceReset, resetCfg.Force, opts.externalCfg.Force).(bool),
+		forceReset:            cmdUtil.ValueFromFlagsOrConfig(cmd.Flags(), options.Force, resetCfg.Force, opts.externalCfg.Force).(bool),
 		cleanupTmpDir:         cmdUtil.ValueFromFlagsOrConfig(cmd.Flags(), options.CleanupTmpDir, resetCfg.CleanupTmpDir, opts.externalCfg.CleanupTmpDir).(bool),
 		ikniteCluster:         ikniteCluster,
 	}, nil
