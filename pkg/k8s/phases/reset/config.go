@@ -87,7 +87,7 @@ func runCleanupConfig(c workflow.RunData) error {
 
 	dirsToClean = append(dirsToClean, certsDir)
 	if r.CleanupTmpDir() {
-		tempDir := path.Join(kubeadmConstants.KubernetesDir, kubeadmConstants.TempDirForKubeadm)
+		tempDir := path.Join(kubeadmConstants.KubernetesDir, kubeadmConstants.TempDir)
 		dirsToClean = append(dirsToClean, tempDir)
 	}
 	resetConfigDir(kubeadmConstants.KubernetesDir, dirsToClean, r.DryRun())
