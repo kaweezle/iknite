@@ -1,0 +1,115 @@
+# This is a melange (see https://github.com/chainguard-dev/melange) recipe
+# for building an apk package that contains the kubernetes base container
+# images for the iknite project.
+# Build with this command:
+# doas nerdctl run --privileged --rm -v $(pwd):/work cgr.dev/chainguard/melange build support/apk/iknite-images.yaml --arch $(uname -m)
+package:
+  name: iknite-images
+  version: 1.32.3
+  description: A collection of containerd images for the iknite project.
+  copyright:
+    - license: Apache-2.0
+  dependencies:
+    runtime:
+      - containerd
+      - containerd-ctr
+  scriptlets:
+    post-install: |
+      #!/bin/sh
+
+      # Check if containerd is running. If not, start it and memorize we have started it
+      if [ -S /run/containerd/containerd.sock ]; then
+        started_containerd=no
+      else
+        # Start containerd
+        echo "Starting containerd..."
+        containerd --config /etc/containerd/config.toml >/dev/null 2>&1 &
+        # Wait for containerd to start
+        while [ ! -S /run/containerd/containerd.sock ]; do
+          sleep 1
+        done
+        started_containerd=yes
+      fi
+
+      cd /usr/share/iknite/images
+      for i in *.tar.gz; do
+        name=$(basename $i .tar.gz | tr '_' ':')
+        # Check if the image is already imported
+        if ! ctr -n k8s.io images ls | grep -q "$name"; then
+          # Import the image
+          echo "Importing container image $name..."
+          ctr -n k8s.io images import $i
+        else
+          echo "Container image $name already imported, skipping."
+        fi
+      done
+
+      # If we started containerd, stop it
+      if [ "$started_containerd" = "yes" ]; then
+        # Stop containerd
+        echo "Stopping containerd..."
+        kill $(pgrep containerd)
+        # Wait for containerd to stop
+        while [ -S /run/containerd/containerd.sock ]; do
+          sleep 1
+        done
+      fi
+
+environment:
+  contents:
+    repositories:
+      - https://packages.wolfi.dev/os
+      - https://dl-cdn.alpinelinux.org/alpine/edge/community
+      - https://dl-cdn.alpinelinux.org/alpine/edge/testing
+    keyring:
+      - https://packages.wolfi.dev/os/wolfi-signing.rsa.pub
+    packages:
+      - busybox
+      - containers-common
+      - skopeo
+
+pipeline:
+  - name: Download images
+    runs: |
+      DEST_DIR=${{targets.destdir}}/usr/share/iknite/images
+      KUBERNETES_VERSION=1.32.3
+
+      mkdir -p $DEST_DIR
+      mkdir -p /var/tmp
+      cd $DEST_DIR
+      skopeo copy docker://registry.k8s.io/pause:3.10 oci-archive:pause_3.10.tar:registry.k8s.io/pause:3.10
+      gzip pause_3.10.tar
+      skopeo copy docker://registry.k8s.io/pause:3.9 oci-archive:pause_3.9.tar:registry.k8s.io/pause:3.9
+      gzip pause_3.9.tar
+      skopeo copy docker://registry.k8s.io/etcd:3.5.12-0 oci-archive:etcd_3.5.12-0.tar:registry.k8s.io/etcd:3.5.12-0
+      gzip etcd_3.5.12-0.tar
+      skopeo copy docker://registry.k8s.io/kube-controller-manager:v${KUBERNETES_VERSION} oci-archive:kube-controller-manager_v${KUBERNETES_VERSION}.tar:registry.k8s.io/kube-controller-manager:v${KUBERNETES_VERSION}
+      gzip kube-controller-manager_v${KUBERNETES_VERSION}.tar
+      skopeo copy docker://registry.k8s.io/kube-scheduler:v${KUBERNETES_VERSION} oci-archive:kube-scheduler_v${KUBERNETES_VERSION}.tar:registry.k8s.io/kube-scheduler:v${KUBERNETES_VERSION}
+      gzip kube-scheduler_v${KUBERNETES_VERSION}.tar
+      skopeo copy docker://registry.k8s.io/kube-apiserver:v${KUBERNETES_VERSION} oci-archive:kube-apiserver_v${KUBERNETES_VERSION}.tar:registry.k8s.io/kube-apiserver:v${KUBERNETES_VERSION}
+      gzip kube-apiserver_v${KUBERNETES_VERSION}.tar
+      skopeo copy docker://registry.k8s.io/kube-proxy:v${KUBERNETES_VERSION} oci-archive:kube-proxy_v${KUBERNETES_VERSION}.tar:registry.k8s.io/kube-proxy:v${KUBERNETES_VERSION}
+      gzip kube-proxy_v${KUBERNETES_VERSION}.tar
+      skopeo copy docker://registry.k8s.io/coredns/coredns:v1.11.1 oci-archive:coredns_v1.11.1.tar:registry.k8s.io/coredns/coredns:v1.11.1
+      gzip coredns_v1.11.1.tar
+      skopeo copy docker://docker.io/rancher/local-path-provisioner:v0.0.31 oci-archive:local-path-provisioner_v0.0.31.tar:docker.io/rancher/local-path-provisioner:v0.0.31
+      gzip local-path-provisioner_v0.0.31.tar
+      skopeo copy docker://registry.k8s.io/metrics-server/metrics-server:v0.7.2 oci-archive:metrics-server_v0.7.2.tar:registry.k8s.io/metrics-server/metrics-server:v0.7.2
+      gzip metrics-server_v0.7.2.tar
+      skopeo copy docker://ghcr.io/flannel-io/flannel:v0.26.5 oci-archive:flannel_v0.26.5.tar:ghcr.io/flannel-io/flannel:v0.26.5
+      gzip flannel_v0.26.5.tar
+      skopeo copy docker://ghcr.io/boxboat/kubectl:${KUBERNETES_VERSION} oci-archive:kubectl_v${KUBERNETES_VERSION}.tar:ghcr.io/boxboat/kubectl:${KUBERNETES_VERSION}
+      gzip kubectl_v${KUBERNETES_VERSION}.tar
+      skopeo copy docker://ghcr.io/kube-vip/kube-vip:v0.8.9 oci-archive:kube-vip_v0.8.9.tar:ghcr.io/kube-vip/kube-vip:v0.8.9
+      gzip kube-vip_v0.8.9.tar
+      skopeo copy docker://ghcr.io/kube-vip/kube-vip-cloud-provider:v0.0.11 oci-archive:kube-vip-cloud-provider_v0.0.11.tar:ghcr.io/kube-vip/kube-vip-cloud-provider:v0.0.11
+      gzip kube-vip-cloud-provider_v0.0.11.tar
+
+test:
+  environment:
+    contents:
+      packages: []
+  pipeline:
+    - runs: |
+        ls -l ${{targets.destdir}}/usr/share/iknite/images
