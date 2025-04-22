@@ -47,7 +47,9 @@ RUN install -m 700 -o root -g root /usr/share/oh-my-zsh/templates/zshrc.zsh-temp
 
 COPY --chown=root:root ./p10k.zsh /root/.p10k.zsh
 
-RUN --mount=type=bind,target=/build --security=insecure /build/install_images.sh ${KUBERNETES_VERSION}
+RUN --mount=type=bind,target=/apks --security=insecure \
+    apk add --no-progress --no-cache /apks/iknite-images-${KUBERNETES_VERSION}*.apk && \
+    apk del iknite-images
 
 # Run shell by default. Allows using the docker image
 CMD /bin/zsh

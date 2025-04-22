@@ -22,17 +22,30 @@ jobs:
       - name: Import Signature key
         shell: bash
         run: |
-          echo -e "$GPG_PRIVATE_KEY" > gpg_key.asc
-          openssl rsa -in gpg_key.asc -pubout -out kaweezle-devel@kaweezle.com-c9d89864.rsa.pub
+          echo -e "$GPG_PRIVATE_KEY" > kaweezle-devel@kaweezle.com-c9d89864.rsa
+          openssl rsa -in kaweezle-devel@kaweezle.com-c9d89864.rsa -pubout -out kaweezle-devel@kaweezle.com-c9d89864.rsa.pub
         env:
           GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
       - name: Run GoReleaser Tests
         uses: goreleaser/goreleaser-action@v5
         with:
-          version: '~> v2'
+          version: "~> v2"
           args: --snapshot --skip=publish --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build iknite images APK
+        run: |
+          docker run --rm --privileged \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            -v $(pwd):/work \
+            cgr.dev/chainguard/melange build support/apk/iknite-images.yaml \
+            --arch $(uname -m) \
+            --signing-key kaweezle-devel@kaweezle.com-c9d89864.rsa \
+            --generate-index=false
+          sudo chown -R $(id -u):$(id -g) packages
+          (cd packages/$(uname -m)/ && \
+           sha256sum *.apk >>../../dist/SHA256SUMS && \
+           for f in *.apk; do mv $f ../../dist/$(echo $f | sed 's/\-r0.apk$//').$(uname -m).apk; done)
       - name: Upload assets
         uses: actions/upload-artifact@v4
         with:
@@ -96,7 +109,7 @@ jobs:
           export IKNITE_VERSION=$(jq -Mr ".version" packages/metadata.json)
           export IKNITE_LAST_TAG=$(jq -Mr ".tag" packages/metadata.json)
           echo "Version is $IKNITE_VERSION"
-          mv packages/iknite-${IKNITE_VERSION}.x86_64.apk rootfs
+          mv packages/iknite-${IKNITE_VERSION}.x86_64.apk packages/iknite-images-*.apk rootfs
           cd rootfs
           mkdir -p /tmp/.buildx-cache
           mkdir -p /tmp/.buildx-cache-new

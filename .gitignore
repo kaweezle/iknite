@@ -16,6 +16,7 @@ build/
 # vendor/
 
 dist/
+*.rsa
 gpg_key.asc
 kaweezle-devel@kaweezle.com-c9d89864.rsa.pub
 
@@ -26,3 +27,4 @@ kaweezle-devel@kaweezle.com-c9d89864.rsa.pub
 
 iknite
 packages/
+rootfs/*.apk
