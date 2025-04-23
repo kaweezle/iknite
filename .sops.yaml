@@ -1,0 +1,6 @@
+creation_rules:
+  - path_regex: gitops(\\|\/).*\.sops\.yaml
+    encrypted_regex: "^(data|stringData|.*_keys?|admin|adminKey|password)$"
+    age: age1fs48f8rw9gj49ss5fapsy8euqln0dtrc5yg35fuq7c930jtkveps2swvt6
+  - path_regex: support(\\|\/)iac(\\|\/).*\.sops\.yaml
+    age: age1fs48f8rw9gj49ss5fapsy8euqln0dtrc5yg35fuq7c930jtkveps2swvt6

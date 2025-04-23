@@ -1,4 +1,18 @@
 {
+  "[terraform]": {
+    "editor.detectIndentation": false,
+    "editor.insertSpaces": true,
+    "editor.tabSize": 2,
+    "editor.defaultFormatter": "hashicorp.terraform",
+    "editor.formatOnSave": true
+  },
+  "[hcl]": {
+    "editor.detectIndentation": false,
+    "editor.insertSpaces": true,
+    "editor.tabSize": 2,
+    "editor.defaultFormatter": "fredwangwang.vscode-hcl-format",
+    "editor.formatOnSave": true
+  },
   "editor.formatOnSave": true,
   "editor.formatOnSaveMode": "file",
   "editor.renderWhitespace": "boundary",

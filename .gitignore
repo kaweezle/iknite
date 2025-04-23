@@ -25,6 +25,9 @@ kaweezle-devel@kaweezle.com-c9d89864.rsa.pub
 .vscode/*.log
 .venv/
 
-iknite
+/iknite
 packages/
 rootfs/*.apk
+
+.terraform/
+.terragrunt-cache/
