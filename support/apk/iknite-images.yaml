@@ -62,7 +62,7 @@ package:
 
           echo "Installing fuse-overlayfs snapshotter"
           (cd /usr/local/bin && \
-              wget -q -O - https://github.com/containerd/fuse-overlayfs-snapshotter/releases/download/v1.0.8/containerd-fuse-overlayfs-1.0.8-linux-amd64.tar.gz | tar zx)
+              wget -q -O - https://github.com/containerd/fuse-overlayfs-snapshotter/releases/download/v2.1.2/containerd-fuse-overlayfs-2.1.2-linux-amd64.tar.gz | tar zx)
 
           echo "Starting fuse-overlayfs snapshotter"
           /usr/local/bin/containerd-fuse-overlayfs-grpc /var/run/fuse-overlayfs.sock /var/lib/containerd/io.containerd.snapshotter.v1.overlayfs >/var/log/fuse-overlayfs.log 2>&1 &
@@ -86,7 +86,7 @@ package:
           type = "snapshot"
           address = "/var/run/fuse-overlayfs.sock"
       EOF
-          echo "Containerd snapshotter set to $CONTAINERD_SNAPSHOTTER"
+          echo "Containerd snapshotter set to fuse-overlayfs"
       }
 
       remove_fuse_overlayfs_snapshotter() {
@@ -135,7 +135,8 @@ package:
         fi
 
         if [ "$used_fuse" = "yes" ]; then
-            CONTAINERD_SNAPSHOTTER=fuse-overlayfs start_containerd
+            export CONTAINERD_SNAPSHOTTER=fuse-overlayfs
+            start_containerd
         else
             start_containerd
         fi
@@ -150,7 +151,7 @@ package:
           if ! ctr -n k8s.io images ls | grep -q "$name"; then
               # Import the image
               echo "Importing container image $name..."
-              ctr -n k8s.io images import $i
+              gzip -dc $i | ctr -n k8s.io images import --local -
           else
               echo "Container image $name already imported, skipping."
           fi
@@ -159,6 +160,7 @@ package:
       # If we started containerd, stop it
       if [ "$started_containerd" = "yes" ]; then
         stop_containerd
+        unset CONTAINERD_SNAPSHOTTER
 
         if [ "$used_fuse" = "yes" ]; then
             remove_fuse_overlayfs_snapshotter

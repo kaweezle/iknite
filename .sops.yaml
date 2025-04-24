@@ -1,6 +1,10 @@
 creation_rules:
   - path_regex: gitops(\\|\/).*\.sops\.yaml
     encrypted_regex: "^(data|stringData|.*_keys?|admin|adminKey|password)$"
-    age: age1fs48f8rw9gj49ss5fapsy8euqln0dtrc5yg35fuq7c930jtkveps2swvt6
+    age: >-
+      age1fs48f8rw9gj49ss5fapsy8euqln0dtrc5yg35fuq7c930jtkveps2swvt6,
+      ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQCyiEaw+WQHsp9KAfxhJ/6OR5q6VgFhuRz5vqnLYZMIgtQVjt4t190H7Mj1pL3vvWKbVpb8ehe57Yw0Ttum6fXgy4ObqmkSWdrCFb9tMeTHmoULl8LLAHUkGO6eCbKnsEX24Rn4sFTEaYVLzIpZ9sM1E1xUSeVWK+gEJzEfE4md5W2uO4JZA0rpGHFbZmKo1RaL4sBP9DofesXCCSJ5LyoJkC6QCUSHdK3OSRz2dOn6wqwZecmxUU933TQPCwb5HcXUGOQtF23NBMornmpVbHOPfa7cr+7DVt6UsN/s7TQJ2P9VTtbKQrOWdwAiAVVeEyN3lPz+ZdiuuD+fMwB/jaTTbMQGVR2t/PqBRanzS9oWzmzh+4yf7duJT++Rkdei9/C49wuJ2fSutC7+2MhydiviRTpposL90F9dQvRGyxj9XoNf3zNBGr8l3MI0l1/iA7osWyw9xhgOYDMW71WjK53K6YDrZh/KtqdsyosGDgfXzHCsvdV/Jcb6mVmHAPnZ8tcim/7tjdeqOM6o1Ev5Gz0g0LQ1F91AbGXmZ08oyqrKhqnlycrVKOkLmp4ByyIxa93uZy/WKPICsdpuEHsHLBk6n2RV5rcjqOXbHI9lMzykypi7uVBeohJesJC2yoCXzyCXkPp1E+aXOvmb7OYD3kMP6uLpqhoKpeXuugeIytDkjw==
   - path_regex: support(\\|\/)iac(\\|\/).*\.sops\.yaml
-    age: age1fs48f8rw9gj49ss5fapsy8euqln0dtrc5yg35fuq7c930jtkveps2swvt6
+    age: >-
+      age1fs48f8rw9gj49ss5fapsy8euqln0dtrc5yg35fuq7c930jtkveps2swvt6,
+      ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQCyiEaw+WQHsp9KAfxhJ/6OR5q6VgFhuRz5vqnLYZMIgtQVjt4t190H7Mj1pL3vvWKbVpb8ehe57Yw0Ttum6fXgy4ObqmkSWdrCFb9tMeTHmoULl8LLAHUkGO6eCbKnsEX24Rn4sFTEaYVLzIpZ9sM1E1xUSeVWK+gEJzEfE4md5W2uO4JZA0rpGHFbZmKo1RaL4sBP9DofesXCCSJ5LyoJkC6QCUSHdK3OSRz2dOn6wqwZecmxUU933TQPCwb5HcXUGOQtF23NBMornmpVbHOPfa7cr+7DVt6UsN/s7TQJ2P9VTtbKQrOWdwAiAVVeEyN3lPz+ZdiuuD+fMwB/jaTTbMQGVR2t/PqBRanzS9oWzmzh+4yf7duJT++Rkdei9/C49wuJ2fSutC7+2MhydiviRTpposL90F9dQvRGyxj9XoNf3zNBGr8l3MI0l1/iA7osWyw9xhgOYDMW71WjK53K6YDrZh/KtqdsyosGDgfXzHCsvdV/Jcb6mVmHAPnZ8tcim/7tjdeqOM6o1Ev5Gz0g0LQ1F91AbGXmZ08oyqrKhqnlycrVKOkLmp4ByyIxa93uZy/WKPICsdpuEHsHLBk6n2RV5rcjqOXbHI9lMzykypi7uVBeohJesJC2yoCXzyCXkPp1E+aXOvmb7OYD3kMP6uLpqhoKpeXuugeIytDkjw==

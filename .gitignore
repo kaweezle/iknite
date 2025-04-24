@@ -31,3 +31,4 @@ rootfs/*.apk
 
 .terraform/
 .terragrunt-cache/
+*.dec.sops.yaml
