@@ -1,41 +1,41 @@
 {
-    // See https://go.microsoft.com/fwlink/?LinkId=827846 to learn about workspace recommendations.
-    // Extension identifier format: ${publisher}.${name}. Example: vscode.csharp
-    // List of extensions which should be recommended for users of this workspace.
-    "recommendations": [
-        // Git related
-        "donjayamanne.githistory",
-        "maattdd.gitless",
-        "mhutchie.git-graph",
-        "seatonjiang.gitmoji-vscode",
-        // Copilot
-        "github.copilot",
-        "github.copilot-chat",
-        // Utilities
-        "aabegg.vscode-bcrypt",
-        "adamhartford.vscode-base64",
-        "flesler.url-encode",
-        "heaths.vscode-guid",
-        "humao.rest-client",
-        "moshfeu.compare-folders",
-        "pascalreitermann93.vscode-yaml-sort",
-        "ruiquelhas.vscode-uppercase",
-        "sandipchitale.vscode-decode-x509certificates",
-        "signageos.signageos-vscode-sops",
-        "well-ar.plantuml",
-        // Formatting
-        "editorconfig.editorconfig",
-        "esbenp.prettier-vscode",
-        "prateekmahendrakar.prettyxml",
-        "redhat.vscode-xml",
-        "redhat.vscode-yaml",
-        "tamasfe.even-better-toml",
-        "streetsidesoftware.code-spell-checker",
-        // Project related
-        "ms-kubernetes-tools.vscode-kubernetes-tools",
-        "golang.Go",
-        "zxh404.vscode-proto3",
-    ],
-    // List of extensions recommended by VS Code that should not be recommended for users of this workspace.
-    "unwantedRecommendations": []
+  // See https://go.microsoft.com/fwlink/?LinkId=827846 to learn about workspace recommendations.
+  // Extension identifier format: ${publisher}.${name}. Example: vscode.csharp
+  // List of extensions which should be recommended for users of this workspace.
+  "recommendations": [
+    // Git related
+    "donjayamanne.githistory",
+    "maattdd.gitless",
+    "mhutchie.git-graph",
+    "seatonjiang.gitmoji-vscode",
+    // Copilot
+    "github.copilot",
+    "github.copilot-chat",
+    // Utilities
+    "aabegg.vscode-bcrypt",
+    "adamhartford.vscode-base64",
+    "flesler.url-encode",
+    "heaths.vscode-guid",
+    "humao.rest-client",
+    "moshfeu.compare-folders",
+    "pascalreitermann93.vscode-yaml-sort",
+    "ruiquelhas.vscode-uppercase",
+    "sandipchitale.vscode-decode-x509certificates",
+    "signageos.signageos-vscode-sops",
+    "well-ar.plantuml",
+    // Formatting
+    "editorconfig.editorconfig",
+    "esbenp.prettier-vscode",
+    "prateekmahendrakar.prettyxml",
+    "redhat.vscode-xml",
+    "redhat.vscode-yaml",
+    "tamasfe.even-better-toml",
+    "streetsidesoftware.code-spell-checker",
+    // Project related
+    "ms-kubernetes-tools.vscode-kubernetes-tools",
+    "golang.Go",
+    "DrBlury.protobuf-vsc"
+  ],
+  // List of extensions recommended by VS Code that should not be recommended for users of this workspace.
+  "unwantedRecommendations": []
 }
