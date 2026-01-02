@@ -90,6 +90,11 @@ func NewStatusCmd(ikniteConfig *v1alpha1.IkniteClusterSpec) *cobra.Command {
 
 func performStatus(ikniteConfig *v1alpha1.IkniteClusterSpec) {
 
+	var checkData = k8s.CreateCheckWorkloadData(ikniteConfig.GetApiEndPoint())
+	var checkDataBuilder = func() k8s.CheckData {
+		return checkData
+	}
+
 	// Create all checks
 	checks := []*k8s.Check{
 
@@ -237,8 +242,9 @@ func performStatus(ikniteConfig *v1alpha1.IkniteClusterSpec) {
 				DependsOn:   []string{"kubelet_running"},
 				Description: "Check if the kube-apiserver is healthy",
 				CheckFn: func(ctx context.Context, data k8s.CheckData) (bool, string, error) {
-					return k8s.CheckApiServerHealth(checkTimeout)
+					return k8s.CheckApiServerHealth(checkTimeout, data)
 				},
+				CheckDataBuilder: checkDataBuilder,
 			},
 		}),
 		{
@@ -246,7 +252,7 @@ func performStatus(ikniteConfig *v1alpha1.IkniteClusterSpec) {
 			Description:      "Check Workload Status",
 			DependsOn:        []string{"runtime"},
 			CheckFn:          k8s.CheckWorkloads,
-			CheckDataBuilder: k8s.CreateCheckWorkloadData,
+			CheckDataBuilder: checkDataBuilder,
 			CustomPrinter:    k8s.CheckWorkloadResultPrinter,
 		},
 	}

@@ -5,6 +5,7 @@ package k8s
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -14,9 +15,12 @@ import (
 	"github.com/kaweezle/iknite/pkg/alpine"
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
 	"github.com/pkg/errors"
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmConstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	kubeConfigUtil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
+	staticPodUtil "k8s.io/kubernetes/cmd/kubeadm/app/util/staticpod"
 )
 
 // cSpell: enable
@@ -176,7 +180,7 @@ func CheckKubeletHealth(timeout time.Duration) (bool, string, error) {
 		return false, "", err
 	}
 
-	waiter := apiclient.NewKubeWaiter(client, timeout, nil)
+	waiter := apiclient.NewKubeWaiter(client, timeout, io.Discard)
 	err = waiter.WaitForKubelet("127.0.0.1", 10248)
 	if err != nil {
 		return false, "", err
@@ -185,15 +189,26 @@ func CheckKubeletHealth(timeout time.Duration) (bool, string, error) {
 
 }
 
-func CheckApiServerHealth(timeout time.Duration) (bool, string, error) {
+func CheckApiServerHealth(timeout time.Duration, checkData CheckData) (bool, string, error) {
+
+	data, ok := checkData.(*checkWorkloadData)
+	if !ok {
+		return false, "", fmt.Errorf("wait-control-plane phase invoked with an invalid data struct %T", checkData)
+	}
 
 	client, err := kubeConfigUtil.ClientSetFromFile(kubeadmConstants.GetAdminKubeConfigPath())
 	if err != nil {
 		return false, "", err
 	}
 
-	waiter := apiclient.NewKubeWaiter(client, timeout, nil)
-	err = waiter.WaitForAPI()
+	waiter := apiclient.NewKubeWaiter(client, timeout, io.Discard)
+	var podMap map[string]*v1.Pod
+	podMap, err = staticPodUtil.ReadMultipleStaticPodsFromDisk(data.ManifestDir(),
+		constants.ControlPlaneComponents...)
+	if err == nil {
+		err = waiter.WaitForControlPlaneComponents(podMap, data.ApiAdvertiseAddress())
+	}
+
 	if err != nil {
 		return false, "", err
 	}
@@ -213,15 +228,18 @@ type CheckWorkloadData interface {
 	SetNotReadyWorkloads([]*v1alpha1.WorkloadState)
 	SetIteration(int)
 	Start()
+	ApiAdvertiseAddress() string
+	ManifestDir() string
 }
 
 type checkWorkloadData struct {
-	ok                bool
-	workloadCount     int
-	readyWorkloads    []*v1alpha1.WorkloadState
-	notReadyWorkloads []*v1alpha1.WorkloadState
-	iteration         int
-	startTime         time.Time
+	ok                  bool
+	workloadCount       int
+	readyWorkloads      []*v1alpha1.WorkloadState
+	notReadyWorkloads   []*v1alpha1.WorkloadState
+	iteration           int
+	startTime           time.Time
+	apiAdvertiseAddress string
 }
 
 func (c *checkWorkloadData) IsOk() bool {
@@ -275,8 +293,18 @@ func (c *checkWorkloadData) Duration() time.Duration {
 	return time.Since(c.startTime)
 }
 
-func CreateCheckWorkloadData() CheckData {
-	return &checkWorkloadData{}
+func (c *checkWorkloadData) ApiAdvertiseAddress() string {
+	return c.apiAdvertiseAddress
+}
+
+func (c *checkWorkloadData) ManifestDir() string {
+	return kubeadmConstants.GetStaticPodDirectory()
+}
+
+func CreateCheckWorkloadData(apiAdvertiseAddress string) CheckData {
+	return &checkWorkloadData{
+		apiAdvertiseAddress: apiAdvertiseAddress,
+	}
 }
 
 var (
@@ -356,7 +384,7 @@ func CheckWorkloadResultPrinter(result *CheckResult, prefix string, spinView str
 }
 
 func CheckWorkloads(ctx context.Context, data CheckData) (bool, string, error) {
-	workloadData := data.(CheckWorkloadData)
+	workloadData := (data).(CheckWorkloadData)
 	config, err := LoadFromFile(filepath.Join(kubeadmConstants.KubernetesDir, kubeadmConstants.AdminKubeConfigFileName))
 	if err != nil {
 		return false, "", errors.Wrap(err, "While loading local cluster configuration")

@@ -122,7 +122,7 @@ used_fuse=no
 #     start_containerd
 # fi
 
-apk add --allow-untrusted --no-cache /root/iknite-images-1.32.3-r0.apk
+apk add --allow-untrusted --no-cache /root/iknite-images-1.34.3-r0.apk
 
 # cd /usr/share/iknite/images
 # for i in *.tar.gz; do

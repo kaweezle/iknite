@@ -16,15 +16,17 @@ limitations under the License.
 
 package cmd
 
-// cSpell:words kubeproxyconfig
+// cSpell:words kubeproxyconfig clientcmdapi clientcmd
 // cSpell: disable
 import (
 	"context"
 	"fmt"
 	"io"
+	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"syscall"
 	"time"
 
@@ -36,6 +38,8 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/clientcmd"
+	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 
 	kubeadmApi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmScheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
@@ -109,6 +113,7 @@ type initData struct {
 	cfg                         *kubeadmApi.InitConfiguration
 	skipTokenPrint              bool
 	dryRun                      bool
+	kubeconfig                  *clientcmdapi.Config
 	kubeconfigDir               string
 	kubeconfigPath              string
 	ignorePreflightErrors       sets.Set[string]
@@ -497,6 +502,21 @@ func (d *initData) CertificateDir() string {
 	return d.certificatesDir
 }
 
+// KubeConfig returns a kubeconfig after loading it from KubeConfigPath().
+func (d *initData) KubeConfig() (*clientcmdapi.Config, error) {
+	if d.kubeconfig != nil {
+		return d.kubeconfig, nil
+	}
+
+	var err error
+	d.kubeconfig, err = clientcmd.LoadFromFile(d.KubeConfigPath())
+	if err != nil {
+		return nil, err
+	}
+
+	return d.kubeconfig, nil
+}
+
 // KubeConfigDir returns the path of the Kubernetes configuration folder or the temporary folder path in case of DryRun.
 func (d *initData) KubeConfigDir() string {
 	if d.dryRun {
@@ -571,6 +591,30 @@ func (d *initData) Client() (clientset.Interface, error) {
 		}
 	}
 	return d.client, nil
+}
+
+// WaitControlPlaneClient returns a basic client used for the purpose of waiting
+// for control plane components to report 'ok' on their respective health check endpoints.
+// It uses the admin.conf as the base, but modifies it to point at the local API server instead
+// of the control plane endpoint.
+func (d *initData) WaitControlPlaneClient() (clientset.Interface, error) {
+	config, err := clientcmd.LoadFromFile(d.KubeConfigPath())
+	if err != nil {
+		return nil, err
+	}
+	for _, v := range config.Clusters {
+		v.Server = fmt.Sprintf("https://%s",
+			net.JoinHostPort(
+				d.Cfg().LocalAPIEndpoint.AdvertiseAddress,
+				strconv.Itoa(int(d.Cfg().LocalAPIEndpoint.BindPort)),
+			),
+		)
+	}
+	client, err := kubeConfigUtil.ToClientSet(config)
+	if err != nil {
+		return nil, err
+	}
+	return client, nil
 }
 
 // ClientWithoutBootstrap returns a dry-run client or a regular client from admin.conf.

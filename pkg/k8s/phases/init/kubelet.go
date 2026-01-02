@@ -21,10 +21,12 @@ import (
 
 	"github.com/kaweezle/iknite/pkg/k8s"
 	"github.com/pkg/errors"
+	kubeletConfig "k8s.io/kubelet/config/v1beta1"
 
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	cmdUtil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
+	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	kubeletPhase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubelet"
 )
 
@@ -70,11 +72,22 @@ func runKubeletStart(c workflow.RunData) error {
 		return errors.Wrap(err, "error writing a dynamic environment file for the kubelet")
 	}
 
+	// Write the instance kubelet configuration file to disk.
+	if features.Enabled(data.Cfg().FeatureGates, features.NodeLocalCRISocket) {
+		kubeletConfig := &kubeletConfig.KubeletConfiguration{
+			ContainerRuntimeEndpoint: data.Cfg().NodeRegistration.CRISocket,
+		}
+		if err := kubeletPhase.WriteInstanceConfigToDisk(kubeletConfig, data.KubeletDir()); err != nil {
+			return errors.Wrap(err, "error writing instance kubelet configuration to disk")
+		}
+	} else {
+		fmt.Println("[kubelet-start] Skipping writing instance kubelet configuration file as the NodeLocalCRISocket feature gate is disabled")
+	}
+
 	// Write the kubelet configuration file to disk.
 	if err := kubeletPhase.WriteConfigToDisk(&data.Cfg().ClusterConfiguration, data.KubeletDir(), data.PatchesDir(), data.OutputWriter()); err != nil {
 		return errors.Wrap(err, "error writing kubelet configuration to disk")
 	}
-
 	// Try to start the kubelet service in case it's inactive
 	if !data.DryRun() {
 		fmt.Println("[kubelet-start] Starting the kubelet")

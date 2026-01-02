@@ -21,7 +21,7 @@ const (
 	StatusFailed
 )
 
-type CheckData = any
+type CheckData any
 
 type CheckDataBuilder func() CheckData
 

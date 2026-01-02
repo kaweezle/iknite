@@ -157,7 +157,7 @@ func newResetData(cmd *cobra.Command, opts *resetOptions, in io.Reader, out io.W
 
 	if err == nil {
 		klog.V(1).Infof("[reset] Loaded client set from kubeconfig file: %s", opts.kubeconfigPath)
-		initCfg, err = configUtil.FetchInitConfigurationFromCluster(client, nil, "reset", false, false)
+		initCfg, err = configUtil.FetchInitConfigurationFromCluster(client, nil, "reset", false, false, false)
 		if err != nil {
 			klog.Warningf("[reset] Unable to fetch the kubeadm-config ConfigMap from cluster: %v", err)
 		}
