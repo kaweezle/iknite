@@ -53,8 +53,7 @@ func EnsureOpenRC(level string) error {
 // not started, it is started.
 func StartOpenRC() (err error) {
 	return utils.ExecuteIfNotExist(constants.SoftLevelPath, func() error {
-		EnsureOpenRC("default")
-		return nil
+		return EnsureOpenRC("default")
 	})
 }
 

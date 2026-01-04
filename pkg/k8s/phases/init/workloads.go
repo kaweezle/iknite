@@ -64,7 +64,12 @@ func runMonitorWorkloads(c workflow.RunData) error {
 				return
 			case <-ticker.C:
 				log.Debug("Getting workloads information...")
-				updateWorkloads(ctx)
+				_, err := updateWorkloads(ctx)
+				if err != nil {
+					log.Errorf("While getting workloads information: %v", err)
+					ticker.Stop()
+					return
+				}
 			}
 		}
 

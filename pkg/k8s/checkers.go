@@ -16,7 +16,6 @@ import (
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
 	"github.com/pkg/errors"
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmConstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	kubeConfigUtil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
@@ -204,7 +203,7 @@ func CheckApiServerHealth(timeout time.Duration, checkData CheckData) (bool, str
 	waiter := apiclient.NewKubeWaiter(client, timeout, io.Discard)
 	var podMap map[string]*v1.Pod
 	podMap, err = staticPodUtil.ReadMultipleStaticPodsFromDisk(data.ManifestDir(),
-		constants.ControlPlaneComponents...)
+		kubeadmConstants.ControlPlaneComponents...)
 	if err == nil {
 		err = waiter.WaitForControlPlaneComponents(podMap, data.ApiAdvertiseAddress())
 	}

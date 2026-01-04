@@ -15,7 +15,6 @@ import (
 
 const (
 	netfilter_module = "br_netfilter"
-	conntrackFile    = "/proc/sys/net/nf_conntrack_max"
 	brNetfilterDir   = "/proc/sys/net/bridge"
 	machineIDFile    = "/etc/machine-id"
 )

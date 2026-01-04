@@ -193,7 +193,7 @@ func AreWorkloadsReady(config *Config, callback WorkloadStateCallbackFunc) wait.
 		if err != nil {
 			return false, err
 		}
-		var result bool = true
+		var result = true
 		var ready, unready []*v1alpha1.WorkloadState
 		for _, state := range states {
 			if !state.Ok {

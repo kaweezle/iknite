@@ -182,7 +182,7 @@ func performClean(ikniteConfig *v1alpha1.IkniteClusterSpec, cleanOptions *cleanO
 		reset.CleanConfig(dryRun)
 		logger.WithField("path", constants.KubernetesRootConfig).Info("Removing kubernetes root config...")
 		if !dryRun {
-			os.RemoveAll(constants.KubernetesRootConfig)
+			cobra.CheckErr(os.RemoveAll(constants.KubernetesRootConfig))
 		}
 	}
 
@@ -193,7 +193,8 @@ func performClean(ikniteConfig *v1alpha1.IkniteClusterSpec, cleanOptions *cleanO
 			err = kubeletProcess.Signal(syscall.SIGTERM)
 			if err == nil {
 				logger.WithField("pid", kubeletProcess.Pid).Info("Waiting for kubelet to stop...")
-				kubeletProcess.Wait()
+				_, err = kubeletProcess.Wait()
+				cobra.CheckErr(err)
 			}
 		}
 	}

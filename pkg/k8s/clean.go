@@ -206,9 +206,9 @@ func processMounts(path string, remove bool, message string, isDryRun bool) erro
 	p := s.File("/proc/self/mounts").Column(2).Match(path).FilterLine(func(s string) string {
 		logger.WithField("mount", s).Debug(message)
 		if !isDryRun {
-			syscall.Unmount(s, 0)
+			_ = syscall.Unmount(s, 0)
 			if remove {
-				os.RemoveAll(s)
+				_ = os.RemoveAll(s)
 			}
 		}
 		return s

@@ -186,7 +186,9 @@ func newCmdInit(out io.Writer, initOptions *initOptions) *cobra.Command {
 				if err != nil {
 					return errors.Wrapf(err, "failed to terminate the kubelet process %d", kubeletCmd.Process.Pid)
 				}
-				kubeletCmd.Wait()
+				if err = kubeletCmd.Wait(); err != nil {
+					return errors.Wrapf(err, "kubelet process %d exited with error", kubeletCmd.Process.Pid)
+				}
 			}
 			k8s.RemovePidFiles()
 
@@ -311,7 +313,9 @@ func newInitData(cmd *cobra.Command, _ []string, initOptions *initOptions, out i
 	kubeadmScheme.Scheme.Default(initOptions.externalClusterCfg)
 
 	// Retrieve information from environment variables and apply them to the configuration
-	config.DecodeIkniteConfig(initOptions.ikniteCfg)
+	if err := config.DecodeIkniteConfig(initOptions.ikniteCfg); err != nil {
+		return nil, err
+	}
 
 	ikniteCluster := &v1alpha1.IkniteCluster{}
 	ikniteCluster.TypeMeta = metaV1.TypeMeta{
@@ -418,7 +422,6 @@ func newInitData(cmd *cobra.Command, _ []string, initOptions *initOptions, out i
 	// Apply the IkniteConfig to the InitConfiguration
 	cfg.KubernetesVersion = fmt.Sprintf("v%s", initOptions.ikniteCfg.KubernetesVersion)
 	if initOptions.ikniteCfg.DomainName != "" {
-		cfg.ClusterConfiguration.ControlPlaneEndpoint = initOptions.ikniteCfg.DomainName
 		cfg.ControlPlaneEndpoint = initOptions.ikniteCfg.DomainName
 	}
 	// Apply configured IP to the configuration

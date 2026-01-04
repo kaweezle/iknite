@@ -49,14 +49,14 @@ func ConfigureClusterCommand(flagSet *flag.FlagSet, ikniteConfig *v1alpha1.Iknit
 func StartPersistentPreRun(cmd *cobra.Command, args []string) {
 
 	flags := cmd.Flags()
-	viper.BindPFlag(IP, flags.Lookup(options.Ip))
-	viper.BindPFlag(IPCreate, flags.Lookup(options.IpCreate))
-	viper.BindPFlag(IPNetworkInterface, flags.Lookup(options.IpNetworkInterface))
-	viper.BindPFlag(DomainName, flags.Lookup(options.DomainName))
-	viper.BindPFlag(KubernetesVersion, flags.Lookup(koptions.KubernetesVersion))
-	viper.BindPFlag(EnableMDNS, flags.Lookup(options.EnableMDNS))
-	viper.BindPFlag(ClusterName, flags.Lookup(options.ClusterName))
-	viper.BindPFlag(Kustomization, flags.Lookup(options.Kustomization))
+	_ = viper.BindPFlag(IP, flags.Lookup(options.Ip))
+	_ = viper.BindPFlag(IPCreate, flags.Lookup(options.IpCreate))
+	_ = viper.BindPFlag(IPNetworkInterface, flags.Lookup(options.IpNetworkInterface))
+	_ = viper.BindPFlag(DomainName, flags.Lookup(options.DomainName))
+	_ = viper.BindPFlag(KubernetesVersion, flags.Lookup(koptions.KubernetesVersion))
+	_ = viper.BindPFlag(EnableMDNS, flags.Lookup(options.EnableMDNS))
+	_ = viper.BindPFlag(ClusterName, flags.Lookup(options.ClusterName))
+	_ = viper.BindPFlag(Kustomization, flags.Lookup(options.Kustomization))
 }
 
 // DecodeIkniteConfig decodes the configuration from the viper configuration.

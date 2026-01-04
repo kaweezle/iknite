@@ -136,7 +136,9 @@ func ApplyKustomizations(fs filesys.FileSystem, dirname string) (ids []resid.Res
 			return
 		}
 		for _, curId := range crdIds {
-			resources.Remove(curId)
+			if err = resources.Remove(curId); err != nil {
+				return
+			}
 		}
 	}
 

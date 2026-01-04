@@ -47,7 +47,7 @@ func WaitForKubelet(cmd *exec.Cmd, conn *mdns.Conn, cancel context.CancelFunc) e
 			log.Info("Received TERM Signal. Stopping kubelet...")
 			err = cmd.Process.Signal(syscall.SIGTERM)
 			if err == nil {
-				cmd.Wait()
+				_ = cmd.Wait()
 			}
 
 			alive = false

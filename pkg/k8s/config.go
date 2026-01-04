@@ -179,10 +179,10 @@ func (config *Config) RestartProxy() (err error) {
 		return
 	}
 
-	if ds.Spec.Template.ObjectMeta.Annotations == nil {
-		ds.Spec.Template.ObjectMeta.Annotations = make(map[string]string)
+	if ds.Spec.Template.Annotations == nil {
+		ds.Spec.Template.Annotations = make(map[string]string)
 	}
-	ds.Spec.Template.ObjectMeta.Annotations["kubectl.kubernetes.io/restartedAt"] = time.Now().Format(time.RFC3339)
+	ds.Spec.Template.Annotations["kubectl.kubernetes.io/restartedAt"] = time.Now().Format(time.RFC3339)
 
 	_, err = client.AppsV1().DaemonSets("kube-system").Update(ctx, ds, metaV1.UpdateOptions{})
 	return

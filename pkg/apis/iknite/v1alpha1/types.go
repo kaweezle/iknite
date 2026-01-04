@@ -106,7 +106,11 @@ func (ikniteCluster IkniteCluster) Persist() {
 	ikniteClusterJSON, err := json.MarshalIndent(ikniteCluster, "", "  ")
 	if err == nil {
 		// Write JSON to file
-		os.MkdirAll(constants.StatusDirectory, 0755)
+		err = os.MkdirAll(constants.StatusDirectory, 0755)
+		if err != nil {
+			log.WithError(err).Warn("Failed to create status directory")
+			return
+		}
 		err = os.WriteFile(constants.StatusFile, ikniteClusterJSON, 0644)
 		if err != nil {
 			log.WithError(err).Warn("Failed to write status.json")

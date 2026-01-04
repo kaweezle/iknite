@@ -115,7 +115,9 @@ func newResetData(cmd *cobra.Command, opts *resetOptions, in io.Reader, out io.W
 	}
 
 	// Retrieve information from environment variables and apply them to the configuration
-	config.DecodeIkniteConfig(opts.ikniteCfg)
+	if err := config.DecodeIkniteConfig(opts.ikniteCfg); err != nil {
+		return nil, err
+	}
 
 	ikniteCluster := &v1alpha1.IkniteCluster{}
 	ikniteCluster.TypeMeta = metaV1.TypeMeta{
@@ -188,8 +190,8 @@ func newResetData(cmd *cobra.Command, opts *resetOptions, in io.Reader, out io.W
 		certificatesDir = opts.externalCfg.CertificatesDir
 	} else if len(resetCfg.CertificatesDir) > 0 { // configured in the ResetConfiguration
 		certificatesDir = resetCfg.CertificatesDir
-	} else if len(initCfg.ClusterConfiguration.CertificatesDir) > 0 { // fetch from cluster
-		certificatesDir = initCfg.ClusterConfiguration.CertificatesDir
+	} else if len(initCfg.CertificatesDir) > 0 { // fetch from cluster
+		certificatesDir = initCfg.CertificatesDir
 	}
 
 	return &resetData{

@@ -45,7 +45,9 @@ func (s *RuntimeEnvironmentTestSuite) TestPreventKubeletServiceFromStarting() {
 
 	tempFile, err := afero.TempFile(fs, "", "rc.conf")
 	require.NoError(err)
-	defer tempFile.Close()
+	defer func() {
+		err = tempFile.Close()
+	}()
 
 	_, err = tempFile.WriteString(rcConfFileContent)
 	require.NoError(err)
@@ -77,7 +79,9 @@ func (s *RuntimeEnvironmentTestSuite) TestPreventKubeletServiceFromStartingWhenL
 
 	tempFile, err := afero.TempFile(fs, "", "rc.conf")
 	require.NoError(err)
-	defer tempFile.Close()
+	defer func() {
+		err = tempFile.Close()
+	}()
 
 	_, err = tempFile.WriteString(existingContent)
 	require.NoError(err)

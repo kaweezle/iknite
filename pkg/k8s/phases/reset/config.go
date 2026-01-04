@@ -161,7 +161,9 @@ func CleanDir(filePath string) error {
 	if err != nil {
 		return err
 	}
-	defer d.Close()
+	defer func() {
+		err = d.Close()
+	}()
 	names, err := d.Readdirnames(-1)
 	if err != nil {
 		return err
@@ -180,7 +182,9 @@ func IsDirEmpty(dir string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	defer d.Close()
+	defer func() {
+		err = d.Close()
+	}()
 	_, err = d.Readdirnames(1)
 	if err == io.EOF {
 		return true, nil

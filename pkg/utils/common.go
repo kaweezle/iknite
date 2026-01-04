@@ -82,7 +82,9 @@ func GetOutboundIP() (net.IP, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "Error while getting IP address")
 	}
-	defer conn.Close()
+	defer func() {
+		err = conn.Close()
+	}()
 
 	localAddr := conn.LocalAddr().(*net.UDPAddr)
 
@@ -94,7 +96,9 @@ func RemoveDirectoryContents(dir string, predicate func(string) bool) error {
 	if err != nil {
 		return err
 	}
-	defer d.Close()
+	defer func() {
+		err = d.Close()
+	}()
 	names, err := d.Readdirnames(-1)
 	if err != nil {
 		return err

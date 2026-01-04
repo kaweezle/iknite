@@ -86,14 +86,14 @@ func PrepareKubernetesEnvironment(ikniteConfig *v1alpha1.IkniteClusterSpec) erro
 
 	// Allow forwarding (kubeadm requirement)
 	log.Info("Ensuring basic settings...")
-	utils.WriteFile("/proc/sys/net/ipv4/ip_forward", []byte("1\n"), os.FileMode(int(0644)))
+	_ = utils.WriteFile("/proc/sys/net/ipv4/ip_forward", []byte("1\n"), os.FileMode(int(0644)))
 
 	if err := alpine.EnsureNetFilter(); err != nil {
 		return errors.Wrap(err, "While ensuring netfilter")
 	}
 
 	// Make bridge use ip-tables
-	utils.WriteFile("/proc/sys/net/bridge/bridge-nf-call-iptables", []byte("1\n"), os.FileMode(int(0644)))
+	_ = utils.WriteFile("/proc/sys/net/bridge/bridge-nf-call-iptables", []byte("1\n"), os.FileMode(int(0644)))
 
 	if err := alpine.EnsureMachineID(); err != nil {
 		return errors.Wrap(err, "While ensuring machine ID")
@@ -144,8 +144,10 @@ func PrepareKubernetesEnvironment(ikniteConfig *v1alpha1.IkniteClusterSpec) erro
 	}
 
 	log.Infof("Ensuring %s existence...", constants.CrictlYaml)
-	utils.ExecuteIfNotExist(constants.CrictlYaml, func() error {
+	if err := utils.ExecuteIfNotExist(constants.CrictlYaml, func() error {
 		return utils.WriteFile(constants.CrictlYaml, []byte("runtime-endpoint: unix://"+constants.ContainerServiceSock+"\n"), os.FileMode(int(0644)))
-	})
+	}); err != nil {
+		return errors.Wrapf(err, "While ensuring %s existence", constants.CrictlYaml)
+	}
 	return nil
 }

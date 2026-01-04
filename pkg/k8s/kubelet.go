@@ -158,7 +158,9 @@ func StartKubelet() (*exec.Cmd, error) {
 	if err != nil {
 		return nil, errors.WithMessagef(err, "Failed to open kubelet log file %s", kubeletLogFile)
 	}
-	defer logFile.Close()
+	defer func() {
+		_ = logFile.Close()
+	}()
 
 	// Set the command's stdout and stderr to the log file
 	cmd.Stdout = logFile
@@ -179,7 +181,7 @@ func StartKubelet() (*exec.Cmd, error) {
 	}
 
 	// Write the PID to the /run/kubelet.pid file
-	err = os.WriteFile(kubeletPidFile, []byte(fmt.Sprintf("%d", cmd.Process.Pid)), 0644)
+	err = os.WriteFile(kubeletPidFile, fmt.Appendf(nil, "%d", cmd.Process.Pid), 0644)
 	if err != nil {
 		log.WithFields(log.Fields{
 			"pid":     cmd.Process.Pid,
@@ -192,7 +194,7 @@ func StartKubelet() (*exec.Cmd, error) {
 }
 
 func RemovePidFiles() {
-	os.Remove(kubeletPidFile)
+	_ = os.Remove(kubeletPidFile)
 }
 
 func StartAndConfigureKubelet(kubeConfig *v1alpha1.IkniteClusterSpec) error {
@@ -218,18 +220,24 @@ func StartAndConfigureKubelet(kubeConfig *v1alpha1.IkniteClusterSpec) error {
 
 	defer RemovePidFiles()
 
+	var alive = true
+
+	killKubelet := func() {
+		err = cmd.Process.Signal(syscall.SIGTERM)
+		if err != nil {
+			log.Fatalf("Failed to stop subprocess: %v", err)
+		}
+		_ = cmd.Wait()
+		alive = false
+	}
+
 	// Wait for the signals or for the child process to stop
-	for alive := true; alive; {
+	for alive {
 		select {
 		case <-stop:
 			// Stop the cmd process
 			log.Info("Received TERM Signal. Stopping kubelet...")
-			err = cmd.Process.Signal(syscall.SIGTERM)
-			if err != nil {
-				log.Fatalf("Failed to stop subprocess: %v", err)
-			}
-			cmd.Wait()
-			alive = false
+			killKubelet()
 		case <-cmdDone:
 			// Child process has stopped
 			log.Infof("Kubelet stopped with state: %s", cmd.ProcessState.String())
@@ -237,12 +245,7 @@ func StartAndConfigureKubelet(kubeConfig *v1alpha1.IkniteClusterSpec) error {
 		case isKubeletHealthy := <-kubeletHealthz:
 			if isKubeletHealthy != nil {
 				log.WithError(isKubeletHealthy).Error("Kubelet is not healthy")
-				err = cmd.Process.Signal(syscall.SIGTERM)
-				if err != nil {
-					log.Fatalf("Failed to stop subprocess: %v", err)
-				}
-				cmd.Wait()
-				alive = false
+				killKubelet()
 			} else {
 				log.Info("Kubelet is healthy. Waiting for API server to be healthy...")
 				go func() {
@@ -257,12 +260,7 @@ func StartAndConfigureKubelet(kubeConfig *v1alpha1.IkniteClusterSpec) error {
 		case isApiServerHealthy := <-apiServerHealthz:
 			if isApiServerHealthy != nil {
 				log.WithError(isApiServerHealthy).Error("API server is not healthy")
-				err = cmd.Process.Signal(syscall.SIGTERM)
-				if err != nil {
-					log.Fatalf("Failed to stop subprocess: %v", err)
-				}
-				cmd.Wait()
-				alive = false
+				killKubelet()
 			} else {
 				log.Info("API server is healthy")
 				go func() {
@@ -278,12 +276,7 @@ func StartAndConfigureKubelet(kubeConfig *v1alpha1.IkniteClusterSpec) error {
 		case configError := <-configErr:
 			if configError != nil {
 				log.WithError(configError).Error("Failed to configure the cluster")
-				err = cmd.Process.Signal(syscall.SIGTERM)
-				if err != nil {
-					log.Fatalf("Failed to stop subprocess: %v", err)
-				}
-				cmd.Wait()
-				alive = false
+				killKubelet()
 			} else {
 				log.Info("Cluster configured successfully")
 			}
@@ -300,7 +293,7 @@ func CheckKubeletRunning(retries, okResponses, waitTime int) (err error) {
 		log.WithField("retries", retries).Debug("Checking kubelet health...")
 		resp, err = http.Get("http://localhost:10248/healthz")
 		if err == nil {
-			defer resp.Body.Close()
+			defer func() { err = resp.Body.Close() }()
 			body, err := io.ReadAll(resp.Body)
 			if err == nil {
 				contentStr := string(body)

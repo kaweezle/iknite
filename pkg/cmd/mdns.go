@@ -56,7 +56,7 @@ It assumes that mDNS is not use elsewhere inside WSL.
 }
 
 func mdnsPersistentPreRun(cmd *cobra.Command, args []string) {
-	viper.BindPFlag(config.DomainName, cmd.Flags().Lookup(options.DomainName))
+	_ = viper.BindPFlag(config.DomainName, cmd.Flags().Lookup(options.DomainName))
 }
 
 func performMdns(cmd *cobra.Command, args []string) {

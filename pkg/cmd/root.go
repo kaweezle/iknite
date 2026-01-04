@@ -74,7 +74,7 @@ kubernetes.`,
 	flags.StringVarP(&v, options.Verbosity, "v", log.InfoLevel.String(), "Log level (debug, info, warn, error, fatal, panic)")
 	flags.BoolVar(&jsonLogs, options.Json, false, "Log messages in JSON")
 
-	var ikniteConfig *v1alpha1.IkniteClusterSpec = &v1alpha1.IkniteClusterSpec{}
+	var ikniteConfig = &v1alpha1.IkniteClusterSpec{}
 
 	rootCmd.AddCommand(NewKustomizeCmd())
 	rootCmd.AddCommand(newCmdInit(os.Stdout, nil))
