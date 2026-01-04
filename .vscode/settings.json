@@ -16,9 +16,6 @@
   "editor.formatOnSave": true,
   "editor.formatOnSaveMode": "file",
   "editor.renderWhitespace": "boundary",
-  "editor.rulers": [
-    80,
-    120
-  ],
+  "editor.rulers": [80, 120],
   "go.formatTool": "default"
 }
