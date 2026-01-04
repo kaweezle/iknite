@@ -136,10 +136,8 @@ package:
 
         if [ "$used_fuse" = "yes" ]; then
             export CONTAINERD_SNAPSHOTTER=fuse-overlayfs
-            start_containerd
-        else
-            start_containerd
         fi
+        start_containerd
         started_containerd=yes
       fi
 
@@ -191,34 +189,29 @@ pipeline:
       mkdir -p $DEST_DIR
       mkdir -p /var/tmp
       cd $DEST_DIR
-      skopeo copy docker://registry.k8s.io/pause:3.10.1 oci-archive:pause_3.10.1.tar:registry.k8s.io/pause:3.10.1
-      gzip pause_3.10.1.tar
-      skopeo copy docker://registry.k8s.io/pause:3.9 oci-archive:pause_3.9.tar:registry.k8s.io/pause:3.9
-      gzip pause_3.9.tar
-      skopeo copy docker://registry.k8s.io/etcd:3.6.5-0 oci-archive:etcd_3.6.5-0.tar:registry.k8s.io/etcd:3.6.5-0
-      gzip etcd_3.6.5-0.tar
-      skopeo copy docker://registry.k8s.io/kube-controller-manager:v${KUBERNETES_VERSION} oci-archive:kube-controller-manager_v${KUBERNETES_VERSION}.tar:registry.k8s.io/kube-controller-manager:v${KUBERNETES_VERSION}
-      gzip kube-controller-manager_v${KUBERNETES_VERSION}.tar
-      skopeo copy docker://registry.k8s.io/kube-scheduler:v${KUBERNETES_VERSION} oci-archive:kube-scheduler_v${KUBERNETES_VERSION}.tar:registry.k8s.io/kube-scheduler:v${KUBERNETES_VERSION}
-      gzip kube-scheduler_v${KUBERNETES_VERSION}.tar
-      skopeo copy docker://registry.k8s.io/kube-apiserver:v${KUBERNETES_VERSION} oci-archive:kube-apiserver_v${KUBERNETES_VERSION}.tar:registry.k8s.io/kube-apiserver:v${KUBERNETES_VERSION}
-      gzip kube-apiserver_v${KUBERNETES_VERSION}.tar
-      skopeo copy docker://registry.k8s.io/kube-proxy:v${KUBERNETES_VERSION} oci-archive:kube-proxy_v${KUBERNETES_VERSION}.tar:registry.k8s.io/kube-proxy:v${KUBERNETES_VERSION}
-      gzip kube-proxy_v${KUBERNETES_VERSION}.tar
-      skopeo copy docker://registry.k8s.io/coredns/coredns:v1.11.1 oci-archive:coredns_v1.11.1.tar:registry.k8s.io/coredns/coredns:v1.11.1
-      gzip coredns_v1.11.1.tar
-      skopeo copy docker://docker.io/rancher/local-path-provisioner:v0.0.33 oci-archive:local-path-provisioner_v0.0.33.tar:docker.io/rancher/local-path-provisioner:v0.0.33
-      gzip local-path-provisioner_v0.0.33.tar
-      skopeo copy docker://registry.k8s.io/metrics-server/metrics-server:v0.8.0 oci-archive:metrics-server_v0.8.0.tar:registry.k8s.io/metrics-server/metrics-server:v0.8.0
-      gzip metrics-server_v0.8.0.tar
-      skopeo copy docker://ghcr.io/flannel-io/flannel:v0.26.5 oci-archive:flannel_v0.26.5.tar:ghcr.io/flannel-io/flannel:v0.26.5
-      gzip flannel_v0.26.5.tar
-      skopeo copy docker://docker.io/alpine/kubectl:${KUBECTL_VERSION} oci-archive:kubectl_v${KUBECTL_VERSION}.tar:docker.io/alpine/kubectl:${KUBECTL_VERSION}
-      gzip kubectl_v${KUBECTL_VERSION}.tar
-      skopeo copy docker://ghcr.io/kube-vip/kube-vip:v0.8.9 oci-archive:kube-vip_v0.8.9.tar:ghcr.io/kube-vip/kube-vip:v0.8.9
-      gzip kube-vip_v0.8.9.tar
-      skopeo copy docker://ghcr.io/kube-vip/kube-vip-cloud-provider:v0.0.12 oci-archive:kube-vip-cloud-provider_v0.0.12.tar:ghcr.io/kube-vip/kube-vip-cloud-provider:v0.0.12
-      gzip kube-vip-cloud-provider_v0.0.12.tar
+
+      # Download and compress each image
+      while IFS= read -r IMAGE; do
+        FILENAME=$(echo "$IMAGE" | sed 's|[/:]|_|g')
+        echo "Downloading $IMAGE..."
+        skopeo copy docker://$IMAGE oci-archive:${FILENAME}.tar:$IMAGE
+        gzip ${FILENAME}.tar
+      done << END
+      registry.k8s.io/pause:3.10.1
+      registry.k8s.io/pause:3.9
+      registry.k8s.io/etcd:3.6.5-0
+      registry.k8s.io/kube-controller-manager:v${KUBERNETES_VERSION}
+      registry.k8s.io/kube-scheduler:v${KUBERNETES_VERSION}
+      registry.k8s.io/kube-apiserver:v${KUBERNETES_VERSION}
+      registry.k8s.io/kube-proxy:v${KUBERNETES_VERSION}
+      registry.k8s.io/coredns/coredns:v1.11.1
+      docker.io/rancher/local-path-provisioner:v0.0.33
+      registry.k8s.io/metrics-server/metrics-server:v0.8.0
+      ghcr.io/flannel-io/flannel:v0.26.5
+      docker.io/alpine/kubectl:${KUBECTL_VERSION}
+      ghcr.io/kube-vip/kube-vip:v0.8.9
+      ghcr.io/kube-vip/kube-vip-cloud-provider:v0.0.12
+      END
 
 test:
   environment:
