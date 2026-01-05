@@ -26,6 +26,7 @@ RUN git clone --quiet --depth 1 https://github.com/ohmyzsh/ohmyzsh.git /usr/shar
     git clone --quiet --depth=1  https://github.com/zsh-users/zsh-autosuggestions "/usr/share/oh-my-zsh/custom/plugins/zsh-autosuggestions" && \
     sed -ie '/^plugins=/ s#.*#plugins=(git zsh-autosuggestions)#' /usr/share/oh-my-zsh/templates/zshrc.zsh-template && \
     sed -ie '/^ZSH_THEME=/ s#.*#ZSH_THEME="powerlevel10k/powerlevel10k"#' /usr/share/oh-my-zsh/templates/zshrc.zsh-template && \
+    sed -ie '/# User configuration/a export CONTAINERD_SNAPSHOTTER=native' /usr/share/oh-my-zsh/templates/zshrc.zsh-template && \
     echo '[[ ! -f ~/.p10k.zsh ]] || source ~/.p10k.zsh' >> /usr/share/oh-my-zsh/templates/zshrc.zsh-template && \
     mkdir -p /etc/skel && \
     install -m 700 -o root -g root /usr/share/oh-my-zsh/templates/zshrc.zsh-template /etc/skel/.zshrc  && \
@@ -34,18 +35,14 @@ RUN git clone --quiet --depth 1 https://github.com/ohmyzsh/ohmyzsh.git /usr/shar
     touch /etc/subuid && touch /etc/subgid
 
 # Allow OpenRC to run as non init
-RUN mkdir -p /lib/rc/init.d && \
+RUN --mount=type=bind,target=/conf mkdir -p /lib/rc/init.d && \
     ln -s /lib/rc/init.d /run/openrc && \
     touch /lib/rc/init.d/softlevel && \
+    mkdir -p /etc/buildkit && \
+    install -m 644 -o root -g root /conf/buildkitd.toml /etc/buildkit/buildkitd.toml && \
+    install -m 644 -o root -g root /conf/rc.conf /etc/rc.conf && \
     rc-update add containerd default && \
     rc-update add buildkitd default
-
-COPY <<EOF /etc/rc.conf
-rc_sys="prefix"
-rc_controller_cgroups="NO"
-rc_depend_strict="NO"
-rc_need="!net !dev !udev-mount !sysfs !checkfs !fsck !netmount !logger !clock !modules"
-EOF
 
 # Configure the root user for zsh/oh-my-zsh/powerlevel10k
 USER root
@@ -60,7 +57,7 @@ RUN adduser -s /bin/zsh -g ${USERNAME} -D ${GROUPNAME} && \
     echo "permit nopass keepenv :wheel" >> /etc/doas.d/doas.conf # && \
     echo "Host *" > /home/${USERNAME}/.ssh/config && echo " StrictHostKeyChecking no" >> /home/${USERNAME}/.ssh/config && \
     chown -R ${USERNAME}:${GROUPNAME} /home/${USERNAME}/.ssh && \
-    su -l ${USERNAME} -c "gpg -k && gpgconf --kill keyboxd || /bin/true" >/dev/null 2>&1 \
+    su -l ${USERNAME} -c "gpg -k && gpgconf --kill keyboxd || /bin/true" >/dev/null 2>&1 && \
     su -l ${USERNAME} -c "pipx ensurepath || /bin/true" >/dev/null 2>&1
 
 # Set WSL default user
@@ -75,7 +72,7 @@ ARG USERNAME=alpine
 
 LABEL team="Octave tech team <technique@octave.biz>"
 LABEL devcontainer.metadata='[{ \
-    "capAdd": [ "SYS_PTRACE" ], \
+    "capAdd": [ "SYS_ADMIN" ], \
     "remoteUser": "${USERNAME}", \
     "containerEnv": {} \
     }]'

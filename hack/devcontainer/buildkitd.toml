@@ -1,0 +1,13 @@
+debug = false
+
+# insecure-entitlements allows insecure entitlements, disabled by default.
+# insecure-entitlements = [ "network.host", "security.insecure" ]
+
+[worker.oci]
+  enabled = false
+
+[worker.containerd]
+  enabled = true
+  # namespace should be "k8s.io" for Kubernetes (including Rancher Desktop)
+  namespace = "k8s.io"
+  snapshotter = "native"
