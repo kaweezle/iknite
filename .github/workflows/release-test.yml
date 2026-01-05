@@ -133,19 +133,28 @@ jobs:
           export IKNITE_VERSION=$(jq -Mr ".version" packages/metadata.json)
           export IKNITE_LAST_TAG=$(jq -Mr ".tag" packages/metadata.json)
           echo "Version is $IKNITE_VERSION"
-          mv packages/iknite-${IKNITE_VERSION}.x86_64.apk packages/iknite-images-*.apk rootfs
-          cd rootfs
+          cp packages/iknite-${IKNITE_VERSION}.x86_64.apk rootfs
           mkdir -p /tmp/.buildx-cache
           mkdir -p /tmp/.buildx-cache-new
           docker buildx build \
              --build-arg IKNITE_REPO_URL=http://kwzl-apkrepo.s3-website.gra.io.cloud.ovh.net/test/ \
              --build-arg IKNITE_VERSION=$IKNITE_VERSION \
              --build-arg IKNITE_LAST_TAG=$IKNITE_LAST_TAG \
-             --allow security.insecure \
              --cache-from type=local,src=/tmp/.buildx-cache \
              --cache-to type=local,dest=/tmp/.buildx-cache-new \
-             --output type=tar . | gzip >kaweezle.rootfs.tar.gz
-          sha256sum kaweezle.rootfs.tar.gz >> ../packages/SHA256SUMS
+             --tag iknite-rootfs-base:${IKNITE_VERSION} \
+             --load \
+             rootfs
+
+          docker run \
+            --name iknite-rootfs \
+            --privileged \
+            -v $(pwd)/packages:/apks \
+            iknite-rootfs-base:${IKNITE_VERSION} \
+            /bin/sh -c 'apk --no-cache add /apks/iknite-images-*.apk; apk del iknite-images'
+
+          docker export iknite-rootfs | gzip > rootfs/kaweezle.rootfs.tar.gz
+          sha256sum rootfs/kaweezle.rootfs.tar.gz >> packages/SHA256SUMS
 
       - name: Upload root fs artifact
         uses: actions/upload-artifact@v4
