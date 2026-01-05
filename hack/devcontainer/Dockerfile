@@ -4,7 +4,6 @@ FROM alpine:3.23 as builder
 
 ARG USERNAME=alpine
 ARG GROUPNAME=alpine
-ARG GORELEASER_VERSION=2.13.2
 
 # Add the dependencies
 RUN echo "http://dl-cdn.alpinelinux.org/alpine/edge/testing/" >> /etc/apk/repositories && \
@@ -12,6 +11,7 @@ RUN echo "http://dl-cdn.alpinelinux.org/alpine/edge/testing/" >> /etc/apk/reposi
     apk add --quiet --no-progress --no-cache zsh tzdata git libstdc++ doas iproute2 gnupg socat openssh openrc curl tar zstd && \
     apk add --quiet --no-progress --no-cache pipx uv go jq skopeo tenv kubectl k9s golangci-lint && \
     apk add --quiet --no-progress --no-cache ip6tables containerd kubelet kubeadm cni-plugins cni-plugin-flannel util-linux-misc buildkit buildctl nerdctl rootlesskit slirp4netns && \
+    GORELEASER_VERSION=$(curl --silent  https://api.github.com/repos/goreleaser/goreleaser/releases/latest | jq -r .tag_name | sed -e 's/^v//') && \
     wget -q -O /tmp/goreleaser.apk "https://github.com/goreleaser/goreleaser/releases/download/v${GORELEASER_VERSION}/goreleaser_${GORELEASER_VERSION}_x86_64.apk" && \
     apk add --quiet --no-progress --allow-untrusted --no-cache /tmp/goreleaser.apk && \
     rm -rf `find /var/cache/apk/ -type f`
