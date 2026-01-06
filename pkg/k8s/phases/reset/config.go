@@ -26,16 +26,13 @@ import (
 	"path/filepath"
 
 	"github.com/pkg/errors"
-
+	log "github.com/sirupsen/logrus"
 	"k8s.io/klog/v2"
-
 	kubeadmApiV1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	kubeadmConstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
-
-	log "github.com/sirupsen/logrus"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/users"
 )
 
@@ -186,7 +183,7 @@ func IsDirEmpty(dir string) (bool, error) {
 		err = d.Close()
 	}()
 	_, err = d.Readdirnames(1)
-	if err == io.EOF {
+	if errors.Is(err, io.EOF) {
 		return true, nil
 	}
 	return false, nil

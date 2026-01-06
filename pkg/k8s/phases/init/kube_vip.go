@@ -7,10 +7,11 @@ import (
 	"io"
 	"path/filepath"
 
-	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
 	"github.com/spf13/afero"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
+
+	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
 )
 
 func NewKubeVipControlPlanePhase() workflow.Phase {
@@ -38,7 +39,7 @@ func WriteKubeVipConfiguration(fs afero.Fs, manifestDir string, config *v1alpha1
 	afs := &afero.Afero{Fs: fs}
 	f, err = afs.Create(filepath.Join(manifestDir, "kube-vip.yaml"))
 	if err != nil {
-		return
+		return f, err
 	}
 	defer func() {
 		closeErr := f.Close()
@@ -55,7 +56,7 @@ func WriteKubeVipConfiguration(fs afero.Fs, manifestDir string, config *v1alpha1
 	}()
 
 	err = CreateKubeVipConfiguration(f, config)
-	return
+	return f, err
 }
 
 func runKubeVipControlPlane(c workflow.RunData) error {

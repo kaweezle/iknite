@@ -15,11 +15,12 @@ import (
 	"time"
 
 	"github.com/joho/godotenv"
-	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
-	"github.com/kaweezle/iknite/pkg/config"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
+
+	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
+	"github.com/kaweezle/iknite/pkg/config"
 )
 
 // cSpell: enable
@@ -158,7 +159,7 @@ func StartKubelet() (*exec.Cmd, error) {
 	}
 
 	// Open the kubelet log file for writing
-	logFile, err := os.OpenFile(kubeletLogFile, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0644)
+	logFile, err := os.OpenFile(kubeletLogFile, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0o644)
 	if err != nil {
 		return nil, errors.WithMessagef(err, "Failed to open kubelet log file %s", kubeletLogFile)
 	}
@@ -185,7 +186,7 @@ func StartKubelet() (*exec.Cmd, error) {
 	}
 
 	// Write the PID to the /run/kubelet.pid file
-	err = os.WriteFile(kubeletPidFile, fmt.Appendf(nil, "%d", cmd.Process.Pid), 0644)
+	err = os.WriteFile(kubeletPidFile, fmt.Appendf(nil, "%d", cmd.Process.Pid), 0o644)
 	if err != nil {
 		log.WithFields(log.Fields{
 			"pid":     cmd.Process.Pid,
@@ -223,7 +224,7 @@ func StartAndConfigureKubelet(kubeConfig *v1alpha1.IkniteClusterSpec) error {
 
 	defer RemovePidFiles()
 
-	var alive = true
+	alive := true
 
 	killKubelet := func() {
 		err = cmd.Process.Signal(syscall.SIGTERM)
@@ -324,7 +325,8 @@ func CheckKubeletRunning(retries, okResponses, waitTime int) (err error) {
 		} else {
 			log.WithFields(log.Fields{
 				"err":       err,
-				"wait_time": waitTime}).Debug("Waiting...")
+				"wait_time": waitTime,
+			}).Debug("Waiting...")
 			time.Sleep(time.Duration(waitTime) * time.Millisecond)
 		}
 	}

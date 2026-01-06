@@ -29,22 +29,24 @@ import (
 	"strconv"
 	"syscall"
 	"time"
+	_ "unsafe"
 
 	"github.com/pion/mdns"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	flag "github.com/spf13/pflag"
-
+	metaV1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
-
+	kubeproxyconfig "k8s.io/kube-proxy/config/v1alpha1"
 	kubeadmApi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmScheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
 	kubeadmApiV1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta4"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
+	kubeadmCmd "k8s.io/kubernetes/cmd/kubeadm/app/cmd"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	phases "k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/init"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
@@ -57,17 +59,12 @@ import (
 	configUtil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	kubeConfigUtil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 
-	_ "unsafe"
-
 	ikniteApi "github.com/kaweezle/iknite/pkg/apis/iknite"
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
 	"github.com/kaweezle/iknite/pkg/config"
 	"github.com/kaweezle/iknite/pkg/constants"
 	"github.com/kaweezle/iknite/pkg/k8s"
 	iknitePhase "github.com/kaweezle/iknite/pkg/k8s/phases/init"
-	metaV1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	kubeproxyconfig "k8s.io/kube-proxy/config/v1alpha1"
-	kubeadmCmd "k8s.io/kubernetes/cmd/kubeadm/app/cmd"
 )
 
 // cSpell: enable

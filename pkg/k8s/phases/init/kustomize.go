@@ -4,14 +4,14 @@ package init
 import (
 	"fmt"
 
-	"github.com/kaweezle/iknite/pkg/config"
-	"github.com/kaweezle/iknite/pkg/constants"
-	"github.com/kaweezle/iknite/pkg/k8s"
 	"github.com/pkg/errors"
+	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 
-	log "github.com/sirupsen/logrus"
+	"github.com/kaweezle/iknite/pkg/config"
+	"github.com/kaweezle/iknite/pkg/constants"
+	"github.com/kaweezle/iknite/pkg/k8s"
 )
 
 // cSpell: enable

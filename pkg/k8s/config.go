@@ -23,7 +23,6 @@ import (
 	"net"
 	"time"
 
-	"github.com/kaweezle/iknite/pkg/provision"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	appsV1 "k8s.io/api/apps/v1"
@@ -37,6 +36,8 @@ import (
 	"k8s.io/client-go/tools/clientcmd/api"
 	kubeadmConstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"sigs.k8s.io/kustomize/kyaml/resid"
+
+	"github.com/kaweezle/iknite/pkg/provision"
 )
 
 // cSpell: enable
@@ -104,10 +105,10 @@ func (config *Config) Client() (client *kubernetes.Clientset, err error) {
 	var rest *rest.Config
 	rest, err = clientConfig.ClientConfig()
 	if err != nil {
-		return
+		return client, err
 	}
 	client, err = kubernetes.NewForConfig(rest)
-	return
+	return client, err
 }
 
 // CheckClusterRunning checks that the cluster is running by requesting the
@@ -148,7 +149,8 @@ func (config *Config) CheckClusterRunning(retries, okResponses, waitTime int) er
 		} else {
 			log.WithFields(log.Fields{
 				"err":       err,
-				"wait_time": waitTime}).Debug("Waiting...")
+				"wait_time": waitTime,
+			}).Debug("Waiting...")
 			time.Sleep(time.Duration(waitTime) * time.Millisecond)
 		}
 	}
@@ -168,14 +170,14 @@ func (config *Config) WriteToFile(filename string) error {
 func (config *Config) RestartProxy() (err error) {
 	var client *kubernetes.Clientset
 	if client, err = config.Client(); err != nil {
-		return
+		return err
 	}
 
 	ctx := context.Background()
 
 	var ds *appsV1.DaemonSet
 	if ds, err = client.AppsV1().DaemonSets("kube-system").Get(ctx, "kube-proxy", metaV1.GetOptions{}); err != nil {
-		return
+		return err
 	}
 
 	if ds.Spec.Template.Annotations == nil {
@@ -184,7 +186,7 @@ func (config *Config) RestartProxy() (err error) {
 	ds.Spec.Template.Annotations["kubectl.kubernetes.io/restartedAt"] = time.Now().Format(time.RFC3339)
 
 	_, err = client.AppsV1().DaemonSets("kube-system").Update(ctx, ds, metaV1.UpdateOptions{})
-	return
+	return err
 }
 
 func (config *Config) DoKustomization(ip net.IP, kustomization string, force bool, waitTimeout int) error {
@@ -250,7 +252,7 @@ func GetIkniteConfigMap(client kubernetes.Interface) (cm *coreV1.ConfigMap, err 
 			BinaryData: map[string][]byte{},
 		}
 	}
-	return
+	return cm, err
 }
 
 func WriteIkniteConfigMap(client kubernetes.Interface, cm *coreV1.ConfigMap) (res *coreV1.ConfigMap, err error) {
@@ -260,5 +262,5 @@ func WriteIkniteConfigMap(client kubernetes.Interface, cm *coreV1.ConfigMap) (re
 		res, err = client.CoreV1().ConfigMaps("kube-system").Create(context.TODO(), cm, metaV1.CreateOptions{})
 	}
 
-	return
+	return res, err
 }

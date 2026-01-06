@@ -7,10 +7,11 @@ import (
 	"net"
 	"os"
 
-	ikniteApi "github.com/kaweezle/iknite/pkg/apis/iknite"
-	"github.com/kaweezle/iknite/pkg/constants"
 	log "github.com/sirupsen/logrus"
 	metaV1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	ikniteApi "github.com/kaweezle/iknite/pkg/apis/iknite"
+	"github.com/kaweezle/iknite/pkg/constants"
 )
 
 // cSpell: enable
@@ -104,12 +105,12 @@ func (ikniteCluster IkniteCluster) Persist() {
 	ikniteClusterJSON, err := json.MarshalIndent(ikniteCluster, "", "  ")
 	if err == nil {
 		// Write JSON to file
-		err = os.MkdirAll(constants.StatusDirectory, 0755)
+		err = os.MkdirAll(constants.StatusDirectory, 0o755)
 		if err != nil {
 			log.WithError(err).Warn("Failed to create status directory")
 			return
 		}
-		err = os.WriteFile(constants.StatusFile, ikniteClusterJSON, 0644)
+		err = os.WriteFile(constants.StatusFile, ikniteClusterJSON, 0o644)
 		if err != nil {
 			log.WithError(err).Warn("Failed to write status.json")
 		}

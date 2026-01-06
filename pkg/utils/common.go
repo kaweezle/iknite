@@ -24,8 +24,10 @@ import (
 	"github.com/spf13/afero"
 )
 
-var fs = afero.NewOsFs()
-var afs = &afero.Afero{Fs: fs}
+var (
+	fs  = afero.NewOsFs()
+	afs = &afero.Afero{Fs: fs}
+)
 
 // ExecuteOnExistence executes the function fn if the file existence is the
 // one given by the parameter.
@@ -41,13 +43,13 @@ func ExecuteOnExistence(file string, existence bool, fn func() error) error {
 	return nil
 }
 
-// ExecuteIfNotExist executes the function fn if the file file
+// ExecuteIfNotExist executes the function fn if the file
 // doesn't exist.
 func ExecuteIfNotExist(file string, fn func() error) error {
 	return ExecuteOnExistence(file, false, fn)
 }
 
-// ExecuteIfExist executes the function fn if the file file
+// ExecuteIfExist executes the function fn if the file
 // exists.
 func ExecuteIfExist(file string, fn func() error) error {
 	return ExecuteOnExistence(file, true, fn)

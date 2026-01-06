@@ -4,11 +4,12 @@ package k8s
 import (
 	"testing"
 
-	tu "github.com/kaweezle/iknite/pkg/testutils"
-	"github.com/kaweezle/iknite/pkg/utils"
 	"github.com/lithammer/dedent"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/suite"
+
+	tu "github.com/kaweezle/iknite/pkg/testutils"
+	"github.com/kaweezle/iknite/pkg/utils"
 )
 
 // cSpell: enable

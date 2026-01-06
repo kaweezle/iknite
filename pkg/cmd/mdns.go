@@ -19,20 +19,21 @@ import (
 	"net"
 	"os"
 
-	"github.com/kaweezle/iknite/pkg/cmd/options"
-	"github.com/kaweezle/iknite/pkg/config"
-	"github.com/kaweezle/iknite/pkg/constants"
-	"github.com/kaweezle/iknite/pkg/utils"
 	"github.com/pion/mdns"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"golang.org/x/net/ipv4"
+
+	"github.com/kaweezle/iknite/pkg/cmd/options"
+	"github.com/kaweezle/iknite/pkg/config"
+	"github.com/kaweezle/iknite/pkg/constants"
+	"github.com/kaweezle/iknite/pkg/utils"
 )
 
 func NewMdnsCmd() *cobra.Command {
 	// configureCmd represents the start command
-	var mdnsCmd = &cobra.Command{
+	mdnsCmd := &cobra.Command{
 		Use:   "mdns",
 		Short: "Publish cluster hostname through mdns",
 		Long: `On WSL, publishing the localhost over mdns allows avoiding messing

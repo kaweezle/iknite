@@ -19,23 +19,21 @@ package init
 import (
 	"fmt"
 
-	"github.com/kaweezle/iknite/pkg/k8s"
 	"github.com/pkg/errors"
 	kubeletConfig "k8s.io/kubelet/config/v1beta1"
-
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	cmdUtil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	kubeletPhase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubelet"
+
+	"github.com/kaweezle/iknite/pkg/k8s"
 )
 
-var (
-	kubeletStartPhaseExample = cmdUtil.Examples(`
+var kubeletStartPhaseExample = cmdUtil.Examples(`
 		# Writes a dynamic environment file with kubelet flags from a InitConfiguration file.
 		kubeadm init phase kubelet-start --config config.yaml
 		`)
-)
 
 // NewKubeletStartPhase creates a kubeadm workflow phase that start kubelet on a node.
 func NewKubeletStartPhase() workflow.Phase {

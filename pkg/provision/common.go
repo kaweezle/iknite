@@ -26,7 +26,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/kaweezle/iknite/pkg/constants"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"sigs.k8s.io/kustomize/api/krusty"
@@ -35,6 +34,8 @@ import (
 	"sigs.k8s.io/kustomize/api/types"
 	"sigs.k8s.io/kustomize/kyaml/filesys"
 	"sigs.k8s.io/kustomize/kyaml/resid"
+
+	"github.com/kaweezle/iknite/pkg/constants"
 )
 
 // cSpell: enable
@@ -92,7 +93,7 @@ func createTempKustomizeDirectory(content *embed.FS, fs filesys.FileSystem, temp
 func applyResmap(resources resmap.ResMap) (err error) {
 	var out []byte
 	if out, err = resources.AsYaml(); err != nil {
-		return
+		return err
 	}
 
 	buffer := bytes.Buffer{}
@@ -108,9 +109,9 @@ func applyResmap(resources resmap.ResMap) (err error) {
 			"code": cmd.ProcessState.ExitCode(),
 		}).Error(string(out))
 		err = errors.Wrap(err, "While applying templates")
-		return
+		return err
 	}
-	return
+	return err
 }
 
 func ApplyKustomizations(fs filesys.FileSystem, dirname string) (ids []resid.ResId, err error) {
@@ -118,7 +119,7 @@ func ApplyKustomizations(fs filesys.FileSystem, dirname string) (ids []resid.Res
 	resources, err = RunKustomizations(fs, dirname)
 	if err != nil {
 		err = errors.Wrap(err, "While building templates")
-		return
+		return ids, err
 	}
 
 	ids = resources.AllIds()
@@ -132,11 +133,11 @@ func ApplyKustomizations(fs filesys.FileSystem, dirname string) (ids []resid.Res
 		crdIds := crds.AllIds()
 		log.WithField("resources", crdIds).Debug("Cluster resources")
 		if err = applyResmap(crds); err != nil {
-			return
+			return ids, err
 		}
 		for _, curId := range crdIds {
 			if err = resources.Remove(curId); err != nil {
-				return
+				return ids, err
 			}
 		}
 	}
@@ -145,7 +146,7 @@ func ApplyKustomizations(fs filesys.FileSystem, dirname string) (ids []resid.Res
 
 	err = applyResmap(resources)
 
-	return
+	return ids, err
 }
 
 func ApplyLocalKustomizations(dirname string) ([]resid.ResId, error) {
@@ -177,5 +178,5 @@ func RunKustomizations(fs filesys.FileSystem, dirname string) (resources resmap.
 	opts := EnablePlugins(krusty.MakeDefaultOptions())
 	k := krusty.MakeKustomizer(opts)
 	resources, err = k.Run(fs, dirname)
-	return
+	return resources, err
 }

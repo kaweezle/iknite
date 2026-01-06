@@ -9,7 +9,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
 	log "github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -25,6 +24,8 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/kubectl/pkg/polymorphichelpers"
+
+	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
 )
 
 // cSpell: enable
@@ -103,7 +104,7 @@ func (s *ApplicationStatusViewer) Status(obj runtime.Unstructured, revision int6
 
 	err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.UnstructuredContent(), application)
 	if err != nil {
-		return "", false, fmt.Errorf("failed to convert %T to %T: %v", obj, application, err)
+		return "", false, fmt.Errorf("failed to convert %T to %T: %w", obj, application, err)
 	}
 
 	healthStatusString := application.Status.Health.Status
@@ -116,7 +117,7 @@ func (s *ApplicationStatusViewer) Status(obj runtime.Unstructured, revision int6
 func (client *RESTClientGetter) HasApplications() (has bool, err error) {
 	var mapper meta.RESTMapper
 	if mapper, err = client.ToRESTMapper(); err != nil {
-		return
+		return has, err
 	}
 
 	_, err = mapper.RESTMapping(ApplicationSchemaGroupVersionKind.GroupKind(), ApplicationSchemaGroupVersionKind.Version)
@@ -124,21 +125,21 @@ func (client *RESTClientGetter) HasApplications() (has bool, err error) {
 		if meta.IsNoMatchError(err) {
 			err = nil
 		} else {
-			return
+			return has, err
 		}
 	} else {
 		has = true
 	}
-	return
+	return has, err
 }
 
 func (client *RESTClientGetter) AllWorkloadStates() (result []*v1alpha1.WorkloadState, err error) {
 	var _result []*v1alpha1.WorkloadState
 
-	var resourceTypes = "deployments,statefulsets,daemonsets"
+	resourceTypes := "deployments,statefulsets,daemonsets"
 	var hasApplications bool
 	if hasApplications, err = client.HasApplications(); err != nil {
-		return
+		return result, err
 	}
 	if hasApplications {
 		resourceTypes += ",applications"
@@ -154,25 +155,25 @@ func (client *RESTClientGetter) AllWorkloadStates() (result []*v1alpha1.Workload
 
 	var infos []*resource.Info
 	if infos, err = r.Infos(); err != nil {
-		return
+		return result, err
 	}
 
 	for _, info := range infos {
 		var u map[string]any
 
 		if u, err = runtime.DefaultUnstructuredConverter.ToUnstructured(info.Object); err != nil {
-			return
+			return result, err
 		}
 
 		var v polymorphichelpers.StatusViewer
 		if v, err = /* polymorphichelpers. */ StatusViewerFor(info.Object.GetObjectKind().GroupVersionKind().GroupKind()); err != nil {
-			return
+			return result, err
 		}
 
 		var msg string
 		var ok bool
 		if msg, ok, err = v.Status(&unstructured.Unstructured{Object: u}, 0); err != nil {
-			return
+			return result, err
 		}
 		_result = append(_result, &v1alpha1.WorkloadState{Namespace: info.Namespace, Name: info.ObjectName(), Ok: ok, Message: strings.TrimSuffix(msg, "\n")})
 	}
@@ -180,7 +181,7 @@ func (client *RESTClientGetter) AllWorkloadStates() (result []*v1alpha1.Workload
 		return _result[i].String() < _result[j].String()
 	})
 	result = _result
-	return
+	return result, err
 }
 
 type WorkloadStateCallbackFunc func(state bool, total int, ready []*v1alpha1.WorkloadState, unready []*v1alpha1.WorkloadState, iteration int) bool
@@ -193,7 +194,7 @@ func AreWorkloadsReady(config *Config, callback WorkloadStateCallbackFunc) wait.
 		if err != nil {
 			return false, err
 		}
-		var result = true
+		result := true
 		var ready, unready []*v1alpha1.WorkloadState
 		for _, state := range states {
 			if !state.Ok {

@@ -33,7 +33,7 @@ func (m CheckModel) Init() tea.Cmd {
 func (m CheckModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg.(type) {
 	case tea.KeyMsg:
-		log.Infof("Cancelling checks %v", m.cancel)
+		log.Infof("Canceling checks %v", m.cancel)
 		m.cancel()
 		return m, tea.Batch(
 			// tea.ExitAltScreen,

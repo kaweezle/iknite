@@ -12,14 +12,15 @@ import (
 	"time"
 
 	"github.com/charmbracelet/lipgloss"
-	"github.com/kaweezle/iknite/pkg/alpine"
-	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
 	"github.com/pkg/errors"
 	v1 "k8s.io/api/core/v1"
 	kubeadmConstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	kubeConfigUtil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 	staticPodUtil "k8s.io/kubernetes/cmd/kubeadm/app/util/staticpod"
+
+	"github.com/kaweezle/iknite/pkg/alpine"
+	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
 )
 
 // cSpell: enable
@@ -32,7 +33,7 @@ func SystemFileCheck(name, description, path, expectedContent string) *Check {
 		CheckFn: func(ctx context.Context, data CheckData) (bool, string, error) {
 			content, err := os.ReadFile(path)
 			if err != nil {
-				return false, "", fmt.Errorf("failed to read %s: %v", path, err)
+				return false, "", fmt.Errorf("failed to read %s: %w", path, err)
 			}
 			contentMessage := ""
 			if expectedContent != "" {
@@ -95,7 +96,7 @@ func KubernetesFileCheck(name, path string) *Check {
 			if os.IsNotExist(err) {
 				return false, "", fmt.Errorf("%s does not exist", path)
 			} else if err != nil {
-				return false, "", fmt.Errorf("error checking %s: %v", path, err)
+				return false, "", fmt.Errorf("error checking %s: %w", path, err)
 			}
 
 			// Check if path is a file and not a directory

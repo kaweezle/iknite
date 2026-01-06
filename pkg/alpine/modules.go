@@ -6,9 +6,10 @@ import (
 	"os"
 
 	"github.com/google/uuid"
-	"github.com/kaweezle/iknite/pkg/utils"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
+
+	"github.com/kaweezle/iknite/pkg/utils"
 )
 
 // cSpell: enable
@@ -32,7 +33,7 @@ func EnsureNetFilter() error {
 		} else {
 			err = errors.Wrapf(err, "Error while enabling netfilter: %s", string(out))
 		}
-		return
+		return err
 	})
 }
 
@@ -44,9 +45,9 @@ func EnsureMachineID() error {
 			"filename": machineIDFile,
 		}).Info("Generating machine ID...")
 
-		if err = utils.WriteFile(machineIDFile, []byte(id.String()), os.FileMode(int(0644))); err != nil {
+		if err = utils.WriteFile(machineIDFile, []byte(id.String()), os.FileMode(int(0o644))); err != nil {
 			err = errors.Wrapf(err, "Error while creating machine id: %s", machineIDFile)
 		}
-		return
+		return err
 	})
 }

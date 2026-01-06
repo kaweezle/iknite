@@ -20,11 +20,12 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/kaweezle/iknite/pkg/constants"
-	"github.com/kaweezle/iknite/pkg/utils"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
+
+	"github.com/kaweezle/iknite/pkg/constants"
+	"github.com/kaweezle/iknite/pkg/utils"
 )
 
 // cSpell: enable
@@ -44,8 +45,10 @@ type CRIStatusResponse struct {
 	Status CRIStatus `json:"status"`
 }
 
-var fs = afero.NewOsFs()
-var afs = &afero.Afero{Fs: fs}
+var (
+	fs  = afero.NewOsFs()
+	afs = &afero.Afero{Fs: fs}
+)
 
 func WaitForContainerService() (bool, error) {
 	retries := 3

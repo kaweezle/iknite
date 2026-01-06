@@ -21,10 +21,11 @@ import (
 	"os"
 	"path"
 
-	"github.com/kaweezle/iknite/pkg/constants"
-	"github.com/kaweezle/iknite/pkg/utils"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
+
+	"github.com/kaweezle/iknite/pkg/constants"
+	"github.com/kaweezle/iknite/pkg/utils"
 )
 
 // cSpell: enable
@@ -132,8 +133,8 @@ func StopService(serviceName string) error {
 }
 
 func PretendServiceStarted(serviceName string) error {
-	var networkSource = path.Join(servicesDir, serviceName)
-	var networkDestination = path.Join(startedServicesDir, serviceName)
+	networkSource := path.Join(servicesDir, serviceName)
+	networkDestination := path.Join(startedServicesDir, serviceName)
 	return utils.ExecuteIfNotExist(networkDestination, func() error {
 		return os.Symlink(networkSource, networkDestination)
 	})

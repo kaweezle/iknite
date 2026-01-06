@@ -9,14 +9,15 @@ import (
 	"syscall"
 
 	s "github.com/bitfield/script"
-	"github.com/kaweezle/iknite/pkg/alpine"
-	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/txn2/txeh"
 	resetPhases "k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/reset"
 	kubeadmConstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	utilStaticPod "k8s.io/kubernetes/cmd/kubeadm/app/util/staticpod"
+
+	"github.com/kaweezle/iknite/pkg/alpine"
+	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
 )
 
 // cSpell: enable
@@ -63,7 +64,7 @@ func ResetIPTables(isDryRun bool) (err error) {
 	if !isDryRun {
 		_, err = s.Exec("iptables-save").Reject("KUBE-").Reject("CNI-").Reject("FLANNEL").Exec("iptables-restore").String()
 		if err != nil {
-			return
+			return err
 		}
 	}
 	log.WithField("isDryRun", isDryRun).Info("Cleaning up ip6tables rules...")
@@ -94,7 +95,7 @@ func StopAllContainers(isDryRun bool) (err error) {
 		log.Info("Stopping all containers with command /bin/sh -c 'crictl rmp -f $(crictl pods -q)'...")
 		_, err = s.Exec("/bin/sh -c 'crictl rmp -f $(crictl pods -q)'").String()
 	}
-	return
+	return err
 }
 
 func UnmountPaths(failOnError bool, isDryRun bool) error {

@@ -16,15 +16,16 @@ limitations under the License.
 package cmd
 
 import (
+	"github.com/pkg/errors"
+	"github.com/spf13/cobra"
+	flag "github.com/spf13/pflag"
+	"github.com/spf13/viper"
+
 	"github.com/kaweezle/iknite/pkg/cmd/options"
 	"github.com/kaweezle/iknite/pkg/config"
 	"github.com/kaweezle/iknite/pkg/constants"
 	"github.com/kaweezle/iknite/pkg/k8s"
 	"github.com/kaweezle/iknite/pkg/utils"
-	"github.com/pkg/errors"
-	"github.com/spf13/cobra"
-	flag "github.com/spf13/pflag"
-	"github.com/spf13/viper"
 )
 
 var (
@@ -36,7 +37,7 @@ var (
 )
 
 func NewKustomizeCmd() *cobra.Command {
-	var kustomizeCmd = &cobra.Command{
+	kustomizeCmd := &cobra.Command{
 		Use:   "kustomize",
 		Short: "Kustomize the cluster",
 		Long: `Apply the configuration to the cluster using kustomize.

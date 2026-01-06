@@ -6,10 +6,11 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/kaweezle/iknite/pkg/utils"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/txn2/txeh"
+
+	"github.com/kaweezle/iknite/pkg/utils"
 )
 
 // cSpell: enable
@@ -18,9 +19,8 @@ func CheckIpExists(ip net.IP) (result bool, err error) {
 	result = false
 	var ifaces []net.Interface
 	ifaces, err = net.Interfaces()
-
 	if err != nil {
-		return
+		return result, err
 	}
 	for _, i := range ifaces {
 		var addrs []net.Addr
@@ -36,15 +36,15 @@ func CheckIpExists(ip net.IP) (result bool, err error) {
 			case *net.IPNet:
 				if v.IP.Equal(ip) {
 					result = true
-					return
+					return result, err
 				}
 			}
 		}
 	}
-	return
+	return result, err
 }
 
-// AddIpAddress adds the IP address address to the interface iface.
+// AddIpAddress adds the IP address to the interface iface.
 //
 // It uses the default mask of the IP address class as the mask, and the default
 // broadcast address as the broadcast address.
@@ -68,7 +68,7 @@ func AddIpAddress(iface string, address net.IP) (err error) {
 	if out, err = utils.Exec.Run(true, "/sbin/ip", parameters...); err != nil {
 		err = errors.Wrap(err, string(out))
 	}
-	return
+	return err
 }
 
 func removeIpAddresses(hosts *txeh.Hosts, toRemove []net.IP) {
@@ -100,7 +100,7 @@ func AddIpMapping(hostConfig *txeh.HostsConfig, ip net.IP, domainName string, to
 
 	hosts.AddHost(ip.String(), domainName)
 	err = hosts.Save()
-	return
+	return err
 }
 
 func IsHostMapped(Ip net.IP, DomainName string) (bool, []net.IP) {

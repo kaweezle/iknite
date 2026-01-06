@@ -22,14 +22,14 @@ import (
 	"os"
 
 	"github.com/bitfield/script"
-	"github.com/kaweezle/iknite/pkg/alpine"
-	"github.com/kaweezle/iknite/pkg/constants"
-	"github.com/kaweezle/iknite/pkg/utils"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/txn2/txeh"
 
+	"github.com/kaweezle/iknite/pkg/alpine"
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
+	"github.com/kaweezle/iknite/pkg/constants"
+	"github.com/kaweezle/iknite/pkg/utils"
 )
 
 // cSpell: enable
@@ -43,7 +43,7 @@ func IsKubeletServiceRunnable(confFilePath string) (present bool, err error) {
 	if lines, err = script.File(confFilePath).Match(rcConfPreventKubeletRunning).CountLines(); err == nil {
 		present = lines == 0
 	}
-	return
+	return present, err
 }
 
 // PreventKubeletServiceFromStarting ensures that the kubelet service is not started
@@ -82,14 +82,14 @@ func PrepareKubernetesEnvironment(ikniteConfig *v1alpha1.IkniteClusterSpec) erro
 
 	// Allow forwarding (kubeadm requirement)
 	log.Info("Ensuring basic settings...")
-	_ = utils.WriteFile("/proc/sys/net/ipv4/ip_forward", []byte("1\n"), os.FileMode(int(0644)))
+	_ = utils.WriteFile("/proc/sys/net/ipv4/ip_forward", []byte("1\n"), os.FileMode(int(0o644)))
 
 	if err := alpine.EnsureNetFilter(); err != nil {
 		return errors.Wrap(err, "While ensuring netfilter")
 	}
 
 	// Make bridge use ip-tables
-	_ = utils.WriteFile("/proc/sys/net/bridge/bridge-nf-call-iptables", []byte("1\n"), os.FileMode(int(0644)))
+	_ = utils.WriteFile("/proc/sys/net/bridge/bridge-nf-call-iptables", []byte("1\n"), os.FileMode(int(0o644)))
 
 	if err := alpine.EnsureMachineID(); err != nil {
 		return errors.Wrap(err, "While ensuring machine ID")
@@ -141,7 +141,7 @@ func PrepareKubernetesEnvironment(ikniteConfig *v1alpha1.IkniteClusterSpec) erro
 
 	log.Infof("Ensuring %s existence...", constants.CrictlYaml)
 	if err := utils.ExecuteIfNotExist(constants.CrictlYaml, func() error {
-		return utils.WriteFile(constants.CrictlYaml, []byte("runtime-endpoint: unix://"+constants.ContainerServiceSock+"\n"), os.FileMode(int(0644)))
+		return utils.WriteFile(constants.CrictlYaml, []byte("runtime-endpoint: unix://"+constants.ContainerServiceSock+"\n"), os.FileMode(int(0o644)))
 	}); err != nil {
 		return errors.Wrapf(err, "While ensuring %s existence", constants.CrictlYaml)
 	}

@@ -22,21 +22,14 @@ import (
 	"errors"
 	"io"
 	"os"
+	_ "unsafe"
 
-	ikniteApi "github.com/kaweezle/iknite/pkg/apis/iknite"
-	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
-	"github.com/kaweezle/iknite/pkg/config"
 	"github.com/spf13/cobra"
 	flag "github.com/spf13/pflag"
-
 	metaV1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
-
-	_ "unsafe"
-
-	iknitePhases "github.com/kaweezle/iknite/pkg/k8s/phases/reset"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmScheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
 	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
@@ -50,6 +43,11 @@ import (
 	apiClient "k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	configUtil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	kubeconfigUtil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
+
+	ikniteApi "github.com/kaweezle/iknite/pkg/apis/iknite"
+	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
+	"github.com/kaweezle/iknite/pkg/config"
+	iknitePhases "github.com/kaweezle/iknite/pkg/k8s/phases/reset"
 )
 
 // cSpell: enable

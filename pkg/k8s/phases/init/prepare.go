@@ -3,8 +3,9 @@ package init
 import (
 	"fmt"
 
-	"github.com/kaweezle/iknite/pkg/k8s"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
+
+	"github.com/kaweezle/iknite/pkg/k8s"
 )
 
 func NewPrepareHostPhase() workflow.Phase {

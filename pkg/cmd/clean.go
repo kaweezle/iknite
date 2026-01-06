@@ -6,6 +6,11 @@ import (
 	"os"
 	"syscall"
 
+	log "github.com/sirupsen/logrus"
+	"github.com/spf13/cobra"
+	flag "github.com/spf13/pflag"
+	kubeadmOptions "k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
+
 	"github.com/kaweezle/iknite/pkg/alpine"
 	"github.com/kaweezle/iknite/pkg/apis/iknite"
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
@@ -14,10 +19,6 @@ import (
 	"github.com/kaweezle/iknite/pkg/constants"
 	"github.com/kaweezle/iknite/pkg/k8s"
 	"github.com/kaweezle/iknite/pkg/k8s/phases/reset"
-	log "github.com/sirupsen/logrus"
-	"github.com/spf13/cobra"
-	flag "github.com/spf13/pflag"
-	kubeadmOptions "k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 )
 
 // cSpell: enable
@@ -74,7 +75,7 @@ func NewCmdClean(ikniteConfig *v1alpha1.IkniteClusterSpec, cleanOptions *cleanOp
 		cleanOptions = newCleanOptions()
 	}
 
-	var cleanCmd = &cobra.Command{
+	cleanCmd := &cobra.Command{
 		Use:   "clean",
 		Short: "Clean up the environment, stopping all services and removing configuration files (optional)",
 		Long: `Kill the cluster and clean up the environment.

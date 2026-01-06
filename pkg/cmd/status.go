@@ -24,14 +24,15 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/sirupsen/logrus"
+	"github.com/spf13/cobra"
+
 	"github.com/kaweezle/iknite/pkg/alpine"
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
 	"github.com/kaweezle/iknite/pkg/config"
 	"github.com/kaweezle/iknite/pkg/constants"
 	"github.com/kaweezle/iknite/pkg/k8s"
 	"github.com/kaweezle/iknite/pkg/utils"
-	"github.com/sirupsen/logrus"
-	"github.com/spf13/cobra"
 )
 
 // cSpell: enable
@@ -68,7 +69,7 @@ var (
 
 func NewStatusCmd(ikniteConfig *v1alpha1.IkniteClusterSpec) *cobra.Command {
 	// configureCmd represents the start command
-	var statusCmd = &cobra.Command{
+	statusCmd := &cobra.Command{
 		Use:   "status",
 		Short: "Gives status information on the cluster",
 		Long: `Gives status information of the deployed workloads:
@@ -88,14 +89,13 @@ func NewStatusCmd(ikniteConfig *v1alpha1.IkniteClusterSpec) *cobra.Command {
 }
 
 func performStatus(ikniteConfig *v1alpha1.IkniteClusterSpec) {
-	var checkData = k8s.CreateCheckWorkloadData(ikniteConfig.GetApiEndPoint())
-	var checkDataBuilder = func() k8s.CheckData {
+	checkData := k8s.CreateCheckWorkloadData(ikniteConfig.GetApiEndPoint())
+	checkDataBuilder := func() k8s.CheckData {
 		return checkData
 	}
 
 	// Create all checks
 	checks := []*k8s.Check{
-
 		// Phase 1: Environment
 		k8s.NewPhase("environment", "Environment configuration", []*k8s.Check{
 			k8s.SystemFileCheck("ip_forward", "Check IP forwarding is enabled", "/proc/sys/net/ipv4/ip_forward", "1\n"),

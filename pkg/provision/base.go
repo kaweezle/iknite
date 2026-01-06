@@ -21,10 +21,11 @@ import (
 	"net/url"
 	"path"
 
-	"github.com/kaweezle/iknite/pkg/utils"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"sigs.k8s.io/kustomize/kyaml/resid"
+
+	"github.com/kaweezle/iknite/pkg/utils"
 )
 
 // cSpell: enable

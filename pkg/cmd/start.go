@@ -21,23 +21,24 @@ import (
 	"os"
 	"time"
 
+	"github.com/pkg/errors"
+	log "github.com/sirupsen/logrus"
+	"github.com/spf13/cobra"
+	"k8s.io/apimachinery/pkg/util/wait"
+
 	"github.com/kaweezle/iknite/pkg/alpine"
 	"github.com/kaweezle/iknite/pkg/apis/iknite"
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
 	"github.com/kaweezle/iknite/pkg/cmd/options"
 	"github.com/kaweezle/iknite/pkg/config"
 	"github.com/kaweezle/iknite/pkg/k8s"
-	"github.com/pkg/errors"
-	log "github.com/sirupsen/logrus"
-	"github.com/spf13/cobra"
-	"k8s.io/apimachinery/pkg/util/wait"
 )
 
 // cSpell: enable
 
 func NewStartCmd(ikniteConfig *v1alpha1.IkniteClusterSpec) *cobra.Command {
 	// startCmd represents the start command
-	var startCmd = &cobra.Command{
+	startCmd := &cobra.Command{
 		Use:   "start",
 		Short: "Creates or starts the cluster",
 		Long: `Starts the cluster. Performs the following operations:

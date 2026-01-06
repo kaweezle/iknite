@@ -17,14 +17,15 @@ package config
 
 // cSpell: disable
 import (
-	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
-	"github.com/kaweezle/iknite/pkg/cmd/options"
 	"github.com/mitchellh/mapstructure"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	flag "github.com/spf13/pflag"
 	"github.com/spf13/viper"
 	koptions "k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
+
+	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
+	"github.com/kaweezle/iknite/pkg/cmd/options"
 )
 
 // cSpell: enable

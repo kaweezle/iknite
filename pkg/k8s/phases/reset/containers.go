@@ -19,11 +19,11 @@ package reset
 // cSpell:words klog cleanupnode
 // cSpell:disable
 import (
-	"github.com/kaweezle/iknite/pkg/k8s"
 	"github.com/pkg/errors"
-
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
+
+	"github.com/kaweezle/iknite/pkg/k8s"
 )
 
 // cSpell:enable

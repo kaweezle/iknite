@@ -9,12 +9,12 @@ import (
 	"regexp"
 	"testing"
 
-	tu "github.com/kaweezle/iknite/pkg/testutils"
 	"github.com/spf13/afero"
+	"github.com/stretchr/testify/suite"
 	"github.com/txn2/txeh"
 
+	tu "github.com/kaweezle/iknite/pkg/testutils"
 	"github.com/kaweezle/iknite/pkg/utils"
-	"github.com/stretchr/testify/suite"
 )
 
 // cSpell: enable

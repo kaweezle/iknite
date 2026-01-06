@@ -22,13 +22,13 @@ import (
 	"os"
 	"strings"
 
-	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
-	"github.com/kaweezle/iknite/pkg/cmd/options"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
-
 	"github.com/spf13/viper"
+
+	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
+	"github.com/kaweezle/iknite/pkg/cmd/options"
 )
 
 // cSpell: enable
@@ -45,7 +45,7 @@ func NewRootCmd() *cobra.Command {
 	cobra.EnableTraverseRunHooks = true
 
 	// rootCmd represents the base command when called without any subcommands
-	var rootCmd = &cobra.Command{
+	rootCmd := &cobra.Command{
 		Use:   "iknite",
 		Short: "Start kubernetes in Alpine",
 		Long: `Initializes Kubernetes in a WSL 2 Alpine distribution.
@@ -74,7 +74,7 @@ kubernetes.`,
 	flags.StringVarP(&v, options.Verbosity, "v", log.InfoLevel.String(), "Log level (debug, info, warn, error, fatal, panic)")
 	flags.BoolVar(&jsonLogs, options.Json, false, "Log messages in JSON")
 
-	var ikniteConfig = &v1alpha1.IkniteClusterSpec{}
+	ikniteConfig := &v1alpha1.IkniteClusterSpec{}
 
 	rootCmd.AddCommand(NewKustomizeCmd())
 	rootCmd.AddCommand(newCmdInit(os.Stdout, nil))

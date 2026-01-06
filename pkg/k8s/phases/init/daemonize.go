@@ -9,11 +9,12 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/kaweezle/iknite/pkg/apis/iknite"
-	"github.com/kaweezle/iknite/pkg/k8s"
 	"github.com/pion/mdns"
 	log "github.com/sirupsen/logrus"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
+
+	"github.com/kaweezle/iknite/pkg/apis/iknite"
+	"github.com/kaweezle/iknite/pkg/k8s"
 )
 
 // cSpell: enable
@@ -63,7 +64,7 @@ func WaitForKubelet(cmd *exec.Cmd, conn *mdns.Conn, cancel context.CancelFunc) e
 	}
 
 	if err == nil && cancel != nil {
-		log.Info("Cancelling the context...")
+		log.Info("Canceling the context...")
 		cancel()
 	}
 

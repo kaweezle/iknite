@@ -14,8 +14,7 @@ type Executor interface {
 	Pipe(stdin io.Reader, combined bool, cmd string, arguments ...string) ([]byte, error)
 }
 
-type CommandExecutor struct {
-}
+type CommandExecutor struct{}
 
 func (c *CommandExecutor) Run(combined bool, cmd string, arguments ...string) ([]byte, error) {
 	command := exec.Command(cmd, arguments...)

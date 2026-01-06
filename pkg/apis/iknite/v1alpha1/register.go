@@ -3,10 +3,11 @@ package v1alpha1
 // cSpell: words metav1 ikniteapi
 // cSpell: disable
 import (
-	ikniteapi "github.com/kaweezle/iknite/pkg/apis/iknite"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+
+	ikniteapi "github.com/kaweezle/iknite/pkg/apis/iknite"
 )
 
 // cSpell: enable
