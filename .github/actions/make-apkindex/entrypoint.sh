@@ -85,5 +85,3 @@ for arch in $archs; do
 done
 
 echo "::endgroup::"
-
-

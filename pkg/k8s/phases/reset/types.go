@@ -1,5 +1,6 @@
 package reset
 
+// cSpell: disable
 import (
 	"io"
 
@@ -9,6 +10,8 @@ import (
 
 	kubeadmApi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 )
+
+// cSpell: enable
 
 type IkniteResetData interface {
 	// From k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/reset.resetData

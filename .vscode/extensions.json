@@ -34,7 +34,10 @@
     // Project related
     "ms-kubernetes-tools.vscode-kubernetes-tools",
     "golang.Go",
-    "DrBlury.protobuf-vsc"
+    "DrBlury.protobuf-vsc",
+    "HashiCorp.terraform",
+    "HashiCorp.HCL",
+    "fredwangwang.vscode-hcl-format"
   ],
   // List of extensions recommended by VS Code that should not be recommended for users of this workspace.
   "unwantedRecommendations": []
