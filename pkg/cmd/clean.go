@@ -136,7 +136,7 @@ func performClean(ikniteConfig *v1alpha1.IkniteClusterSpec, cleanOptions *cleanO
 	// we assume that starting from here, we are in a stopped state
 	if cleanOptions.stopContainers {
 		logger.Info("Stopping all containers...")
-		if err := k8s.StopAllContainers(dryRun); err != nil {
+		if err = k8s.StopAllContainers(dryRun); err != nil {
 			log.WithError(err).Warn("Error stopping all containers")
 		}
 	}
@@ -165,7 +165,7 @@ func performClean(ikniteConfig *v1alpha1.IkniteClusterSpec, cleanOptions *cleanO
 	}
 
 	if cleanOptions.cleanIpAddress {
-		err := k8s.ResetIPAddress(ikniteConfig, dryRun)
+		err = k8s.ResetIPAddress(ikniteConfig, dryRun)
 		if err != nil {
 			log.WithError(err).Warn("Error resetting IP address")
 		}

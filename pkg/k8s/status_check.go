@@ -30,32 +30,31 @@ type CheckFn func(ctx context.Context, data CheckData) (bool, string, error)
 type CustomResultPrinter func(result *CheckResult, prefix string, spinView string) string
 
 type Check struct {
+	CheckFn          CheckFn
+	CheckDataBuilder CheckDataBuilder
+	CustomPrinter    CustomResultPrinter
 	Name             string
 	Description      string
 	Message          string
 	DependsOn        []string
 	SubChecks        []*Check
-	CheckFn          CheckFn
-	CheckDataBuilder CheckDataBuilder
-	CustomPrinter    CustomResultPrinter
 }
 
 type CheckResult struct {
-	Check         *Check
-	Status        CheckStatus
-	Message       string
 	Error         error
+	CheckData     CheckData
+	Check         *Check
+	Done          chan struct{}
+	Message       string
 	SubResults    []*CheckResult
 	ParentResults []*CheckResult
-	Done          chan struct{}
-	CheckData     CheckData
+	Status        CheckStatus
 }
 
 type CheckExecutor struct {
-	Checks  []*Check
-	Results []*CheckResult
-
 	resultNameMap map[string]*CheckResult
+	Checks        []*Check
+	Results       []*CheckResult
 }
 
 func (c *Check) NewResult() *CheckResult {

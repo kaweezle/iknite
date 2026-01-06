@@ -52,11 +52,13 @@ func CheckPidFile(service string, cmd *exec.Cmd) (int, error) {
 	}
 	if err == nil {
 		pidStr := strings.TrimSpace(string(pidBytes))
-		pid, err := strconv.Atoi(pidStr)
+		var pid int
+		pid, err = strconv.Atoi(pidStr)
 		if err != nil {
 			logger.WithField("content", pidStr).Warn("Failed to convert pid file to integer")
 		} else {
-			process, err := os.FindProcess(pid)
+			var process *os.Process
+			process, err = os.FindProcess(pid)
 			if err == nil && process.Signal(syscall.Signal(0)) == nil {
 				if cmd != nil {
 					cmd.Process = process
@@ -85,11 +87,13 @@ func IsKubeletRunning() (*os.Process, error) {
 	pidBytes, err := os.ReadFile(kubeletPidFile)
 	if err == nil {
 		pidStr := strings.TrimSpace(string(pidBytes))
-		pid, err := strconv.Atoi(pidStr)
+		var pid int
+		pid, err = strconv.Atoi(pidStr)
 		if err != nil {
 			log.WithField("pidfile", kubeletPidFile).Warnf("Failed to convert kubelet PID to integer: %s", pidStr)
 		} else {
-			process, err := os.FindProcess(pid)
+			var process *os.Process
+			process, err = os.FindProcess(pid)
 			if err == nil && process.Signal(syscall.Signal(0)) == nil {
 				log.WithField("pid", pid).Warnf("Kubelet is already running with pid: %d. Swallowing...", pid)
 				return process, nil
@@ -293,7 +297,8 @@ func CheckKubeletRunning(retries, okResponses, waitTime int) (err error) {
 		resp, err = http.Get("http://localhost:10248/healthz")
 		if err == nil {
 			defer func() { err = resp.Body.Close() }()
-			body, err := io.ReadAll(resp.Body)
+			var body []byte
+			body, err = io.ReadAll(resp.Body)
 			if err == nil {
 				contentStr := string(body)
 				if contentStr != "ok" {

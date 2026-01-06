@@ -76,21 +76,21 @@ import (
 // Please note that this structure includes the public kubeadm config API, but only a subset of the options
 // supported by this api will be exposed as a flag.
 type initOptions struct {
-	cfgPath                 string
-	skipTokenPrint          bool
-	dryRun                  bool
-	kubeconfigDir           string
-	kubeconfigPath          string
-	featureGatesString      string
-	ignorePreflightErrors   []string
 	bto                     *options.BootstrapTokenOptions
-	externalInitCfg         *kubeadmApiV1.InitConfiguration
+	ikniteCfg               *v1alpha1.IkniteClusterSpec
 	externalClusterCfg      *kubeadmApiV1.ClusterConfiguration
+	externalInitCfg         *kubeadmApiV1.InitConfiguration
+	kubeconfigDir           string
+	featureGatesString      string
+	kubeconfigPath          string
+	cfgPath                 string
+	patchesDir              string
+	ignorePreflightErrors   []string
+	dryRun                  bool
 	uploadCerts             bool
 	skipCertificateKeyPrint bool
-	patchesDir              string
 	skipCRIDetect           bool
-	ikniteCfg               *v1alpha1.IkniteClusterSpec
+	skipTokenPrint          bool
 }
 
 const (
@@ -110,27 +110,27 @@ var _ phases.InitData = &initData{}
 // initData defines all the runtime information used when running the kubeadm init workflow;
 // this data is shared across all the phases that are included in the workflow.
 type initData struct {
-	cfg                         *kubeadmApi.InitConfiguration
-	skipTokenPrint              bool
-	dryRun                      bool
-	kubeconfig                  *clientcmdapi.Config
-	kubeconfigDir               string
-	kubeconfigPath              string
-	ignorePreflightErrors       sets.Set[string]
-	certificatesDir             string
-	dryRunDir                   string
-	externalCA                  bool
 	client                      clientset.Interface
+	ctx                         context.Context
 	outputWriter                io.Writer
+	ctxCancel                   context.CancelFunc
+	kubeconfig                  *clientcmdapi.Config
+	mdnsConn                    *mdns.Conn
+	cfg                         *kubeadmApi.InitConfiguration
+	ignorePreflightErrors       sets.Set[string]
+	kubeletCmd                  *exec.Cmd
+	ikniteCluster               *v1alpha1.IkniteCluster
+	kubeconfigPath              string
+	patchesDir                  string
+	dryRunDir                   string
+	certificatesDir             string
+	kubeconfigDir               string
+	externalCA                  bool
 	uploadCerts                 bool
 	skipCertificateKeyPrint     bool
-	patchesDir                  string
 	adminKubeConfigBootstrapped bool
-	ikniteCluster               *v1alpha1.IkniteCluster
-	kubeletCmd                  *exec.Cmd
-	mdnsConn                    *mdns.Conn
-	ctx                         context.Context
-	ctxCancel                   context.CancelFunc
+	dryRun                      bool
+	skipTokenPrint              bool
 }
 
 // HACK: This is a hack to allow the use of the unexported initOptions struct in the kubeadm codebase.
@@ -368,10 +368,10 @@ func newInitData(cmd *cobra.Command, _ []string, initOptions *initOptions, out i
 		cfg.NodeRegistration.Name = initOptions.externalInitCfg.NodeRegistration.Name
 	}
 
-	if err := configUtil.VerifyAPIServerBindAddress(cfg.LocalAPIEndpoint.AdvertiseAddress); err != nil {
+	if err = configUtil.VerifyAPIServerBindAddress(cfg.LocalAPIEndpoint.AdvertiseAddress); err != nil {
 		return nil, err
 	}
-	if err := features.ValidateVersion(features.InitFeatureGates, cfg.FeatureGates, cfg.KubernetesVersion); err != nil {
+	if err = features.ValidateVersion(features.InitFeatureGates, cfg.FeatureGates, cfg.KubernetesVersion); err != nil {
 		return nil, err
 	}
 
@@ -398,7 +398,7 @@ func newInitData(cmd *cobra.Command, _ []string, initOptions *initOptions, out i
 		// Validate that also the required kubeconfig files exists and are invalid, because
 		// kubeadm can't regenerate them without the CA Key
 		kubeconfigDir := initOptions.kubeconfigDir
-		if err := kubeconfigPhase.ValidateKubeconfigsForExternalCA(kubeconfigDir, cfg); err != nil {
+		if err = kubeconfigPhase.ValidateKubeconfigsForExternalCA(kubeconfigDir, cfg); err != nil {
 			return nil, err
 		}
 	}

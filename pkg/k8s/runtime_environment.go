@@ -52,9 +52,10 @@ func PreventKubeletServiceFromStarting(confFilePath string) error {
 	if present, err := script.File(confFilePath).Match(rcConfPreventKubeletRunning).CountLines(); err == nil {
 		if present == 0 {
 			log.Info("Preventing kubelet from running")
-			if lines, err := script.File(confFilePath).Slice(); err == nil {
+			var lines []string
+			if lines, err = script.File(confFilePath).Slice(); err == nil {
 				lines = append(lines, rcConfPreventKubeletRunning)
-				if _, err := script.Slice(lines).WriteFile(confFilePath); err != nil {
+				if _, err = script.Slice(lines).WriteFile(confFilePath); err != nil {
 					return errors.Wrapf(err, "While writing %s", confFilePath)
 				}
 			} else {

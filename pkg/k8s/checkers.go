@@ -229,13 +229,13 @@ type CheckWorkloadData interface {
 }
 
 type checkWorkloadData struct {
-	ok                  bool
-	workloadCount       int
-	readyWorkloads      []*v1alpha1.WorkloadState
-	notReadyWorkloads   []*v1alpha1.WorkloadState
-	iteration           int
 	startTime           time.Time
 	apiAdvertiseAddress string
+	readyWorkloads      []*v1alpha1.WorkloadState
+	notReadyWorkloads   []*v1alpha1.WorkloadState
+	workloadCount       int
+	iteration           int
+	ok                  bool
 }
 
 func (c *checkWorkloadData) IsOk() bool {

@@ -123,7 +123,8 @@ func (config *Config) CheckClusterRunning(retries, okResponses, waitTime int) er
 	okTries := 0
 	query := client.Discovery().RESTClient().Get().AbsPath("/readyz")
 	for retries > 0 {
-		content, err := query.DoRaw(context.Background())
+		var content []byte
+		content, err = query.DoRaw(context.Background())
 		if err == nil {
 			contentStr := string(content)
 			if contentStr != "ok" {

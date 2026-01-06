@@ -62,29 +62,29 @@ func resetDetectCRISocket(resetCfg *kubeadmapi.ResetConfiguration, initCfg *kube
 
 // resetOptions defines all the options exposed via flags by kubeadm reset.
 type resetOptions struct {
+	externalCfg           *v1beta4.ResetConfiguration
+	ikniteCfg             *v1alpha1.IkniteClusterSpec
 	kubeconfigPath        string
 	cfgPath               string
 	ignorePreflightErrors []string
-	externalCfg           *v1beta4.ResetConfiguration
 	skipCRIDetect         bool
-	ikniteCfg             *v1alpha1.IkniteClusterSpec
 }
 
 // resetData defines all the runtime information used when running the kubeadm reset workflow;
 // this data is shared across all the phases that are included in the workflow.
 type resetData struct {
-	certificatesDir       string
 	client                clientset.Interface
-	criSocketPath         string
-	forceReset            bool
-	ignorePreflightErrors sets.Set[string]
 	inputReader           io.Reader
 	outputWriter          io.Writer
+	ignorePreflightErrors sets.Set[string]
 	cfg                   *kubeadmapi.InitConfiguration
 	resetCfg              *kubeadmapi.ResetConfiguration
+	ikniteCluster         *v1alpha1.IkniteCluster
+	certificatesDir       string
+	criSocketPath         string
+	forceReset            bool
 	dryRun                bool
 	cleanupTmpDir         bool
-	ikniteCluster         *v1alpha1.IkniteCluster
 }
 
 // newResetOptions returns a struct ready for being used for creating cmd join flags.

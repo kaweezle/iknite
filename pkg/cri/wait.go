@@ -31,9 +31,9 @@ import (
 
 type CRICondition struct {
 	Type    string `json:"type"`
-	Status  bool   `json:"status"`
 	Reason  string `json:"reason"`
 	Message string `json:"message"`
+	Status  bool   `json:"status"`
 }
 
 type CRIStatus struct {

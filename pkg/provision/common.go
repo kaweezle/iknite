@@ -63,7 +63,8 @@ func createTempKustomizeDirectory(content *embed.FS, fs filesys.FileSystem, temp
 
 			if filepath.Ext(entry.Name()) == ".tmpl" {
 				log.WithField("path", inPath).Trace("Is template")
-				t, err := template.New("tmp").Parse(string(payload))
+				var t *template.Template
+				t, err = template.New("tmp").Parse(string(payload))
 				if err != nil {
 					return errors.Wrapf(err, "While reading template %s", entry.Name())
 				}
