@@ -124,7 +124,6 @@ func (s *IPTestSuite) TestAddIpMapping() {
 	re2 := regexp.MustCompile(`192\.168\.99\.4`)
 	found = re2.Find(changed)
 	require.Nil(found, "Shouldn't contain old IP")
-
 }
 
 func TestIP(t *testing.T) {

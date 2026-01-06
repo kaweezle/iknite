@@ -67,7 +67,6 @@ var (
 )
 
 func NewStatusCmd(ikniteConfig *v1alpha1.IkniteClusterSpec) *cobra.Command {
-
 	// configureCmd represents the start command
 	var statusCmd = &cobra.Command{
 		Use:   "status",
@@ -89,7 +88,6 @@ func NewStatusCmd(ikniteConfig *v1alpha1.IkniteClusterSpec) *cobra.Command {
 }
 
 func performStatus(ikniteConfig *v1alpha1.IkniteClusterSpec) {
-
 	var checkData = k8s.CreateCheckWorkloadData(ikniteConfig.GetApiEndPoint())
 	var checkDataBuilder = func() k8s.CheckData {
 		return checkData

@@ -90,7 +90,7 @@ func ExecuteIfServiceStarted(serviceName string, fn func() error) error {
 	return nil
 }
 
-// EnableService enables the service named serviceName
+// EnableService enables the service named serviceName.
 func EnableService(serviceName string) error {
 	serviceFilename := path.Join(servicesDir, serviceName)
 	destinationFilename := path.Join(runLevelDir, serviceName)
@@ -99,7 +99,7 @@ func EnableService(serviceName string) error {
 	})
 }
 
-// DisableService disables the service named serviceName
+// DisableService disables the service named serviceName.
 func DisableService(serviceName string) error {
 	destinationFilename := path.Join(runLevelDir, serviceName)
 	return utils.ExecuteIfExist(destinationFilename, func() error {

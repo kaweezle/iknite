@@ -39,7 +39,7 @@ var (
 	jsonLogs bool
 )
 
-// NewRootCmd creates a new root command
+// NewRootCmd creates a new root command.
 func NewRootCmd() *cobra.Command {
 	cobra.OnInitialize(initConfig)
 	cobra.EnableTraverseRunHooks = true
@@ -95,7 +95,6 @@ func initConfig() {
 		// Use config file from the flag.
 		viper.SetConfigFile(cfgFile)
 	} else {
-
 		viper.SetConfigType("yaml")
 		viper.SetConfigName("iknite")
 		viper.AddConfigPath("$HOME/.config/iknite/")

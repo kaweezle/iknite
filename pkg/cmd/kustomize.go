@@ -36,7 +36,6 @@ var (
 )
 
 func NewKustomizeCmd() *cobra.Command {
-
 	var kustomizeCmd = &cobra.Command{
 		Use:   "kustomize",
 		Short: "Kustomize the cluster",
@@ -76,7 +75,6 @@ func initializeKustomization(flagSet *flag.FlagSet) {
 }
 
 func performKustomize(cmd *cobra.Command, args []string) {
-
 	ip, err := utils.GetOutboundIP()
 	cobra.CheckErr(errors.Wrap(err, "While getting IP address"))
 

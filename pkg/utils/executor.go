@@ -5,10 +5,10 @@ import (
 	"os/exec"
 )
 
-// ExecutorFunction is a function that executes a command and returns its input
+// ExecutorFunction is a function that executes a command and returns its input.
 type ExecutorFunction = func(cmd string, arguments ...string) ([]byte, error)
 
-// The Executor interface provides a way to run commands and pipe input to them
+// The Executor interface provides a way to run commands and pipe input to them.
 type Executor interface {
 	Run(combined bool, cmd string, arguments ...string) ([]byte, error)
 	Pipe(stdin io.Reader, combined bool, cmd string, arguments ...string) ([]byte, error)

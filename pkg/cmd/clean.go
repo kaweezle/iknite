@@ -113,7 +113,6 @@ func initializeClean(flags *flag.FlagSet, cleanOptions *cleanOptions) {
 }
 
 func performClean(ikniteConfig *v1alpha1.IkniteClusterSpec, cleanOptions *cleanOptions) {
-
 	dryRun := cleanOptions.dryRun
 	logger := log.WithField("isDryRun", dryRun)
 
@@ -200,5 +199,4 @@ func performClean(ikniteConfig *v1alpha1.IkniteClusterSpec, cleanOptions *cleanO
 	}
 
 	logger.Info("Cleanup completed")
-
 }

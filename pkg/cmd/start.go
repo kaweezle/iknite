@@ -36,7 +36,6 @@ import (
 // cSpell: enable
 
 func NewStartCmd(ikniteConfig *v1alpha1.IkniteClusterSpec) *cobra.Command {
-
 	// startCmd represents the start command
 	var startCmd = &cobra.Command{
 		Use:   "start",
@@ -63,7 +62,6 @@ func NewStartCmd(ikniteConfig *v1alpha1.IkniteClusterSpec) *cobra.Command {
 }
 
 func IsIkniteReady(ctx context.Context) (bool, error) {
-
 	cluster, err := v1alpha1.LoadIkniteCluster()
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
 		return false, err
@@ -94,7 +92,6 @@ func IsIkniteReady(ctx context.Context) (bool, error) {
 }
 
 func performStart(ikniteConfig *v1alpha1.IkniteClusterSpec) {
-
 	cobra.CheckErr(config.DecodeIkniteConfig(ikniteConfig))
 	cobra.CheckErr(k8s.PrepareKubernetesEnvironment(ikniteConfig))
 

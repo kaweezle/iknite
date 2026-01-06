@@ -110,11 +110,9 @@ func applyResmap(resources resmap.ResMap) (err error) {
 		return
 	}
 	return
-
 }
 
 func ApplyKustomizations(fs filesys.FileSystem, dirname string) (ids []resid.ResId, err error) {
-
 	var resources, crds resmap.ResMap
 	resources, err = RunKustomizations(fs, dirname)
 	if err != nil {
@@ -175,7 +173,6 @@ func EnablePlugins(opts *krusty.Options) *krusty.Options {
 }
 
 func RunKustomizations(fs filesys.FileSystem, dirname string) (resources resmap.ResMap, err error) {
-
 	opts := EnablePlugins(krusty.MakeDefaultOptions())
 	k := krusty.MakeKustomizer(opts)
 	resources, err = k.Run(fs, dirname)

@@ -80,7 +80,7 @@ func CheckPidFile(service string, cmd *exec.Cmd) (int, error) {
 	return 0, nil
 }
 
-// IsKubeletRunning checks if the kubelet process is running
+// IsKubeletRunning checks if the kubelet process is running.
 func IsKubeletRunning() (*os.Process, error) {
 	pidBytes, err := os.ReadFile(kubeletPidFile)
 	if err == nil {
@@ -198,7 +198,6 @@ func RemovePidFiles() {
 }
 
 func StartAndConfigureKubelet(kubeConfig *v1alpha1.IkniteClusterSpec) error {
-
 	cmd, err := StartKubelet()
 	if err != nil {
 		return errors.Wrap(err, "Failed to start kubelet")

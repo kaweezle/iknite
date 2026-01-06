@@ -31,7 +31,6 @@ import (
 )
 
 func NewMdnsCmd() *cobra.Command {
-
 	// configureCmd represents the start command
 	var mdnsCmd = &cobra.Command{
 		Use:   "mdns",
@@ -60,7 +59,6 @@ func mdnsPersistentPreRun(cmd *cobra.Command, args []string) {
 }
 
 func performMdns(cmd *cobra.Command, args []string) {
-
 	addr, err := net.ResolveUDPAddr("udp", mdns.DefaultAddress)
 	cobra.CheckErr(errors.Wrap(err, "Cannot resolve default address"))
 

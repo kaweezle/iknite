@@ -87,7 +87,7 @@ func (c *Config) RenameConfig(newName string) *Config {
 }
 
 // IsConfigServerAddress checks that config points to the server at ip IP
-// address
+// address.
 func (config *Config) IsConfigServerAddress(address string) bool {
 	expectedURL := fmt.Sprintf("https://%v:6443", address)
 	for _, cluster := range config.Clusters {
@@ -115,7 +115,6 @@ func (config *Config) Client() (client *kubernetes.Clientset, err error) {
 // milliseconds between each check. It needs at least okResponses good responses
 // from the server.
 func (config *Config) CheckClusterRunning(retries, okResponses, waitTime int) error {
-
 	client, err := config.Client()
 	if err != nil {
 		return err
@@ -157,7 +156,7 @@ func (config *Config) CheckClusterRunning(retries, okResponses, waitTime int) er
 }
 
 // WriteToFile writes the config configuration to the file pointed by filename.
-// it returns the appropriate error in case of failure.
+// It returns the appropriate error in case of failure.
 func (config *Config) WriteToFile(filename string) error {
 	return clientcmd.WriteToFile(*(*api.Config)(config), filename)
 }
@@ -166,7 +165,6 @@ func (config *Config) WriteToFile(filename string) error {
 // be done after an IP address change.
 // The restart method is taken from kubectl: https://github.com/kubernetes/kubectl/blob/652881798563c00c1895ded6ced819030bfaa4d7/pkg/polymorphichelpers/objectrestarter.go#L81
 func (config *Config) RestartProxy() (err error) {
-
 	var client *kubernetes.Clientset
 	if client, err = config.Client(); err != nil {
 		return
@@ -237,7 +235,6 @@ func (config *Config) DoKustomization(ip net.IP, kustomization string, force boo
 	}
 
 	return nil
-
 }
 
 func GetIkniteConfigMap(client kubernetes.Interface) (cm *coreV1.ConfigMap, err error) {

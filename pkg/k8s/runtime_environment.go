@@ -35,11 +35,7 @@ import (
 // cSpell: enable
 
 const (
-	kubernetesConfigurationDirectory = "/etc/kubernetes"
-	configurationPattern             = "*.conf"
-	pkiSubdirectory                  = "pki"
-	manifestsSubdirectory            = "manifests"
-	rcConfPreventKubeletRunning      = "rc_kubelet_need=\"non-existing-service\""
+	rcConfPreventKubeletRunning = "rc_kubelet_need=\"non-existing-service\""
 )
 
 func IsKubeletServiceRunnable(confFilePath string) (present bool, err error) {
@@ -72,7 +68,6 @@ func PreventKubeletServiceFromStarting(confFilePath string) error {
 }
 
 func PrepareKubernetesEnvironment(ikniteConfig *v1alpha1.IkniteClusterSpec) error {
-
 	log.WithFields(log.Fields{
 		"ip":                 ikniteConfig.Ip.String(),
 		"kubernetes_version": ikniteConfig.KubernetesVersion,

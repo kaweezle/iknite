@@ -224,5 +224,4 @@ func (config *Config) WaitForWorkloads(ctx context.Context, timeout time.Duratio
 	} else {
 		return wait.PollUntilContextCancel(ctx, time.Second*time.Duration(2), true, AreWorkloadsReady(config, callback))
 	}
-
 }

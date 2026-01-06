@@ -122,7 +122,6 @@ func UnmountPaths(failOnError bool, isDryRun bool) error {
 }
 
 func CleanAll(ikniteConfig *v1alpha1.IkniteClusterSpec, resetIpAddress, resetIpTables, failOnError, isDryRun bool) error {
-
 	var err error
 	if err = StopAllContainers(isDryRun); err != nil {
 		log.WithError(err).Warn("Error stopping all containers")
@@ -257,7 +256,7 @@ func DeleteNetworkInterfaces(isDryRun bool) error {
 	return err
 }
 
-// DeleteEtcdData deletes the etcd data directory
+// DeleteEtcdData deletes the etcd data directory.
 func DeleteEtcdData(isDryRun bool) error {
 	etcdDataDir := "/var/lib/etcd"
 	etcdManifestPath := filepath.Join(kubeadmConstants.KubernetesDir, kubeadmConstants.ManifestsSubDirName, "etcd.yaml")

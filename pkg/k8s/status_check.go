@@ -197,7 +197,7 @@ func NewPhase(name, description string, subChecks []*Check) *Check {
 	}
 }
 
-// FillResultNameMap fills a map with check results by name
+// FillResultNameMap fills a map with check results by name.
 func FillResultNameMap(results []*CheckResult, resultNameMap map[string]*CheckResult) map[string]*CheckResult {
 	if resultNameMap == nil {
 		resultNameMap = make(map[string]*CheckResult)
@@ -211,9 +211,8 @@ func FillResultNameMap(results []*CheckResult, resultNameMap map[string]*CheckRe
 	return resultNameMap
 }
 
-// PrepareChecks prepares the checks for running
+// PrepareChecks prepares the checks for running.
 func PrepareChecks(checks []*Check) []*CheckResult {
-
 	var results []*CheckResult
 	for _, check := range checks {
 		results = append(results, check.NewResult())
@@ -227,7 +226,7 @@ func PrepareChecks(checks []*Check) []*CheckResult {
 	return results
 }
 
-// RunChecks runs the checks
+// RunChecks runs the checks.
 func RunChecks(ctx context.Context, results []*CheckResult) []*CheckResult {
 	for _, result := range results {
 		result.Run(ctx)
@@ -235,7 +234,7 @@ func RunChecks(ctx context.Context, results []*CheckResult) []*CheckResult {
 	return results
 }
 
-// NewCheckExecutor creates a new CheckExecutor
+// NewCheckExecutor creates a new CheckExecutor.
 func NewCheckExecutor(checks []*Check) *CheckExecutor {
 	e := &CheckExecutor{
 		Checks:        checks,
@@ -313,7 +312,7 @@ func (result *CheckResult) Format(prefix string, spinView string) string {
 	return result.FormatResult(prefix, spinView)
 }
 
-// Run runs the checks
+// Run runs the checks.
 func (e *CheckExecutor) Run(ctx context.Context) []*CheckResult {
 	// Start all top-level checks
 	for _, result := range e.Results {

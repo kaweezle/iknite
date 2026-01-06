@@ -74,12 +74,10 @@ type WorkloadState struct {
 }
 
 func (r *WorkloadState) LongString() string {
-
 	return fmt.Sprintf("%s %-20s %-54s %s", OkString(r.Ok), r.Namespace, r.Name, r.Message)
 }
 
 func (r *WorkloadState) String() string {
-
 	return fmt.Sprintf("%s/%s:%s", r.Namespace, r.Name, OkString(r.Ok))
 }
 

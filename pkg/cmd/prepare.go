@@ -27,7 +27,6 @@ import (
 // cSpell: enable
 
 func NewPrepareCommand(ikniteConfig *v1alpha1.IkniteClusterSpec) *cobra.Command {
-
 	// prepareCmd represents the start command
 	var prepareCmd = &cobra.Command{
 		Use:   "prepare",
@@ -50,7 +49,6 @@ func NewPrepareCommand(ikniteConfig *v1alpha1.IkniteClusterSpec) *cobra.Command 
 }
 
 func performPrepare(ikniteConfig *v1alpha1.IkniteClusterSpec) {
-
 	cobra.CheckErr(config.DecodeIkniteConfig(ikniteConfig))
 	cobra.CheckErr(k8s.PrepareKubernetesEnvironment(ikniteConfig))
 	log.Info("VM is ready")

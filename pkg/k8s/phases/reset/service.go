@@ -32,7 +32,7 @@ import (
 
 // cSpell:enable
 
-// NewCleanupNodePhase creates a kubeadm workflow phase that cleanup the node
+// NewCleanupNodePhase creates a kubeadm workflow phase that cleanup the node.
 func NewCleanupServicePhase() workflow.Phase {
 	return workflow.Phase{
 		Name:    "cleanup-service",

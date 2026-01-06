@@ -72,7 +72,6 @@ func runMonitorWorkloads(c workflow.RunData) error {
 				}
 			}
 		}
-
 	}()
 
 	return nil

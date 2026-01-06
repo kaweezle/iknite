@@ -41,7 +41,7 @@ import (
 
 // cSpell:enable
 
-// NewCleanupNodePhase creates a kubeadm workflow phase that cleanup the node
+// NewCleanupNodePhase creates a kubeadm workflow phase that cleanup the node.
 func NewCleanupConfigPhase() workflow.Phase {
 	return workflow.Phase{
 		Name:    "cleanup-config",
@@ -149,7 +149,7 @@ func resetConfigDir(configPathDir string, dirsToClean []string, isDryRun bool) {
 	}
 }
 
-// CleanDir removes everything in a directory, but not the directory itself
+// CleanDir removes everything in a directory, but not the directory itself.
 func CleanDir(filePath string) error {
 	// If the directory doesn't even exist there's nothing to do, and we do
 	// not consider this an error
@@ -176,7 +176,7 @@ func CleanDir(filePath string) error {
 	return nil
 }
 
-// IsDirEmpty returns true if a directory is empty
+// IsDirEmpty returns true if a directory is empty.
 func IsDirEmpty(dir string) (bool, error) {
 	d, err := os.Open(dir)
 	if err != nil {

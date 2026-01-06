@@ -27,7 +27,6 @@ func NewDaemonizePhase() workflow.Phase {
 }
 
 func WaitForKubelet(cmd *exec.Cmd, conn *mdns.Conn, cancel context.CancelFunc) error {
-
 	// Wait for SIGTERM and SIGKILL signals
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, syscall.SIGTERM)
@@ -56,7 +55,6 @@ func WaitForKubelet(cmd *exec.Cmd, conn *mdns.Conn, cancel context.CancelFunc) e
 			log.Infof("Kubelet stopped with state: %s", cmd.ProcessState.String())
 			alive = false
 		}
-
 	}
 
 	if err == nil && conn != nil {

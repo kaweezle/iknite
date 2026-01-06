@@ -210,7 +210,7 @@ func newResetData(cmd *cobra.Command, opts *resetOptions, in io.Reader, out io.W
 	}, nil
 }
 
-// newCmdReset returns the "kubeadm reset" command
+// newCmdReset returns the "kubeadm reset" command.
 func newCmdReset(in io.Reader, out io.Writer, resetOptions *resetOptions) *cobra.Command {
 	if resetOptions == nil {
 		resetOptions = newResetOptions()

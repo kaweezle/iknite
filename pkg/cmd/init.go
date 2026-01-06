@@ -94,13 +94,13 @@ type initOptions struct {
 }
 
 const (
-	// CoreDNSPhase is the name of CoreDNS sub phase in "kubeadm init"
+	// CoreDNSPhase is the name of CoreDNS sub phase in "kubeadm init".
 	coreDNSPhase = "addon/coredns"
 
-	// KubeProxyPhase is the name of kube-proxy sub phase during "kubeadm init"
+	// KubeProxyPhase is the name of kube-proxy sub phase during "kubeadm init".
 	kubeProxyPhase = "addon/kube-proxy"
 
-	// AddonPhase is the name of addon phase during "kubeadm init"
+	// AddonPhase is the name of addon phase during "kubeadm init".
 	addonPhase = "addon"
 )
 
@@ -143,8 +143,7 @@ func AddInitOtherFlags(flagSet *flag.FlagSet, initOptions *initOptions)
 func getDryRunClient(d *initData) (clientset.Interface, error)
 
 // newCmdInit returns "kubeadm init" command.
-// NB. initOptions is exposed as parameter for allowing unit testing of
-// the newInitOptions method, that implements all the command options validation logic
+// NB. InitOptions is exposed as parameter for allowing unit testing of the newInitOptions method, that implements all the command options validation logic.
 func newCmdInit(out io.Writer, initOptions *initOptions) *cobra.Command {
 	if initOptions == nil {
 		initOptions = newInitOptions()
@@ -305,8 +304,7 @@ func newInitOptions() *initOptions {
 }
 
 // newInitData returns a new initData struct to be used for the execution of the kubeadm init workflow.
-// This func takes care of validating initOptions passed to the command, and then it converts
-// options into the internal InitConfiguration type that is used as input all the phases in the kubeadm init workflow
+// This func takes care of validating initOptions passed to the command, and then it converts options into the internal InitConfiguration type that is used as input all the phases in the kubeadm init workflow.
 func newInitData(cmd *cobra.Command, _ []string, initOptions *initOptions, out io.Writer) (*initData, error) {
 	// Re-apply defaults to the public kubeadm API (this will set only values not exposed/not set as a flags)
 	kubeadmScheme.Scheme.Default(initOptions.externalInitCfg)
@@ -528,7 +526,7 @@ func (d *initData) KubeConfigDir() string {
 	return d.kubeconfigDir
 }
 
-// KubeConfigPath returns the path to the kubeconfig file to use for connecting to Kubernetes
+// KubeConfigPath returns the path to the kubeconfig file to use for connecting to Kubernetes.
 func (d *initData) KubeConfigPath() string {
 	if d.dryRun {
 		d.kubeconfigPath = filepath.Join(d.dryRunDir, kubeadmConstants.AdminKubeConfigFileName)
@@ -651,7 +649,7 @@ func (d *initData) Tokens() []string {
 	return tokens
 }
 
-// PatchesDir returns the folder where patches for components are stored
+// PatchesDir returns the folder where patches for components are stored.
 func (d *initData) PatchesDir() string {
 	// If provided, make the flag value override the one in config.
 	if len(d.patchesDir) > 0 {

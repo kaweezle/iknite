@@ -8,7 +8,6 @@ import (
 )
 
 func NewKubeletCmd(ikniteConfig *v1alpha1.IkniteClusterSpec) *cobra.Command {
-
 	var kubeletCmd = &cobra.Command{
 		Use:   "kubelet",
 		Short: "Start and monitor the kubelet (Experimental)",

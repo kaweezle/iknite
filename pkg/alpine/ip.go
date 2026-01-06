@@ -49,7 +49,6 @@ func CheckIpExists(ip net.IP) (result bool, err error) {
 // It uses the default mask of the IP address class as the mask, and the default
 // broadcast address as the broadcast address.
 func AddIpAddress(iface string, address net.IP) (err error) {
-
 	ones, _ := address.DefaultMask().Size()
 	ipWithMask := fmt.Sprintf("%v/%d", address, ones)
 
@@ -73,7 +72,6 @@ func AddIpAddress(iface string, address net.IP) (err error) {
 }
 
 func removeIpAddresses(hosts *txeh.Hosts, toRemove []net.IP) {
-
 	if len(toRemove) > 0 {
 		ips := make([]string, len(toRemove))
 		for i, toRem := range toRemove {
@@ -84,7 +82,6 @@ func removeIpAddresses(hosts *txeh.Hosts, toRemove []net.IP) {
 }
 
 func IpMappingForHost(hosts *txeh.Hosts, domainName string) (net.IP, error) {
-
 	found, address, _ := hosts.HostAddressLookup(domainName, txeh.IPFamilyV4)
 	if !found {
 		return nil, fmt.Errorf("no IP address found for %s", domainName)

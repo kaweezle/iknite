@@ -53,7 +53,7 @@ func ExecuteIfExist(file string, fn func() error) error {
 	return ExecuteOnExistence(file, true, fn)
 }
 
-// Exists tells if file exists
+// Exists tells if file exists.
 func Exists(path string) (bool, error) {
 	return afs.Exists(path)
 }
@@ -63,7 +63,7 @@ func WriteFile(filename string, data []byte, perm os.FileMode) error {
 }
 
 // MoveFileIfExists moves the file src to the destination dst
-// if it exists
+// if it exists.
 func MoveFileIfExists(src string, dst string) error {
 	err := os.Link(src, dst)
 	if err != nil {
@@ -76,7 +76,7 @@ func MoveFileIfExists(src string, dst string) error {
 	return os.Remove(src)
 }
 
-// GetOutboundIP returns the preferred outbound ip of this machine
+// GetOutboundIP returns the preferred outbound ip of this machine.
 func GetOutboundIP() (net.IP, error) {
 	conn, err := net.Dial("udp", "8.8.8.8:80")
 	if err != nil {

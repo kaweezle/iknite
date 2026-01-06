@@ -24,7 +24,7 @@ import (
 
 // cSpell: enable
 
-// SystemFileCheck checks if a file exists and has specific content
+// SystemFileCheck checks if a file exists and has specific content.
 func SystemFileCheck(name, description, path, expectedContent string) *Check {
 	return &Check{
 		Name:        name,
@@ -71,7 +71,7 @@ func CheckService(serviceName string, checkOpenRC, checkPidFile bool) (bool, str
 	return true, fmt.Sprintf("Service %s is running with pid %d", serviceName, pid), nil
 }
 
-// ServiceCheck checks if a service is running
+// ServiceCheck checks if a service is running.
 func ServiceCheck(name, serviceName string) *Check {
 	return &Check{
 		Name:        name,
@@ -83,7 +83,7 @@ func ServiceCheck(name, serviceName string) *Check {
 	}
 }
 
-// KubernetesFileCheck checks if kubernetes configuration files exist
+// KubernetesFileCheck checks if kubernetes configuration files exist.
 func KubernetesFileCheck(name, path string) *Check {
 	return &Check{
 		Name:        name,
@@ -123,7 +123,7 @@ func difference(a, b []string) []string {
 	return diff
 }
 
-// FileTreeDifference computes the difference between an actual path and an expected file tree
+// FileTreeDifference computes the difference between an actual path and an expected file tree.
 func FileTreeDifference(path string, expectedFiles []string) ([]string, []string, error) {
 	foundFiles := []string{}
 	actualPath, err := filepath.EvalSymlinks(path)
@@ -151,7 +151,7 @@ func FileTreeDifference(path string, expectedFiles []string) ([]string, []string
 	return missingFiles, extraFiles, nil
 }
 
-// FileTreeCheck checks if a file tree exists
+// FileTreeCheck checks if a file tree exists.
 func FileTreeCheck(name, description, path string, expectedFiles []string) *Check {
 	return &Check{
 		Name:        name,
@@ -173,7 +173,6 @@ func FileTreeCheck(name, description, path string, expectedFiles []string) *Chec
 }
 
 func CheckKubeletHealth(timeout time.Duration) (bool, string, error) {
-
 	client, err := kubeConfigUtil.ClientSetFromFile(kubeadmConstants.GetAdminKubeConfigPath())
 	if err != nil {
 		return false, "", err
@@ -185,11 +184,9 @@ func CheckKubeletHealth(timeout time.Duration) (bool, string, error) {
 		return false, "", err
 	}
 	return true, "Kubelet is healthy", nil
-
 }
 
 func CheckApiServerHealth(timeout time.Duration, checkData CheckData) (bool, string, error) {
-
 	data, ok := checkData.(*checkWorkloadData)
 	if !ok {
 		return false, "", fmt.Errorf("wait-control-plane phase invoked with an invalid data struct %T", checkData)

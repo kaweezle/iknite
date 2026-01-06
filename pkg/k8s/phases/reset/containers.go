@@ -28,7 +28,7 @@ import (
 
 // cSpell:enable
 
-// NewCleanupNodePhase creates a kubeadm workflow phase that cleanup the node
+// NewCleanupNodePhase creates a kubeadm workflow phase that cleanup the node.
 func NewCleanupNodePhase() workflow.Phase {
 	return workflow.Phase{
 		Name:    "cleanup-node",
@@ -51,5 +51,4 @@ func runCleanupNode(c workflow.RunData) error {
 	}
 
 	return k8s.CleanAll(&r.IkniteCluster().Spec, true, true, true, r.DryRun())
-
 }
