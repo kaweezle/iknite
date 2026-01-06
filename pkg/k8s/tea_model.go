@@ -15,7 +15,7 @@ import (
 
 type CheckModel struct {
 	executor *CheckExecutor
-	ctx      context.Context
+	ctx      context.Context //nolint:containedctx
 	cancel   context.CancelFunc
 	spinner  spinner.Model
 }

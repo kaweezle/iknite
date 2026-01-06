@@ -108,7 +108,7 @@ var _ phases.InitData = &initData{}
 // this data is shared across all the phases that are included in the workflow.
 type initData struct {
 	client                      clientset.Interface
-	ctx                         context.Context
+	ctx                         context.Context //nolint:containedctx
 	outputWriter                io.Writer
 	ctxCancel                   context.CancelFunc
 	kubeconfig                  *clientcmdapi.Config

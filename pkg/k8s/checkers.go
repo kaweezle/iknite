@@ -388,7 +388,7 @@ func CheckWorkloads(ctx context.Context, data CheckData) (bool, string, error) {
 	}
 	workloadData.Start()
 
-	err = config.WaitForWorkloads(context.Background(), 0, func(state bool, total int, ready, unready []*v1alpha1.WorkloadState, iteration int) bool {
+	err = config.WaitForWorkloads(ctx, 0, func(state bool, total int, ready, unready []*v1alpha1.WorkloadState, iteration int) bool {
 		workloadData.SetOk(state)
 		workloadData.SetWorkloadCount(total)
 		workloadData.SetReadyWorkloads(ready)

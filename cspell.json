@@ -15,7 +15,13 @@
     "**/rc.conf"
   ],
   "dictionaryDefinitions": [],
-  "dictionaries": ["bash", "docker", "golang", "terraform", "softwareTerms"],
+  "dictionaries": [
+    "bash",
+    "docker",
+    "golang",
+    "terraform",
+    "softwareTerms"
+  ],
   "words": [
     "afero",
     "antoinemartin",
@@ -24,6 +30,7 @@
     "buildkitd",
     "clientset",
     "codegen",
+    "containedctx",
     "containerd",
     "coredns",
     "crictl",
@@ -55,6 +62,7 @@
     "nerdctl",
     "netns",
     "nohup",
+    "nolint",
     "openrc",
     "pflag",
     "pidfile",
