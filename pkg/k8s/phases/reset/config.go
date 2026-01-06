@@ -91,12 +91,12 @@ func runCleanupConfig(c workflow.RunData) error {
 
 	if r.Cfg() != nil && features.Enabled(r.Cfg().FeatureGates, features.RootlessControlPlane) {
 		if !r.DryRun() {
-			klog.V(1).Infoln("[reset] Removing users and groups created for rootless control-plane")
+			klog.Infoln("[reset] Removing users and groups created for rootless control-plane")
 			if err := users.RemoveUsersAndGroups(); err != nil {
 				klog.Warningf("[reset] Failed to remove users and groups: %v\n", err)
 			}
 		} else {
-			fmt.Println("[reset] Would remove users and groups created for rootless control-plane")
+			klog.Infoln("[reset] Would remove users and groups created for rootless control-plane")
 		}
 	}
 

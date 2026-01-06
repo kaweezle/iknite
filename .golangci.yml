@@ -54,7 +54,8 @@ linters:
     - forbidigo
     - forcetypeassert
     - gocheckcompilerdirectives
-    - gochecknoglobals
+    # Not ready yet for this one
+    # - gochecknoglobals
     - gochecknoinits
     - gocognit
     - goconst

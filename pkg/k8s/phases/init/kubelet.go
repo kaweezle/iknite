@@ -17,9 +17,8 @@ limitations under the License.
 package init
 
 import (
-	"fmt"
-
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 	kubeletConfig "k8s.io/kubelet/config/v1beta1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
@@ -79,7 +78,7 @@ func runKubeletStart(c workflow.RunData) error {
 			return errors.Wrap(err, "error writing instance kubelet configuration to disk")
 		}
 	} else {
-		fmt.Println("[kubelet-start] Skipping writing instance kubelet configuration file as the NodeLocalCRISocket feature gate is disabled")
+		logrus.WithField("phase", "kubelet-start").Info("Skipping writing instance kubelet configuration file as the NodeLocalCRISocket feature gate is disabled")
 	}
 
 	// Write the kubelet configuration file to disk.
@@ -88,7 +87,7 @@ func runKubeletStart(c workflow.RunData) error {
 	}
 	// Try to start the kubelet service in case it's inactive
 	if !data.DryRun() {
-		fmt.Println("[kubelet-start] Starting the kubelet")
+		logrus.WithField("phase", "kubelet-start").Info("Starting the kubelet")
 		cmd, err := k8s.StartKubelet()
 		if err != nil {
 			return errors.Wrap(err, "Failed to start kubelet")

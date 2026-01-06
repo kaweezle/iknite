@@ -19,9 +19,8 @@ package reset
 // cSpell:words klog cleanupservice
 // cSpell:disable
 import (
-	"fmt"
-
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
@@ -60,13 +59,13 @@ func runCleanupService(c workflow.RunData) error {
 		klog.Warningln("[reset] Please ensure iknite is stopped manually")
 	} else {
 		if !r.DryRun() {
-			fmt.Println("[reset] Stopping the iknite service")
+			logrus.WithField("phase", "reset").Info("Stopping the iknite service...")
 			if err := initSystem.ServiceStop("iknite"); err != nil {
 				klog.Warningf("[reset] The iknite service could not be stopped by kubeadm: [%v]\n", err)
 				klog.Warningln("[reset] Please ensure iknite is stopped manually")
 			}
 		} else {
-			fmt.Println("[reset] Would stop the iknite service")
+			logrus.WithField("phase", "reset").Info("Would stop the iknite service")
 		}
 	}
 

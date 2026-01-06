@@ -265,8 +265,7 @@ func performStatus(ikniteConfig *v1alpha1.IkniteClusterSpec) {
 	defer func() { os.Stdout = tmp }()
 	os.Stdout = nil
 	if _, err := p.Run(); err != nil {
-		fmt.Printf("Error running checks: %v\n", err)
-		os.Exit(1)
+		cobra.CheckErr(fmt.Errorf("error running checks: %w", err))
 	}
 }
 
