@@ -8,6 +8,9 @@ on:
 env:
   tf_version: "1.11.1"
   tg_version: "0.77.6"
+  REGISTRY: ghcr.io
+  KUBERNETES_VERSION: "1.34.3"
+  IMAGE_NAME: ${{ github.repository_owner }}/iknite
 
 jobs:
   goreleaser-snapshot:
@@ -104,6 +107,9 @@ jobs:
     name: Build Root Filesystem for WSL
     needs: [goreleaser-snapshot]
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
     steps:
       - uses: actions/checkout@v4
 
@@ -113,6 +119,13 @@ jobs:
           driver-opts: |
             image=moby/buildkit:master
           buildkitd-flags: "--allow-insecure-entitlement security.insecure"
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Cache Docker layers
         uses: actions/cache@v4
@@ -136,6 +149,7 @@ jobs:
           cp packages/iknite-${IKNITE_VERSION}.x86_64.apk rootfs
           mkdir -p /tmp/.buildx-cache
           mkdir -p /tmp/.buildx-cache-new
+          echo "::group::Building iknite-rootfs-base:${IKNITE_VERSION}"
           docker buildx build \
              --build-arg IKNITE_REPO_URL=http://kwzl-apkrepo.s3-website.gra.io.cloud.ovh.net/test/ \
              --build-arg IKNITE_VERSION=$IKNITE_VERSION \
@@ -145,7 +159,9 @@ jobs:
              --tag iknite-rootfs-base:${IKNITE_VERSION} \
              --load \
              rootfs
+          echo "::endgroup::"
 
+          echo "::group::Adding base iknite images to root fs and exporting"
           docker run \
             --name iknite-rootfs \
             --privileged \
@@ -153,15 +169,26 @@ jobs:
             iknite-rootfs-base:${IKNITE_VERSION} \
             /bin/sh -c 'apk --no-cache add /apks/iknite-images-*.apk; apk del iknite-images'
 
-          docker export iknite-rootfs | gzip > rootfs/kaweezle.rootfs.tar.gz
-          sha256sum rootfs/kaweezle.rootfs.tar.gz >> packages/SHA256SUMS
+          docker export iknite-rootfs | gzip > rootfs/iknite.rootfs.tar.gz
+          sha256sum rootfs/iknite.rootfs.tar.gz >> packages/SHA256SUMS
+          echo "::endgroup::"
+
+          echo "::group::Building and pushing root fs image to registry"
+          docker buildx build \
+             --build-arg IKNITE_VERSION=$IKNITE_VERSION \
+             --build-arg KUBERNETES_VERSION=${KUBERNETES_VERSION} \
+             --tag ${REGISTRY}/${IMAGE_NAME}:${IKNITE_VERSION}-${KUBERNETES_VERSION} \
+             --push \
+             --file rootfs/Dockerfile.rootfs \
+             rootfs
+          echo "::endgroup::"
 
       - name: Upload root fs artifact
         uses: actions/upload-artifact@v4
         with:
           name: rootfs
           path: |
-            rootfs/kaweezle.rootfs.tar.gz
+            rootfs/iknite.rootfs.tar.gz
             packages/SHA256SUMS
 
       - name: Move cache

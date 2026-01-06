@@ -8,14 +8,23 @@ export IKNITE_REPO_URL=http://kwzl-apkrepo.s3-website.gra.io.cloud.ovh.net/test/
 KUBERNETES_VERSION=${KUBERNETES_VERSION:-"1.34.3"}
 ROOTLESS=false
 SUDO_CMD="doas"
-SKIP_GORELEASER=false
-SKIP_IMAGES=false
-SKIP_BUILD=false
-SKIP_ADD_IMAGES=false
 WITH_CACHE=false
-SKIP_EXPORT=false
-SKIP_CLEAN=false
 BUILDKIT_NAMESPACE="k8s.io"
+
+# Step names for dynamic --skip-* and --only-* handling
+STEP_NAMES="goreleaser build images add-images export rootfs-image clean"
+
+# Initialize skip flags
+SKIP_GORELEASER=false
+SKIP_BUILD=false
+SKIP_IMAGES=false
+SKIP_ADD_IMAGES=false
+SKIP_EXPORT=false
+SKIP_ROOTFS_IMAGE=false
+SKIP_CLEAN=false
+
+# Only run this specific step (empty means run all non-skipped steps)
+ONLY_STEP=""
 
 usage() {
     cat << EOF
@@ -26,13 +35,18 @@ Build Iknite packages and rootfs tarball.
 OPTIONS:
     -h, --help          Show this help message and exit
     --rootless          Use rootless containerd (skip doas/sudo)
-    --skip-goreleaser   Skip goreleaser build step
-    --skip-images       Skip iknite-images package build step
-    --skip-build        Skip docker image build step
-    --skip-add-images   Skip adding images to rootfs step
-    --skip-export       Skip exporting the rootfs tarball step
-    --skip-clean        Skip cleanup step
+    --skip-<step>       Skip a specific step
+    --only-<step>       Run only the specified step (skip all others)
     --with-cache        Use cache for docker build (default: no cache)
+
+STEPS:
+    goreleaser          Build Iknite package with goreleaser
+    build               Build Iknite rootfs base image
+    images              Build iknite-images APK package
+    add-images          Add images to rootfs container
+    export              Export rootfs tarball
+    rootfs-image        Build final rootfs image
+    clean               Cleanup temporary files
 
 ENVIRONMENT VARIABLES:
     IKNITE_REPO_URL     APK repository URL (default: $IKNITE_REPO_URL)
@@ -43,6 +57,43 @@ that the BUILDKIT_HOST environment variable is set:
 
     export BUILDKIT_HOST=unix:///run/user/\$UID/buildkit/buildkitd.sock
 EOF
+}
+
+# Check if a step name is valid
+is_valid_step() {
+    for s in $STEP_NAMES; do
+        if [ "$s" == "$1" ]; then
+            return 0
+        fi
+    done
+    return 1
+}
+
+# Convert step name to variable name (e.g., add-images -> ADD_IMAGES)
+step_to_var() {
+    echo "$1" | tr '[:lower:]-' '[:upper:]_'
+}
+
+# Check if a step should run
+should_run_step() {
+    local step_name="$1"
+    local skip_var="SKIP_$(step_to_var "$step_name")"
+
+    # If --only-<step> was specified, only run that step
+    if [ -n "$ONLY_STEP" ]; then
+        if [ "$step_name" == "$ONLY_STEP" ]; then
+            return 0
+        else
+            return 1
+        fi
+    fi
+
+    # Otherwise, check the skip flag
+    eval "local skip_value=\$$skip_var"
+    if [ "$skip_value" == "true" ]; then
+        return 1
+    fi
+    return 0
 }
 
 # Parse command-line arguments
@@ -57,28 +108,26 @@ while [ $# -gt 0 ]; do
             SUDO_CMD=""
             shift
             ;;
-        --skip-goreleaser)
-            SKIP_GORELEASER=true
+        --skip-*)
+            step_name="${1#--skip-}"
+            if is_valid_step "$step_name"; then
+                eval "SKIP_$(step_to_var "$step_name")=true"
+            else
+                error "Unknown step: $step_name"
+                usage
+                exit 1
+            fi
             shift
             ;;
-        --skip-images)
-            SKIP_IMAGES=true
-            shift
-            ;;
-        --skip-build)
-            SKIP_BUILD=true
-            shift
-            ;;
-        --skip-add-images)
-            SKIP_ADD_IMAGES=true
-            shift
-            ;;
-        --skip-export)
-            SKIP_EXPORT=true
-            shift
-            ;;
-        --skip-clean)
-            SKIP_CLEAN=true
+        --only-*)
+            step_name="${1#--only-}"
+            if is_valid_step "$step_name"; then
+                ONLY_STEP="$step_name"
+            else
+                error "Unknown step: $step_name"
+                usage
+                exit 1
+            fi
             shift
             ;;
         --with-cache)
@@ -159,7 +208,7 @@ if [ ! -f "kaweezle-devel@kaweezle.com-c9d89864.rsa" ]; then
     exit 1
 fi
 
-if [ "$SKIP_GORELEASER" = false ]; then
+if should_run_step "goreleaser"; then
     step "Building Iknite package..."
     goreleaser  --skip=publish --snapshot --clean
 else
@@ -171,7 +220,7 @@ export IKNITE_VERSION=$(jq -Mr ".version" dist/metadata.json)
 
 
 IKNITE_ROOTFS_BASE="iknite-rootfs-base:${IKNITE_VERSION}"
-if [ "$SKIP_BUILD" = false ]; then
+if should_run_step "build"; then
     step "Building Iknite rootfs base image..."
 
     rm -f rootfs/iknite.rootfs.tar.gz rootfs/*.apk || /bin/true
@@ -196,7 +245,7 @@ else
     skip "Building Iknite rootfs base image"
 fi
 
-if [ "$SKIP_IMAGES" = false ]; then
+if should_run_step "images"; then
     step "Building Iknite images package..."
     rm -rf packages
     $SUDO_CMD nerdctl run --privileged --rm -v $(pwd):/work cgr.dev/chainguard/melange build support/apk/iknite-images.yaml --arch $(uname -m) --signing-key kaweezle-devel@kaweezle.com-c9d89864.rsa --generate-index=false
@@ -210,7 +259,7 @@ fi
 IKNITE_IMAGES_APK="iknite-images-${KUBERNETES_VERSION}-r0.apk"
 
 
-if [ "$SKIP_ADD_IMAGES" = false ]; then
+if should_run_step "add-images"; then
     step "Adding images to Iknite rootfs..."
     rm -f rootfs/*.apk || /bin/true
     cp packages/$(uname -m)/${IKNITE_IMAGES_APK} rootfs/
@@ -227,7 +276,7 @@ else
     skip "Adding images to Iknite rootfs"
 fi
 
-if [ "$SKIP_EXPORT" = false ]; then
+if should_run_step "export"; then
     step "Exporting Iknite rootfs tarball..."
     rm -f rootfs/iknite.rootfs.tar.gz || /bin/true
 
@@ -236,7 +285,28 @@ else
     skip "Exporting Iknite rootfs tarball"
 fi
 
-if [ "$SKIP_CLEAN" = false ]; then
+IKNITE_ROOTFS_IMAGE="ghcr.io/kaweezle/iknite/iknite:${IKNITE_VERSION}-${KUBERNETES_VERSION}"
+if should_run_step "rootfs-image"; then
+    step "Building Iknite rootfs image..."
+
+    # Set cache flag based on option
+    CACHE_FLAG="--no-cache"
+    if [ "$WITH_CACHE" = true ]; then
+        CACHE_FLAG=""
+    fi
+
+    $SUDO_CMD buildctl build \
+                 --frontend dockerfile.v0 \
+                 --local context=rootfs \
+                 --local dockerfile=rootfs \
+                 --opt filename=Dockerfile.rootfs \
+                 $CACHE_FLAG \
+                 --output type=image,name=${IKNITE_ROOTFS_IMAGE},push=false
+else
+    skip "Building Iknite rootfs image"
+fi
+
+if should_run_step "clean"; then
     step "Cleaning up..."
     rm -f rootfs/*.apk || /bin/true
     $SUDO_CMD rm -rf packages || /bin/true
