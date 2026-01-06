@@ -70,14 +70,14 @@ func CheckPidFile(service string, cmd *exec.Cmd) (int, error) {
 				// remove kubeletPidFile
 				err = os.Remove(pidFilePath)
 				if err != nil {
-					logger.WithError(err).Warn("Failed to remove pidfile")
+					return 0, fmt.Errorf("failed to remove pid file: %w", err)
 				}
 			}
 		}
 	} else {
 		// only return error is the error is not a file not found error
 		if !errors.Is(err, os.ErrNotExist) {
-			return 0, err
+			return 0, fmt.Errorf("failed to read pid file: %w", err)
 		}
 	}
 	return 0, nil
@@ -103,14 +103,14 @@ func IsKubeletRunning() (*os.Process, error) {
 				// remove kubeletPidFile
 				err = os.Remove(kubeletPidFile)
 				if err != nil {
-					log.WithError(err).Warnf("Failed to remove kubelet pidfile: %s", kubeletPidFile)
+					return nil, fmt.Errorf("failed to remove kubelet pidfile: %w", err)
 				}
 			}
 		}
 	} else {
 		// only return error is the error is not a file not found error
 		if !errors.Is(err, os.ErrNotExist) {
-			return nil, err
+			return nil, fmt.Errorf("failed to read kubelet pid file: %w", err)
 		}
 	}
 	return nil, nil

@@ -48,7 +48,7 @@ type Config api.Config
 func LoadFromFile(filename string) (*Config, error) {
 	_config, err := clientcmd.LoadFromFile(filename)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to load kubeconfig from file: %w", err)
 	}
 	config := (*Config)(_config)
 	return config, nil
@@ -105,10 +105,13 @@ func (config *Config) Client() (client *kubernetes.Clientset, err error) {
 	var rest *rest.Config
 	rest, err = clientConfig.ClientConfig()
 	if err != nil {
-		return client, err
+		return client, fmt.Errorf("failed to get client config: %w", err)
 	}
 	client, err = kubernetes.NewForConfig(rest)
-	return client, err
+	if err != nil {
+		return client, fmt.Errorf("failed to create kubernetes client: %w", err)
+	}
+	return client, nil
 }
 
 // CheckClusterRunning checks that the cluster is running by requesting the
@@ -161,7 +164,10 @@ func (config *Config) CheckClusterRunning(retries, okResponses, waitTime int) er
 // WriteToFile writes the config configuration to the file pointed by filename.
 // It returns the appropriate error in case of failure.
 func (config *Config) WriteToFile(filename string) error {
-	return clientcmd.WriteToFile(*(*api.Config)(config), filename)
+	if err := clientcmd.WriteToFile(*(*api.Config)(config), filename); err != nil {
+		return fmt.Errorf("failed to write kubeconfig to file: %w", err)
+	}
+	return nil
 }
 
 // RestartProxy restarts kube-proxy after config has been updated. This needs to
@@ -177,7 +183,7 @@ func (config *Config) RestartProxy() (err error) {
 
 	var ds *appsV1.DaemonSet
 	if ds, err = client.AppsV1().DaemonSets("kube-system").Get(ctx, "kube-proxy", metaV1.GetOptions{}); err != nil {
-		return err
+		return fmt.Errorf("failed to get kube-proxy daemonset: %w", err)
 	}
 
 	if ds.Spec.Template.Annotations == nil {
@@ -186,7 +192,10 @@ func (config *Config) RestartProxy() (err error) {
 	ds.Spec.Template.Annotations["kubectl.kubernetes.io/restartedAt"] = time.Now().Format(time.RFC3339)
 
 	_, err = client.AppsV1().DaemonSets("kube-system").Update(ctx, ds, metaV1.UpdateOptions{})
-	return err
+	if err != nil {
+		return fmt.Errorf("failed to update kube-proxy daemonset: %w", err)
+	}
+	return nil
 }
 
 func (config *Config) DoKustomization(ip net.IP, kustomization string, force bool, waitTimeout int) error {
@@ -215,7 +224,7 @@ func (config *Config) DoKustomization(ip net.IP, kustomization string, force boo
 			}).Info("Performing configuration")
 
 			if ids, err = provision.ApplyBaseKustomizations(kustomization, context); err != nil {
-				return err
+				return fmt.Errorf("failed to apply base kustomizations: %w", err)
 			}
 		}
 
@@ -261,6 +270,8 @@ func WriteIkniteConfigMap(client kubernetes.Interface, cm *coreV1.ConfigMap) (re
 	} else {
 		res, err = client.CoreV1().ConfigMaps("kube-system").Create(context.TODO(), cm, metaV1.CreateOptions{})
 	}
-
-	return res, err
+	if err != nil {
+		return res, fmt.Errorf("failed to write iknite config map: %w", err)
+	}
+	return res, nil
 }

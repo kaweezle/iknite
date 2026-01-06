@@ -61,6 +61,9 @@ func WaitForKubelet(cmd *exec.Cmd, conn *mdns.Conn, cancel context.CancelFunc) e
 	if err == nil && conn != nil {
 		log.Info("Stopping the mdns responder...")
 		err = conn.Close()
+		if err != nil {
+			return fmt.Errorf("failed to close mdns responder: %w", err)
+		}
 	}
 
 	if err == nil && cancel != nil {
@@ -68,7 +71,7 @@ func WaitForKubelet(cmd *exec.Cmd, conn *mdns.Conn, cancel context.CancelFunc) e
 		cancel()
 	}
 
-	return err
+	return fmt.Errorf("failed to wait for kubelet: %w", err)
 }
 
 // runPrepare executes the node initialization process.

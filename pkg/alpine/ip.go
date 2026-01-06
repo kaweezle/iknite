@@ -20,7 +20,7 @@ func CheckIpExists(ip net.IP) (result bool, err error) {
 	var ifaces []net.Interface
 	ifaces, err = net.Interfaces()
 	if err != nil {
-		return result, err
+		return result, fmt.Errorf("failed to get network interfaces: %w", err)
 	}
 	for _, i := range ifaces {
 		var addrs []net.Addr
@@ -36,12 +36,12 @@ func CheckIpExists(ip net.IP) (result bool, err error) {
 			case *net.IPNet:
 				if v.IP.Equal(ip) {
 					result = true
-					return result, err
+					return result, nil
 				}
 			}
 		}
 	}
-	return result, err
+	return result, nil
 }
 
 // AddIpAddress adds the IP address to the interface iface.
@@ -94,13 +94,16 @@ func AddIpMapping(hostConfig *txeh.HostsConfig, ip net.IP, domainName string, to
 	var hosts *txeh.Hosts
 	hosts, err = txeh.NewHosts(hostConfig)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to create hosts file handler: %w", err)
 	}
 	removeIpAddresses(hosts, toRemove)
 
 	hosts.AddHost(ip.String(), domainName)
 	err = hosts.Save()
-	return err
+	if err != nil {
+		return fmt.Errorf("failed to save hosts file: %w", err)
+	}
+	return nil
 }
 
 func IsHostMapped(Ip net.IP, DomainName string) (bool, []net.IP) {

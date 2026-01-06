@@ -29,17 +29,20 @@ func NewKubeVipControlPlanePhase() workflow.Phase {
 func CreateKubeVipConfiguration(wr io.Writer, config *v1alpha1.IkniteClusterSpec) error {
 	template, err := template.New("config").Parse(kubeVipManifestTemplate)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to parse kube-vip manifest template: %w", err)
 	}
 
-	return template.Execute(wr, config)
+	if err := template.Execute(wr, config); err != nil {
+		return fmt.Errorf("failed to execute kube-vip manifest template: %w", err)
+	}
+	return nil
 }
 
 func WriteKubeVipConfiguration(fs afero.Fs, manifestDir string, config *v1alpha1.IkniteClusterSpec) (f afero.File, err error) {
 	afs := &afero.Afero{Fs: fs}
 	f, err = afs.Create(filepath.Join(manifestDir, "kube-vip.yaml"))
 	if err != nil {
-		return f, err
+		return f, fmt.Errorf("failed to create kube-vip.yaml file: %w", err)
 	}
 	defer func() {
 		closeErr := f.Close()

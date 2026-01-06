@@ -30,11 +30,11 @@ func ResetIPAddress(ikniteConfig *v1alpha1.IkniteClusterSpec, isDryRun bool) err
 	log.WithField("isDryRun", isDryRun).Info("Resetting IP address...")
 	hosts, err := txeh.NewHosts(&txeh.HostsConfig{})
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to create hosts file handler: %w", err)
 	}
 	ip, err := alpine.IpMappingForHost(hosts, ikniteConfig.DomainName)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to get IP mapping for host: %w", err)
 	}
 	ones, _ := ip.DefaultMask().Size()
 	ipWithMask := fmt.Sprintf("%v/%d", ip, ones)
@@ -50,11 +50,13 @@ func ResetIPAddress(ikniteConfig *v1alpha1.IkniteClusterSpec, isDryRun bool) err
 	}).ExecForEach(fmt.Sprintf("%sip addr del %s dev {{.}}", prefix, ipWithMask))
 	p.Wait()
 	if p.Error() != nil {
-		return p.Error()
+		return fmt.Errorf("failed to delete IP address: %w", p.Error())
 	}
 	if !isDryRun {
 		hosts.RemoveHost(ikniteConfig.DomainName)
-		return hosts.Save()
+		if err := hosts.Save(); err != nil {
+			return fmt.Errorf("failed to save hosts file: %w", err)
+		}
 	}
 	return nil
 }
@@ -64,14 +66,17 @@ func ResetIPTables(isDryRun bool) (err error) {
 	if !isDryRun {
 		_, err = s.Exec("iptables-save").Reject("KUBE-").Reject("CNI-").Reject("FLANNEL").Exec("iptables-restore").String()
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to clean up iptables rules: %w", err)
 		}
 	}
 	log.WithField("isDryRun", isDryRun).Info("Cleaning up ip6tables rules...")
 	if !isDryRun {
 		_, err = s.Exec("ip6tables-save").Reject("KUBE-").Reject("CNI-").Reject("FLANNEL").Exec("ip6tables-restore").String()
+		if err != nil {
+			return fmt.Errorf("failed to clean up ip6tables rules: %w", err)
+		}
 	}
-	return err
+	return nil
 }
 
 func RemoveKubeletFiles(isDryRun bool) (err error) {
@@ -94,8 +99,11 @@ func StopAllContainers(isDryRun bool) (err error) {
 	} else {
 		log.Info("Stopping all containers with command /bin/sh -c 'crictl rmp -f $(crictl pods -q)'...")
 		_, err = s.Exec("/bin/sh -c 'crictl rmp -f $(crictl pods -q)'").String()
+		if err != nil {
+			return fmt.Errorf("failed to stop all containers: %w", err)
+		}
 	}
-	return err
+	return nil
 }
 
 func UnmountPaths(failOnError bool, isDryRun bool) error {
@@ -214,7 +222,10 @@ func processMounts(path string, remove bool, message string, isDryRun bool) erro
 		return s
 	})
 	p.Wait()
-	return p.Error()
+	if err = p.Error(); err != nil {
+		return fmt.Errorf("failed to process mounts for path %s: %w", path, err)
+	}
+	return nil
 }
 
 func DeleteCniNamespaces(isDryRun bool) error {
@@ -229,7 +240,10 @@ func DeleteCniNamespaces(isDryRun bool) error {
 		return s
 	}).ExecForEach(command)
 	p.Wait()
-	return p.Error()
+	if err := p.Error(); err != nil {
+		return fmt.Errorf("failed to delete CNI namespaces: %w", err)
+	}
+	return nil
 }
 
 func DeleteNetworkInterfaces(isDryRun bool) error {
@@ -249,12 +263,12 @@ func DeleteNetworkInterfaces(isDryRun bool) error {
 	err := p.Error()
 	if err != nil {
 		log.WithError(err).Error("Error deleting pods network interfaces")
-		return err
+		return fmt.Errorf("failed to delete network interfaces: %w", err)
 	} else {
 		logger.Infof("Deleted pods network interfaces")
 	}
 
-	return err
+	return nil
 }
 
 // DeleteEtcdData deletes the etcd data directory.
@@ -280,6 +294,9 @@ func DeleteEtcdData(isDryRun bool) error {
 	} else {
 		log.WithField("path", etcdDataDir).Info("Deleting etcd data...")
 		err = resetPhases.CleanDir(etcdDataDir)
+		if err != nil {
+			return fmt.Errorf("failed to delete etcd data: %w", err)
+		}
 	}
-	return err
+	return nil
 }

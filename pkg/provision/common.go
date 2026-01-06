@@ -93,7 +93,7 @@ func createTempKustomizeDirectory(content *embed.FS, fs filesys.FileSystem, temp
 func applyResmap(resources resmap.ResMap) (err error) {
 	var out []byte
 	if out, err = resources.AsYaml(); err != nil {
-		return err
+		return fmt.Errorf("failed to convert resources to YAML: %w", err)
 	}
 
 	buffer := bytes.Buffer{}
@@ -137,7 +137,7 @@ func ApplyKustomizations(fs filesys.FileSystem, dirname string) (ids []resid.Res
 		}
 		for _, curId := range crdIds {
 			if err = resources.Remove(curId); err != nil {
-				return ids, err
+				return ids, fmt.Errorf("failed to remove CRD resource: %w", err)
 			}
 		}
 	}
@@ -156,7 +156,7 @@ func ApplyLocalKustomizations(dirname string) ([]resid.ResId, error) {
 func ApplyEmbeddedKustomizations(content *embed.FS, dirname string, data any) ([]resid.ResId, error) {
 	fs := filesys.MakeFsInMemory()
 	if err := fs.MkdirAll(dirname); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create directory in memory: %w", err)
 	}
 
 	if err := createTempKustomizeDirectory(content, fs, dirname, dirname, data); err != nil {
@@ -178,5 +178,8 @@ func RunKustomizations(fs filesys.FileSystem, dirname string) (resources resmap.
 	opts := EnablePlugins(krusty.MakeDefaultOptions())
 	k := krusty.MakeKustomizer(opts)
 	resources, err = k.Run(fs, dirname)
-	return resources, err
+	if err != nil {
+		return resources, fmt.Errorf("failed to run kustomize: %w", err)
+	}
+	return resources, nil
 }

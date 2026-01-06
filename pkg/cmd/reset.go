@@ -20,6 +20,7 @@ package cmd
 // cSpell: disable
 import (
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	_ "unsafe"
@@ -109,12 +110,12 @@ func newResetOptions() *resetOptions {
 func newResetData(cmd *cobra.Command, opts *resetOptions, in io.Reader, out io.Writer, allowExperimental bool) (*resetData, error) {
 	// Validate the mixed arguments with --config and return early on errors
 	if err := validation.ValidateMixedArguments(cmd.Flags()); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to validate mixed arguments: %w", err)
 	}
 
 	// Retrieve information from environment variables and apply them to the configuration
 	if err := config.DecodeIkniteConfig(opts.ikniteCfg); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to decode iknite config: %w", err)
 	}
 
 	ikniteCluster := &v1alpha1.IkniteCluster{}
@@ -137,7 +138,7 @@ func newResetData(cmd *cobra.Command, opts *resetOptions, in io.Reader, out io.W
 		SkipCRIDetect:     opts.skipCRIDetect,
 	})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to load or default reset configuration: %w", err)
 	}
 
 	dryRunFlag := cmdUtil.ValueFromFlagsOrConfig(cmd.Flags(), options.DryRun, resetCfg.DryRun, opts.externalCfg.DryRun).(bool)
@@ -167,7 +168,7 @@ func newResetData(cmd *cobra.Command, opts *resetOptions, in io.Reader, out io.W
 
 	ignorePreflightErrorsSet, err := validation.ValidateIgnorePreflightErrors(opts.ignorePreflightErrors, resetCfg.IgnorePreflightErrors)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to validate ignore preflight errors: %w", err)
 	}
 	if initCfg != nil {
 		// Also set the union of pre-flight errors to InitConfiguration, to provide a consistent view of the runtime configuration:
@@ -221,13 +222,13 @@ func newCmdReset(in io.Reader, out io.Writer, resetOptions *resetOptions) *cobra
 		RunE: func(cmd *cobra.Command, args []string) error {
 			data, err := resetRunner.InitData(args)
 			if err != nil {
-				return err
+				return fmt.Errorf("failed to initialize reset data: %w", err)
 			}
 			if _, ok := data.(*resetData); !ok {
 				return errors.New("invalid data struct")
 			}
 			if err := resetRunner.Run(args); err != nil {
-				return err
+				return fmt.Errorf("failed to run reset: %w", err)
 			}
 
 			return nil

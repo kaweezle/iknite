@@ -53,7 +53,7 @@ func CheckService(serviceName string, checkOpenRC, checkPidFile bool) (bool, str
 	if checkOpenRC {
 		started, err := alpine.IsServiceStarted(serviceName)
 		if err != nil {
-			return false, "", err
+			return false, "", fmt.Errorf("failed to check if service %s is started: %w", serviceName, err)
 		}
 		if !started {
 			return false, "", fmt.Errorf("service %s is not running", serviceName)
@@ -129,7 +129,7 @@ func FileTreeDifference(path string, expectedFiles []string) ([]string, []string
 	foundFiles := []string{}
 	actualPath, err := filepath.EvalSymlinks(path)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("failed to evaluate symlinks for %s: %w", path, err)
 	}
 	err = filepath.Walk(actualPath, func(filePath string, info os.FileInfo, err error) error {
 		if err != nil {
@@ -138,14 +138,14 @@ func FileTreeDifference(path string, expectedFiles []string) ([]string, []string
 		if !info.IsDir() {
 			relativePath, err := filepath.Rel(actualPath, filePath)
 			if err != nil {
-				return err
+				return fmt.Errorf("failed to get relative path: %w", err)
 			}
 			foundFiles = append(foundFiles, relativePath)
 		}
 		return nil
 	})
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("failed to walk file tree: %w", err)
 	}
 	missingFiles := difference(expectedFiles, foundFiles)
 	extraFiles := difference(foundFiles, expectedFiles)
@@ -176,13 +176,13 @@ func FileTreeCheck(name, description, path string, expectedFiles []string) *Chec
 func CheckKubeletHealth(timeout time.Duration) (bool, string, error) {
 	client, err := kubeConfigUtil.ClientSetFromFile(kubeadmConstants.GetAdminKubeConfigPath())
 	if err != nil {
-		return false, "", err
+		return false, "", fmt.Errorf("failed to create client set for kubelet health check: %w", err)
 	}
 
 	waiter := apiclient.NewKubeWaiter(client, timeout, io.Discard)
 	err = waiter.WaitForKubelet("127.0.0.1", 10248)
 	if err != nil {
-		return false, "", err
+		return false, "", fmt.Errorf("kubelet health check failed: %w", err)
 	}
 	return true, "Kubelet is healthy", nil
 }
@@ -195,7 +195,7 @@ func CheckApiServerHealth(timeout time.Duration, checkData CheckData) (bool, str
 
 	client, err := kubeConfigUtil.ClientSetFromFile(kubeadmConstants.GetAdminKubeConfigPath())
 	if err != nil {
-		return false, "", err
+		return false, "", fmt.Errorf("failed to create client set for API server health check: %w", err)
 	}
 
 	waiter := apiclient.NewKubeWaiter(client, timeout, io.Discard)
@@ -207,7 +207,7 @@ func CheckApiServerHealth(timeout time.Duration, checkData CheckData) (bool, str
 	}
 
 	if err != nil {
-		return false, "", err
+		return false, "", fmt.Errorf("control plane health check failed: %w", err)
 	}
 	return true, "API Server is healthy", nil
 }

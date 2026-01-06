@@ -47,5 +47,8 @@ func runKustomize(c workflow.RunData) error {
 	if err != nil {
 		return errors.Wrap(err, "failed to write configuration")
 	}
-	return config.DoKustomization(ikniteConfig.Ip, ikniteConfig.Kustomization, force_config, 0)
+	if err := config.DoKustomization(ikniteConfig.Ip, ikniteConfig.Kustomization, force_config, 0); err != nil {
+		return fmt.Errorf("failed to apply kustomization: %w", err)
+	}
+	return nil
 }

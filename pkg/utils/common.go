@@ -16,6 +16,7 @@ limitations under the License.
 package utils
 
 import (
+	"fmt"
 	"net"
 	"os"
 	"path/filepath"
@@ -57,11 +58,18 @@ func ExecuteIfExist(file string, fn func() error) error {
 
 // Exists tells if file exists.
 func Exists(path string) (bool, error) {
-	return afs.Exists(path)
+	exists, err := afs.Exists(path)
+	if err != nil {
+		return false, fmt.Errorf("failed to check if path exists: %w", err)
+	}
+	return exists, nil
 }
 
 func WriteFile(filename string, data []byte, perm os.FileMode) error {
-	return afs.WriteFile(filename, data, perm)
+	if err := afs.WriteFile(filename, data, perm); err != nil {
+		return fmt.Errorf("failed to write file: %w", err)
+	}
+	return nil
 }
 
 // MoveFileIfExists moves the file src to the destination dst
@@ -75,7 +83,10 @@ func MoveFileIfExists(src string, dst string) error {
 		return errors.Wrapf(err, "Error while linking %s to %s", src, dst)
 	}
 
-	return os.Remove(src)
+	if err := os.Remove(src); err != nil {
+		return fmt.Errorf("failed to remove source file: %w", err)
+	}
+	return nil
 }
 
 // GetOutboundIP returns the preferred outbound ip of this machine.
@@ -96,20 +107,20 @@ func GetOutboundIP() (net.IP, error) {
 func RemoveDirectoryContents(dir string, predicate func(string) bool) error {
 	d, err := os.Open(dir)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to open directory: %w", err)
 	}
 	defer func() {
 		err = d.Close()
 	}()
 	names, err := d.Readdirnames(-1)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to read directory names: %w", err)
 	}
 	for _, name := range names {
 		if predicate == nil || predicate(name) {
 			err = os.RemoveAll(filepath.Join(dir, name))
 			if err != nil {
-				return err
+				return fmt.Errorf("failed to remove %s: %w", name, err)
 			}
 		}
 	}

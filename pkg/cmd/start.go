@@ -18,6 +18,7 @@ package cmd
 // cSpell: disable
 import (
 	"context"
+	"fmt"
 	"os"
 	"time"
 
@@ -65,7 +66,7 @@ func NewStartCmd(ikniteConfig *v1alpha1.IkniteClusterSpec) *cobra.Command {
 func IsIkniteReady(ctx context.Context) (bool, error) {
 	cluster, err := v1alpha1.LoadIkniteCluster()
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
-		return false, err
+		return false, fmt.Errorf("failed to load iknite cluster: %w", err)
 	}
 	if errors.Is(err, os.ErrNotExist) {
 		return false, nil

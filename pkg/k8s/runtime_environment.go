@@ -40,10 +40,11 @@ const (
 
 func IsKubeletServiceRunnable(confFilePath string) (present bool, err error) {
 	var lines int
-	if lines, err = script.File(confFilePath).Match(rcConfPreventKubeletRunning).CountLines(); err == nil {
-		present = lines == 0
+	if lines, err = script.File(confFilePath).Match(rcConfPreventKubeletRunning).CountLines(); err != nil {
+		return false, fmt.Errorf("failed to count lines in config file: %w", err)
 	}
-	return present, err
+	present = lines == 0
+	return present, nil
 }
 
 // PreventKubeletServiceFromStarting ensures that the kubelet service is not started

@@ -18,6 +18,7 @@ package alpine
 // cSpell: words runlevel runlevels softlevel
 // cSpell: disable
 import (
+	"fmt"
 	"os"
 	"path"
 
@@ -53,14 +54,21 @@ func EnsureOpenRC(level string) error {
 // If one of the services is already started, it is not restarted. It one is
 // not started, it is started.
 func StartOpenRC() (err error) {
-	return utils.ExecuteIfNotExist(constants.SoftLevelPath, func() error {
+	if err := utils.ExecuteIfNotExist(constants.SoftLevelPath, func() error {
 		return EnsureOpenRC("default")
-	})
+	}); err != nil {
+		return fmt.Errorf("failed to start OpenRC: %w", err)
+	}
+	return nil
 }
 
 func IsServiceStarted(serviceName string) (bool, error) {
 	serviceLink := path.Join(startedServicesDir, serviceName)
-	return utils.Exists(serviceLink)
+	exists, err := utils.Exists(serviceLink)
+	if err != nil {
+		return false, fmt.Errorf("failed to check if service %s is started: %w", serviceName, err)
+	}
+	return exists, nil
 }
 
 // ExecuteIfServiceNotStarted executes the function fn if the service serviceName
@@ -95,17 +103,23 @@ func ExecuteIfServiceStarted(serviceName string, fn func() error) error {
 func EnableService(serviceName string) error {
 	serviceFilename := path.Join(servicesDir, serviceName)
 	destinationFilename := path.Join(runLevelDir, serviceName)
-	return utils.ExecuteIfNotExist(destinationFilename, func() error {
+	if err := utils.ExecuteIfNotExist(destinationFilename, func() error {
 		return os.Symlink(serviceFilename, destinationFilename)
-	})
+	}); err != nil {
+		return fmt.Errorf("failed to enable service %s: %w", serviceName, err)
+	}
+	return nil
 }
 
 // DisableService disables the service named serviceName.
 func DisableService(serviceName string) error {
 	destinationFilename := path.Join(runLevelDir, serviceName)
-	return utils.ExecuteIfExist(destinationFilename, func() error {
+	if err := utils.ExecuteIfExist(destinationFilename, func() error {
 		return os.Remove(destinationFilename)
-	})
+	}); err != nil {
+		return fmt.Errorf("failed to disable service %s: %w", serviceName, err)
+	}
+	return nil
 }
 
 // StartService start the serviceName service if it is not already started.
@@ -135,13 +149,19 @@ func StopService(serviceName string) error {
 func PretendServiceStarted(serviceName string) error {
 	networkSource := path.Join(servicesDir, serviceName)
 	networkDestination := path.Join(startedServicesDir, serviceName)
-	return utils.ExecuteIfNotExist(networkDestination, func() error {
+	if err := utils.ExecuteIfNotExist(networkDestination, func() error {
 		return os.Symlink(networkSource, networkDestination)
-	})
+	}); err != nil {
+		return fmt.Errorf("failed to pretend service %s is started: %w", serviceName, err)
+	}
+	return nil
 }
 
 func EnsureOpenRCDirectory() error {
-	return utils.ExecuteIfNotExist(openRCDirectory, func() error {
+	if err := utils.ExecuteIfNotExist(openRCDirectory, func() error {
 		return os.Symlink(openRCSourceDirectory, openRCDirectory)
-	})
+	}); err != nil {
+		return fmt.Errorf("failed to ensure OpenRC directory: %w", err)
+	}
+	return nil
 }

@@ -156,18 +156,18 @@ func CleanDir(filePath string) error {
 
 	d, err := os.Open(filePath)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to open directory for cleanup: %w", err)
 	}
 	defer func() {
 		err = d.Close()
 	}()
 	names, err := d.Readdirnames(-1)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to read directory names: %w", err)
 	}
 	for _, name := range names {
 		if err = os.RemoveAll(filepath.Join(filePath, name)); err != nil {
-			return err
+			return fmt.Errorf("failed to remove %s: %w", name, err)
 		}
 	}
 	return nil
@@ -177,7 +177,7 @@ func CleanDir(filePath string) error {
 func IsDirEmpty(dir string) (bool, error) {
 	d, err := os.Open(dir)
 	if err != nil {
-		return false, err
+		return false, fmt.Errorf("failed to open directory: %w", err)
 	}
 	defer func() {
 		err = d.Close()

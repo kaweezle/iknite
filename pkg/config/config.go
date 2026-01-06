@@ -17,6 +17,8 @@ package config
 
 // cSpell: disable
 import (
+	"fmt"
+
 	"github.com/mitchellh/mapstructure"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
@@ -75,5 +77,8 @@ func DecodeIkniteConfig(ikniteConfig *v1alpha1.IkniteClusterSpec) error {
 		return errors.Wrap(err, "While creating decoder")
 	}
 
-	return decoder.Decode(viper.AllSettings()["cluster"])
+	if err := decoder.Decode(viper.AllSettings()["cluster"]); err != nil {
+		return fmt.Errorf("failed to decode cluster settings: %w", err)
+	}
+	return nil
 }

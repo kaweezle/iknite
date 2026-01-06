@@ -153,7 +153,7 @@ func newCmdInit(out io.Writer, initOptions *initOptions) *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := initRunner.InitData(args)
 			if err != nil {
-				return err
+				return fmt.Errorf("failed to initialize init data: %w", err)
 			}
 
 			data, ok := c.(*initData)
@@ -169,7 +169,7 @@ func newCmdInit(out io.Writer, initOptions *initOptions) *cobra.Command {
 		PostRunE: func(cmd *cobra.Command, args []string) error {
 			c, err := initRunner.InitData(args)
 			if err != nil {
-				return err
+				return fmt.Errorf("failed to initialize init data in post-run: %w", err)
 			}
 			data, ok := c.(*initData)
 			if !ok {
@@ -309,7 +309,7 @@ func newInitData(cmd *cobra.Command, _ []string, initOptions *initOptions, out i
 
 	// Retrieve information from environment variables and apply them to the configuration
 	if err := config.DecodeIkniteConfig(initOptions.ikniteCfg); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to decode iknite config: %w", err)
 	}
 
 	ikniteCluster := &v1alpha1.IkniteCluster{}
@@ -324,15 +324,15 @@ func newInitData(cmd *cobra.Command, _ []string, initOptions *initOptions, out i
 	// validated values to the public kubeadm config API when applicable
 	var err error
 	if initOptions.externalClusterCfg.FeatureGates, err = features.NewFeatureGate(&features.InitFeatureGates, initOptions.featureGatesString); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to parse feature gates: %w", err)
 	}
 
 	if err = validation.ValidateMixedArguments(cmd.Flags()); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to validate mixed arguments: %w", err)
 	}
 
 	if err = initOptions.bto.ApplyTo(initOptions.externalInitCfg); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to apply bootstrap token options: %w", err)
 	}
 
 	// Either use the config file if specified, or convert public kubeadm API to the internal InitConfiguration
@@ -341,7 +341,7 @@ func newInitData(cmd *cobra.Command, _ []string, initOptions *initOptions, out i
 		SkipCRIDetect: initOptions.skipCRIDetect,
 	})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to load or default init configuration: %w", err)
 	}
 
 	// Set the iptables sync duration to 10 seconds instead of 30 seconds for faster restarts
@@ -355,7 +355,7 @@ func newInitData(cmd *cobra.Command, _ []string, initOptions *initOptions, out i
 
 	ignorePreflightErrorsSet, err := validation.ValidateIgnorePreflightErrors(initOptions.ignorePreflightErrors, cfg.NodeRegistration.IgnorePreflightErrors)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to validate ignore preflight errors: %w", err)
 	}
 	// Also set the union of pre-flight errors to InitConfiguration, to provide a consistent view of the runtime configuration:
 	cfg.NodeRegistration.IgnorePreflightErrors = sets.List(ignorePreflightErrorsSet)
@@ -366,10 +366,10 @@ func newInitData(cmd *cobra.Command, _ []string, initOptions *initOptions, out i
 	}
 
 	if err = configUtil.VerifyAPIServerBindAddress(cfg.LocalAPIEndpoint.AdvertiseAddress); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to verify API server bind address: %w", err)
 	}
 	if err = features.ValidateVersion(features.InitFeatureGates, cfg.FeatureGates, cfg.KubernetesVersion); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to validate version: %w", err)
 	}
 
 	// if dry running creates a temporary folder for saving kubeadm generated files
@@ -396,7 +396,7 @@ func newInitData(cmd *cobra.Command, _ []string, initOptions *initOptions, out i
 		// kubeadm can't regenerate them without the CA Key
 		kubeconfigDir := initOptions.kubeconfigDir
 		if err = kubeconfigPhase.ValidateKubeconfigsForExternalCA(kubeconfigDir, cfg); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to validate kubeconfigs for external CA: %w", err)
 		}
 	}
 
@@ -509,7 +509,7 @@ func (d *initData) KubeConfig() (*clientcmdapi.Config, error) {
 	var err error
 	d.kubeconfig, err = clientcmd.LoadFromFile(d.KubeConfigPath())
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to load kubeconfig from file: %w", err)
 	}
 
 	return d.kubeconfig, nil
@@ -583,7 +583,7 @@ func (d *initData) Client() (clientset.Interface, error) {
 				// Alternatively, just load the config pointed at the --kubeconfig path
 				d.client, err = kubeConfigUtil.ClientSetFromFile(d.KubeConfigPath())
 				if err != nil {
-					return nil, err
+					return nil, fmt.Errorf("failed to create client set from file: %w", err)
 				}
 			}
 		}
@@ -598,7 +598,7 @@ func (d *initData) Client() (clientset.Interface, error) {
 func (d *initData) WaitControlPlaneClient() (clientset.Interface, error) {
 	config, err := clientcmd.LoadFromFile(d.KubeConfigPath())
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to load kubeconfig for wait control plane: %w", err)
 	}
 	for _, v := range config.Clusters {
 		v.Server = fmt.Sprintf("https://%s",
@@ -610,7 +610,7 @@ func (d *initData) WaitControlPlaneClient() (clientset.Interface, error) {
 	}
 	client, err := kubeConfigUtil.ToClientSet(config)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create client set from config: %w", err)
 	}
 	return client, nil
 }
@@ -631,7 +631,7 @@ func (d *initData) ClientWithoutBootstrap() (clientset.Interface, error) {
 	} else { // Use a real client
 		client, err = kubeConfigUtil.ClientSetFromFile(d.KubeConfigPath())
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to create client without bootstrap: %w", err)
 		}
 	}
 	return client, nil

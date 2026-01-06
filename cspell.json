@@ -34,6 +34,7 @@
     "containerd",
     "coredns",
     "crictl",
+    "daemonset",
     "Debugf",
     "deepcopy",
     "DRYRUN",

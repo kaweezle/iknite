@@ -125,10 +125,10 @@ func LoadIkniteCluster() (*IkniteCluster, error) {
 	if err == nil {
 		err = json.Unmarshal(ikniteClusterJSON, ikniteCluster)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to unmarshal iknite cluster: %w", err)
 		}
 	} else {
-		return nil, err
+		return nil, fmt.Errorf("failed to read status file: %w", err)
 	}
 	return ikniteCluster, nil
 }

@@ -39,17 +39,21 @@ func (config *Config) RESTClient() *RESTClientGetter {
 }
 
 func (r *RESTClientGetter) ToRESTConfig() (*rest.Config, error) {
-	return r.clientconfig.ClientConfig()
+	restConfig, err := r.clientconfig.ClientConfig()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get REST config: %w", err)
+	}
+	return restConfig, nil
 }
 
 func (r *RESTClientGetter) ToDiscoveryClient() (discovery.CachedDiscoveryInterface, error) {
 	restconfig, err := r.clientconfig.ClientConfig()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get REST config for discovery: %w", err)
 	}
 	dc, err := discovery.NewDiscoveryClientForConfig(restconfig)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create discovery client: %w", err)
 	}
 	return memory.NewMemCacheClient(dc), nil
 }
@@ -96,7 +100,11 @@ func StatusViewerFor(kind schema.GroupKind) (polymorphichelpers.StatusViewer, er
 	if kind == ApplicationSchemaGroupVersionKind.GroupKind() {
 		return &ApplicationStatusViewer{}, nil
 	}
-	return polymorphichelpers.StatusViewerFor(kind)
+	sv, err := polymorphichelpers.StatusViewerFor(kind)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get status viewer for %v: %w", kind, err)
+	}
+	return sv, nil
 }
 
 func (s *ApplicationStatusViewer) Status(obj runtime.Unstructured, revision int64) (string, bool, error) {
@@ -155,25 +163,25 @@ func (client *RESTClientGetter) AllWorkloadStates() (result []*v1alpha1.Workload
 
 	var infos []*resource.Info
 	if infos, err = r.Infos(); err != nil {
-		return result, err
+		return result, fmt.Errorf("failed to get resource infos: %w", err)
 	}
 
 	for _, info := range infos {
 		var u map[string]any
 
 		if u, err = runtime.DefaultUnstructuredConverter.ToUnstructured(info.Object); err != nil {
-			return result, err
+			return result, fmt.Errorf("failed to convert object to unstructured: %w", err)
 		}
 
 		var v polymorphichelpers.StatusViewer
 		if v, err = /* polymorphichelpers. */ StatusViewerFor(info.Object.GetObjectKind().GroupVersionKind().GroupKind()); err != nil {
-			return result, err
+			return result, fmt.Errorf("failed to get status viewer: %w", err)
 		}
 
 		var msg string
 		var ok bool
 		if msg, ok, err = v.Status(&unstructured.Unstructured{Object: u}, 0); err != nil {
-			return result, err
+			return result, fmt.Errorf("failed to get workload status: %w", err)
 		}
 		_result = append(_result, &v1alpha1.WorkloadState{Namespace: info.Namespace, Name: info.ObjectName(), Ok: ok, Message: strings.TrimSuffix(msg, "\n")})
 	}
@@ -181,7 +189,7 @@ func (client *RESTClientGetter) AllWorkloadStates() (result []*v1alpha1.Workload
 		return _result[i].String() < _result[j].String()
 	})
 	result = _result
-	return result, err
+	return result, nil
 }
 
 type WorkloadStateCallbackFunc func(state bool, total int, ready []*v1alpha1.WorkloadState, unready []*v1alpha1.WorkloadState, iteration int) bool
@@ -221,8 +229,14 @@ func AreWorkloadsReady(config *Config, callback WorkloadStateCallbackFunc) wait.
 
 func (config *Config) WaitForWorkloads(ctx context.Context, timeout time.Duration, callback WorkloadStateCallbackFunc) error {
 	if timeout > 0 {
-		return wait.PollUntilContextTimeout(ctx, time.Second*time.Duration(2), timeout, true, AreWorkloadsReady(config, callback))
+		if err := wait.PollUntilContextTimeout(ctx, time.Second*time.Duration(2), timeout, true, AreWorkloadsReady(config, callback)); err != nil {
+			return fmt.Errorf("failed to wait for workloads (timeout): %w", err)
+		}
+		return nil
 	} else {
-		return wait.PollUntilContextCancel(ctx, time.Second*time.Duration(2), true, AreWorkloadsReady(config, callback))
+		if err := wait.PollUntilContextCancel(ctx, time.Second*time.Duration(2), true, AreWorkloadsReady(config, callback)); err != nil {
+			return fmt.Errorf("failed to wait for workloads: %w", err)
+		}
+		return nil
 	}
 }

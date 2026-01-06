@@ -109,7 +109,7 @@ func performStatus(ikniteConfig *v1alpha1.IkniteClusterSpec) {
 				CheckFn: func(ctx context.Context, data k8s.CheckData) (bool, string, error) {
 					runnable, err := k8s.IsKubeletServiceRunnable(constants.RcConfFile)
 					if err != nil {
-						return false, "", err
+						return false, "", fmt.Errorf("failed to check if kubelet service is runnable: %w", err)
 					}
 					if runnable {
 						return false, "Kubelet service is runnable", nil
@@ -127,7 +127,7 @@ func performStatus(ikniteConfig *v1alpha1.IkniteClusterSpec) {
 					if ikniteConfig.CreateIp {
 						result, err := alpine.CheckIpExists(ikniteConfig.Ip)
 						if err != nil {
-							return false, "", err
+							return false, "", fmt.Errorf("failed to check if IP exists: %w", err)
 						} else if result {
 							return true, fmt.Sprintf("IP address %s is created", ikniteConfig.Ip.String()), nil
 						} else {
@@ -186,7 +186,7 @@ func performStatus(ikniteConfig *v1alpha1.IkniteClusterSpec) {
 				CheckFn: func(ctx context.Context, data k8s.CheckData) (bool, string, error) {
 					missingFiles, _, err := k8s.FileTreeDifference("/var/lib/etcd", []string{"member/snap/db"})
 					if err != nil {
-						return false, "", err
+						return false, "", fmt.Errorf("failed to check etcd file tree: %w", err)
 					}
 					if len(missingFiles) > 0 {
 						return false, "/var/lib/etcd has no data file", nil
@@ -205,7 +205,7 @@ func performStatus(ikniteConfig *v1alpha1.IkniteClusterSpec) {
 				CheckFn: func(ctx context.Context, data k8s.CheckData) (bool, string, error) {
 					exists, err := utils.Exists(constants.SoftLevelPath)
 					if err != nil {
-						return false, "", err
+						return false, "", fmt.Errorf("failed to check if OpenRC is started: %w", err)
 					}
 					if !exists {
 						return false, "OpenRC is not started", nil

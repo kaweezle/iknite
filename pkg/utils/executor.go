@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"fmt"
 	"io"
 	"os/exec"
 )
@@ -18,21 +19,33 @@ type CommandExecutor struct{}
 
 func (c *CommandExecutor) Run(combined bool, cmd string, arguments ...string) ([]byte, error) {
 	command := exec.Command(cmd, arguments...)
+	var output []byte
+	var err error
 	if combined {
-		return command.CombinedOutput()
+		output, err = command.CombinedOutput()
 	} else {
-		return command.Output()
+		output, err = command.Output()
 	}
+	if err != nil {
+		return output, fmt.Errorf("failed to run command %s: %w", cmd, err)
+	}
+	return output, nil
 }
 
 func (c *CommandExecutor) Pipe(stdin io.Reader, combined bool, cmd string, arguments ...string) ([]byte, error) {
 	command := exec.Command(cmd, arguments...)
 	command.Stdin = stdin
+	var output []byte
+	var err error
 	if combined {
-		return command.CombinedOutput()
+		output, err = command.CombinedOutput()
 	} else {
-		return command.Output()
+		output, err = command.Output()
 	}
+	if err != nil {
+		return output, fmt.Errorf("failed to pipe command %s: %w", cmd, err)
+	}
+	return output, nil
 }
 
 var Exec Executor = &CommandExecutor{}

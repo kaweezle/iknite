@@ -24,5 +24,8 @@ func runPreCleanHost(c workflow.RunData) error {
 	}
 	ikniteConfig := &data.IkniteCluster().Spec
 
-	return k8s.CleanAll(ikniteConfig, false, false, true, false)
+	if err := k8s.CleanAll(ikniteConfig, false, false, true, false); err != nil {
+		return fmt.Errorf("failed to pre-clean host: %w", err)
+	}
+	return nil
 }

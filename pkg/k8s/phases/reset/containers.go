@@ -19,6 +19,8 @@ package reset
 // cSpell:words klog cleanupnode
 // cSpell:disable
 import (
+	"fmt"
+
 	"github.com/pkg/errors"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
@@ -50,5 +52,8 @@ func runCleanupNode(c workflow.RunData) error {
 		return errors.New("cleanup-node phase invoked with an invalid data struct")
 	}
 
-	return k8s.CleanAll(&r.IkniteCluster().Spec, true, true, true, r.DryRun())
+	if err := k8s.CleanAll(&r.IkniteCluster().Spec, true, true, true, r.DryRun()); err != nil {
+		return fmt.Errorf("failed to cleanup node: %w", err)
+	}
+	return nil
 }
