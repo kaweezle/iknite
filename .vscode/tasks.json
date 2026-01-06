@@ -6,13 +6,70 @@
       "type": "shell",
       "command": "golangci-lint",
       //"args": ["run", "--enable-only", "godot"],
-      "args": ["run", "--fix"],
+      "args": ["run", "--enable-only", "lll", "--fix"],
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      // "problemMatcher": ["$go"],
+      "problemMatcher": {
+        "owner": "golangci-lint",
+        "fileLocation": ["relative", "${workspaceFolder}"],
+        "pattern": {
+          "regexp": "^(.*):(\\d+):(\\d+): (.*)$",
+          "file": 1,
+          "line": 2,
+          "column": 3,
+          "message": 4
+        }
+      },
+      "detail": "Run golangci-lint"
+    },
+    {
+      "label": "golangci-fmt",
+      "type": "shell",
+      "command": "golangci-lint",
+      "args": ["fmt"],
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      // "problemMatcher": ["$go"],
+      "problemMatcher": {
+        "owner": "golangci-lint-fmt",
+        "fileLocation": ["relative", "${workspaceFolder}"],
+        "pattern": {
+          "regexp": "^(.*):(\\d+):(\\d+): (.*)$",
+          "file": 1,
+          "line": 2,
+          "column": 3,
+          "message": 4
+        }
+      },
+      "detail": "Run golangci-lint format"
+    },
+    {
+      "label": "go mod tidy",
+      "type": "shell",
+      "command": "go",
+      "args": ["mod", "tidy"],
       "group": {
         "kind": "build",
         "isDefault": true
       },
       "problemMatcher": ["$go"],
-      "detail": "Run golangci-lint with godot enabled"
+      "detail": "Run go mod tidy"
+    },
+    {
+      "label": "pre-commit",
+      "type": "shell",
+      "command": "pre-commit",
+      "args": ["run"],
+      "group": {
+        "kind": "test",
+        "isDefault": true
+      },
+      "detail": "Run pre-commit hooks"
     }
   ]
 }

@@ -41,6 +41,7 @@
     "fontawesome",
     "gitmoji",
     "GOPATH",
+    "govet",
     "Healthz",
     "iknite",
     "Infof",

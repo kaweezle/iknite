@@ -36,17 +36,44 @@ func ConfigureClusterCommand(flagSet *flag.FlagSet, ikniteConfig *v1alpha1.Iknit
 	v1alpha1.SetDefaults_IkniteClusterSpec(ikniteConfig)
 
 	flagSet.IPVar(&ikniteConfig.Ip, options.Ip, ikniteConfig.Ip, "Cluster IP address")
-	flagSet.BoolVar(&ikniteConfig.CreateIp, options.IpCreate, ikniteConfig.CreateIp, "Add IP address if it doesn't exist")
-	flagSet.StringVar(&ikniteConfig.NetworkInterface, options.IpNetworkInterface, ikniteConfig.NetworkInterface, "Interface to which add IP")
-	flagSet.StringVar(&ikniteConfig.DomainName, options.DomainName, ikniteConfig.DomainName, "Domain name of the cluster")
-	flagSet.BoolVar(&ikniteConfig.EnableMDNS, options.EnableMDNS, ikniteConfig.EnableMDNS, "Enable mDNS publication of domain name")
+	flagSet.BoolVar(
+		&ikniteConfig.CreateIp,
+		options.IpCreate,
+		ikniteConfig.CreateIp,
+		"Add IP address if it doesn't exist",
+	)
+	flagSet.StringVar(
+		&ikniteConfig.NetworkInterface,
+		options.IpNetworkInterface,
+		ikniteConfig.NetworkInterface,
+		"Interface to which add IP",
+	)
+	flagSet.StringVar(&ikniteConfig.DomainName, options.DomainName, ikniteConfig.DomainName,
+		"Domain name of the cluster")
+	flagSet.BoolVar(&ikniteConfig.EnableMDNS, options.EnableMDNS, ikniteConfig.EnableMDNS,
+		"Enable mDNS publication of domain name")
 
 	// This flag may already be defined by kubeadm
 	if flagSet.Lookup(koptions.KubernetesVersion) == nil {
-		flagSet.StringVar(&ikniteConfig.KubernetesVersion, koptions.KubernetesVersion, ikniteConfig.KubernetesVersion, "Kubernetes version to install")
+		flagSet.StringVar(
+			&ikniteConfig.KubernetesVersion,
+			koptions.KubernetesVersion,
+			ikniteConfig.KubernetesVersion,
+			"Kubernetes version to install",
+		)
 	}
-	flagSet.StringVar(&ikniteConfig.ClusterName, options.ClusterName, ikniteConfig.ClusterName, "Cluster name")
-	flagSet.StringVar(&ikniteConfig.Kustomization, options.Kustomization, ikniteConfig.Kustomization, "Kustomization location (URL or directory)")
+	flagSet.StringVar(
+		&ikniteConfig.ClusterName,
+		options.ClusterName,
+		ikniteConfig.ClusterName,
+		"Cluster name",
+	)
+	flagSet.StringVar(
+		&ikniteConfig.Kustomization,
+		options.Kustomization,
+		ikniteConfig.Kustomization,
+		"Kustomization location (URL or directory)",
+	)
 }
 
 func StartPersistentPreRun(cmd *cobra.Command, args []string) {

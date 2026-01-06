@@ -38,7 +38,9 @@ func CreateKubeVipConfiguration(wr io.Writer, config *v1alpha1.IkniteClusterSpec
 	return nil
 }
 
-func WriteKubeVipConfiguration(fs afero.Fs, manifestDir string, config *v1alpha1.IkniteClusterSpec) (f afero.File, err error) {
+func WriteKubeVipConfiguration(
+	fs afero.Fs, manifestDir string, config *v1alpha1.IkniteClusterSpec,
+) (f afero.File, err error) {
 	afs := &afero.Afero{Fs: fs}
 	f, err = afs.Create(filepath.Join(manifestDir, "kube-vip.yaml"))
 	if err != nil {

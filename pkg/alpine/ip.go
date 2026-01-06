@@ -90,7 +90,12 @@ func IpMappingForHost(hosts *txeh.Hosts, domainName string) (net.IP, error) {
 	}
 }
 
-func AddIpMapping(hostConfig *txeh.HostsConfig, ip net.IP, domainName string, toRemove []net.IP) (err error) {
+func AddIpMapping(
+	hostConfig *txeh.HostsConfig,
+	ip net.IP,
+	domainName string,
+	toRemove []net.IP,
+) (err error) {
 	var hosts *txeh.Hosts
 	hosts, err = txeh.NewHosts(hostConfig)
 	if err != nil {

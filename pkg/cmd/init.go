@@ -140,7 +140,9 @@ func AddInitOtherFlags(flagSet *flag.FlagSet, initOptions *initOptions)
 func getDryRunClient(d *initData) (clientset.Interface, error)
 
 // newCmdInit returns "kubeadm init" command.
-// NB. InitOptions is exposed as parameter for allowing unit testing of the newInitOptions method, that implements all the command options validation logic.
+//
+// NB. InitOptions is exposed as parameter for allowing unit testing of the newInitOptions method, that implements all
+// the command options validation logic.
 func newCmdInit(out io.Writer, initOptions *initOptions) *cobra.Command {
 	if initOptions == nil {
 		initOptions = newInitOptions()
@@ -161,7 +163,8 @@ func newCmdInit(out io.Writer, initOptions *initOptions) *cobra.Command {
 				return errors.New("invalid data struct")
 			}
 
-			log.WithField("phase", "init").Infof("Using Kubernetes version: %s", data.cfg.KubernetesVersion)
+			log.WithField("phase", "init").
+				Infof("Using Kubernetes version: %s", data.cfg.KubernetesVersion)
 
 			return initRunner.Run(args)
 		},
@@ -180,10 +183,18 @@ func newCmdInit(out io.Writer, initOptions *initOptions) *cobra.Command {
 			if kubeletCmd != nil {
 				err = kubeletCmd.Process.Signal(syscall.SIGTERM)
 				if err != nil {
-					return errors.Wrapf(err, "failed to terminate the kubelet process %d", kubeletCmd.Process.Pid)
+					return errors.Wrapf(
+						err,
+						"failed to terminate the kubelet process %d",
+						kubeletCmd.Process.Pid,
+					)
 				}
 				if err = kubeletCmd.Wait(); err != nil {
-					return errors.Wrapf(err, "kubelet process %d exited with error", kubeletCmd.Process.Pid)
+					return errors.Wrapf(
+						err,
+						"kubelet process %d exited with error",
+						kubeletCmd.Process.Pid,
+					)
 				}
 			}
 			k8s.RemovePidFiles()
@@ -195,7 +206,11 @@ func newCmdInit(out io.Writer, initOptions *initOptions) *cobra.Command {
 	// add flags to the init command.
 	// init command local flags could be eventually inherited by the sub-commands automatically generated for phases
 	kubeadmCmd.AddInitConfigFlags(cmd.Flags(), initOptions.externalInitCfg)
-	kubeadmCmd.AddClusterConfigFlags(cmd.Flags(), initOptions.externalClusterCfg, &initOptions.featureGatesString)
+	kubeadmCmd.AddClusterConfigFlags(
+		cmd.Flags(),
+		initOptions.externalClusterCfg,
+		&initOptions.featureGatesString,
+	)
 
 	// Keep: this is an example of how to call a method casting the unexported struct value
 	// methodVal := reflect.ValueOf(kubeadmCmd.AddInitOtherFlags)
@@ -214,7 +229,12 @@ func newCmdInit(out io.Writer, initOptions *initOptions) *cobra.Command {
 	initRunner.SetAdditionalFlags(func(flags *flag.FlagSet) {
 		options.AddKubeConfigFlag(flags, &initOptions.kubeconfigPath)
 		options.AddKubeConfigDirFlag(flags, &initOptions.kubeconfigDir)
-		options.AddControlPlanExtraArgsFlags(flags, &initOptions.externalClusterCfg.APIServer.ExtraArgs, &initOptions.externalClusterCfg.ControllerManager.ExtraArgs, &initOptions.externalClusterCfg.Scheduler.ExtraArgs)
+		options.AddControlPlanExtraArgsFlags(
+			flags,
+			&initOptions.externalClusterCfg.APIServer.ExtraArgs,
+			&initOptions.externalClusterCfg.ControllerManager.ExtraArgs,
+			&initOptions.externalClusterCfg.Scheduler.ExtraArgs,
+		)
 	})
 
 	// initialize the workflow runner with the list of phases
@@ -225,11 +245,18 @@ func newCmdInit(out io.Writer, initOptions *initOptions) *cobra.Command {
 	initRunner.AppendPhase(WrapPhase(phases.NewKubeConfigPhase(), ikniteApi.Initializing, nil))
 	initRunner.AppendPhase(WrapPhase(phases.NewEtcdPhase(), ikniteApi.Initializing, nil))
 	controlPlanePhase := phases.NewControlPlanePhase()
-	controlPlanePhase.Phases = append(controlPlanePhase.Phases, iknitePhase.NewKubeVipControlPlanePhase())
+	controlPlanePhase.Phases = append(
+		controlPlanePhase.Phases,
+		iknitePhase.NewKubeVipControlPlanePhase(),
+	)
 
 	initRunner.AppendPhase(WrapPhase(controlPlanePhase, ikniteApi.Initializing, nil))
-	initRunner.AppendPhase(WrapPhase(iknitePhase.NewKubeletStartPhase(), ikniteApi.Initializing, nil))
-	initRunner.AppendPhase(WrapPhase(phases.NewWaitControlPlanePhase(), ikniteApi.Initializing, nil))
+	initRunner.AppendPhase(
+		WrapPhase(iknitePhase.NewKubeletStartPhase(), ikniteApi.Initializing, nil),
+	)
+	initRunner.AppendPhase(
+		WrapPhase(phases.NewWaitControlPlanePhase(), ikniteApi.Initializing, nil),
+	)
 	initRunner.AppendPhase(WrapPhase(phases.NewUploadConfigPhase(), ikniteApi.Initializing, nil))
 	initRunner.AppendPhase(WrapPhase(phases.NewUploadCertsPhase(), ikniteApi.Initializing, nil))
 	// initRunner.AppendPhase(phases.NewMarkControlPlanePhase())
@@ -237,31 +264,38 @@ func newCmdInit(out io.Writer, initOptions *initOptions) *cobra.Command {
 	initRunner.AppendPhase(WrapPhase(phases.NewKubeletFinalizePhase(), ikniteApi.Initializing, nil))
 	initRunner.AppendPhase(WrapPhase(phases.NewAddonPhase(), ikniteApi.Initializing, nil))
 	initRunner.AppendPhase(WrapPhase(iknitePhase.NewMDnsPublishPhase(), ikniteApi.Stabilizing, nil))
-	initRunner.AppendPhase(WrapPhase(iknitePhase.NewKustomizeClusterPhase(), ikniteApi.Stabilizing, nil))
+	initRunner.AppendPhase(
+		WrapPhase(iknitePhase.NewKustomizeClusterPhase(), ikniteApi.Stabilizing, nil),
+	)
 	initRunner.AppendPhase(WrapPhase(iknitePhase.NewWorkloadsPhase(), ikniteApi.Stabilizing, nil))
 	initRunner.AppendPhase(WrapPhase(iknitePhase.NewDaemonizePhase(), ikniteApi.Stabilizing, nil))
 	// initRunner.AppendPhase(phases.NewShowJoinCommandPhase())
 
 	// sets the data builder function, that will be used by the runner
 	// both when running the entire workflow or single phases
-	initRunner.SetDataInitializer(func(cmd *cobra.Command, args []string) (workflow.RunData, error) {
-		if cmd.Flags().Lookup(options.NodeCRISocket) == nil {
-			// skip CRI detection
-			// assume that the command execution does not depend on CRISocket when --cri-socket flag is not set
-			initOptions.skipCRIDetect = true
-		}
-		data, err := newInitData(cmd, args, initOptions, out)
-		if err != nil {
-			return nil, err
-		}
-		// If the flag for skipping phases was empty, use the values from config
-		if len(initRunner.Options.SkipPhases) == 0 {
-			initRunner.Options.SkipPhases = data.cfg.SkipPhases
-		}
+	initRunner.SetDataInitializer(
+		func(cmd *cobra.Command, args []string) (workflow.RunData, error) {
+			if cmd.Flags().Lookup(options.NodeCRISocket) == nil {
+				// skip CRI detection
+				// assume that the command execution does not depend on CRISocket when --cri-socket flag is not set
+				initOptions.skipCRIDetect = true
+			}
+			data, err := newInitData(cmd, args, initOptions, out)
+			if err != nil {
+				return nil, err
+			}
+			// If the flag for skipping phases was empty, use the values from config
+			if len(initRunner.Options.SkipPhases) == 0 {
+				initRunner.Options.SkipPhases = data.cfg.SkipPhases
+			}
 
-		initRunner.Options.SkipPhases = manageSkippedAddons(&data.cfg.ClusterConfiguration, initRunner.Options.SkipPhases)
-		return data, nil
-	})
+			initRunner.Options.SkipPhases = manageSkippedAddons(
+				&data.cfg.ClusterConfiguration,
+				initRunner.Options.SkipPhases,
+			)
+			return data, nil
+		},
+	)
 
 	// binds the Runner to kubeadm init command by altering
 	// command help, adding --skip-phases flag and by adding phases subcommands
@@ -301,8 +335,15 @@ func newInitOptions() *initOptions {
 }
 
 // newInitData returns a new initData struct to be used for the execution of the kubeadm init workflow.
-// This func takes care of validating initOptions passed to the command, and then it converts options into the internal InitConfiguration type that is used as input all the phases in the kubeadm init workflow.
-func newInitData(cmd *cobra.Command, _ []string, initOptions *initOptions, out io.Writer) (*initData, error) {
+//
+// This func takes care of validating initOptions passed to the command, and then it converts options into the internal
+// InitConfiguration type that is used as input all the phases in the kubeadm init workflow.
+func newInitData(
+	cmd *cobra.Command,
+	_ []string,
+	initOptions *initOptions,
+	out io.Writer,
+) (*initData, error) {
 	// Re-apply defaults to the public kubeadm API (this will set only values not exposed/not set as a flags)
 	kubeadmScheme.Scheme.Default(initOptions.externalInitCfg)
 	kubeadmScheme.Scheme.Default(initOptions.externalClusterCfg)
@@ -323,7 +364,8 @@ func newInitData(cmd *cobra.Command, _ []string, initOptions *initOptions, out i
 	// Validate standalone flags values and/or combination of flags and then assigns
 	// validated values to the public kubeadm config API when applicable
 	var err error
-	if initOptions.externalClusterCfg.FeatureGates, err = features.NewFeatureGate(&features.InitFeatureGates, initOptions.featureGatesString); err != nil {
+	if initOptions.externalClusterCfg.FeatureGates,
+		err = features.NewFeatureGate(&features.InitFeatureGates, initOptions.featureGatesString); err != nil {
 		return nil, fmt.Errorf("failed to parse feature gates: %w", err)
 	}
 
@@ -337,9 +379,14 @@ func newInitData(cmd *cobra.Command, _ []string, initOptions *initOptions, out i
 
 	// Either use the config file if specified, or convert public kubeadm API to the internal InitConfiguration
 	// and validates InitConfiguration
-	cfg, err := configUtil.LoadOrDefaultInitConfiguration(initOptions.cfgPath, initOptions.externalInitCfg, initOptions.externalClusterCfg, configUtil.LoadOrDefaultConfigurationOptions{
-		SkipCRIDetect: initOptions.skipCRIDetect,
-	})
+	cfg, err := configUtil.LoadOrDefaultInitConfiguration(
+		initOptions.cfgPath,
+		initOptions.externalInitCfg,
+		initOptions.externalClusterCfg,
+		configUtil.LoadOrDefaultConfigurationOptions{
+			SkipCRIDetect: initOptions.skipCRIDetect,
+		},
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load or default init configuration: %w", err)
 	}
@@ -353,11 +400,15 @@ func newInitData(cmd *cobra.Command, _ []string, initOptions *initOptions, out i
 	}
 	kubeProxyConfigTyped.IPTables.SyncPeriod.Duration = 10 * time.Second
 
-	ignorePreflightErrorsSet, err := validation.ValidateIgnorePreflightErrors(initOptions.ignorePreflightErrors, cfg.NodeRegistration.IgnorePreflightErrors)
+	ignorePreflightErrorsSet, err := validation.ValidateIgnorePreflightErrors(
+		initOptions.ignorePreflightErrors,
+		cfg.NodeRegistration.IgnorePreflightErrors,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to validate ignore preflight errors: %w", err)
 	}
-	// Also set the union of pre-flight errors to InitConfiguration, to provide a consistent view of the runtime configuration:
+	// Also set the union of pre-flight errors to InitConfiguration, to provide a consistent view of the runtime
+	// configuration:
 	cfg.NodeRegistration.IgnorePreflightErrors = sets.List(ignorePreflightErrorsSet)
 
 	// override node name from the command line option
@@ -378,7 +429,8 @@ func newInitData(cmd *cobra.Command, _ []string, initOptions *initOptions, out i
 		// the KUBEADM_INIT_DRYRUN_DIR environment variable allows overriding the dry-run temporary
 		// directory from the command line. This makes it possible to run "kubeadm init" integration
 		// tests without root.
-		if dryRunDir, err = kubeadmConstants.CreateTempDir(os.Getenv("KUBEADM_INIT_DRYRUN_DIR"), "kubeadm-init-dryrun"); err != nil {
+		if dryRunDir, err = kubeadmConstants.CreateTempDir(os.Getenv("KUBEADM_INIT_DRYRUN_DIR"),
+			"kubeadm-init-dryrun"); err != nil {
 			return nil, errors.Wrap(err, "couldn't create a temporary directory")
 		}
 	}
@@ -400,18 +452,21 @@ func newInitData(cmd *cobra.Command, _ []string, initOptions *initOptions, out i
 		}
 	}
 
-	// Checks if an external Front-Proxy CA is provided by the user (when the Front-Proxy CA Cert is present but the Front-Proxy CA Key is not)
+	// Checks if an external Front-Proxy CA is provided by the user (when the Front-Proxy CA Cert is present but the
+	// Front-Proxy CA Key is not).
 	externalFrontProxyCA, err := certsPhase.UsingExternalFrontProxyCA(&cfg.ClusterConfiguration)
 	if externalFrontProxyCA {
-		// In case the certificates signed by Front-Proxy CA (that should be provided by the user) are missing or invalid,
-		// returns, because kubeadm can't regenerate them without the Front-Proxy CA Key
+		// In case the certificates signed by Front-Proxy CA (that should be provided by the user) are missing or
+		// invalid, returns, because kubeadm can't regenerate them without the Front-Proxy CA Key
 		if err != nil {
 			return nil, errors.Wrapf(err, "invalid or incomplete external front-proxy CA")
 		}
 	}
 
 	if initOptions.uploadCerts && (externalCA || externalFrontProxyCA) {
-		return nil, errors.New("can't use upload-certs with an external CA or an external front-proxy CA")
+		return nil, errors.New(
+			"can't use upload-certs with an external CA or an external front-proxy CA",
+		)
 	}
 
 	// Apply the IkniteConfig to the InitConfiguration
@@ -431,7 +486,6 @@ func newInitData(cmd *cobra.Command, _ []string, initOptions *initOptions, out i
 		cfg:                     cfg,
 		certificatesDir:         cfg.CertificatesDir,
 		skipTokenPrint:          initOptions.skipTokenPrint,
-		dryRun:                  cmdUtil.ValueFromFlagsOrConfig(cmd.Flags(), options.DryRun, cfg.DryRun, initOptions.dryRun).(bool),
 		dryRunDir:               dryRunDir,
 		kubeconfigDir:           initOptions.kubeconfigDir,
 		kubeconfigPath:          initOptions.kubeconfigPath,
@@ -444,6 +498,8 @@ func newInitData(cmd *cobra.Command, _ []string, initOptions *initOptions, out i
 		ikniteCluster:           ikniteCluster,
 		ctx:                     ctx,
 		ctxCancel:               cancel,
+		dryRun: cmdUtil.ValueFromFlagsOrConfig(cmd.Flags(), options.DryRun, cfg.DryRun,
+			initOptions.dryRun).(bool),
 	}, nil
 }
 
@@ -558,7 +614,10 @@ func (d *initData) OutputWriter() io.Writer {
 }
 
 // Client returns a Kubernetes client to be used by kubeadm.
-// This function is implemented as a singleton, thus avoiding to recreate the client when it is used by different phases.
+//
+// This function is implemented as a singleton, thus avoiding to recreate the client when it is used by different
+// phases.
+//
 // Important. This function must be called after the admin.conf kubeconfig file is created.
 func (d *initData) Client() (clientset.Interface, error) {
 	var err error
@@ -576,7 +635,8 @@ func (d *initData) Client() (clientset.Interface, error) {
 				// Call EnsureAdminClusterRoleBinding() to obtain a working client from admin.conf.
 				d.client, err = kubeconfigPhase.EnsureAdminClusterRoleBinding(kubeadmConstants.KubernetesDir, nil)
 				if err != nil {
-					return nil, errors.Wrapf(err, "could not bootstrap the admin user in file %s", kubeadmConstants.AdminKubeConfigFileName)
+					return nil, errors.Wrapf(err, "could not bootstrap the admin user in file %s",
+						kubeadmConstants.AdminKubeConfigFileName)
 				}
 				d.adminKubeConfigBootstrapped = true
 			} else {
@@ -731,7 +791,11 @@ func PhaseName(p workflow.Phase, parentPhases *[]workflow.Phase) string {
 	return fmt.Sprintf("%s/%s", PhaseName(parentPhaseName, &grandParentPhases), p.Name)
 }
 
-func WrapPhase(p workflow.Phase, state ikniteApi.ClusterState, parentPhases *[]workflow.Phase) workflow.Phase {
+func WrapPhase(
+	p workflow.Phase,
+	state ikniteApi.ClusterState,
+	parentPhases *[]workflow.Phase,
+) workflow.Phase {
 	var newRun func(c workflow.RunData) error
 	var newChildPhases []workflow.Phase
 	if parentPhases == nil {

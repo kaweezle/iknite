@@ -197,7 +197,10 @@ func NewPhase(name, description string, subChecks []*Check) *Check {
 }
 
 // FillResultNameMap fills a map with check results by name.
-func FillResultNameMap(results []*CheckResult, resultNameMap map[string]*CheckResult) map[string]*CheckResult {
+func FillResultNameMap(
+	results []*CheckResult,
+	resultNameMap map[string]*CheckResult,
+) map[string]*CheckResult {
 	if resultNameMap == nil {
 		resultNameMap = make(map[string]*CheckResult)
 	}

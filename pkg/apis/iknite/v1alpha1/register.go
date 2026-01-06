@@ -13,7 +13,10 @@ import (
 // cSpell: enable
 
 // SchemeGroupVersion is group version used to register these objects.
-var SchemeGroupVersion = schema.GroupVersion{Group: ikniteapi.GroupName, Version: ikniteapi.V1alpha1Version}
+var SchemeGroupVersion = schema.GroupVersion{
+	Group:   ikniteapi.GroupName,
+	Version: ikniteapi.V1alpha1Version,
+}
 
 var (
 	// SchemeBuilder points to a list of functions added to Scheme.

@@ -57,7 +57,8 @@ import (
 func AddResetFlags(flagSet *flag.FlagSet, resetOptions *resetOptions)
 
 //go:linkname resetDetectCRISocket k8s.io/kubernetes/cmd/kubeadm/app/cmd.resetDetectCRISocket
-func resetDetectCRISocket(resetCfg *kubeadmapi.ResetConfiguration, initCfg *kubeadmapi.InitConfiguration) (string, error)
+func resetDetectCRISocket(
+	resetCfg *kubeadmapi.ResetConfiguration, initCfg *kubeadmapi.InitConfiguration) (string, error)
 
 // resetOptions defines all the options exposed via flags by kubeadm reset.
 //
@@ -111,7 +112,9 @@ func newResetOptions() *resetOptions {
 }
 
 // newResetData returns a new resetData struct to be used for the execution of the kubeadm reset workflow.
-func newResetData(cmd *cobra.Command, opts *resetOptions, in io.Reader, out io.Writer, allowExperimental bool) (*resetData, error) {
+func newResetData(
+	cmd *cobra.Command, opts *resetOptions, in io.Reader, out io.Writer, allowExperimental bool,
+) (*resetData, error) {
 	// Validate the mixed arguments with --config and return early on errors
 	if err := validation.ValidateMixedArguments(cmd.Flags()); err != nil {
 		return nil, fmt.Errorf("failed to validate mixed arguments: %w", err)
@@ -136,16 +139,19 @@ func newResetData(cmd *cobra.Command, opts *resetOptions, in io.Reader, out io.W
 		client  clientset.Interface
 	)
 
-	// Either use the config file if specified, or convert public kubeadm API to the internal ResetConfiguration and validates cfg.
-	resetCfg, err := configUtil.LoadOrDefaultResetConfiguration(opts.cfgPath, opts.externalCfg, configUtil.LoadOrDefaultConfigurationOptions{
-		AllowExperimental: allowExperimental,
-		SkipCRIDetect:     opts.skipCRIDetect,
-	})
+	// Either use the config file if specified, or convert public kubeadm API to the internal ResetConfiguration and
+	// validates cfg.
+	resetCfg, err := configUtil.LoadOrDefaultResetConfiguration(opts.cfgPath, opts.externalCfg,
+		configUtil.LoadOrDefaultConfigurationOptions{
+			AllowExperimental: allowExperimental,
+			SkipCRIDetect:     opts.skipCRIDetect,
+		})
 	if err != nil {
 		return nil, fmt.Errorf("failed to load or default reset configuration: %w", err)
 	}
 
-	dryRunFlag := cmdUtil.ValueFromFlagsOrConfig(cmd.Flags(), options.DryRun, resetCfg.DryRun, opts.externalCfg.DryRun).(bool)
+	dryRunFlag := cmdUtil.ValueFromFlagsOrConfig(cmd.Flags(), options.DryRun, resetCfg.DryRun,
+		opts.externalCfg.DryRun).(bool)
 	if dryRunFlag {
 		dryRun := apiClient.NewDryRun().WithDefaultMarshalFunction().WithWriter(os.Stdout)
 		dryRun.AppendReactor(dryRun.GetKubeadmConfigReactor()).
@@ -162,20 +168,34 @@ func newResetData(cmd *cobra.Command, opts *resetOptions, in io.Reader, out io.W
 
 	if err == nil {
 		klog.V(1).Infof("[reset] Loaded client set from kubeconfig file: %s", opts.kubeconfigPath)
-		initCfg, err = configUtil.FetchInitConfigurationFromCluster(client, nil, "reset", false, false, false)
+		initCfg, err = configUtil.FetchInitConfigurationFromCluster(
+			client,
+			nil,
+			"reset",
+			false,
+			false,
+			false,
+		)
 		if err != nil {
-			klog.Warningf("[reset] Unable to fetch the kubeadm-config ConfigMap from cluster: %v", err)
+			klog.Warningf(
+				"[reset] Unable to fetch the kubeadm-config ConfigMap from cluster: %v",
+				err,
+			)
 		}
 	} else {
 		klog.V(1).Infof("[reset] Could not obtain a client set from the kubeconfig file: %s", opts.kubeconfigPath)
 	}
 
-	ignorePreflightErrorsSet, err := validation.ValidateIgnorePreflightErrors(opts.ignorePreflightErrors, resetCfg.IgnorePreflightErrors)
+	ignorePreflightErrorsSet, err := validation.ValidateIgnorePreflightErrors(
+		opts.ignorePreflightErrors,
+		resetCfg.IgnorePreflightErrors,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to validate ignore preflight errors: %w", err)
 	}
 	if initCfg != nil {
-		// Also set the union of pre-flight errors to InitConfiguration, to provide a consistent view of the runtime configuration:
+		// Also set the union of pre-flight errors to InitConfiguration, to provide a consistent view of the runtime
+		// configuration:
 		initCfg.NodeRegistration.IgnorePreflightErrors = sets.List(ignorePreflightErrorsSet)
 	}
 
@@ -206,10 +226,13 @@ func newResetData(cmd *cobra.Command, opts *resetOptions, in io.Reader, out io.W
 		outputWriter:          out,
 		cfg:                   initCfg,
 		resetCfg:              resetCfg,
-		dryRun:                cmdUtil.ValueFromFlagsOrConfig(cmd.Flags(), options.DryRun, resetCfg.DryRun, opts.externalCfg.DryRun).(bool),
-		forceReset:            cmdUtil.ValueFromFlagsOrConfig(cmd.Flags(), options.Force, resetCfg.Force, opts.externalCfg.Force).(bool),
-		cleanupTmpDir:         cmdUtil.ValueFromFlagsOrConfig(cmd.Flags(), options.CleanupTmpDir, resetCfg.CleanupTmpDir, opts.externalCfg.CleanupTmpDir).(bool),
-		ikniteCluster:         ikniteCluster,
+		dryRun: cmdUtil.ValueFromFlagsOrConfig(cmd.Flags(), options.DryRun, resetCfg.DryRun,
+			opts.externalCfg.DryRun).(bool),
+		forceReset: cmdUtil.ValueFromFlagsOrConfig(cmd.Flags(), options.Force, resetCfg.Force,
+			opts.externalCfg.Force).(bool),
+		cleanupTmpDir: cmdUtil.ValueFromFlagsOrConfig(cmd.Flags(), options.CleanupTmpDir, resetCfg.CleanupTmpDir,
+			opts.externalCfg.CleanupTmpDir).(bool),
+		ikniteCluster: ikniteCluster,
 	}, nil
 }
 
@@ -251,22 +274,24 @@ func newCmdReset(in io.Reader, out io.Writer, resetOptions *resetOptions) *cobra
 
 	// sets the data builder function, that will be used by the runner
 	// both when running the entire workflow or single phases
-	resetRunner.SetDataInitializer(func(cmd *cobra.Command, args []string) (workflow.RunData, error) {
-		if cmd.Flags().Lookup(options.NodeCRISocket) == nil {
-			// skip CRI detection
-			// assume that the command execution does not depend on CRISocket when --cri-socket flag is not set
-			resetOptions.skipCRIDetect = true
-		}
-		data, err := newResetData(cmd, resetOptions, in, out, true)
-		if err != nil {
-			return nil, err
-		}
-		// If the flag for skipping phases was empty, use the values from config
-		if len(resetRunner.Options.SkipPhases) == 0 {
-			resetRunner.Options.SkipPhases = data.resetCfg.SkipPhases
-		}
-		return data, nil
-	})
+	resetRunner.SetDataInitializer(
+		func(cmd *cobra.Command, args []string) (workflow.RunData, error) {
+			if cmd.Flags().Lookup(options.NodeCRISocket) == nil {
+				// skip CRI detection
+				// assume that the command execution does not depend on CRISocket when --cri-socket flag is not set
+				resetOptions.skipCRIDetect = true
+			}
+			data, err := newResetData(cmd, resetOptions, in, out, true)
+			if err != nil {
+				return nil, err
+			}
+			// If the flag for skipping phases was empty, use the values from config
+			if len(resetRunner.Options.SkipPhases) == 0 {
+				resetRunner.Options.SkipPhases = data.resetCfg.SkipPhases
+			}
+			return data, nil
+		},
+	)
 
 	// binds the Runner to kubeadm reset command by altering
 	// command help, adding --skip-phases flag and by adding phases subcommands

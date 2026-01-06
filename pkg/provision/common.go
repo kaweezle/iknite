@@ -15,7 +15,7 @@ limitations under the License.
 */
 package provision
 
-// cSpell: words kustomizer filesys crds tmpl
+// cSpell: words kustomizer filesys crds tmpl Bplo
 // cSpell: disable
 import (
 	"bytes"
@@ -40,7 +40,9 @@ import (
 
 // cSpell: enable
 
-func createTempKustomizeDirectory(content *embed.FS, fs filesys.FileSystem, tempdir string, dirname string, data any) error {
+func createTempKustomizeDirectory(
+	content *embed.FS, fs filesys.FileSystem, tempdir string, dirname string, data any,
+) error {
 	log.WithFields(log.Fields{
 		"tempdir": tempdir,
 		"dirname": dirname,
@@ -127,7 +129,8 @@ func ApplyKustomizations(fs filesys.FileSystem, dirname string) (ids []resid.Res
 	// The set of resources may contain CRDs and CRs. If there are cluster wide
 	// resources (CRDs are cluster wide), we apply them first and then the rest.
 	// TODO: Don't apply CRDs twice
-	crds = resmap.NewFactory(provider.NewDefaultDepProvider().GetResourceFactory()).FromResourceSlice(resources.ClusterScoped())
+	crds = resmap.NewFactory(provider.NewDefaultDepProvider().GetResourceFactory()).
+		FromResourceSlice(resources.ClusterScoped())
 
 	if crds.Size() != 0 {
 		crdIds := crds.AllIds()
@@ -153,7 +156,11 @@ func ApplyLocalKustomizations(dirname string) ([]resid.ResId, error) {
 	return ApplyKustomizations(filesys.MakeFsOnDisk(), dirname)
 }
 
-func ApplyEmbeddedKustomizations(content *embed.FS, dirname string, data any) ([]resid.ResId, error) {
+func ApplyEmbeddedKustomizations(
+	content *embed.FS,
+	dirname string,
+	data any,
+) ([]resid.ResId, error) {
 	fs := filesys.MakeFsInMemory()
 	if err := fs.MkdirAll(dirname); err != nil {
 		return nil, fmt.Errorf("failed to create directory in memory: %w", err)
@@ -166,7 +173,9 @@ func ApplyEmbeddedKustomizations(content *embed.FS, dirname string, data any) ([
 }
 
 func EnablePlugins(opts *krusty.Options) *krusty.Options {
-	opts.PluginConfig = types.EnabledPluginConfig(types.BploUseStaticallyLinked) // cSpell: disable-line
+	opts.PluginConfig = types.EnabledPluginConfig(
+		types.BploUseStaticallyLinked,
+	) // cSpell: disable-line
 	opts.PluginConfig.FnpLoadingOptions.EnableExec = true
 	opts.PluginConfig.FnpLoadingOptions.AsCurrentUser = true
 	opts.PluginConfig.HelmConfig.Command = "helm"

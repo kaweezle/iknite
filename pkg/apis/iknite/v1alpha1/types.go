@@ -21,28 +21,28 @@ import (
 type IkniteCluster struct {
 	metaV1.TypeMeta `json:",inline"`
 
-	Spec IkniteClusterSpec `json:"spec" protobuf:"bytes,2,opt,name=spec"`
+	Spec IkniteClusterSpec `json:"spec"             protobuf:"bytes,2,opt,name=spec"`
 	// +optional
 	Status IkniteClusterStatus `json:"status,omitempty" protobuf:"bytes,3,opt,name=status"`
 }
 
 type IkniteClusterSpec struct {
 	// +optional
-	KubernetesVersion string `json:"kubernetesVersion,omitempty" protobuf:"bytes,2,opt,name=kubernetesVersion" mapstructure:"kubernetes_version"`
+	KubernetesVersion string `json:"kubernetesVersion,omitempty" protobuf:"bytes,2,opt,name=kubernetesVersion" mapstructure:"kubernetes_version"` //nolint:lll
 	// +optional
-	DomainName string `json:"domainName,omitempty" protobuf:"bytes,3,opt,name=domainName" mapstructure:"domain_name"`
+	DomainName string `json:"domainName,omitempty"        protobuf:"bytes,3,opt,name=domainName"        mapstructure:"domain_name"` //nolint:lll
 	// +optional
-	NetworkInterface string `json:"networkInterface,omitempty" protobuf:"bytes,5,opt,name=networkInterface" mapstructure:"network_interface"`
+	NetworkInterface string `json:"networkInterface,omitempty"  protobuf:"bytes,5,opt,name=networkInterface"  mapstructure:"network_interface"` //nolint:lll
 	// +optional
-	ClusterName string `json:"clusterName,omitempty" protobuf:"bytes,7,opt,name=clusterName" mapstructure:"cluster_name"`
+	ClusterName string `json:"clusterName,omitempty"       protobuf:"bytes,7,opt,name=clusterName"       mapstructure:"cluster_name"` //nolint:lll
 	// +optional
-	Kustomization string `json:"kustomization,omitempty" protobuf:"bytes,8,opt,name=kustomization"`
+	Kustomization string `json:"kustomization,omitempty"     protobuf:"bytes,8,opt,name=kustomization"`
 	// +optional
-	Ip net.IP `json:"ip,omitempty" protobuf:"bytes,1,opt,name=ip" mapstructure:"ip"`
+	Ip net.IP `json:"ip,omitempty"                protobuf:"bytes,1,opt,name=ip"                mapstructure:"ip"`
 	// +optional
-	CreateIp bool `json:"createIp,omitempty" protobuf:"bytes,4,opt,name=createIp" mapstructure:"create_ip"`
+	CreateIp bool `json:"createIp,omitempty"          protobuf:"bytes,4,opt,name=createIp"          mapstructure:"create_ip"` //nolint:lll
 	// +optional
-	EnableMDNS bool `json:"enableMDNS,omitempty" protobuf:"bytes,6,opt,name=enableMDNS" mapstructure:"enable_mdns"`
+	EnableMDNS bool `json:"enableMDNS,omitempty"        protobuf:"bytes,6,opt,name=enableMDNS"        mapstructure:"enable_mdns"` //nolint:lll
 }
 
 func (c *IkniteClusterSpec) GetApiEndPoint() string {
@@ -54,16 +54,16 @@ func (c *IkniteClusterSpec) GetApiEndPoint() string {
 
 type IkniteClusterStatus struct {
 	LastUpdateTimeStamp metaV1.Time            `json:"lastUpdateTimeStamp" protobuf:"bytes,1,opt,name=lastUpdateTimeStamp"`
-	CurrentPhase        string                 `json:"currentPhase" protobuf:"bytes,2,opt,name=currentPhase"`
-	WorkloadsState      ClusterWorkloadsState  `json:"workloadsState" protobuf:"bytes,3,opt,name=workloadsState"`
-	State               ikniteApi.ClusterState `json:"state" protobuf:"bytes,1,opt,name=state"`
+	CurrentPhase        string                 `json:"currentPhase"        protobuf:"bytes,2,opt,name=currentPhase"`
+	WorkloadsState      ClusterWorkloadsState  `json:"workloadsState"      protobuf:"bytes,3,opt,name=workloadsState"`
+	State               ikniteApi.ClusterState `json:"state"               protobuf:"bytes,1,opt,name=state"`
 }
 
 type ClusterWorkloadsState struct {
-	Ready        []*WorkloadState `json:"ready" protobuf:"bytes,4,opt,name=ready"`
-	Unready      []*WorkloadState `json:"unready" protobuf:"bytes,5,opt,name=unready"`
-	Count        int              `json:"count" protobuf:"bytes,1,opt,name=count"`
-	ReadyCount   int              `json:"readyCount" protobuf:"bytes,2,opt,name=readyCount"`
+	Ready        []*WorkloadState `json:"ready"        protobuf:"bytes,4,opt,name=ready"`
+	Unready      []*WorkloadState `json:"unready"      protobuf:"bytes,5,opt,name=unready"`
+	Count        int              `json:"count"        protobuf:"bytes,1,opt,name=count"`
+	ReadyCount   int              `json:"readyCount"   protobuf:"bytes,2,opt,name=readyCount"`
 	UnreadyCount int              `json:"unreadyCount" protobuf:"bytes,3,opt,name=unreadyCount"`
 }
 
@@ -89,7 +89,9 @@ func OkString(b bool) string {
 	return "🟥"
 }
 
-func (ikniteCluster *IkniteCluster) Update(state ikniteApi.ClusterState, phase string, ready, unready []*WorkloadState) {
+func (ikniteCluster *IkniteCluster) Update(
+	state ikniteApi.ClusterState, phase string, ready, unready []*WorkloadState,
+) {
 	ikniteCluster.Status.State = state
 	ikniteCluster.Status.CurrentPhase = phase
 	ikniteCluster.Status.LastUpdateTimeStamp = metaV1.Now()

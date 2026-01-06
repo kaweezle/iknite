@@ -16,6 +16,7 @@ limitations under the License.
 
 package init
 
+// cSpell: disable
 import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -29,6 +30,8 @@ import (
 	"github.com/kaweezle/iknite/pkg/k8s"
 )
 
+// cSpell: enable
+
 var kubeletStartPhaseExample = cmdUtil.Examples(`
 		# Writes a dynamic environment file with kubelet flags from a InitConfiguration file.
 		kubeadm init phase kubelet-start --config config.yaml
@@ -39,7 +42,7 @@ func NewKubeletStartPhase() workflow.Phase {
 	return workflow.Phase{
 		Name:    "kubelet-start",
 		Short:   "Write kubelet settings and (re)start the kubelet",
-		Long:    "Write a file with KubeletConfiguration and an environment file with node specific kubelet settings, and then (re)start kubelet.",
+		Long:    "Write a file with KubeletConfiguration and an environment file with node specific kubelet settings, and then (re)start kubelet.", //nolint:lll
 		Example: kubeletStartPhaseExample,
 		Run:     runKubeletStart,
 		InheritFlags: []string{
@@ -62,10 +65,12 @@ func runKubeletStart(c workflow.RunData) error {
 
 	// TODO: Do we need to try to stop the kubelet ?
 
-	// Write env file with flags for the kubelet to use. We do not need to write the --register-with-taints for the control-plane,
-	// as we handle that ourselves in the mark-control-plane phase
-	// TODO: Maybe we want to do that some time in the future, in order to remove some logic from the mark-control-plane phase?
-	if err := kubeletPhase.WriteKubeletDynamicEnvFile(&data.Cfg().ClusterConfiguration, &data.Cfg().NodeRegistration, false, data.KubeletDir()); err != nil {
+	// Write env file with flags for the kubelet to use. We do not need to write the --register-with-taints for the
+	// control-plane, as we handle that ourselves in the mark-control-plane phase.
+	// TODO: Maybe we want to do that some time in the future, in order to remove some logic from the
+	// mark-control-plane phase?
+	if err := kubeletPhase.WriteKubeletDynamicEnvFile(
+		&data.Cfg().ClusterConfiguration, &data.Cfg().NodeRegistration, false, data.KubeletDir()); err != nil {
 		return errors.Wrap(err, "error writing a dynamic environment file for the kubelet")
 	}
 
@@ -78,11 +83,13 @@ func runKubeletStart(c workflow.RunData) error {
 			return errors.Wrap(err, "error writing instance kubelet configuration to disk")
 		}
 	} else {
-		logrus.WithField("phase", "kubelet-start").Info("Skipping writing instance kubelet configuration file as the NodeLocalCRISocket feature gate is disabled")
+		logrus.WithField("phase", "kubelet-start").
+			Info("Skipping writing instance kubelet configuration file as the NodeLocalCRISocket feature gate is disabled")
 	}
 
 	// Write the kubelet configuration file to disk.
-	if err := kubeletPhase.WriteConfigToDisk(&data.Cfg().ClusterConfiguration, data.KubeletDir(), data.PatchesDir(), data.OutputWriter()); err != nil {
+	if err := kubeletPhase.WriteConfigToDisk(
+		&data.Cfg().ClusterConfiguration, data.KubeletDir(), data.PatchesDir(), data.OutputWriter()); err != nil {
 		return errors.Wrap(err, "error writing kubelet configuration to disk")
 	}
 	// Try to start the kubelet service in case it's inactive

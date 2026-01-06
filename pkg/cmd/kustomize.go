@@ -61,18 +61,41 @@ applies the Embedded configuration that installs the following components:
 	}
 
 	initializeKustomization(kustomizeCmd.Flags())
-	kustomizeCmd.Flags().StringVarP(&kustomization, options.Kustomization, "d", constants.DefaultKustomization,
-		"The directory to look for kustomization. Can be an URL")
+	kustomizeCmd.Flags().
+		StringVarP(&kustomization, options.Kustomization, "d", constants.DefaultKustomization,
+			"The directory to look for kustomization. Can be an URL")
 
 	return kustomizeCmd
 }
 
 func initializeKustomization(flagSet *flag.FlagSet) {
-	flagSet.IntVarP(&waitTimeout, options.Wait, "w", waitTimeout, "Wait n seconds for all pods to settle")
-	flagSet.BoolP(options.ForceConfig, "C", false, "Force configuration even if it has already occurred")
-	flagSet.IntVar(&clusterCheckWaitMilliseconds, options.ClusterCheckWait, clusterCheckWaitMilliseconds, "Milliseconds to wait between each cluster check")
-	flagSet.IntVar(&clusterCheckRetries, options.ClusterCheckRetries, clusterCheckRetries, "Number of tries to access the cluster")
-	flagSet.IntVar(&clusterCheckOkResponses, options.ClusterCheckOkResponses, clusterCheckOkResponses, "Number of Ok response to receive before proceeding")
+	flagSet.IntVarP(
+		&waitTimeout,
+		options.Wait,
+		"w",
+		waitTimeout,
+		"Wait n seconds for all pods to settle",
+	)
+	flagSet.BoolP(
+		options.ForceConfig,
+		"C",
+		false,
+		"Force configuration even if it has already occurred",
+	)
+	flagSet.IntVar(
+		&clusterCheckWaitMilliseconds,
+		options.ClusterCheckWait,
+		clusterCheckWaitMilliseconds,
+		"Milliseconds to wait between each cluster check",
+	)
+	flagSet.IntVar(&clusterCheckRetries, options.ClusterCheckRetries, clusterCheckRetries,
+		"Number of tries to access the cluster")
+	flagSet.IntVar(
+		&clusterCheckOkResponses,
+		options.ClusterCheckOkResponses,
+		clusterCheckOkResponses,
+		"Number of Ok response to receive before proceeding",
+	)
 }
 
 func performKustomize(cmd *cobra.Command, args []string) {
@@ -82,7 +105,12 @@ func performKustomize(cmd *cobra.Command, args []string) {
 	// We need to get it from root as we will apply configuration
 	kubeConfig, err := k8s.LoadFromFile(constants.KubernetesRootConfig)
 	cobra.CheckErr(errors.Wrap(err, "While loading local cluster configuration"))
-	cobra.CheckErr(kubeConfig.CheckClusterRunning(clusterCheckRetries, clusterCheckOkResponses, clusterCheckWaitMilliseconds))
+	err = kubeConfig.CheckClusterRunning(
+		clusterCheckRetries,
+		clusterCheckOkResponses,
+		clusterCheckWaitMilliseconds,
+	)
+	cobra.CheckErr(err)
 
 	force := viper.GetBool(config.ForceConfig)
 	kustomization := viper.GetString(config.Kustomization)

@@ -15,7 +15,7 @@ limitations under the License.
 */
 package k8s
 
-// cSpell: words tmpl netfilter
+// cSpell: words tmpl netfilter txeh
 // cSpell: disable
 import (
 	"fmt"
@@ -90,7 +90,11 @@ func PrepareKubernetesEnvironment(ikniteConfig *v1alpha1.IkniteClusterSpec) erro
 	}
 
 	// Make bridge use ip-tables
-	_ = utils.WriteFile("/proc/sys/net/bridge/bridge-nf-call-iptables", []byte("1\n"), os.FileMode(int(0o644)))
+	_ = utils.WriteFile(
+		"/proc/sys/net/bridge/bridge-nf-call-iptables",
+		[]byte("1\n"),
+		os.FileMode(int(0o644)),
+	)
 
 	if err := alpine.EnsureMachineID(); err != nil {
 		return errors.Wrap(err, "While ensuring machine ID")
@@ -104,7 +108,8 @@ func PrepareKubernetesEnvironment(ikniteConfig *v1alpha1.IkniteClusterSpec) erro
 	if !ipExists {
 		if ikniteConfig.CreateIp {
 			if err := alpine.AddIpAddress(ikniteConfig.NetworkInterface, ikniteConfig.Ip); err != nil {
-				return errors.Wrapf(err, "While adding ip address %v to interface %v", ikniteConfig.Ip, ikniteConfig.NetworkInterface)
+				return errors.Wrapf(err, "While adding ip address %v to interface %v",
+					ikniteConfig.Ip, ikniteConfig.NetworkInterface)
 			}
 		} else {
 			return fmt.Errorf("ip address %v is not available locally", ikniteConfig.Ip)
@@ -124,8 +129,19 @@ func PrepareKubernetesEnvironment(ikniteConfig *v1alpha1.IkniteClusterSpec) erro
 				"domainName": ikniteConfig.DomainName,
 			}).Info("Mapping not found, creating...")
 
-			if err := alpine.AddIpMapping(&txeh.HostsConfig{}, ikniteConfig.Ip, ikniteConfig.DomainName, ips); err != nil { // cSpell: disable-line
-				return errors.Wrapf(err, "While adding domain name %s to hosts file with ip %s", ikniteConfig.DomainName, ikniteConfig.Ip)
+			err := alpine.AddIpMapping(
+				&txeh.HostsConfig{},
+				ikniteConfig.Ip,
+				ikniteConfig.DomainName,
+				ips,
+			) // cSpell: disable-line
+			if err != nil {
+				return errors.Wrapf(
+					err,
+					"While adding domain name %s to hosts file with ip %s",
+					ikniteConfig.DomainName,
+					ikniteConfig.Ip,
+				)
 			}
 		}
 	}
@@ -142,7 +158,10 @@ func PrepareKubernetesEnvironment(ikniteConfig *v1alpha1.IkniteClusterSpec) erro
 
 	log.Infof("Ensuring %s existence...", constants.CrictlYaml)
 	if err := utils.ExecuteIfNotExist(constants.CrictlYaml, func() error {
-		return utils.WriteFile(constants.CrictlYaml, []byte("runtime-endpoint: unix://"+constants.ContainerServiceSock+"\n"), os.FileMode(int(0o644)))
+		return utils.WriteFile(
+			constants.CrictlYaml,
+			[]byte("runtime-endpoint: unix://"+constants.ContainerServiceSock+"\n"),
+			os.FileMode(int(0o644)))
 	}); err != nil {
 		return errors.Wrapf(err, "While ensuring %s existence", constants.CrictlYaml)
 	}

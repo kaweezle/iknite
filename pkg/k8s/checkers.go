@@ -53,7 +53,11 @@ func CheckService(serviceName string, checkOpenRC, checkPidFile bool) (bool, str
 	if checkOpenRC {
 		started, err := alpine.IsServiceStarted(serviceName)
 		if err != nil {
-			return false, "", fmt.Errorf("failed to check if service %s is started: %w", serviceName, err)
+			return false, "", fmt.Errorf(
+				"failed to check if service %s is started: %w",
+				serviceName,
+				err,
+			)
 		}
 		if !started {
 			return false, "", fmt.Errorf("service %s is not running", serviceName)
@@ -163,12 +167,19 @@ func FileTreeCheck(name, description, path string, expectedFiles []string) *Chec
 				return false, "", err
 			}
 			if len(missingFiles) > 0 {
-				return false, fmt.Sprintf("Missing files: %s", strings.Join(missingFiles, ", ")), nil
+				return false, fmt.Sprintf(
+					"Missing files: %s",
+					strings.Join(missingFiles, ", "),
+				), nil
 			}
 			if len(extraFiles) > 0 {
 				return false, fmt.Sprintf("Extra files: %s", strings.Join(extraFiles, ", ")), nil
 			}
-			return true, fmt.Sprintf("All expected %d files found in %s", len(expectedFiles), path), nil
+			return true, fmt.Sprintf(
+				"All expected %d files found in %s",
+				len(expectedFiles),
+				path,
+			), nil
 		},
 	}
 }
@@ -176,7 +187,10 @@ func FileTreeCheck(name, description, path string, expectedFiles []string) *Chec
 func CheckKubeletHealth(timeout time.Duration) (bool, string, error) {
 	client, err := kubeConfigUtil.ClientSetFromFile(kubeadmConstants.GetAdminKubeConfigPath())
 	if err != nil {
-		return false, "", fmt.Errorf("failed to create client set for kubelet health check: %w", err)
+		return false, "", fmt.Errorf(
+			"failed to create client set for kubelet health check: %w",
+			err,
+		)
 	}
 
 	waiter := apiclient.NewKubeWaiter(client, timeout, io.Discard)
@@ -190,12 +204,18 @@ func CheckKubeletHealth(timeout time.Duration) (bool, string, error) {
 func CheckApiServerHealth(timeout time.Duration, checkData CheckData) (bool, string, error) {
 	data, ok := checkData.(*checkWorkloadData)
 	if !ok {
-		return false, "", fmt.Errorf("wait-control-plane phase invoked with an invalid data struct %T", checkData)
+		return false, "", fmt.Errorf(
+			"wait-control-plane phase invoked with an invalid data struct %T",
+			checkData,
+		)
 	}
 
 	client, err := kubeConfigUtil.ClientSetFromFile(kubeadmConstants.GetAdminKubeConfigPath())
 	if err != nil {
-		return false, "", fmt.Errorf("failed to create client set for API server health check: %w", err)
+		return false, "", fmt.Errorf(
+			"failed to create client set for API server health check: %w",
+			err,
+		)
 	}
 
 	waiter := apiclient.NewKubeWaiter(client, timeout, io.Discard)
@@ -382,23 +402,26 @@ func CheckWorkloadResultPrinter(result *CheckResult, prefix string, spinView str
 
 func CheckWorkloads(ctx context.Context, data CheckData) (bool, string, error) {
 	workloadData := (data).(CheckWorkloadData)
-	config, err := LoadFromFile(filepath.Join(kubeadmConstants.KubernetesDir, kubeadmConstants.AdminKubeConfigFileName))
+	config, err := LoadFromFile(
+		filepath.Join(kubeadmConstants.KubernetesDir, kubeadmConstants.AdminKubeConfigFileName),
+	)
 	if err != nil {
 		return false, "", errors.Wrap(err, "While loading local cluster configuration")
 	}
 	workloadData.Start()
 
-	err = config.WaitForWorkloads(ctx, 0, func(state bool, total int, ready, unready []*v1alpha1.WorkloadState, iteration int) bool {
-		workloadData.SetOk(state)
-		workloadData.SetWorkloadCount(total)
-		workloadData.SetReadyWorkloads(ready)
-		workloadData.SetNotReadyWorkloads(unready)
-		workloadData.SetIteration(iteration)
-		if iteration > 5 {
-			return state
-		}
-		return false
-	})
+	err = config.WaitForWorkloads(ctx, 0,
+		func(state bool, total int, ready, unready []*v1alpha1.WorkloadState, iteration int) bool {
+			workloadData.SetOk(state)
+			workloadData.SetWorkloadCount(total)
+			workloadData.SetReadyWorkloads(ready)
+			workloadData.SetNotReadyWorkloads(unready)
+			workloadData.SetIteration(iteration)
+			if iteration > 5 {
+				return state
+			}
+			return false
+		})
 	if err != nil {
 		return false, "", errors.Wrap(err, "While waiting for workloads")
 	}

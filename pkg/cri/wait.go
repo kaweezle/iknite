@@ -55,10 +55,15 @@ func WaitForContainerService() (bool, error) {
 	for retries > 0 {
 		exist, err := afs.Exists(constants.ContainerServiceSock)
 		if err != nil {
-			return false, errors.Wrapf(err, "Error while checking container service sock %s", constants.ContainerServiceSock)
+			return false, errors.Wrapf(
+				err,
+				"Error while checking container service sock %s",
+				constants.ContainerServiceSock,
+			)
 		}
 		if exist {
-			out, err := utils.Exec.Run(false, "/usr/bin/crictl", "--runtime-endpoint", "unix://"+constants.ContainerServiceSock, "info")
+			out, err := utils.Exec.Run(false, "/usr/bin/crictl", "--runtime-endpoint",
+				"unix://"+constants.ContainerServiceSock, "info")
 			if err == nil {
 				log.Trace(string(out))
 				response := &CRIStatusResponse{}

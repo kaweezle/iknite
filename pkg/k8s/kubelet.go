@@ -37,7 +37,11 @@ const (
 
 // cSpell: disable
 var (
-	pathsToUnmount          = []string{"/var/lib/kubelet/pods", "/var/lib/kubelet/plugins", "/var/lib/kubelet"}
+	pathsToUnmount = []string{
+		"/var/lib/kubelet/pods",
+		"/var/lib/kubelet/plugins",
+		"/var/lib/kubelet",
+	}
 	pathsToUnmountAndRemove = []string{"/run/containerd", "/run/netns", "/run/ipcns", "/run/utsns"}
 )
 
@@ -91,7 +95,8 @@ func IsKubeletRunning() (*os.Process, error) {
 		var pid int
 		pid, err = strconv.Atoi(pidStr)
 		if err != nil {
-			log.WithField("pidfile", kubeletPidFile).Warnf("Failed to convert kubelet PID to integer: %s", pidStr)
+			log.WithField("pidfile", kubeletPidFile).
+				Warnf("Failed to convert kubelet PID to integer: %s", pidStr)
 		} else {
 			var process *os.Process
 			process, err = os.FindProcess(pid)
@@ -148,14 +153,19 @@ func StartKubelet() (*exec.Cmd, error) {
 	// ignore the error if for some reason the pid file is not found
 	kubeletPid, _ := CheckPidFile("kubelet", cmd)
 	if kubeletPid > 0 {
-		log.WithField("pid", kubeletPid).Warnf("Kubelet is already running with pid: %d. Swallowing...", kubeletPid)
+		log.WithField("pid", kubeletPid).
+			Warnf("Kubelet is already running with pid: %d. Swallowing...", kubeletPid)
 		return cmd, nil
 	}
 
 	// Create the kubelet log directory if it doesn't exist
 	err = os.MkdirAll(kubeletLogDir, os.ModePerm)
 	if err != nil {
-		return nil, errors.WithMessagef(err, "Failed to create kubelet log directory %s", kubeletLogDir)
+		return nil, errors.WithMessagef(
+			err,
+			"Failed to create kubelet log directory %s",
+			kubeletLogDir,
+		)
 	}
 
 	// Open the kubelet log file for writing
@@ -217,7 +227,16 @@ func StartAndConfigureKubelet(kubeConfig *v1alpha1.IkniteClusterSpec) error {
 		cmdDone <- cmd.Wait()
 	}()
 
-	kubeletHealthz, apiServerHealthz, configErr := make(chan error, 1), make(chan error, 1), make(chan error, 1)
+	kubeletHealthz, apiServerHealthz, configErr := make(
+		chan error,
+		1,
+	), make(
+		chan error,
+		1,
+	), make(
+		chan error,
+		1,
+	)
 	go func() {
 		kubeletHealthz <- CheckKubeletRunning(10, 3, 1000)
 	}()

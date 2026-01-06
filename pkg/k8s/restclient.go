@@ -70,7 +70,11 @@ func (r *RESTClientGetter) ToRawKubeConfigLoader() clientcmd.ClientConfig {
 	return r.clientconfig
 }
 
-var ApplicationSchemaGroupVersionKind = schema.GroupVersionKind{Group: "argoproj.io", Version: "v1alpha1", Kind: "Application"}
+var ApplicationSchemaGroupVersionKind = schema.GroupVersionKind{
+	Group:   "argoproj.io",
+	Version: "v1alpha1",
+	Kind:    "Application",
+}
 
 type SyncStatus struct {
 	Status string `json:"status" protobuf:"bytes,1,opt,name=status,casttype=SyncStatusCode"`
@@ -78,20 +82,20 @@ type SyncStatus struct {
 
 type HealthStatus struct {
 	// Status holds the status code of the application or resource
-	Status string `json:"status,omitempty" protobuf:"bytes,1,opt,name=status"`
+	Status string `json:"status,omitempty"  protobuf:"bytes,1,opt,name=status"`
 	// Message is a human-readable informational message describing the health status
 	Message string `json:"message,omitempty" protobuf:"bytes,2,opt,name=message"`
 }
 
 type ApplicationStatus struct {
-	Sync   SyncStatus   `json:"sync,omitempty" protobuf:"bytes,2,opt,name=sync"`
+	Sync   SyncStatus   `json:"sync,omitempty"   protobuf:"bytes,2,opt,name=sync"`
 	Health HealthStatus `json:"health,omitempty" protobuf:"bytes,3,opt,name=health"`
 }
 
 type Application struct {
 	Status            ApplicationStatus `json:"status,omitempty" protobuf:"bytes,3,opt,name=status"`
-	metav1.TypeMeta   `json:",inline"`
-	metav1.ObjectMeta `json:"metadata" protobuf:"bytes,1,opt,name=metadata"`
+	metav1.TypeMeta   `                  json:",inline"`
+	metav1.ObjectMeta `                  json:"metadata"         protobuf:"bytes,1,opt,name=metadata"`
 }
 
 type ApplicationStatusViewer struct{}
@@ -107,10 +111,16 @@ func StatusViewerFor(kind schema.GroupKind) (polymorphichelpers.StatusViewer, er
 	return sv, nil
 }
 
-func (s *ApplicationStatusViewer) Status(obj runtime.Unstructured, revision int64) (string, bool, error) {
+func (s *ApplicationStatusViewer) Status(
+	obj runtime.Unstructured,
+	revision int64,
+) (string, bool, error) {
 	application := &Application{}
 
-	err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.UnstructuredContent(), application)
+	err := runtime.DefaultUnstructuredConverter.FromUnstructured(
+		obj.UnstructuredContent(),
+		application,
+	)
 	if err != nil {
 		return "", false, fmt.Errorf("failed to convert %T to %T: %w", obj, application, err)
 	}
@@ -118,7 +128,8 @@ func (s *ApplicationStatusViewer) Status(obj runtime.Unstructured, revision int6
 	healthStatusString := application.Status.Health.Status
 	syncStatusString := application.Status.Sync.Status
 
-	msg := fmt.Sprintf("application \"%s\" sync status: %s, health status: %s", application.Name, syncStatusString, healthStatusString)
+	msg := fmt.Sprintf("application \"%s\" sync status: %s, health status: %s",
+		application.Name, syncStatusString, healthStatusString)
 	return msg, healthStatusString == "Healthy" && syncStatusString == "Synced", nil
 }
 
@@ -128,7 +139,10 @@ func (client *RESTClientGetter) HasApplications() (has bool, err error) {
 		return has, err
 	}
 
-	_, err = mapper.RESTMapping(ApplicationSchemaGroupVersionKind.GroupKind(), ApplicationSchemaGroupVersionKind.Version)
+	_, err = mapper.RESTMapping(
+		ApplicationSchemaGroupVersionKind.GroupKind(),
+		ApplicationSchemaGroupVersionKind.Version,
+	)
 	if err != nil {
 		if meta.IsNoMatchError(err) {
 			err = nil
@@ -174,7 +188,7 @@ func (client *RESTClientGetter) AllWorkloadStates() (result []*v1alpha1.Workload
 		}
 
 		var v polymorphichelpers.StatusViewer
-		if v, err = /* polymorphichelpers. */ StatusViewerFor(info.Object.GetObjectKind().GroupVersionKind().GroupKind()); err != nil {
+		if v, err = StatusViewerFor(info.Object.GetObjectKind().GroupVersionKind().GroupKind()); err != nil {
 			return result, fmt.Errorf("failed to get status viewer: %w", err)
 		}
 
@@ -183,7 +197,12 @@ func (client *RESTClientGetter) AllWorkloadStates() (result []*v1alpha1.Workload
 		if msg, ok, err = v.Status(&unstructured.Unstructured{Object: u}, 0); err != nil {
 			return result, fmt.Errorf("failed to get workload status: %w", err)
 		}
-		_result = append(_result, &v1alpha1.WorkloadState{Namespace: info.Namespace, Name: info.ObjectName(), Ok: ok, Message: strings.TrimSuffix(msg, "\n")})
+		_result = append(_result, &v1alpha1.WorkloadState{
+			Namespace: info.Namespace,
+			Name:      info.ObjectName(),
+			Ok:        ok,
+			Message:   strings.TrimSuffix(msg, "\n"),
+		})
 	}
 	sort.SliceStable(_result, func(i, j int) bool {
 		return _result[i].String() < _result[j].String()
@@ -192,9 +211,13 @@ func (client *RESTClientGetter) AllWorkloadStates() (result []*v1alpha1.Workload
 	return result, nil
 }
 
-type WorkloadStateCallbackFunc func(state bool, total int, ready []*v1alpha1.WorkloadState, unready []*v1alpha1.WorkloadState, iteration int) bool
+type WorkloadStateCallbackFunc func(state bool, total int, ready []*v1alpha1.WorkloadState,
+	unready []*v1alpha1.WorkloadState, iteration int) bool
 
-func AreWorkloadsReady(config *Config, callback WorkloadStateCallbackFunc) wait.ConditionWithContextFunc {
+func AreWorkloadsReady(
+	config *Config,
+	callback WorkloadStateCallbackFunc,
+) wait.ConditionWithContextFunc {
 	client := config.RESTClient()
 	iteration := 0
 	return func(ctx context.Context) (bool, error) {
@@ -227,14 +250,18 @@ func AreWorkloadsReady(config *Config, callback WorkloadStateCallbackFunc) wait.
 	}
 }
 
-func (config *Config) WaitForWorkloads(ctx context.Context, timeout time.Duration, callback WorkloadStateCallbackFunc) error {
+func (config *Config) WaitForWorkloads(
+	ctx context.Context, timeout time.Duration, callback WorkloadStateCallbackFunc,
+) error {
 	if timeout > 0 {
-		if err := wait.PollUntilContextTimeout(ctx, time.Second*time.Duration(2), timeout, true, AreWorkloadsReady(config, callback)); err != nil {
+		if err := wait.PollUntilContextTimeout(ctx, time.Second*time.Duration(2), timeout, true,
+			AreWorkloadsReady(config, callback)); err != nil {
 			return fmt.Errorf("failed to wait for workloads (timeout): %w", err)
 		}
 		return nil
 	} else {
-		if err := wait.PollUntilContextCancel(ctx, time.Second*time.Duration(2), true, AreWorkloadsReady(config, callback)); err != nil {
+		if err := wait.PollUntilContextCancel(ctx, time.Second*time.Duration(2), true,
+			AreWorkloadsReady(config, callback)); err != nil {
 			return fmt.Errorf("failed to wait for workloads: %w", err)
 		}
 		return nil

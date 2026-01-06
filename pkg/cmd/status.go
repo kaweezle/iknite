@@ -98,10 +98,21 @@ func performStatus(ikniteConfig *v1alpha1.IkniteClusterSpec) {
 	checks := []*k8s.Check{
 		// Phase 1: Environment
 		k8s.NewPhase("environment", "Environment configuration", []*k8s.Check{
-			k8s.SystemFileCheck("ip_forward", "Check IP forwarding is enabled", "/proc/sys/net/ipv4/ip_forward", "1\n"),
-			k8s.SystemFileCheck("bridge_nf_call_iptables", "Check IP Tables is active for bridges", "/proc/sys/net/bridge/bridge-nf-call-iptables", "1\n"),
+			k8s.SystemFileCheck(
+				"ip_forward",
+				"Check IP forwarding is enabled",
+				"/proc/sys/net/ipv4/ip_forward",
+				"1\n",
+			),
+			k8s.SystemFileCheck("bridge_nf_call_iptables", "Check IP Tables is active for bridges",
+				"/proc/sys/net/bridge/bridge-nf-call-iptables", "1\n"),
 			k8s.SystemFileCheck("machine_id", "Check machine id is defined", "/etc/machine-id", ""),
-			k8s.SystemFileCheck("crictl_yaml", "Check crictl configuration is defined", "/etc/crictl.yaml", ""),
+			k8s.SystemFileCheck(
+				"crictl_yaml",
+				"Check crictl configuration is defined",
+				"/etc/crictl.yaml",
+				"",
+			),
 			//   - Check if the kubelet service is not runnable
 			{
 				Name:        "kubelet_service",
@@ -109,7 +120,10 @@ func performStatus(ikniteConfig *v1alpha1.IkniteClusterSpec) {
 				CheckFn: func(ctx context.Context, data k8s.CheckData) (bool, string, error) {
 					runnable, err := k8s.IsKubeletServiceRunnable(constants.RcConfFile)
 					if err != nil {
-						return false, "", fmt.Errorf("failed to check if kubelet service is runnable: %w", err)
+						return false, "", fmt.Errorf(
+							"failed to check if kubelet service is runnable: %w",
+							err,
+						)
 					}
 					if runnable {
 						return false, "Kubelet service is runnable", nil
@@ -118,7 +132,8 @@ func performStatus(ikniteConfig *v1alpha1.IkniteClusterSpec) {
 				},
 			},
 			//   - Check if the iknite service is set to run in default mode
-			k8s.SystemFileCheck("iknite_service", "Check if iknite is active on default runlevel", "/etc/runlevels/default/iknite", ""),
+			k8s.SystemFileCheck("iknite_service", "Check if iknite is active on default runlevel",
+				"/etc/runlevels/default/iknite", ""),
 			//   - Check if the IP address we are targeting is bound to an interface
 			{
 				Name:        "ip_bound",
@@ -155,10 +170,18 @@ func performStatus(ikniteConfig *v1alpha1.IkniteClusterSpec) {
 								return false
 							}()
 							if mapped {
-								return true, fmt.Sprintf("Domain name %s is mapped to IP %s", ikniteConfig.DomainName, ipString), nil
+								return true, fmt.Sprintf(
+									"Domain name %s is mapped to IP %s",
+									ikniteConfig.DomainName,
+									ipString,
+								), nil
 							}
 						}
-						return false, fmt.Sprintf("Domain name %s is not mapped to IP %s", ikniteConfig.DomainName, ipString), nil
+						return false, fmt.Sprintf(
+							"Domain name %s is not mapped to IP %s",
+							ikniteConfig.DomainName,
+							ipString,
+						), nil
 					} else {
 						return true, "Domain name is not set", nil
 					}
@@ -171,9 +194,18 @@ func performStatus(ikniteConfig *v1alpha1.IkniteClusterSpec) {
 			k8s.FileTreeCheck("pki", "Check PKI files", "/etc/kubernetes/pki", pkiFiles),
 			k8s.NewPhase("manifests", "Kubernetes manifests", []*k8s.Check{
 				k8s.KubernetesFileCheck("manifest_etcd", "/etc/kubernetes/manifests/etcd.yaml"),
-				k8s.KubernetesFileCheck("manifest_apiserver", "/etc/kubernetes/manifests/kube-apiserver.yaml"),
-				k8s.KubernetesFileCheck("manifest_controller", "/etc/kubernetes/manifests/kube-controller-manager.yaml"),
-				k8s.KubernetesFileCheck("manifest_scheduler", "/etc/kubernetes/manifests/kube-scheduler.yaml"),
+				k8s.KubernetesFileCheck(
+					"manifest_apiserver",
+					"/etc/kubernetes/manifests/kube-apiserver.yaml",
+				),
+				k8s.KubernetesFileCheck(
+					"manifest_controller",
+					"/etc/kubernetes/manifests/kube-controller-manager.yaml",
+				),
+				k8s.KubernetesFileCheck(
+					"manifest_scheduler",
+					"/etc/kubernetes/manifests/kube-scheduler.yaml",
+				),
 			}),
 			k8s.KubernetesFileCheck("kubelet_conf", "/etc/kubernetes/kubelet.conf"),
 			k8s.KubernetesFileCheck("admin_conf", "/etc/kubernetes/admin.conf"),
@@ -184,7 +216,10 @@ func performStatus(ikniteConfig *v1alpha1.IkniteClusterSpec) {
 				Name:        "etcd_data",
 				Description: "Check that the etcd data directory (/var/lib/etcd) is present and contains data",
 				CheckFn: func(ctx context.Context, data k8s.CheckData) (bool, string, error) {
-					missingFiles, _, err := k8s.FileTreeDifference("/var/lib/etcd", []string{"member/snap/db"})
+					missingFiles, _, err := k8s.FileTreeDifference(
+						"/var/lib/etcd",
+						[]string{"member/snap/db"},
+					)
 					if err != nil {
 						return false, "", fmt.Errorf("failed to check etcd file tree: %w", err)
 					}
@@ -205,7 +240,10 @@ func performStatus(ikniteConfig *v1alpha1.IkniteClusterSpec) {
 				CheckFn: func(ctx context.Context, data k8s.CheckData) (bool, string, error) {
 					exists, err := utils.Exists(constants.SoftLevelPath)
 					if err != nil {
-						return false, "", fmt.Errorf("failed to check if OpenRC is started: %w", err)
+						return false, "", fmt.Errorf(
+							"failed to check if OpenRC is started: %w",
+							err,
+						)
 					}
 					if !exists {
 						return false, "OpenRC is not started", nil
@@ -298,11 +336,18 @@ func performStatus(ikniteConfig *v1alpha1.IkniteClusterSpec) {
 //  - Phase 4: Workload status
 //    - Check if all workloads are ready
 /*
-		   We want the checks to be run in parallel, so we will use goroutines to run them concurrently. Some checks may depend on the output of other checks, so we will need to wait for the dependent checks to complete before running the dependent checks.
-		   We want the status of each task to be displayed in the terminal while running the checks.
-		   The status needs to be displayed to the left of the check name. While running the checks, we will display a spinner to indicate that the checks are running.
-		   If a check fails, we will display an error message to the right of the check name and the spinner will be replaced with a red cross.
-		   If a check passes, we will display a success message to the right of the check name and the spinner will be replaced with a green tick.
-		   If a check is skipped, we will display a message to the right of the check name and the spinner will be replaced with a yellow exclamation mark.
-	       If a check is waiting for another check to complete, we will display a message to the right of the check name and the spinner will be replaced with a blue ellipsis.
+We want the checks to be run in parallel, so we will use goroutines to run them concurrently. Some checks may depend on
+the output of other checks, so we will need to wait for the dependent checks to complete before running the dependent
+checks.
+We want the status of each task to be displayed in the terminal while running the checks.
+The status needs to be displayed to the left of the check name. While running the checks, we will display a spinner to
+indicate that the checks are running.
+If a check fails, we will display an error message to the right of the check name and the spinner will be replaced with
+a red cross.
+If a check passes, we will display a success message to the right of the check name and the spinner will be replaced
+with a green tick.
+If a check is skipped, we will display a message to the right of the check name and the spinner will be replaced with a
+yellow exclamation mark.
+If a check is waiting for another check to complete, we will display a message to the right of the check name and the
+spinner will be replaced with a blue ellipsis.
 */

@@ -22,6 +22,7 @@ formatters:
     - gci
     - gofmt
     - gofumpt
+    - golines
   settings:
     goimports:
       local-prefixes:

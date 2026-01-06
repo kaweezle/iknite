@@ -64,14 +64,24 @@ func ResetIPAddress(ikniteConfig *v1alpha1.IkniteClusterSpec, isDryRun bool) err
 func ResetIPTables(isDryRun bool) (err error) {
 	log.WithField("isDryRun", isDryRun).Info("Cleaning up iptables rules...")
 	if !isDryRun {
-		_, err = s.Exec("iptables-save").Reject("KUBE-").Reject("CNI-").Reject("FLANNEL").Exec("iptables-restore").String()
+		_, err = s.Exec("iptables-save").
+			Reject("KUBE-").
+			Reject("CNI-").
+			Reject("FLANNEL").
+			Exec("iptables-restore").
+			String()
 		if err != nil {
 			return fmt.Errorf("failed to clean up iptables rules: %w", err)
 		}
 	}
 	log.WithField("isDryRun", isDryRun).Info("Cleaning up ip6tables rules...")
 	if !isDryRun {
-		_, err = s.Exec("ip6tables-save").Reject("KUBE-").Reject("CNI-").Reject("FLANNEL").Exec("ip6tables-restore").String()
+		_, err = s.Exec("ip6tables-save").
+			Reject("KUBE-").
+			Reject("CNI-").
+			Reject("FLANNEL").
+			Exec("ip6tables-restore").
+			String()
 		if err != nil {
 			return fmt.Errorf("failed to clean up ip6tables rules: %w", err)
 		}
@@ -81,11 +91,14 @@ func ResetIPTables(isDryRun bool) (err error) {
 
 func RemoveKubeletFiles(isDryRun bool) (err error) {
 	if isDryRun {
-		log.Info("Would remove cpu_manager_state, memory_manager_state, pod/* files in /var/lib/kubelet...")
+		log.Info(
+			"Would remove cpu_manager_state, memory_manager_state, pod/* files in /var/lib/kubelet...",
+		)
 	} else {
 		log.Info("Removing cpu_manager_state, memory_manager_state, pod/* files in /var/lib/kubelet...")
 		var out string
-		out, err = s.Exec("sh -c 'rm -rf /var/lib/kubelet/{cpu_manager_state,memory_manager_state} /var/lib/kubelet/pods/*'").String()
+		out, err = s.Exec(
+			"sh -c 'rm -rf /var/lib/kubelet/{cpu_manager_state,memory_manager_state} /var/lib/kubelet/pods/*'").String()
 		if err != nil {
 			err = errors.Wrapf(err, "failed to remove kubelet files: %s", out)
 		}
@@ -95,7 +108,9 @@ func RemoveKubeletFiles(isDryRun bool) (err error) {
 
 func StopAllContainers(isDryRun bool) (err error) {
 	if isDryRun {
-		log.Info("Would stop all containers with command /bin/sh -c 'crictl rmp -f $(crictl pods -q)'...")
+		log.Info(
+			"Would stop all containers with command /bin/sh -c 'crictl rmp -f $(crictl pods -q)'...",
+		)
 	} else {
 		log.Info("Stopping all containers with command /bin/sh -c 'crictl rmp -f $(crictl pods -q)'...")
 		_, err = s.Exec("/bin/sh -c 'crictl rmp -f $(crictl pods -q)'").String()
@@ -130,7 +145,10 @@ func UnmountPaths(failOnError bool, isDryRun bool) error {
 	return nil
 }
 
-func CleanAll(ikniteConfig *v1alpha1.IkniteClusterSpec, resetIpAddress, resetIpTables, failOnError, isDryRun bool) error {
+func CleanAll(
+	ikniteConfig *v1alpha1.IkniteClusterSpec,
+	resetIpAddress, resetIpTables, failOnError, isDryRun bool,
+) error {
 	var err error
 	if err = StopAllContainers(isDryRun); err != nil {
 		log.WithError(err).Warn("Error stopping all containers")
@@ -253,12 +271,15 @@ func DeleteNetworkInterfaces(isDryRun bool) error {
 	}
 	logger := log.WithField("isDryRun", isDryRun)
 	logger.Info("Deleting pods network interfaces...")
-	p := s.Exec("ip -j link show").JQ(`sort_by(.ifname)| reverse | .[] | select(has("link_netnsid") or .ifname == "cni0" or .ifname == "flannel.1") | .ifname`).FilterLine(func(s string) string {
-		ifname := s[1 : len(s)-1]
-		command := fmt.Sprintf("%s ip link delete %s", prefix, ifname)
-		logger.WithField("interface", ifname).Debugf("Deleting interface with: %s...", command)
-		return command
-	}).ExecForEach("{{ . }}")
+	//nolint:lll
+	p := s.Exec("ip -j link show").
+		JQ(`sort_by(.ifname)| reverse | .[] | select(has("link_netnsid") or .ifname == "cni0" or .ifname == "flannel.1") | .ifname`).
+		FilterLine(func(s string) string {
+			ifname := s[1 : len(s)-1]
+			command := fmt.Sprintf("%s ip link delete %s", prefix, ifname)
+			logger.WithField("interface", ifname).Debugf("Deleting interface with: %s...", command)
+			return command
+		}).ExecForEach("{{ . }}")
 	p.Wait()
 	err := p.Error()
 	if err != nil {
@@ -274,7 +295,11 @@ func DeleteNetworkInterfaces(isDryRun bool) error {
 // DeleteEtcdData deletes the etcd data directory.
 func DeleteEtcdData(isDryRun bool) error {
 	etcdDataDir := "/var/lib/etcd"
-	etcdManifestPath := filepath.Join(kubeadmConstants.KubernetesDir, kubeadmConstants.ManifestsSubDirName, "etcd.yaml")
+	etcdManifestPath := filepath.Join(
+		kubeadmConstants.KubernetesDir,
+		kubeadmConstants.ManifestsSubDirName,
+		"etcd.yaml",
+	)
 	etcdPod, err := utilStaticPod.ReadStaticPodFromDisk(etcdManifestPath)
 	if err != nil {
 		if !os.IsNotExist(err) {

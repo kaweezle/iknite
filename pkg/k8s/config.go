@@ -15,7 +15,7 @@ limitations under the License.
 */
 package k8s
 
-// cSpell: words clientcmd readyz
+// cSpell: words clientcmd readyz polymorphichelpers objectrestarter
 // cSpell: disable
 import (
 	"context"
@@ -172,7 +172,9 @@ func (config *Config) WriteToFile(filename string) error {
 
 // RestartProxy restarts kube-proxy after config has been updated. This needs to
 // be done after an IP address change.
-// The restart method is taken from kubectl: https://github.com/kubernetes/kubectl/blob/652881798563c00c1895ded6ced819030bfaa4d7/pkg/polymorphichelpers/objectrestarter.go#L81
+// The restart method is taken from kubectl:
+// https://github.com/kubernetes/kubectl/blob/
+// 652881798563c00c1895ded6ced819030bfaa4d7/pkg/polymorphichelpers/objectrestarter.go#L81
 func (config *Config) RestartProxy() (err error) {
 	var client *kubernetes.Clientset
 	if client, err = config.Client(); err != nil {
@@ -189,7 +191,8 @@ func (config *Config) RestartProxy() (err error) {
 	if ds.Spec.Template.Annotations == nil {
 		ds.Spec.Template.Annotations = make(map[string]string)
 	}
-	ds.Spec.Template.Annotations["kubectl.kubernetes.io/restartedAt"] = time.Now().Format(time.RFC3339)
+	ds.Spec.Template.Annotations["kubectl.kubernetes.io/restartedAt"] = time.Now().
+		Format(time.RFC3339)
 
 	_, err = client.AppsV1().DaemonSets("kube-system").Update(ctx, ds, metaV1.UpdateOptions{})
 	if err != nil {
@@ -198,7 +201,12 @@ func (config *Config) RestartProxy() (err error) {
 	return nil
 }
 
-func (config *Config) DoKustomization(ip net.IP, kustomization string, force bool, waitTimeout int) error {
+func (config *Config) DoKustomization(
+	ip net.IP,
+	kustomization string,
+	force bool,
+	waitTimeout int,
+) error {
 	client, err := config.Client()
 	if err != nil {
 		return err
@@ -243,14 +251,20 @@ func (config *Config) DoKustomization(ip net.IP, kustomization string, force boo
 	if waitTimeout > 0 {
 		log.Infof("Waiting for workloads for %d seconds...", waitTimeout)
 		runtime.ErrorHandlers = runtime.ErrorHandlers[:0]
-		return config.WaitForWorkloads(context.Background(), time.Second*time.Duration(waitTimeout), nil)
+		return config.WaitForWorkloads(
+			context.Background(),
+			time.Second*time.Duration(waitTimeout),
+			nil,
+		)
 	}
 
 	return nil
 }
 
 func GetIkniteConfigMap(client kubernetes.Interface) (cm *coreV1.ConfigMap, err error) {
-	cm, err = client.CoreV1().ConfigMaps("kube-system").Get(context.TODO(), "iknite-config", metaV1.GetOptions{})
+	cm, err = client.CoreV1().
+		ConfigMaps("kube-system").
+		Get(context.TODO(), "iknite-config", metaV1.GetOptions{})
 	if k8Errors.IsNotFound(err) {
 		err = nil
 		cm = &coreV1.ConfigMap{
@@ -264,9 +278,14 @@ func GetIkniteConfigMap(client kubernetes.Interface) (cm *coreV1.ConfigMap, err 
 	return cm, err
 }
 
-func WriteIkniteConfigMap(client kubernetes.Interface, cm *coreV1.ConfigMap) (res *coreV1.ConfigMap, err error) {
+func WriteIkniteConfigMap(
+	client kubernetes.Interface,
+	cm *coreV1.ConfigMap,
+) (res *coreV1.ConfigMap, err error) {
 	if cm.UID != "" {
-		res, err = client.CoreV1().ConfigMaps("kube-system").Update(context.TODO(), cm, metaV1.UpdateOptions{})
+		res, err = client.CoreV1().
+			ConfigMaps("kube-system").
+			Update(context.TODO(), cm, metaV1.UpdateOptions{})
 	} else {
 		res, err = client.CoreV1().ConfigMaps("kube-system").Create(context.TODO(), cm, metaV1.CreateOptions{})
 	}

@@ -55,7 +55,9 @@ func NewCleanupConfigPhase() workflow.Phase {
 }
 
 func runCleanupConfig(c workflow.RunData) error {
-	dirsToClean := []string{filepath.Join(kubeadmConstants.KubernetesDir, kubeadmConstants.ManifestsSubDirName)}
+	dirsToClean := []string{
+		filepath.Join(kubeadmConstants.KubernetesDir, kubeadmConstants.ManifestsSubDirName),
+	}
 	r, ok := c.(IkniteResetData)
 	if !ok {
 		return errors.New("cleanup-config phase invoked with an invalid data struct")
@@ -79,7 +81,10 @@ func runCleanupConfig(c workflow.RunData) error {
 
 	// Remove contents from the config and pki directories
 	if certsDir != kubeadmApiV1.DefaultCertificatesDir {
-		klog.Warningf("[reset] WARNING: Cleaning a non-default certificates directory: %q\n", certsDir)
+		klog.Warningf(
+			"[reset] WARNING: Cleaning a non-default certificates directory: %q\n",
+			certsDir,
+		)
 	}
 
 	dirsToClean = append(dirsToClean, certsDir)

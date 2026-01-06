@@ -123,7 +123,13 @@ func performStart(ikniteConfig *v1alpha1.IkniteClusterSpec) {
 
 	ctx := context.Background()
 	if timeout > 0 {
-		err = wait.PollUntilContextTimeout(ctx, time.Second*time.Duration(2), time.Duration(timeout), true, IsIkniteReady)
+		err = wait.PollUntilContextTimeout(
+			ctx,
+			time.Second*time.Duration(2),
+			time.Duration(timeout),
+			true,
+			IsIkniteReady,
+		)
 	} else {
 		err = wait.PollUntilContextCancel(ctx, time.Second*time.Duration(2), true, IsIkniteReady)
 	}

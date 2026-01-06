@@ -70,8 +70,10 @@ kubernetes.`,
 	}
 	flags := rootCmd.PersistentFlags()
 
-	flags.StringVar(&cfgFile, options.Config, "", "config file (default is $HOME/.config/iknite/iknite.yaml or /etc/iknite.d/iknite.yaml)")
-	flags.StringVarP(&v, options.Verbosity, "v", log.InfoLevel.String(), "Log level (debug, info, warn, error, fatal, panic)")
+	flags.StringVar(&cfgFile, options.Config, "",
+		"config file (default is $HOME/.config/iknite/iknite.yaml or /etc/iknite.d/iknite.yaml)")
+	flags.StringVarP(&v, options.Verbosity, "v", log.InfoLevel.String(),
+		"Log level (debug, info, warn, error, fatal, panic)")
 	flags.BoolVar(&jsonLogs, options.Json, false, "Log messages in JSON")
 
 	ikniteConfig := &v1alpha1.IkniteClusterSpec{}

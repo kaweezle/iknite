@@ -32,7 +32,12 @@ func (c *CommandExecutor) Run(combined bool, cmd string, arguments ...string) ([
 	return output, nil
 }
 
-func (c *CommandExecutor) Pipe(stdin io.Reader, combined bool, cmd string, arguments ...string) ([]byte, error) {
+func (c *CommandExecutor) Pipe(
+	stdin io.Reader,
+	combined bool,
+	cmd string,
+	arguments ...string,
+) ([]byte, error) {
 	command := exec.Command(cmd, arguments...)
 	command.Stdin = stdin
 	var output []byte
