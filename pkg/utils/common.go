@@ -16,10 +16,12 @@ limitations under the License.
 package utils
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/pkg/errors"
 	"github.com/spf13/afero"
@@ -91,7 +93,11 @@ func MoveFileIfExists(src, dst string) error {
 
 // GetOutboundIP returns the preferred outbound ip of this machine.
 func GetOutboundIP() (net.IP, error) {
-	conn, err := net.Dial("udp", "8.8.8.8:80")
+	var d net.Dialer
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	conn, err := d.DialContext(ctx, "udp", "8.8.8.8:80")
 	if err != nil {
 		return nil, errors.Wrap(err, "Error while getting IP address")
 	}

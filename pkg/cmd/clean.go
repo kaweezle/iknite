@@ -57,6 +57,7 @@ func (o *cleanOptions) hasActualWorkToDo() bool {
 		o.cleanAll
 }
 
+//nolint:unparam // validate may be extended in the future
 func (o *cleanOptions) validate() error {
 	if o.cleanAll {
 		o.stopContainers = true
@@ -144,6 +145,7 @@ func initializeClean(flags *flag.FlagSet, cleanOptions *cleanOptions) {
 		cleanOptions.cleanClusterConfig, "Reset cluster configuration")
 }
 
+//nolint:gocyclo // TODO: Should use a runner pattern to reduce complexity
 func performClean(ikniteConfig *v1alpha1.IkniteClusterSpec, cleanOptions *cleanOptions) {
 	dryRun := cleanOptions.dryRun
 	logger := log.WithField("isDryRun", dryRun)
@@ -160,7 +162,7 @@ func performClean(ikniteConfig *v1alpha1.IkniteClusterSpec, cleanOptions *cleanO
 	if state == iknite.Running && cleanOptions.hasActualWorkToDo() {
 		logger.WithField("serviceName", constants.IkniteService).Info("Stopping iknite service...")
 		if !dryRun {
-			// TODO: if reset kubelet, remove his note from etcd cluster
+			// TODO: if reset kubelet, remove his node from etcd cluster
 			cobra.CheckErr(alpine.StopService(constants.IkniteService))
 		}
 	}
@@ -220,18 +222,16 @@ func performClean(ikniteConfig *v1alpha1.IkniteClusterSpec, cleanOptions *cleanO
 	}
 
 	kubeletProcess, err := k8s.IsKubeletRunning()
-	if err != nil { //nolint:nestif // Want method to go through
+	if err != nil {
 		logger.WithError(err).Warn("Error checking kubelet process")
-	} else {
-		if kubeletProcess != nil {
-			logger.WithField("pid", kubeletProcess.Pid).Info("Kubelet is still running, stopping it...")
-			if !dryRun {
-				err = kubeletProcess.Signal(syscall.SIGTERM)
-				if err == nil {
-					logger.WithField("pid", kubeletProcess.Pid).Info("Waiting for kubelet to stop...")
-					_, err = kubeletProcess.Wait()
-					cobra.CheckErr(err)
-				}
+	} else if kubeletProcess != nil {
+		logger.WithField("pid", kubeletProcess.Pid).Info("Kubelet is still running, stopping it...")
+		if !dryRun {
+			err = kubeletProcess.Signal(syscall.SIGTERM)
+			if err == nil {
+				logger.WithField("pid", kubeletProcess.Pid).Info("Waiting for kubelet to stop...")
+				_, err = kubeletProcess.Wait()
+				cobra.CheckErr(err)
 			}
 		}
 	}

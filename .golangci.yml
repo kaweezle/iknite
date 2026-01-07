@@ -63,7 +63,8 @@ linters:
     - gocritic
     - gocyclo
     - godot
-    - godox
+    # Reports TODOs in code
+    # - godox
     - goheader
     - gomoddirectives
     - gomodguard
@@ -162,6 +163,9 @@ linters:
       period: true
       capital: true
       check-all: false
+
+    interfacebloat:
+      max: 15
 
   exclusions:
     rules:

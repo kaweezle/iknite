@@ -26,6 +26,7 @@ var (
 	AddToScheme = localSchemeBuilder.AddToScheme
 )
 
+//nolint:gochecknoinits // TODO: recheck how k8s performs registration
 func init() {
 	// We only register manually written functions here. The registration of the
 	// generated functions takes place in the generated files. The separation

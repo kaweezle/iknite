@@ -340,6 +340,8 @@ func newInitOptions() *initOptions {
 //
 // This func takes care of validating initOptions passed to the command, and then it converts options into the internal
 // InitConfiguration type that is used as input all the phases in the kubeadm init workflow.
+//
+//nolint:gocyclo // This comes from kubeadm
 func newInitData(
 	cmd *cobra.Command,
 	_ []string,
@@ -500,7 +502,7 @@ func newInitData(
 		ikniteCluster:           ikniteCluster,
 		ctx:                     ctx,
 		ctxCancel:               cancel,
-		dryRun: cmdUtil.ValueFromFlagsOrConfig( //nolint:errcheck // default value is false
+		dryRun: cmdUtil.ValueFromFlagsOrConfig( //nolint:errcheck,forcetypeassert // default value is false
 			cmd.Flags(),
 			options.DryRun,
 			cfg.DryRun,

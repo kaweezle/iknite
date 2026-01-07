@@ -59,7 +59,7 @@ func runCleanupService(c workflow.RunData) error {
 			"[reset] The iknite service could not be stopped by kubeadm. Unable to detect a supported init system!",
 		)
 		klog.Warningln("[reset] Please ensure iknite is stopped manually")
-		return nil // TODO: return error?
+		return nil //nolint:nilerr // TODO: return error?
 	}
 	if !r.DryRun() {
 		logrus.WithField("phase", "reset").Info("Stopping the iknite service...")

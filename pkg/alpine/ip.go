@@ -3,6 +3,7 @@ package alpine
 // cSpell: words iface ifaces txeh
 // cSpell: disable
 import (
+	"context"
 	"fmt"
 	"net"
 
@@ -106,8 +107,8 @@ func AddIpMapping(
 	return nil
 }
 
-func IsHostMapped(ip net.IP, domainName string) (bool, []net.IP) {
-	ips, err := net.LookupIP(domainName)
+func IsHostMapped(ctx context.Context, ip net.IP, domainName string) (bool, []net.IP) {
+	ips, err := net.DefaultResolver.LookupIP(ctx, "ip4", domainName)
 	contains := false
 	if err != nil {
 		ips = []net.IP{}

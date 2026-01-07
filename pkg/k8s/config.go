@@ -267,7 +267,7 @@ func (config *Config) DoKustomization(
 
 	if waitTimeout > 0 {
 		log.Infof("Waiting for workloads for %d seconds...", waitTimeout)
-		runtime.ErrorHandlers = runtime.ErrorHandlers[:0]
+		runtime.ErrorHandlers = runtime.ErrorHandlers[:0] //nolint:reassign // disabling printing of errors to stderr
 		return config.WaitForWorkloads(
 			context.Background(),
 			time.Second*time.Duration(waitTimeout),

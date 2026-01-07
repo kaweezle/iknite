@@ -1,4 +1,4 @@
-package k8s
+package k8s_test
 
 // cSpell: disable
 import (
@@ -8,6 +8,7 @@ import (
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/kaweezle/iknite/pkg/k8s"
 	tu "github.com/kaweezle/iknite/pkg/testutils"
 	"github.com/kaweezle/iknite/pkg/utils"
 )
@@ -55,12 +56,12 @@ func (s *RuntimeEnvironmentTestSuite) TestPreventKubeletServiceFromStarting() {
 
 	confFilePath := tempFile.Name()
 
-	err = PreventKubeletServiceFromStarting(confFilePath)
+	err = k8s.PreventKubeletServiceFromStarting(confFilePath)
 	require.NoError(err)
 
 	content, err := afs.ReadFile(confFilePath)
 	require.NoError(err)
-	require.Equal(rcConfFileContent+rcConfPreventKubeletRunning+"\n", string(content))
+	require.Equal(rcConfFileContent+k8s.RcConfPreventKubeletRunning+"\n", string(content))
 }
 
 func (s *RuntimeEnvironmentTestSuite) TestPreventKubeletServiceFromStartingWhenLineIsPresent() {
@@ -89,7 +90,7 @@ func (s *RuntimeEnvironmentTestSuite) TestPreventKubeletServiceFromStartingWhenL
 
 	confFilePath := tempFile.Name()
 
-	err = PreventKubeletServiceFromStarting(confFilePath)
+	err = k8s.PreventKubeletServiceFromStarting(confFilePath)
 	require.NoError(err)
 
 	content, err := afs.ReadFile(confFilePath)
@@ -98,5 +99,6 @@ func (s *RuntimeEnvironmentTestSuite) TestPreventKubeletServiceFromStartingWhenL
 }
 
 func TestRuntimeEnvironment(t *testing.T) {
+	t.Parallel()
 	suite.Run(t, new(RuntimeEnvironmentTestSuite))
 }

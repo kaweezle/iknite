@@ -1,4 +1,4 @@
-package alpine
+package alpine_test
 
 // cSpell: words RTNETLINK Nilf txeh
 // cSpell: disable
@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/suite"
 	"github.com/txn2/txeh"
 
+	"github.com/kaweezle/iknite/pkg/alpine"
 	tu "github.com/kaweezle/iknite/pkg/testutils"
 	"github.com/kaweezle/iknite/pkg/utils"
 )
@@ -40,14 +41,14 @@ func (s *IPTestSuite) TestIPExists() {
 	localhost := net.ParseIP("127.0.0.1")
 	require.NotNil(localhost)
 
-	result, err := CheckIpExists(localhost)
+	result, err := alpine.CheckIpExists(localhost)
 	require.NoError(err)
 	require.True(result, "Localhost should exist")
 
 	nonexistent := net.ParseIP("10.0.0.16")
 	require.NotNil(nonexistent)
 
-	result, err = CheckIpExists(nonexistent)
+	result, err = alpine.CheckIpExists(nonexistent)
 	require.NoError(err)
 	require.False(result, "10.0.0.16 shouldn't exist")
 }
@@ -61,7 +62,7 @@ func (s *IPTestSuite) TestAddIpAddress() {
 	call := s.Executor.On("Run", true, "/sbin/ip", "addr", "add", "192.168.99.2/24", "broadcast", "+", "dev", "eth0").
 		Return("ok", nil)
 
-	err := AddIpAddress("eth0", ipaddr)
+	err := alpine.AddIpAddress("eth0", ipaddr)
 
 	require.NoError(err)
 	s.Executor.AssertExpectations(s.T())
@@ -70,7 +71,7 @@ func (s *IPTestSuite) TestAddIpAddress() {
 	s.Executor.On("Run", true, "/sbin/ip", "addr", "add", "192.168.99.2/24", "broadcast", "+", "dev", "eth0").
 		Return("RTNETLINK answers: File exists", new(exec.ExitError))
 
-	err = AddIpAddress("eth0", ipaddr)
+	err = alpine.AddIpAddress("eth0", ipaddr)
 	s.Executor.AssertExpectations(s.T())
 
 	require.EqualError(err, "RTNETLINK answers: File exists: <nil>")
@@ -94,7 +95,7 @@ func (s *IPTestSuite) TestAddIpMapping() {
 	ip := net.ParseIP("192.168.99.2")
 	domainName := "kaweezle.local"
 
-	err = AddIpMapping(&config, ip, domainName, []net.IP{})
+	err = alpine.AddIpMapping(&config, ip, domainName, []net.IP{})
 	require.NoError(err)
 
 	changed, err := afs.ReadFile(f.Name())
@@ -111,7 +112,7 @@ func (s *IPTestSuite) TestAddIpMapping() {
 		WriteFilePath: f.Name(),
 	}
 
-	err = AddIpMapping(&config, ip, domainName, []net.IP{net.ParseIP("192.168.99.4")})
+	err = alpine.AddIpMapping(&config, ip, domainName, []net.IP{net.ParseIP("192.168.99.4")})
 	require.NoError(err)
 	require.NoError(err)
 
@@ -127,5 +128,6 @@ func (s *IPTestSuite) TestAddIpMapping() {
 }
 
 func TestIP(t *testing.T) {
+	t.Parallel()
 	suite.Run(t, new(IPTestSuite))
 }

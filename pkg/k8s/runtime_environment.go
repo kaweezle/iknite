@@ -18,6 +18,7 @@ package k8s
 // cSpell: words tmpl netfilter txeh
 // cSpell: disable
 import (
+	"context"
 	"fmt"
 	"os"
 
@@ -35,13 +36,13 @@ import (
 // cSpell: enable
 
 const (
-	rcConfPreventKubeletRunning = "rc_kubelet_need=\"non-existing-service\""
+	RcConfPreventKubeletRunning = "rc_kubelet_need=\"non-existing-service\""
 )
 
 func IsKubeletServiceRunnable(confFilePath string) (bool, error) {
 	var lines int
 	var err error
-	if lines, err = script.File(confFilePath).Match(rcConfPreventKubeletRunning).CountLines(); err != nil {
+	if lines, err = script.File(confFilePath).Match(RcConfPreventKubeletRunning).CountLines(); err != nil {
 		return false, fmt.Errorf("failed to count lines in config file: %w", err)
 	}
 	return lines == 0, nil
@@ -50,7 +51,7 @@ func IsKubeletServiceRunnable(confFilePath string) (bool, error) {
 // PreventKubeletServiceFromStarting ensures that the kubelet service is not started
 // by the OpenRC init system. It does so by adding a line to the confFilePath file.
 func PreventKubeletServiceFromStarting(confFilePath string) error {
-	present, err := script.File(confFilePath).Match(rcConfPreventKubeletRunning).CountLines()
+	present, err := script.File(confFilePath).Match(RcConfPreventKubeletRunning).CountLines()
 	if err != nil {
 		return fmt.Errorf("while checking %s: %w", confFilePath, err)
 	}
@@ -61,7 +62,7 @@ func PreventKubeletServiceFromStarting(confFilePath string) error {
 	log.Info("Preventing kubelet from running")
 	var lines []string
 	if lines, err = script.File(confFilePath).Slice(); err == nil {
-		lines = append(lines, rcConfPreventKubeletRunning)
+		lines = append(lines, RcConfPreventKubeletRunning)
 		if _, err = script.Slice(lines).WriteFile(confFilePath); err != nil {
 			return errors.Wrapf(err, "While writing %s", confFilePath)
 		}
@@ -90,7 +91,7 @@ func PrepareKubernetesEnvironment(ikniteConfig *v1alpha1.IkniteClusterSpec) erro
 		log.WithError(err).Info("Could not write to /proc/sys/net/ipv4/ip_forward")
 	}
 
-	if err := alpine.EnsureNetFilter(); err != nil {
+	if err = alpine.EnsureNetFilter(); err != nil {
 		return errors.Wrap(err, "While ensuring netfilter")
 	}
 
@@ -104,7 +105,7 @@ func PrepareKubernetesEnvironment(ikniteConfig *v1alpha1.IkniteClusterSpec) erro
 		log.WithError(err).Info("While enabling bridge-nf-call-iptables")
 	}
 
-	if err := alpine.EnsureMachineID(); err != nil {
+	if err = alpine.EnsureMachineID(); err != nil {
 		return errors.Wrap(err, "While ensuring machine ID")
 	}
 
@@ -131,7 +132,7 @@ func PrepareKubernetesEnvironment(ikniteConfig *v1alpha1.IkniteClusterSpec) erro
 			"domainName": ikniteConfig.DomainName,
 		}).Info("Check domain name to IP mapping...")
 
-		if contains, ips := alpine.IsHostMapped(ikniteConfig.Ip, ikniteConfig.DomainName); !contains {
+		if contains, ips := alpine.IsHostMapped(context.Background(), ikniteConfig.Ip, ikniteConfig.DomainName); !contains {
 			log.WithFields(log.Fields{
 				"ip":         ikniteConfig.Ip,
 				"domainName": ikniteConfig.DomainName,

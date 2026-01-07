@@ -3,6 +3,7 @@ package k8s
 // cSpell:words godotenv txeh
 // cSpell: disable
 import (
+	"context"
 	"fmt"
 	"io"
 	"net/http"
@@ -68,7 +69,7 @@ func CheckPidFile(service string, cmd *exec.Cmd) (int, error) {
 	pid, err = strconv.Atoi(pidStr)
 	if err != nil {
 		logger.WithField("content", pidStr).Warn("Failed to convert pid file to integer")
-		return 0, nil
+		return 0, fmt.Errorf("Failed to convert pid file to integer: %w", err)
 	}
 	var process *os.Process
 	process, err = os.FindProcess(pid)
@@ -95,7 +96,7 @@ func IsKubeletRunning() (*os.Process, error) {
 			// only return error is the error is not a file not found error
 			return nil, fmt.Errorf("failed to read kubelet pid file: %w", err)
 		}
-		return nil, nil
+		return nil, nil //nolint:nilnil // means not running
 	}
 	pidStr := strings.TrimSpace(string(pidBytes))
 	var pid int
@@ -103,7 +104,7 @@ func IsKubeletRunning() (*os.Process, error) {
 	if err != nil {
 		log.WithField("pidfile", kubeletPidFile).
 			Warnf("Failed to convert kubelet PID to integer: %s", pidStr)
-		return nil, nil
+		return nil, fmt.Errorf("Failed to convert kubelet PID to integer: %s: %w", pidStr, err)
 	}
 	var process *os.Process
 	process, err = os.FindProcess(pid)
@@ -118,7 +119,7 @@ func IsKubeletRunning() (*os.Process, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to remove kubelet pidfile: %w", err)
 	}
-	return nil, nil
+	return nil, nil //nolint:nilnil // means not running (old pid file)
 }
 
 func StartKubelet() (*exec.Cmd, error) {
@@ -144,7 +145,7 @@ func StartKubelet() (*exec.Cmd, error) {
 	}
 
 	// Run the command in a subprocess
-	cmd := exec.Command("/usr/bin/kubelet")
+	cmd := exec.CommandContext(context.Background(), "/usr/bin/kubelet")
 	cmd.Args = append(cmd.Args, args...)
 	cmd.Env = os.Environ()
 	cmd.Env = append(cmd.Env, env...)
@@ -323,9 +324,11 @@ func StartAndConfigureKubelet(kubeConfig *v1alpha1.IkniteClusterSpec) error {
 	return nil
 }
 
-func CheckKubeletRunning(retries, okResponses, waitTime int) (err error) {
+func CheckKubeletRunning(retries, okResponses, waitTime int) error {
 	okTries := 0
 	first := true
+	client := http.DefaultClient
+	var err error
 	for ; retries > 0; retries-- {
 		if !first {
 			log.WithFields(log.Fields{
@@ -335,9 +338,21 @@ func CheckKubeletRunning(retries, okResponses, waitTime int) (err error) {
 			time.Sleep(time.Duration(waitTime) * time.Millisecond)
 		}
 		first = false
+		var req *http.Request
 		var resp *http.Response
 		log.WithField("retries", retries).Debug("Checking kubelet health...")
-		resp, err = http.Get("http://localhost:10248/healthz")
+
+		req, err = http.NewRequestWithContext(
+			context.Background(),
+			http.MethodGet,
+			"http://localhost:10248/healthz",
+			http.NoBody,
+		)
+		if err != nil {
+			log.WithError(err).Debug("while making HTTP request")
+			continue
+		}
+		resp, err = client.Do(req)
 		if err != nil {
 			log.WithError(err).Debug("while making HTTP request")
 			continue

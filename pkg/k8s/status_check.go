@@ -58,7 +58,7 @@ type CheckExecutor struct {
 }
 
 func (c *Check) NewResult() *CheckResult {
-	var subResults []*CheckResult
+	subResults := make([]*CheckResult, 0, len(c.SubChecks))
 	for _, subCheck := range c.SubChecks {
 		subResults = append(subResults, subCheck.NewResult())
 	}
@@ -215,7 +215,7 @@ func FillResultNameMap(
 
 // PrepareChecks prepares the checks for running.
 func PrepareChecks(checks []*Check) []*CheckResult {
-	var results []*CheckResult
+	results := make([]*CheckResult, 0, len(checks))
 	for _, check := range checks {
 		results = append(results, check.NewResult())
 	}

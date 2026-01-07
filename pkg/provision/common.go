@@ -19,6 +19,7 @@ package provision
 // cSpell: disable
 import (
 	"bytes"
+	"context"
 	"embed"
 	"fmt"
 	"html/template"
@@ -104,7 +105,13 @@ func applyResmap(resources resmap.ResMap) error {
 	buffer := bytes.Buffer{}
 	buffer.Write(out)
 
-	cmd := exec.Command(constants.KubectlCmd, "apply", "-f", "-") //nolint:gosec // Controlled input
+	cmd := exec.CommandContext( //nolint:gosec // Input is controlled
+		context.TODO(),
+		constants.KubectlCmd,
+		"apply",
+		"-f",
+		"-",
+	)
 	cmd.Env = append(cmd.Env, "KUBECONFIG=/root/.kube/config")
 	cmd.Stdin = &buffer
 	out, err = cmd.CombinedOutput()
@@ -136,12 +143,12 @@ func ApplyKustomizations(fs filesys.FileSystem, dirname string) ([]resid.ResId, 
 	if crds.Size() != 0 {
 		crdIds := crds.AllIds()
 		log.WithField("resources", crdIds).Debug("Cluster resources")
-		if err := applyResmap(crds); err != nil {
-			return nil, err
+		if applyErr := applyResmap(crds); applyErr != nil {
+			return nil, applyErr
 		}
 		for _, curId := range crdIds {
-			if err = resources.Remove(curId); err != nil {
-				return nil, fmt.Errorf("failed to remove CRD resource: %w", err)
+			if removeErr := resources.Remove(curId); removeErr != nil {
+				return nil, fmt.Errorf("failed to remove CRD resource: %w", removeErr)
 			}
 		}
 	}

@@ -6,7 +6,7 @@
       "type": "shell",
       "command": "golangci-lint",
       //"args": ["run", "--enable-only", "godot"],
-      "args": ["run", "--enable-only", "nestif", "--fix"],
+      "args": ["run", "--fix"],
       "group": {
         "kind": "test",
         "isDefault": false
@@ -98,6 +98,25 @@
       },
       "problemMatcher": ["$go"],
       "detail": "Run goreleaser to build the project"
+    },
+    {
+      "label": "test with coverage",
+      "type": "shell",
+      "command": "go",
+      "args": [
+        "test",
+        "-v",
+        "-race",
+        "-covermode=atomic",
+        "-coverprofile=coverage.out",
+        "./..."
+      ],
+      "group": {
+        "kind": "test",
+        "isDefault": false
+      },
+      "problemMatcher": ["$go"],
+      "detail": "Run go tests with coverage"
     }
   ]
 }

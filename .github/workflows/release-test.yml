@@ -72,6 +72,7 @@ jobs:
         run: |
           cd dist
           LATEST_VERSION=$(curl --silent  https://api.github.com/repos/kaweezle/krmfnbuiltin/releases/latest | jq -r .tag_name)
+          echo "Latest krmfnbuiltin version is ${LATEST_VERSION}"
           curl -O -L "https://github.com/kaweezle/krmfnbuiltin/releases/download/${LATEST_VERSION}/krmfnbuiltin-${LATEST_VERSION#v}.x86_64.apk"
           curl -O -L "https://github.com/kaweezle/krmfnbuiltin/releases/download/${LATEST_VERSION}/krmfnbuiltin-${LATEST_VERSION#v}.i386.apk"
           cd ..

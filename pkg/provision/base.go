@@ -34,7 +34,7 @@ import (
 var content embed.FS
 
 func ApplyBaseKustomizations(dirname string, data any) ([]resid.ResId, error) {
-	exists := false
+	var exists bool
 	var err error
 	_, err = url.Parse(dirname)
 	if err == nil {

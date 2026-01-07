@@ -88,6 +88,7 @@ func NewStatusCmd(ikniteConfig *v1alpha1.IkniteClusterSpec) *cobra.Command {
 	return statusCmd
 }
 
+//nolint:gocognit,gocyclo // TODO: Should use a runner pattern to reduce complexity
 func performStatus(ikniteConfig *v1alpha1.IkniteClusterSpec) {
 	checkData := k8s.CreateCheckWorkloadData(ikniteConfig.GetApiEndPoint())
 	checkDataBuilder := func() k8s.CheckData {
@@ -164,12 +165,12 @@ func performStatus(ikniteConfig *v1alpha1.IkniteClusterSpec) {
 			{
 				Name:        "domain_name",
 				Description: "Check if the domain name is set",
-				CheckFn: func(_ context.Context, _ k8s.CheckData) (bool, string, error) {
+				CheckFn: func(ctx context.Context, _ k8s.CheckData) (bool, string, error) {
 					if ikniteConfig.DomainName == "" {
 						return true, "Domain name is not set", nil
 					}
 					ipString := ikniteConfig.Ip.String()
-					if contains, ips := alpine.IsHostMapped(ikniteConfig.Ip, ikniteConfig.DomainName); contains {
+					if contains, ips := alpine.IsHostMapped(ctx, ikniteConfig.Ip, ikniteConfig.DomainName); contains {
 						mapped := func() bool {
 							for _, ip := range ips {
 								if ip.String() == ipString {

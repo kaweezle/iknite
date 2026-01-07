@@ -99,7 +99,7 @@ func RemoveKubeletFiles(isDryRun bool) error {
 		out, err := s.Exec(
 			"sh -c 'rm -rf /var/lib/kubelet/{cpu_manager_state,memory_manager_state} /var/lib/kubelet/pods/*'").String()
 		if err != nil {
-			err = errors.Wrapf(err, "failed to remove kubelet files: %s", out)
+			return errors.Wrapf(err, "failed to remove kubelet files: %s", out)
 		}
 	}
 	return nil
@@ -144,6 +144,7 @@ func UnmountPaths(failOnError, isDryRun bool) error {
 	return nil
 }
 
+//nolint:gocyclo // TODO: Should use a runner pattern to reduce complexity
 func CleanAll(
 	ikniteConfig *v1alpha1.IkniteClusterSpec,
 	resetIpAddress, resetIpTables, failOnError, isDryRun bool,
@@ -231,7 +232,7 @@ func processMounts(path string, remove bool, message string, isDryRun bool) erro
 	p := s.File("/proc/self/mounts").Column(2).Match(path).FilterLine(func(s string) string {
 		logger.WithField("mount", s).Debug(message)
 		if !isDryRun {
-			err := syscall.Unmount(s, 0)
+			err = syscall.Unmount(s, 0)
 			if err != nil {
 				logger.WithField("mount", s).WithError(err).Warn("Error unmounting path")
 				return s
@@ -312,7 +313,7 @@ func DeleteEtcdData(isDryRun bool) error {
 		if !os.IsNotExist(err) {
 			return errors.Wrap(err, "failed to read etcd pod from disk")
 		}
-		err = nil
+		// If the etcd manifest does not exist, we assume the default data directory.
 	} else {
 		for i := range etcdPod.Spec.Volumes {
 			if etcdPod.Spec.Volumes[i].Name == "etcd-data" {
