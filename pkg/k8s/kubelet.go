@@ -78,11 +78,9 @@ func CheckPidFile(service string, cmd *exec.Cmd) (int, error) {
 				}
 			}
 		}
-	} else {
+	} else if !errors.Is(err, os.ErrNotExist) {
 		// only return error is the error is not a file not found error
-		if !errors.Is(err, os.ErrNotExist) {
-			return 0, fmt.Errorf("failed to read pid file: %w", err)
-		}
+		return 0, fmt.Errorf("failed to read pid file: %w", err)
 	}
 	return 0, nil
 }
@@ -112,11 +110,9 @@ func IsKubeletRunning() (*os.Process, error) {
 				}
 			}
 		}
-	} else {
+	} else if !errors.Is(err, os.ErrNotExist) {
 		// only return error is the error is not a file not found error
-		if !errors.Is(err, os.ErrNotExist) {
-			return nil, fmt.Errorf("failed to read kubelet pid file: %w", err)
-		}
+		return nil, fmt.Errorf("failed to read kubelet pid file: %w", err)
 	}
 	return nil, nil
 }
@@ -272,11 +268,11 @@ func StartAndConfigureKubelet(kubeConfig *v1alpha1.IkniteClusterSpec) error {
 			} else {
 				log.Info("Kubelet is healthy. Waiting for API server to be healthy...")
 				go func() {
-					config, err := LoadFromDefault()
+					apiConfig, err := LoadFromDefault()
 					if err != nil {
 						apiServerHealthz <- err
 					} else {
-						apiServerHealthz <- config.CheckClusterRunning(30, 2, 1000)
+						apiServerHealthz <- apiConfig.CheckClusterRunning(30, 2, 1000)
 					}
 				}()
 			}
@@ -288,11 +284,11 @@ func StartAndConfigureKubelet(kubeConfig *v1alpha1.IkniteClusterSpec) error {
 				log.Info("API server is healthy")
 				go func() {
 					force_config := viper.GetBool(config.ForceConfig)
-					config, err := LoadFromDefault()
+					apiConfig, err := LoadFromDefault()
 					if err != nil {
 						configErr <- err
 					} else {
-						configErr <- config.DoKustomization(kubeConfig.Ip, kubeConfig.Kustomization, force_config, 0)
+						configErr <- apiConfig.DoKustomization(kubeConfig.Ip, kubeConfig.Kustomization, force_config, 0)
 					}
 				}()
 			}
@@ -316,7 +312,7 @@ func CheckKubeletRunning(retries, okResponses, waitTime int) (err error) {
 		log.WithField("retries", retries).Debug("Checking kubelet health...")
 		resp, err = http.Get("http://localhost:10248/healthz")
 		if err == nil {
-			defer func() { err = resp.Body.Close() }()
+			defer func() { err = resp.Body.Close() }() //nolint:gocritic // TODO: check potential leak
 			var body []byte
 			body, err = io.ReadAll(resp.Body)
 			if err == nil {
@@ -325,7 +321,7 @@ func CheckKubeletRunning(retries, okResponses, waitTime int) (err error) {
 					err = fmt.Errorf("cluster health API returned: %s", contentStr)
 					log.WithError(err).Debug("Bad response")
 				} else {
-					okTries = okTries + 1
+					okTries += 1
 					log.WithField("okTries", okTries).Trace("Ok response from server")
 					if okTries == okResponses {
 						break
@@ -337,7 +333,7 @@ func CheckKubeletRunning(retries, okResponses, waitTime int) (err error) {
 		} else {
 			log.WithError(err).Debug("while making HTTP request")
 		}
-		retries = retries - 1
+		retries -= 1
 		if retries == 0 {
 			log.Trace("No more retries left.")
 			return err

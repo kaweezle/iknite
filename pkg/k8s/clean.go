@@ -121,7 +121,7 @@ func StopAllContainers(isDryRun bool) (err error) {
 	return nil
 }
 
-func UnmountPaths(failOnError bool, isDryRun bool) error {
+func UnmountPaths(failOnError, isDryRun bool) error {
 	var err error
 	for _, path := range pathsToUnmount {
 		err = processMounts(path, false, "Unmounting", isDryRun)
@@ -271,7 +271,7 @@ func DeleteNetworkInterfaces(isDryRun bool) error {
 	}
 	logger := log.WithField("isDryRun", isDryRun)
 	logger.Info("Deleting pods network interfaces...")
-	//nolint:lll
+	//nolint:lll // long string (jq pipeline)
 	p := s.Exec("ip -j link show").
 		JQ(`sort_by(.ifname)| reverse | .[] | select(has("link_netnsid") or .ifname == "cni0" or .ifname == "flannel.1") | .ifname`).
 		FilterLine(func(s string) string {
@@ -307,9 +307,9 @@ func DeleteEtcdData(isDryRun bool) error {
 		}
 		err = nil
 	} else {
-		for _, volume := range etcdPod.Spec.Volumes {
-			if volume.Name == "etcd-data" {
-				etcdDataDir = volume.HostPath.Path
+		for i := range etcdPod.Spec.Volumes {
+			if etcdPod.Spec.Volumes[i].Name == "etcd-data" {
+				etcdDataDir = etcdPod.Spec.Volumes[i].HostPath.Path
 				break
 			}
 		}

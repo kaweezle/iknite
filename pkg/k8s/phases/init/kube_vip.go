@@ -27,12 +27,12 @@ func NewKubeVipControlPlanePhase() workflow.Phase {
 }
 
 func CreateKubeVipConfiguration(wr io.Writer, config *v1alpha1.IkniteClusterSpec) error {
-	template, err := template.New("config").Parse(kubeVipManifestTemplate)
+	manifestTemplate, err := template.New("config").Parse(kubeVipManifestTemplate)
 	if err != nil {
 		return fmt.Errorf("failed to parse kube-vip manifest template: %w", err)
 	}
 
-	if err := template.Execute(wr, config); err != nil {
+	if err := manifestTemplate.Execute(wr, config); err != nil {
 		return fmt.Errorf("failed to execute kube-vip manifest template: %w", err)
 	}
 	return nil
@@ -50,12 +50,10 @@ func WriteKubeVipConfiguration(
 		closeErr := f.Close()
 		if err == nil {
 			err = closeErr
-		} else {
-			if closeErr == nil {
-				closeErr = afs.Remove(f.Name())
-				if closeErr != nil {
-					err = errors.Join(err, fmt.Errorf("while removing file %s: %w", f.Name(), closeErr))
-				}
+		} else if closeErr == nil {
+			closeErr = afs.Remove(f.Name())
+			if closeErr != nil {
+				err = errors.Join(err, fmt.Errorf("while removing file %s: %w", f.Name(), closeErr))
 			}
 		}
 	}()

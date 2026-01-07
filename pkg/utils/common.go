@@ -74,7 +74,7 @@ func WriteFile(filename string, data []byte, perm os.FileMode) error {
 
 // MoveFileIfExists moves the file src to the destination dst
 // if it exists.
-func MoveFileIfExists(src string, dst string) error {
+func MoveFileIfExists(src, dst string) error {
 	err := os.Link(src, dst)
 	if err != nil {
 		if os.IsNotExist(err) {

@@ -42,7 +42,7 @@ func NewKubeletStartPhase() workflow.Phase {
 	return workflow.Phase{
 		Name:    "kubelet-start",
 		Short:   "Write kubelet settings and (re)start the kubelet",
-		Long:    "Write a file with KubeletConfiguration and an environment file with node specific kubelet settings, and then (re)start kubelet.", //nolint:lll
+		Long:    "Write a file with KubeletConfiguration and an environment file with node specific kubelet settings, and then (re)start kubelet.", //nolint:lll // Ignore long line linter warning
 		Example: kubeletStartPhaseExample,
 		Run:     runKubeletStart,
 		InheritFlags: []string{
@@ -76,10 +76,10 @@ func runKubeletStart(c workflow.RunData) error {
 
 	// Write the instance kubelet configuration file to disk.
 	if features.Enabled(data.Cfg().FeatureGates, features.NodeLocalCRISocket) {
-		kubeletConfig := &kubeletConfig.KubeletConfiguration{
+		kubeletConf := &kubeletConfig.KubeletConfiguration{
 			ContainerRuntimeEndpoint: data.Cfg().NodeRegistration.CRISocket,
 		}
-		if err := kubeletPhase.WriteInstanceConfigToDisk(kubeletConfig, data.KubeletDir()); err != nil {
+		if err := kubeletPhase.WriteInstanceConfigToDisk(kubeletConf, data.KubeletDir()); err != nil {
 			return errors.Wrap(err, "error writing instance kubelet configuration to disk")
 		}
 	} else {

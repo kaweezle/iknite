@@ -108,7 +108,7 @@ var _ phases.InitData = &initData{}
 // this data is shared across all the phases that are included in the workflow.
 type initData struct {
 	client                      clientset.Interface
-	ctx                         context.Context //nolint:containedctx
+	ctx                         context.Context //nolint:containedctx // passed around but not stored
 	outputWriter                io.Writer
 	ctxCancel                   context.CancelFunc
 	kubeconfig                  *clientcmdapi.Config
@@ -259,6 +259,7 @@ func newCmdInit(out io.Writer, initOptions *initOptions) *cobra.Command {
 	)
 	initRunner.AppendPhase(WrapPhase(phases.NewUploadConfigPhase(), ikniteApi.Initializing, nil))
 	initRunner.AppendPhase(WrapPhase(phases.NewUploadCertsPhase(), ikniteApi.Initializing, nil))
+	//nolint:gocritic // both control plane and worker
 	// initRunner.AppendPhase(phases.NewMarkControlPlanePhase())
 	initRunner.AppendPhase(WrapPhase(phases.NewBootstrapTokenPhase(), ikniteApi.Initializing, nil))
 	initRunner.AppendPhase(WrapPhase(phases.NewKubeletFinalizePhase(), ikniteApi.Initializing, nil))
@@ -269,6 +270,7 @@ func newCmdInit(out io.Writer, initOptions *initOptions) *cobra.Command {
 	)
 	initRunner.AppendPhase(WrapPhase(iknitePhase.NewWorkloadsPhase(), ikniteApi.Stabilizing, nil))
 	initRunner.AppendPhase(WrapPhase(iknitePhase.NewDaemonizePhase(), ikniteApi.Stabilizing, nil))
+	//nolint:gocritic // standalone node
 	// initRunner.AppendPhase(phases.NewShowJoinCommandPhase())
 
 	// sets the data builder function, that will be used by the runner
@@ -656,11 +658,11 @@ func (d *initData) Client() (clientset.Interface, error) {
 // It uses the admin.conf as the base, but modifies it to point at the local API server instead
 // of the control plane endpoint.
 func (d *initData) WaitControlPlaneClient() (clientset.Interface, error) {
-	config, err := clientcmd.LoadFromFile(d.KubeConfigPath())
+	kubeConfig, err := clientcmd.LoadFromFile(d.KubeConfigPath())
 	if err != nil {
 		return nil, fmt.Errorf("failed to load kubeconfig for wait control plane: %w", err)
 	}
-	for _, v := range config.Clusters {
+	for _, v := range kubeConfig.Clusters {
 		v.Server = fmt.Sprintf("https://%s",
 			net.JoinHostPort(
 				d.Cfg().LocalAPIEndpoint.AdvertiseAddress,
@@ -668,7 +670,7 @@ func (d *initData) WaitControlPlaneClient() (clientset.Interface, error) {
 			),
 		)
 	}
-	client, err := kubeConfigUtil.ToClientSet(config)
+	client, err := kubeConfigUtil.ToClientSet(kubeConfig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create client set from config: %w", err)
 	}
@@ -709,7 +711,7 @@ func (d *initData) Tokens() []string {
 // PatchesDir returns the folder where patches for components are stored.
 func (d *initData) PatchesDir() string {
 	// If provided, make the flag value override the one in config.
-	if len(d.patchesDir) > 0 {
+	if d.patchesDir != "" {
 		return d.patchesDir
 	}
 	if d.cfg.Patches != nil {
@@ -782,7 +784,10 @@ func (d *initData) ContextWithCancel() (context.Context, context.CancelFunc) {
 	return d.ctx, d.ctxCancel
 }
 
-func PhaseName(p workflow.Phase, parentPhases *[]workflow.Phase) string {
+func PhaseName(
+	p workflow.Phase, //nolint:gocritic // matching kubeadm style
+	parentPhases *[]workflow.Phase,
+) string {
 	if len(*parentPhases) == 0 {
 		return p.Name
 	}
@@ -791,6 +796,7 @@ func PhaseName(p workflow.Phase, parentPhases *[]workflow.Phase) string {
 	return fmt.Sprintf("%s/%s", PhaseName(parentPhaseName, &grandParentPhases), p.Name)
 }
 
+//nolint:gocritic // matching kubeadm style
 func WrapPhase(
 	p workflow.Phase,
 	state ikniteApi.ClusterState,

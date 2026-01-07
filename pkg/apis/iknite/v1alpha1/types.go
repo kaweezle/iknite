@@ -28,21 +28,21 @@ type IkniteCluster struct {
 
 type IkniteClusterSpec struct {
 	// +optional
-	KubernetesVersion string `json:"kubernetesVersion,omitempty" protobuf:"bytes,2,opt,name=kubernetesVersion" mapstructure:"kubernetes_version"` //nolint:lll
+	KubernetesVersion string `json:"kubernetesVersion,omitempty" protobuf:"bytes,2,opt,name=kubernetesVersion" mapstructure:"kubernetes_version"` //nolint:lll // for readability
 	// +optional
-	DomainName string `json:"domainName,omitempty"        protobuf:"bytes,3,opt,name=domainName"        mapstructure:"domain_name"` //nolint:lll
+	DomainName string `json:"domainName,omitempty"        protobuf:"bytes,3,opt,name=domainName"        mapstructure:"domain_name"` //nolint:lll // for readability
 	// +optional
-	NetworkInterface string `json:"networkInterface,omitempty"  protobuf:"bytes,5,opt,name=networkInterface"  mapstructure:"network_interface"` //nolint:lll
+	NetworkInterface string `json:"networkInterface,omitempty"  protobuf:"bytes,5,opt,name=networkInterface"  mapstructure:"network_interface"` //nolint:lll // for readability
 	// +optional
-	ClusterName string `json:"clusterName,omitempty"       protobuf:"bytes,7,opt,name=clusterName"       mapstructure:"cluster_name"` //nolint:lll
+	ClusterName string `json:"clusterName,omitempty"       protobuf:"bytes,7,opt,name=clusterName"       mapstructure:"cluster_name"` //nolint:lll // for readability
 	// +optional
 	Kustomization string `json:"kustomization,omitempty"     protobuf:"bytes,8,opt,name=kustomization"`
 	// +optional
 	Ip net.IP `json:"ip,omitempty"                protobuf:"bytes,1,opt,name=ip"                mapstructure:"ip"`
 	// +optional
-	CreateIp bool `json:"createIp,omitempty"          protobuf:"bytes,4,opt,name=createIp"          mapstructure:"create_ip"` //nolint:lll
+	CreateIp bool `json:"createIp,omitempty"          protobuf:"bytes,4,opt,name=createIp"          mapstructure:"create_ip"` //nolint:lll // for readability
 	// +optional
-	EnableMDNS bool `json:"enableMDNS,omitempty"        protobuf:"bytes,6,opt,name=enableMDNS"        mapstructure:"enable_mdns"` //nolint:lll
+	EnableMDNS bool `json:"enableMDNS,omitempty"        protobuf:"bytes,6,opt,name=enableMDNS"        mapstructure:"enable_mdns"` //nolint:lll // for readability
 }
 
 func (c *IkniteClusterSpec) GetApiEndPoint() string {
@@ -103,7 +103,7 @@ func (ikniteCluster *IkniteCluster) Update(
 	ikniteCluster.Persist()
 }
 
-func (ikniteCluster IkniteCluster) Persist() {
+func (ikniteCluster *IkniteCluster) Persist() {
 	ikniteClusterJSON, err := json.MarshalIndent(ikniteCluster, "", "  ")
 	if err == nil {
 		// Write JSON to file

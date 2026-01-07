@@ -102,12 +102,12 @@ func (config *Config) IsConfigServerAddress(address string) bool {
 // Client returns a clientset for config.
 func (config *Config) Client() (client *kubernetes.Clientset, err error) {
 	clientConfig := clientcmd.NewDefaultClientConfig(api.Config(*config), nil)
-	var rest *rest.Config
-	rest, err = clientConfig.ClientConfig()
+	var restConfig *rest.Config
+	restConfig, err = clientConfig.ClientConfig()
 	if err != nil {
 		return client, fmt.Errorf("failed to get client config: %w", err)
 	}
-	client, err = kubernetes.NewForConfig(rest)
+	client, err = kubernetes.NewForConfig(restConfig)
 	if err != nil {
 		return client, fmt.Errorf("failed to create kubernetes client: %w", err)
 	}
@@ -135,7 +135,7 @@ func (config *Config) CheckClusterRunning(retries, okResponses, waitTime int) er
 				err = fmt.Errorf("cluster health API returned: %s", contentStr)
 				log.WithError(err).Debug("Bad response")
 			} else {
-				okTries = okTries + 1
+				okTries += 1
 				log.WithField("okTries", okTries).Trace("Ok response from server")
 				if okTries == okResponses {
 					break
@@ -145,7 +145,7 @@ func (config *Config) CheckClusterRunning(retries, okResponses, waitTime int) er
 			log.WithError(err).Debug("while querying cluster readiness")
 		}
 
-		retries = retries - 1
+		retries -= 1
 		if retries == 0 {
 			log.Trace("No more retries left.")
 			return err
@@ -174,7 +174,7 @@ func (config *Config) WriteToFile(filename string) error {
 // be done after an IP address change.
 // The restart method is taken from kubectl:
 // https://github.com/kubernetes/kubectl/blob/
-// 652881798563c00c1895ded6ced819030bfaa4d7/pkg/polymorphichelpers/objectrestarter.go#L81
+// 652881798563c00c1895ded6ced819030bfaa4d7/pkg/polymorphichelpers/objectrestarter.go#L81.
 func (config *Config) RestartProxy() (err error) {
 	var client *kubernetes.Clientset
 	if client, err = config.Client(); err != nil {
@@ -219,7 +219,7 @@ func (config *Config) DoKustomization(
 	if cm.Data["configured"] == "true" && !force {
 		log.Info("configuration has already occurred. Use -C to force.")
 	} else {
-		context := log.Fields{
+		logContext := log.Fields{
 			"OutboundIP": ip,
 		}
 		var ids []resid.ResId
@@ -231,7 +231,7 @@ func (config *Config) DoKustomization(
 				"kustomization": kustomization,
 			}).Info("Performing configuration")
 
-			if ids, err = provision.ApplyBaseKustomizations(kustomization, context); err != nil {
+			if ids, err = provision.ApplyBaseKustomizations(kustomization, logContext); err != nil {
 				return fmt.Errorf("failed to apply base kustomizations: %w", err)
 			}
 		}

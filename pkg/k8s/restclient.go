@@ -114,10 +114,10 @@ func StatusViewerFor(kind schema.GroupKind) (polymorphichelpers.StatusViewer, er
 func (s *ApplicationStatusViewer) Status(
 	obj runtime.Unstructured,
 	revision int64,
-) (string, bool, error) {
+) (message string, success bool, err error) {
 	application := &Application{}
 
-	err := runtime.DefaultUnstructuredConverter.FromUnstructured(
+	err = runtime.DefaultUnstructuredConverter.FromUnstructured(
 		obj.UnstructuredContent(),
 		application,
 	)
@@ -128,9 +128,9 @@ func (s *ApplicationStatusViewer) Status(
 	healthStatusString := application.Status.Health.Status
 	syncStatusString := application.Status.Sync.Status
 
-	msg := fmt.Sprintf("application \"%s\" sync status: %s, health status: %s",
+	message = fmt.Sprintf("application %q sync status: %s, health status: %s",
 		application.Name, syncStatusString, healthStatusString)
-	return msg, healthStatusString == "Healthy" && syncStatusString == "Synced", nil
+	return message, healthStatusString == "Healthy" && syncStatusString == "Synced", nil
 }
 
 func (client *RESTClientGetter) HasApplications() (has bool, err error) {

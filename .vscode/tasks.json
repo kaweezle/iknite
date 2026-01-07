@@ -6,10 +6,10 @@
       "type": "shell",
       "command": "golangci-lint",
       //"args": ["run", "--enable-only", "godot"],
-      "args": ["run", "--enable-only", "lll", "--fix"],
+      "args": ["run", "--enable-only", "gocritic", "--fix"],
       "group": {
-        "kind": "build",
-        "isDefault": true
+        "kind": "test",
+        "isDefault": false
       },
       // "problemMatcher": ["$go"],
       "problemMatcher": {
@@ -23,7 +23,15 @@
           "message": 4
         }
       },
-      "detail": "Run golangci-lint"
+      "detail": "Run golangci-lint",
+      "presentation": {
+        "echo": true,
+        "reveal": "never",
+        "focus": false,
+        "panel": "shared",
+        "showReuseMessage": true,
+        "clear": true
+      }
     },
     {
       "label": "golangci-fmt",
@@ -32,7 +40,7 @@
       "args": ["fmt"],
       "group": {
         "kind": "build",
-        "isDefault": true
+        "isDefault": false
       },
       // "problemMatcher": ["$go"],
       "problemMatcher": {
@@ -55,7 +63,7 @@
       "args": ["mod", "tidy"],
       "group": {
         "kind": "build",
-        "isDefault": true
+        "isDefault": false
       },
       "problemMatcher": ["$go"],
       "detail": "Run go mod tidy"
@@ -69,7 +77,27 @@
         "kind": "test",
         "isDefault": true
       },
-      "detail": "Run pre-commit hooks"
+      "detail": "Run pre-commit hooks",
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "shared",
+        "showReuseMessage": true,
+        "clear": true
+      }
+    },
+    {
+      "label": "goreleaser",
+      "type": "shell",
+      "command": "goreleaser",
+      "args": ["--snapshot", "--skip=publish", "--clean"],
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "problemMatcher": ["$go"],
+      "detail": "Run goreleaser to build the project"
     }
   ]
 }

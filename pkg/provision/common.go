@@ -54,39 +54,41 @@ func createTempKustomizeDirectory(
 		return errors.Wrapf(err, "While reading files of %s", dirname)
 	}
 	for _, entry := range files {
-		if !entry.IsDir() {
-			inPath := fmt.Sprintf("%s/%s", dirname, entry.Name())
-			outPath := fmt.Sprintf("%s/%s", tempdir, entry.Name())
+		if entry.IsDir() {
+			continue
+		}
 
-			log.WithField("path", inPath).Trace("Reading file")
-			payload, err := content.ReadFile(inPath)
-			if err != nil {
-				return errors.Wrapf(err, "While reading embedded file %s", entry.Name())
-			}
+		inPath := fmt.Sprintf("%s/%s", dirname, entry.Name())
+		outPath := fmt.Sprintf("%s/%s", tempdir, entry.Name())
 
-			if filepath.Ext(entry.Name()) == ".tmpl" {
-				log.WithField("path", inPath).Trace("Is template")
-				var t *template.Template
-				t, err = template.New("tmp").Parse(string(payload))
-				if err != nil {
-					return errors.Wrapf(err, "While reading template %s", entry.Name())
-				}
-				buf := new(bytes.Buffer)
-				log.WithField("path", inPath).
-					WithField("data", data).
-					Trace("Rendering")
-				err = t.Execute(buf, data)
-				if err != nil {
-					return errors.Wrap(err, "failed to create a manifest file")
-				}
-				payload = buf.Bytes()
-				outPath = strings.TrimSuffix(outPath, ".tmpl")
-			}
-			log.WithField("outPath", outPath).Trace("Writing content")
-			err = fs.WriteFile(outPath, payload)
+		log.WithField("path", inPath).Trace("Reading file")
+		payload, err := content.ReadFile(inPath)
+		if err != nil {
+			return errors.Wrapf(err, "While reading embedded file %s", entry.Name())
+		}
+
+		if filepath.Ext(entry.Name()) == ".tmpl" {
+			log.WithField("path", inPath).Trace("Is template")
+			var t *template.Template
+			t, err = template.New("tmp").Parse(string(payload))
 			if err != nil {
-				return errors.Wrapf(err, "While writing %s to temp dir %s", entry.Name(), tempdir)
+				return errors.Wrapf(err, "While reading template %s", entry.Name())
 			}
+			buf := new(bytes.Buffer)
+			log.WithField("path", inPath).
+				WithField("data", data).
+				Trace("Rendering")
+			err = t.Execute(buf, data)
+			if err != nil {
+				return errors.Wrap(err, "failed to create a manifest file")
+			}
+			payload = buf.Bytes()
+			outPath = strings.TrimSuffix(outPath, ".tmpl")
+		}
+		log.WithField("outPath", outPath).Trace("Writing content")
+		err = fs.WriteFile(outPath, payload)
+		if err != nil {
+			return errors.Wrapf(err, "While writing %s to temp dir %s", entry.Name(), tempdir)
 		}
 	}
 	return nil
@@ -135,7 +137,7 @@ func ApplyKustomizations(fs filesys.FileSystem, dirname string) (ids []resid.Res
 	if crds.Size() != 0 {
 		crdIds := crds.AllIds()
 		log.WithField("resources", crdIds).Debug("Cluster resources")
-		if err = applyResmap(crds); err != nil {
+		if err := applyResmap(crds); err != nil {
 			return ids, err
 		}
 		for _, curId := range crdIds {

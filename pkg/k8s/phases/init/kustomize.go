@@ -38,16 +38,17 @@ func runKustomize(c workflow.RunData) error {
 		"kustomization": ikniteConfig.Kustomization,
 	}).Info("Performing kustomize configuration")
 
-	config, err := k8s.LoadFromDefault()
+	k8sConfig, err := k8s.LoadFromDefault()
 	if err != nil {
 		return errors.Wrap(err, "failed to load configuration")
 	}
 	// TODO: This probably should be elsewhere
-	err = config.RenameConfig(ikniteConfig.ClusterName).WriteToFile(constants.KubernetesRootConfig)
+	err = k8sConfig.RenameConfig(ikniteConfig.ClusterName).
+		WriteToFile(constants.KubernetesRootConfig)
 	if err != nil {
 		return errors.Wrap(err, "failed to write configuration")
 	}
-	if err := config.DoKustomization(ikniteConfig.Ip, ikniteConfig.Kustomization, force_config, 0); err != nil {
+	if err := k8sConfig.DoKustomization(ikniteConfig.Ip, ikniteConfig.Kustomization, force_config, 0); err != nil {
 		return fmt.Errorf("failed to apply kustomization: %w", err)
 	}
 	return nil

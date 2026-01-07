@@ -281,7 +281,7 @@ func (result *CheckResult) StatusString(spinView string) string {
 	return statusStyle.Render(status)
 }
 
-func (result *CheckResult) FormatResult(prefix string, spinView string) string {
+func (result *CheckResult) FormatResult(prefix, spinView string) string {
 	status := result.StatusString(spinView)
 
 	description := result.Check.Description
@@ -307,7 +307,7 @@ func (result *CheckResult) FormatResult(prefix string, spinView string) string {
 	return output
 }
 
-func (result *CheckResult) Format(prefix string, spinView string) string {
+func (result *CheckResult) Format(prefix, spinView string) string {
 	if result.Check.CustomPrinter != nil {
 		return result.Check.CustomPrinter(result, prefix, spinView)
 	}

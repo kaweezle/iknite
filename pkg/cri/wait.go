@@ -87,7 +87,7 @@ func WaitForContainerService() (bool, error) {
 				log.WithError(err).Warn("Error while checking container service sock")
 			}
 		}
-		retries = retries - 1
+		retries--
 
 		log.Debug("Waiting 2 seconds...")
 		time.Sleep(2 * time.Second)

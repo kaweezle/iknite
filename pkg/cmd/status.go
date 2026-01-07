@@ -141,12 +141,19 @@ func performStatus(ikniteConfig *v1alpha1.IkniteClusterSpec) {
 				CheckFn: func(ctx context.Context, data k8s.CheckData) (bool, string, error) {
 					if ikniteConfig.CreateIp {
 						result, err := alpine.CheckIpExists(ikniteConfig.Ip)
-						if err != nil {
+						switch {
+						case err != nil:
 							return false, "", fmt.Errorf("failed to check if IP exists: %w", err)
-						} else if result {
-							return true, fmt.Sprintf("IP address %s is created", ikniteConfig.Ip.String()), nil
-						} else {
-							return false, fmt.Sprintf("IP address %s is not created", ikniteConfig.Ip.String()), nil
+						case result:
+							return true, fmt.Sprintf(
+								"IP address %s is bound to an interface",
+								ikniteConfig.Ip.String(),
+							), nil
+						default:
+							return false, fmt.Sprintf(
+								"IP address %s is not bound to any interface",
+								ikniteConfig.Ip.String(),
+							), nil
 						}
 					} else {
 						return true, "Don't need to create IP", nil

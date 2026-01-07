@@ -62,7 +62,7 @@ func resetDetectCRISocket(
 
 // resetOptions defines all the options exposed via flags by kubeadm reset.
 //
-//nolint:govet
+//nolint:govet // data structure passed to kubeadm phases
 type resetOptions struct {
 	kubeconfigPath        string
 	cfgPath               string
@@ -75,7 +75,7 @@ type resetOptions struct {
 // resetData defines all the runtime information used when running the kubeadm reset workflow;
 // this data is shared across all the phases that are included in the workflow.
 //
-//nolint:govet
+//nolint:govet // data structure passed to kubeadm phases
 type resetData struct {
 	certificatesDir       string
 	client                clientset.Interface
@@ -209,11 +209,12 @@ func newResetData(
 	}
 
 	certificatesDir := kubeadmapiv1.DefaultCertificatesDir
-	if cmd.Flags().Changed(options.CertificatesDir) { // flag is specified
+	switch {
+	case cmd.Flags().Changed(options.CertificatesDir): // flag is specified
 		certificatesDir = opts.externalCfg.CertificatesDir
-	} else if len(resetCfg.CertificatesDir) > 0 { // configured in the ResetConfiguration
+	case resetCfg.CertificatesDir != "": // configured in the ResetConfiguration
 		certificatesDir = resetCfg.CertificatesDir
-	} else if len(initCfg.CertificatesDir) > 0 { // fetch from cluster
+	case initCfg.CertificatesDir != "": // fetch from cluster
 		certificatesDir = initCfg.CertificatesDir
 	}
 

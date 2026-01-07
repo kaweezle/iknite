@@ -210,7 +210,7 @@ fi
 
 if should_run_step "goreleaser"; then
     step "Building Iknite package..."
-    goreleaser  --skip=publish --snapshot --clean
+    goreleaser --skip=publish --snapshot --clean
 else
     skip "Building Iknite package"
 fi

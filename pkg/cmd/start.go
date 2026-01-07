@@ -99,9 +99,9 @@ func performStart(ikniteConfig *v1alpha1.IkniteClusterSpec) {
 
 	// If Kubernetes is already installed, check that the configuration has not
 	// Changed.
-	config, err := k8s.LoadFromDefault()
+	apiConfig, err := k8s.LoadFromDefault()
 	if err == nil {
-		if config.IsConfigServerAddress(ikniteConfig.GetApiEndPoint()) {
+		if apiConfig.IsConfigServerAddress(ikniteConfig.GetApiEndPoint()) {
 			log.Info("Kubeconfig already exists")
 		} else {
 			// If the configuration has changed, we stop and disable the kubelet

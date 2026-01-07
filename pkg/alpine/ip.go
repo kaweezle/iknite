@@ -32,9 +32,8 @@ func CheckIpExists(ip net.IP) (result bool, err error) {
 			continue
 		}
 		for _, a := range addrs {
-			switch v := a.(type) {
-			case *net.IPNet:
-				if v.IP.Equal(ip) {
+			if ipNet, ok := a.(*net.IPNet); ok {
+				if ipNet.IP.Equal(ip) {
 					result = true
 					return result, nil
 				}
@@ -111,14 +110,14 @@ func AddIpMapping(
 	return nil
 }
 
-func IsHostMapped(Ip net.IP, DomainName string) (bool, []net.IP) {
-	ips, err := net.LookupIP(DomainName)
+func IsHostMapped(ip net.IP, domainName string) (bool, []net.IP) {
+	ips, err := net.LookupIP(domainName)
 	contains := false
 	if err != nil {
 		ips = []net.IP{}
 	} else {
 		for _, existing := range ips {
-			if existing.Equal(Ip) {
+			if existing.Equal(ip) {
 				contains = true
 				break
 			}

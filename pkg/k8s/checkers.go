@@ -14,6 +14,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/pkg/errors"
 	v1 "k8s.io/api/core/v1"
+	clientset "k8s.io/client-go/kubernetes"
 	kubeadmConstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	kubeConfigUtil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
@@ -48,10 +49,13 @@ func SystemFileCheck(name, description, path, expectedContent string) *Check {
 	}
 }
 
-func CheckService(serviceName string, checkOpenRC, checkPidFile bool) (bool, string, error) {
+func CheckService(
+	serviceName string,
+	checkOpenRC, checkPidFile bool,
+) (success bool, message string, err error) {
 	pid := 0
 	if checkOpenRC {
-		started, err := alpine.IsServiceStarted(serviceName)
+		success, err = alpine.IsServiceStarted(serviceName)
 		if err != nil {
 			return false, "", fmt.Errorf(
 				"failed to check if service %s is started: %w",
@@ -59,7 +63,7 @@ func CheckService(serviceName string, checkOpenRC, checkPidFile bool) (bool, str
 				err,
 			)
 		}
-		if !started {
+		if !success {
 			return false, "", fmt.Errorf("service %s is not running", serviceName)
 		}
 	}
@@ -129,9 +133,13 @@ func difference(a, b []string) []string {
 }
 
 // FileTreeDifference computes the difference between an actual path and an expected file tree.
-func FileTreeDifference(path string, expectedFiles []string) ([]string, []string, error) {
+func FileTreeDifference(
+	path string,
+	expectedFiles []string,
+) (missingFiles, extraFiles []string, err error) {
 	foundFiles := []string{}
-	actualPath, err := filepath.EvalSymlinks(path)
+	var actualPath string
+	actualPath, err = filepath.EvalSymlinks(path)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to evaluate symlinks for %s: %w", path, err)
 	}
@@ -151,8 +159,8 @@ func FileTreeDifference(path string, expectedFiles []string) ([]string, []string
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to walk file tree: %w", err)
 	}
-	missingFiles := difference(expectedFiles, foundFiles)
-	extraFiles := difference(foundFiles, expectedFiles)
+	missingFiles = difference(expectedFiles, foundFiles)
+	extraFiles = difference(foundFiles, expectedFiles)
 	return missingFiles, extraFiles, nil
 }
 
@@ -184,8 +192,9 @@ func FileTreeCheck(name, description, path string, expectedFiles []string) *Chec
 	}
 }
 
-func CheckKubeletHealth(timeout time.Duration) (bool, string, error) {
-	client, err := kubeConfigUtil.ClientSetFromFile(kubeadmConstants.GetAdminKubeConfigPath())
+func CheckKubeletHealth(timeout time.Duration) (success bool, message string, err error) {
+	var client clientset.Interface
+	client, err = kubeConfigUtil.ClientSetFromFile(kubeadmConstants.GetAdminKubeConfigPath())
 	if err != nil {
 		return false, "", fmt.Errorf(
 			"failed to create client set for kubelet health check: %w",
@@ -201,16 +210,21 @@ func CheckKubeletHealth(timeout time.Duration) (bool, string, error) {
 	return true, "Kubelet is healthy", nil
 }
 
-func CheckApiServerHealth(timeout time.Duration, checkData CheckData) (bool, string, error) {
-	data, ok := checkData.(*checkWorkloadData)
-	if !ok {
+func CheckApiServerHealth(
+	timeout time.Duration,
+	checkData CheckData,
+) (success bool, message string, err error) {
+	var data *checkWorkloadData
+	data, success = checkData.(*checkWorkloadData)
+	if !success {
 		return false, "", fmt.Errorf(
 			"wait-control-plane phase invoked with an invalid data struct %T",
 			checkData,
 		)
 	}
 
-	client, err := kubeConfigUtil.ClientSetFromFile(kubeadmConstants.GetAdminKubeConfigPath())
+	var client clientset.Interface
+	client, err = kubeConfigUtil.ClientSetFromFile(kubeadmConstants.GetAdminKubeConfigPath())
 	if err != nil {
 		return false, "", fmt.Errorf(
 			"failed to create client set for API server health check: %w",
@@ -351,7 +365,7 @@ func PrettyPrintWorkloadState(prefix string, r *v1alpha1.WorkloadState) string {
 	)
 }
 
-func CheckWorkloadResultPrinter(result *CheckResult, prefix string, spinView string) string {
+func CheckWorkloadResultPrinter(result *CheckResult, prefix, spinView string) string {
 	data := result.CheckData.(CheckWorkloadData)
 
 	ready := data.ReadyWorkloads()
@@ -383,7 +397,7 @@ func CheckWorkloadResultPrinter(result *CheckResult, prefix string, spinView str
 	if result.Status == StatusSkipped {
 		return output
 	}
-	prefix = prefix + "  "
+	prefix += "  "
 
 	if len(ready) > 0 {
 		for _, state := range ready {
@@ -400,7 +414,7 @@ func CheckWorkloadResultPrinter(result *CheckResult, prefix string, spinView str
 	return output
 }
 
-func CheckWorkloads(ctx context.Context, data CheckData) (bool, string, error) {
+func CheckWorkloads(ctx context.Context, data CheckData) (success bool, message string, err error) {
 	workloadData := (data).(CheckWorkloadData)
 	config, err := LoadFromFile(
 		filepath.Join(kubeadmConstants.KubernetesDir, kubeadmConstants.AdminKubeConfigFileName),

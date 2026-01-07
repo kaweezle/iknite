@@ -40,6 +40,7 @@
     "DRYRUN",
     "fontawesome",
     "gitmoji",
+    "gocritic",
     "GOPATH",
     "govet",
     "Healthz",
