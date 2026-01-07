@@ -79,7 +79,7 @@ func NewStatusCmd(ikniteConfig *v1alpha1.IkniteClusterSpec) *cobra.Command {
 - Statefulsets
 `,
 		PersistentPreRun: config.StartPersistentPreRun,
-		Run:              func(cmd *cobra.Command, args []string) { performStatus(ikniteConfig) },
+		Run:              func(_ *cobra.Command, _ []string) { performStatus(ikniteConfig) },
 	}
 
 	flags := statusCmd.Flags()
@@ -117,7 +117,7 @@ func performStatus(ikniteConfig *v1alpha1.IkniteClusterSpec) {
 			{
 				Name:        "kubelet_service",
 				Description: "Check if the kubelet service is not runnable",
-				CheckFn: func(ctx context.Context, data k8s.CheckData) (bool, string, error) {
+				CheckFn: func(_ context.Context, _ k8s.CheckData) (bool, string, error) {
 					runnable, err := k8s.IsKubeletServiceRunnable(constants.RcConfFile)
 					if err != nil {
 						return false, "", fmt.Errorf(
@@ -138,7 +138,7 @@ func performStatus(ikniteConfig *v1alpha1.IkniteClusterSpec) {
 			{
 				Name:        "ip_bound",
 				Description: "Check if the IP address is bound to an interface",
-				CheckFn: func(ctx context.Context, data k8s.CheckData) (bool, string, error) {
+				CheckFn: func(_ context.Context, _ k8s.CheckData) (bool, string, error) {
 					if ikniteConfig.CreateIp {
 						result, err := alpine.CheckIpExists(ikniteConfig.Ip)
 						switch {
@@ -164,7 +164,7 @@ func performStatus(ikniteConfig *v1alpha1.IkniteClusterSpec) {
 			{
 				Name:        "domain_name",
 				Description: "Check if the domain name is set",
-				CheckFn: func(ctx context.Context, data k8s.CheckData) (bool, string, error) {
+				CheckFn: func(_ context.Context, _ k8s.CheckData) (bool, string, error) {
 					if ikniteConfig.DomainName != "" {
 						ipString := ikniteConfig.Ip.String()
 						if contains, ips := alpine.IsHostMapped(ikniteConfig.Ip, ikniteConfig.DomainName); contains {
@@ -222,7 +222,7 @@ func performStatus(ikniteConfig *v1alpha1.IkniteClusterSpec) {
 			{
 				Name:        "etcd_data",
 				Description: "Check that the etcd data directory (/var/lib/etcd) is present and contains data",
-				CheckFn: func(ctx context.Context, data k8s.CheckData) (bool, string, error) {
+				CheckFn: func(_ context.Context, _ k8s.CheckData) (bool, string, error) {
 					missingFiles, _, err := k8s.FileTreeDifference(
 						"/var/lib/etcd",
 						[]string{"member/snap/db"},
@@ -244,7 +244,7 @@ func performStatus(ikniteConfig *v1alpha1.IkniteClusterSpec) {
 			{
 				Name:        "openrc",
 				Description: "Check that OpenRC is started",
-				CheckFn: func(ctx context.Context, data k8s.CheckData) (bool, string, error) {
+				CheckFn: func(_ context.Context, _ k8s.CheckData) (bool, string, error) {
 					exists, err := utils.Exists(constants.SoftLevelPath)
 					if err != nil {
 						return false, "", fmt.Errorf(
@@ -266,7 +266,7 @@ func performStatus(ikniteConfig *v1alpha1.IkniteClusterSpec) {
 				Name:        "kubelet_running",
 				DependsOn:   []string{"iknite_running"},
 				Description: "Check if the kubelet process is running",
-				CheckFn: func(ctx context.Context, data k8s.CheckData) (bool, string, error) {
+				CheckFn: func(_ context.Context, _ k8s.CheckData) (bool, string, error) {
 					return k8s.CheckService("kubelet", false, true)
 				},
 			},
@@ -275,7 +275,7 @@ func performStatus(ikniteConfig *v1alpha1.IkniteClusterSpec) {
 				Name:        "kubelet_health",
 				DependsOn:   []string{"kubelet_running"},
 				Description: "Check if the kubelet is reachable and healthy",
-				CheckFn: func(ctx context.Context, data k8s.CheckData) (bool, string, error) {
+				CheckFn: func(_ context.Context, _ k8s.CheckData) (bool, string, error) {
 					return k8s.CheckKubeletHealth(checkTimeout)
 				},
 			},
@@ -284,7 +284,7 @@ func performStatus(ikniteConfig *v1alpha1.IkniteClusterSpec) {
 				Name:        "apiserver_health",
 				DependsOn:   []string{"kubelet_running"},
 				Description: "Check if the kube-apiserver is healthy",
-				CheckFn: func(ctx context.Context, data k8s.CheckData) (bool, string, error) {
+				CheckFn: func(_ context.Context, data k8s.CheckData) (bool, string, error) {
 					return k8s.CheckApiServerHealth(checkTimeout, data)
 				},
 				CheckDataBuilder: checkDataBuilder,

@@ -76,7 +76,7 @@ func ConfigureClusterCommand(flagSet *flag.FlagSet, ikniteConfig *v1alpha1.Iknit
 	)
 }
 
-func StartPersistentPreRun(cmd *cobra.Command, args []string) {
+func StartPersistentPreRun(cmd *cobra.Command, _ []string) {
 	flags := cmd.Flags()
 	_ = viper.BindPFlag(IP, flags.Lookup(options.Ip))
 	_ = viper.BindPFlag(IPCreate, flags.Lookup(options.IpCreate))

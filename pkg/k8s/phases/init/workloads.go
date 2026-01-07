@@ -40,7 +40,7 @@ func runMonitorWorkloads(c workflow.RunData) error {
 		return errors.Wrap(err, "Cannot load the kubernetes configuration")
 	}
 	updateWorkloads := k8s.AreWorkloadsReady(config,
-		func(state bool, total int, ready, unready []*v1alpha1.WorkloadState, iteration int) bool {
+		func(state bool, _ int, ready, unready []*v1alpha1.WorkloadState, _ int) bool {
 			var status iknite.ClusterState
 			if state && cluster.Status.State != iknite.Running {
 				log.Info("All workloads are ready. Going to 60 seconds interval.")

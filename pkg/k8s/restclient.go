@@ -113,7 +113,7 @@ func StatusViewerFor(kind schema.GroupKind) (polymorphichelpers.StatusViewer, er
 
 func (s *ApplicationStatusViewer) Status(
 	obj runtime.Unstructured,
-	revision int64,
+	_ int64,
 ) (message string, success bool, err error) {
 	application := &Application{}
 
@@ -220,7 +220,7 @@ func AreWorkloadsReady(
 ) wait.ConditionWithContextFunc {
 	client := config.RESTClient()
 	iteration := 0
-	return func(ctx context.Context) (bool, error) {
+	return func(_ context.Context) (bool, error) {
 		states, err := client.AllWorkloadStates()
 		if err != nil {
 			return false, err

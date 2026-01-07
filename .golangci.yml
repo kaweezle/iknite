@@ -131,6 +131,9 @@ linters:
       tab-width: 1
 
     gocritic:
+      disabled-checks:
+        - unnamedResult
+
       enabled-tags:
         - diagnostic
         - experimental

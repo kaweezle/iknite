@@ -52,7 +52,7 @@ func NewStartCmd(ikniteConfig *v1alpha1.IkniteClusterSpec) *cobra.Command {
 - Installs flannel, metal-lb and local-path-provisioner.
 `,
 		PersistentPreRun: config.StartPersistentPreRun,
-		Run:              func(cmd *cobra.Command, args []string) { performStart(ikniteConfig) },
+		Run:              func(_ *cobra.Command, _ []string) { performStart(ikniteConfig) },
 	}
 	flags := startCmd.Flags()
 
@@ -63,7 +63,7 @@ func NewStartCmd(ikniteConfig *v1alpha1.IkniteClusterSpec) *cobra.Command {
 	return startCmd
 }
 
-func IsIkniteReady(ctx context.Context) (bool, error) {
+func IsIkniteReady(_ context.Context) (bool, error) {
 	cluster, err := v1alpha1.LoadIkniteCluster()
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
 		return false, fmt.Errorf("failed to load iknite cluster: %w", err)

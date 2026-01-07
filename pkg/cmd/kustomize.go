@@ -53,7 +53,7 @@ applies the Embedded configuration that installs the following components:
 
 `,
 		Run: performKustomize,
-		PreRun: func(cmd *cobra.Command, args []string) {
+		PreRun: func(cmd *cobra.Command, _ []string) {
 			flags := cmd.Flags()
 			_ = viper.BindPFlag(config.Kustomization, flags.Lookup(options.Kustomization))
 			_ = viper.BindPFlag(config.ForceConfig, flags.Lookup(options.ForceConfig))
@@ -98,7 +98,7 @@ func initializeKustomization(flagSet *flag.FlagSet) {
 	)
 }
 
-func performKustomize(cmd *cobra.Command, args []string) {
+func performKustomize(_ *cobra.Command, _ []string) {
 	ip, err := utils.GetOutboundIP()
 	cobra.CheckErr(errors.Wrap(err, "While getting IP address"))
 

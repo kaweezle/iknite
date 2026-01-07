@@ -40,7 +40,7 @@ func NewPrepareCommand(ikniteConfig *v1alpha1.IkniteClusterSpec) *cobra.Command 
 - Ensures Iknite is started with OpenRC.
 `,
 		PersistentPreRun: config.StartPersistentPreRun,
-		Run:              func(cmd *cobra.Command, args []string) { performPrepare(ikniteConfig) },
+		Run:              func(_ *cobra.Command, _ []string) { performPrepare(ikniteConfig) },
 	}
 	flags := prepareCmd.Flags()
 

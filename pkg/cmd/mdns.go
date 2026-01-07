@@ -55,11 +55,11 @@ It assumes that mDNS is not use elsewhere inside WSL.
 	return mdnsCmd
 }
 
-func mdnsPersistentPreRun(cmd *cobra.Command, args []string) {
+func mdnsPersistentPreRun(cmd *cobra.Command, _ []string) {
 	_ = viper.BindPFlag(config.DomainName, cmd.Flags().Lookup(options.DomainName))
 }
 
-func performMdns(cmd *cobra.Command, args []string) {
+func performMdns(_ *cobra.Command, _ []string) {
 	addr, err := net.ResolveUDPAddr("udp", mdns.DefaultAddress)
 	cobra.CheckErr(errors.Wrap(err, "Cannot resolve default address"))
 

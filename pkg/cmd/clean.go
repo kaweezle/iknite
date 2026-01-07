@@ -90,7 +90,7 @@ removes the network interfaces and the IP address assigned to the cluster.
 
 This command must be run as root.
 `,
-		Run: func(cmd *cobra.Command, args []string) {
+		Run: func(_ *cobra.Command, _ []string) {
 			if err := cleanOptions.validate(); err != nil {
 				log.WithError(err).Error("Invalid options")
 				os.Exit(1)

@@ -6,7 +6,7 @@
       "type": "shell",
       "command": "golangci-lint",
       //"args": ["run", "--enable-only", "godot"],
-      "args": ["run", "--enable-only", "gocritic", "--fix"],
+      "args": ["run", "--enable-only", "revive", "--fix"],
       "group": {
         "kind": "test",
         "isDefault": false

@@ -18,7 +18,7 @@ The kubelet is started and monitored. The following operations are performed:
 - Starts the kubelet,
 - Monitors the kubelet,
 `,
-		Run:              func(cmd *cobra.Command, args []string) { performKubelet(ikniteConfig) },
+		Run:              func(_ *cobra.Command, _ []string) { performKubelet(ikniteConfig) },
 		PersistentPreRun: config.StartPersistentPreRun,
 	}
 

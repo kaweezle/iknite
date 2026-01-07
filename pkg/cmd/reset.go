@@ -247,7 +247,7 @@ func newCmdReset(in io.Reader, out io.Writer, resetOptions *resetOptions) *cobra
 	cmd := &cobra.Command{
 		Use:   "reset",
 		Short: "Performs a best effort revert of changes made to this host by 'kubeadm init' or 'kubeadm join'",
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(_ *cobra.Command, args []string) error {
 			data, err := resetRunner.InitData(args)
 			if err != nil {
 				return fmt.Errorf("failed to initialize reset data: %w", err)
@@ -276,7 +276,7 @@ func newCmdReset(in io.Reader, out io.Writer, resetOptions *resetOptions) *cobra
 	// sets the data builder function, that will be used by the runner
 	// both when running the entire workflow or single phases
 	resetRunner.SetDataInitializer(
-		func(cmd *cobra.Command, args []string) (workflow.RunData, error) {
+		func(_ *cobra.Command, _ []string) (workflow.RunData, error) {
 			if cmd.Flags().Lookup(options.NodeCRISocket) == nil {
 				// skip CRI detection
 				// assume that the command execution does not depend on CRISocket when --cri-socket flag is not set

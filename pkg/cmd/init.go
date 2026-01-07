@@ -152,7 +152,7 @@ func newCmdInit(out io.Writer, initOptions *initOptions) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "init",
 		Short: "Run this command in order to set up the Kubernetes control plane",
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(_ *cobra.Command, args []string) error {
 			c, err := initRunner.InitData(args)
 			if err != nil {
 				return fmt.Errorf("failed to initialize init data: %w", err)
@@ -169,7 +169,7 @@ func newCmdInit(out io.Writer, initOptions *initOptions) *cobra.Command {
 			return initRunner.Run(args)
 		},
 		Args: cobra.NoArgs,
-		PostRunE: func(cmd *cobra.Command, args []string) error {
+		PostRunE: func(_ *cobra.Command, args []string) error {
 			c, err := initRunner.InitData(args)
 			if err != nil {
 				return fmt.Errorf("failed to initialize init data in post-run: %w", err)

@@ -31,7 +31,7 @@ func SystemFileCheck(name, description, path, expectedContent string) *Check {
 	return &Check{
 		Name:        name,
 		Description: description,
-		CheckFn: func(ctx context.Context, data CheckData) (bool, string, error) {
+		CheckFn: func(_ context.Context, _ CheckData) (bool, string, error) {
 			content, err := os.ReadFile(path)
 			if err != nil {
 				return false, "", fmt.Errorf("failed to read %s: %w", path, err)
@@ -86,7 +86,7 @@ func ServiceCheck(name, serviceName string) *Check {
 		Name:        name,
 		DependsOn:   []string{"openrc"},
 		Description: fmt.Sprintf("Check if %s service is running", serviceName),
-		CheckFn: func(ctx context.Context, data CheckData) (bool, string, error) {
+		CheckFn: func(_ context.Context, _ CheckData) (bool, string, error) {
 			return CheckService(serviceName, true, true)
 		},
 	}
@@ -98,7 +98,7 @@ func KubernetesFileCheck(name, path string) *Check {
 		Name:        name,
 		Description: fmt.Sprintf("Check %s", path),
 		DependsOn:   []string{},
-		CheckFn: func(ctx context.Context, data CheckData) (bool, string, error) {
+		CheckFn: func(_ context.Context, _ CheckData) (bool, string, error) {
 			// Check if file at path exists
 			info, err := os.Stat(path)
 			if os.IsNotExist(err) {
@@ -169,7 +169,7 @@ func FileTreeCheck(name, description, path string, expectedFiles []string) *Chec
 	return &Check{
 		Name:        name,
 		Description: description,
-		CheckFn: func(ctx context.Context, data CheckData) (bool, string, error) {
+		CheckFn: func(_ context.Context, _ CheckData) (bool, string, error) {
 			missingFiles, extraFiles, err := FileTreeDifference(path, expectedFiles)
 			if err != nil {
 				return false, "", err

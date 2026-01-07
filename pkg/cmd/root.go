@@ -62,7 +62,7 @@ kubernetes.`,
 	// Cobra supports persistent flags, which, if defined here,
 	// will be global for your application.
 
-	rootCmd.PersistentPreRunE = func(cmd *cobra.Command, args []string) error {
+	rootCmd.PersistentPreRunE = func(_ *cobra.Command, _ []string) error {
 		if err := SetUpLogs(os.Stderr, v, jsonLogs); err != nil {
 			return err
 		}
@@ -118,7 +118,7 @@ func SetUpLogs(out io.Writer, level string, json bool) error {
 	if json {
 		log.SetFormatter(&log.JSONFormatter{})
 	}
-	lvl, err := log.ParseLevel(v)
+	lvl, err := log.ParseLevel(level)
 	if err != nil {
 		return errors.Wrap(err, "parsing log level")
 	}
