@@ -150,7 +150,8 @@ func newResetData(
 		return nil, fmt.Errorf("failed to load or default reset configuration: %w", err)
 	}
 
-	dryRunFlag := cmdUtil.ValueFromFlagsOrConfig(cmd.Flags(), options.DryRun, resetCfg.DryRun,
+	dryRunFlag := cmdUtil.ValueFromFlagsOrConfig( //nolint:errcheck // default value is false
+		cmd.Flags(), options.DryRun, resetCfg.DryRun,
 		opts.externalCfg.DryRun).(bool)
 	if dryRunFlag {
 		dryRun := apiClient.NewDryRun().WithDefaultMarshalFunction().WithWriter(os.Stdout)
@@ -227,11 +228,14 @@ func newResetData(
 		outputWriter:          out,
 		cfg:                   initCfg,
 		resetCfg:              resetCfg,
-		dryRun: cmdUtil.ValueFromFlagsOrConfig(cmd.Flags(), options.DryRun, resetCfg.DryRun,
+		dryRun: cmdUtil.ValueFromFlagsOrConfig( //nolint:errcheck // default value is false
+			cmd.Flags(), options.DryRun, resetCfg.DryRun,
 			opts.externalCfg.DryRun).(bool),
-		forceReset: cmdUtil.ValueFromFlagsOrConfig(cmd.Flags(), options.Force, resetCfg.Force,
+		forceReset: cmdUtil.ValueFromFlagsOrConfig( //nolint:errcheck // default value is false
+			cmd.Flags(), options.Force, resetCfg.Force,
 			opts.externalCfg.Force).(bool),
-		cleanupTmpDir: cmdUtil.ValueFromFlagsOrConfig(cmd.Flags(), options.CleanupTmpDir, resetCfg.CleanupTmpDir,
+		cleanupTmpDir: cmdUtil.ValueFromFlagsOrConfig( //nolint:errcheck // default value is false
+			cmd.Flags(), options.CleanupTmpDir, resetCfg.CleanupTmpDir,
 			opts.externalCfg.CleanupTmpDir).(bool),
 		ikniteCluster: ikniteCluster,
 	}, nil

@@ -147,7 +147,10 @@ func StartKubelet() (*exec.Cmd, error) {
 
 	// Check if a process with the value contained in kubeletPidFile exists
 	// ignore the error if for some reason the pid file is not found
-	kubeletPid, _ := CheckPidFile("kubelet", cmd)
+	kubeletPid, err := CheckPidFile("kubelet", cmd)
+	if err != nil {
+		return nil, errors.WithMessagef(err, "Failed to check kubelet pid file %s", kubeletPidFile)
+	}
 	if kubeletPid > 0 {
 		log.WithField("pid", kubeletPid).
 			Warnf("Kubelet is already running with pid: %d. Swallowing...", kubeletPid)
@@ -170,7 +173,7 @@ func StartKubelet() (*exec.Cmd, error) {
 		return nil, errors.WithMessagef(err, "Failed to open kubelet log file %s", kubeletLogFile)
 	}
 	defer func() {
-		_ = logFile.Close()
+		err = logFile.Close()
 	}()
 
 	// Set the command's stdout and stderr to the log file
@@ -205,7 +208,13 @@ func StartKubelet() (*exec.Cmd, error) {
 }
 
 func RemovePidFiles() {
-	_ = os.Remove(kubeletPidFile)
+	err := os.Remove(kubeletPidFile)
+	if err != nil {
+		log.WithFields(log.Fields{
+			"err":     err,
+			"pidFile": kubeletPidFile,
+		}).Warn("Failed to remove kubelet PID file")
+	}
 }
 
 func StartAndConfigureKubelet(kubeConfig *v1alpha1.IkniteClusterSpec) error {
@@ -246,7 +255,10 @@ func StartAndConfigureKubelet(kubeConfig *v1alpha1.IkniteClusterSpec) error {
 		if err != nil {
 			log.Fatalf("Failed to stop subprocess: %v", err)
 		}
-		_ = cmd.Wait()
+		err = cmd.Wait()
+		if err != nil {
+			log.Fatalf("Failed to stop subprocess: %v", err)
+		}
 		alive = false
 	}
 

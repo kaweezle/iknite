@@ -55,8 +55,11 @@ applies the Embedded configuration that installs the following components:
 		Run: performKustomize,
 		PreRun: func(cmd *cobra.Command, _ []string) {
 			flags := cmd.Flags()
-			_ = viper.BindPFlag(config.Kustomization, flags.Lookup(options.Kustomization))
-			_ = viper.BindPFlag(config.ForceConfig, flags.Lookup(options.ForceConfig))
+			_ = viper.BindPFlag( //nolint:errcheck // flag exists
+				config.Kustomization, flags.Lookup(options.Kustomization))
+
+			_ = viper.BindPFlag( //nolint:errcheck // flag exists
+				config.ForceConfig, flags.Lookup(options.ForceConfig))
 		},
 	}
 

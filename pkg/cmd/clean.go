@@ -219,15 +219,19 @@ func performClean(ikniteConfig *v1alpha1.IkniteClusterSpec, cleanOptions *cleanO
 		}
 	}
 
-	kubeletProcess, _ := k8s.IsKubeletRunning()
-	if kubeletProcess != nil {
-		logger.WithField("pid", kubeletProcess.Pid).Info("Kubelet is still running, stopping it...")
-		if !dryRun {
-			err = kubeletProcess.Signal(syscall.SIGTERM)
-			if err == nil {
-				logger.WithField("pid", kubeletProcess.Pid).Info("Waiting for kubelet to stop...")
-				_, err = kubeletProcess.Wait()
-				cobra.CheckErr(err)
+	kubeletProcess, err := k8s.IsKubeletRunning()
+	if err != nil {
+		logger.WithError(err).Warn("Error checking kubelet process")
+	} else {
+		if kubeletProcess != nil {
+			logger.WithField("pid", kubeletProcess.Pid).Info("Kubelet is still running, stopping it...")
+			if !dryRun {
+				err = kubeletProcess.Signal(syscall.SIGTERM)
+				if err == nil {
+					logger.WithField("pid", kubeletProcess.Pid).Info("Waiting for kubelet to stop...")
+					_, err = kubeletProcess.Wait()
+					cobra.CheckErr(err)
+				}
 			}
 		}
 	}

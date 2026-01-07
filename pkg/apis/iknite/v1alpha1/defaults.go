@@ -25,7 +25,7 @@ func SetDefaults_IkniteClusterSpec(obj *IkniteClusterSpec) {
 		if wsl {
 			obj.Ip = net.ParseIP(constants.WslIPAddress)
 		} else {
-			obj.Ip, _ = utils.GetOutboundIP()
+			obj.Ip, _ = utils.GetOutboundIP() //nolint:errcheck // it it fails, no default
 		}
 	}
 	if obj.DomainName == "" && wsl {

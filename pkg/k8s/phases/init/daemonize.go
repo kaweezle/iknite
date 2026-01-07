@@ -47,7 +47,10 @@ func WaitForKubelet(cmd *exec.Cmd, conn *mdns.Conn, cancel context.CancelFunc) e
 			log.Info("Received TERM Signal. Stopping kubelet...")
 			err = cmd.Process.Signal(syscall.SIGTERM)
 			if err == nil {
-				_ = cmd.Wait()
+				err = cmd.Wait()
+				if err != nil {
+					log.WithError(err).Warn("Error while waiting for kubelet to stop")
+				}
 			}
 
 			alive = false
@@ -95,7 +98,10 @@ func runDaemonize(c workflow.RunData) error {
 		data.SetKubeletCmd(nil)
 	}
 	data.IkniteCluster().Update(iknite.Cleaning, "clean", nil, nil)
-	_ = k8s.CleanAll(&data.IkniteCluster().Spec, true, false, false, false)
+	err = k8s.CleanAll(&data.IkniteCluster().Spec, true, false, false, false)
+	if err != nil {
+		log.WithError(err).Warn("Error during cleanup after kubelet stopped")
+	}
 	data.IkniteCluster().Update(iknite.Stopped, "", nil, nil)
-	return err
+	return nil
 }

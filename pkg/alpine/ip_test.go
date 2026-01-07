@@ -84,7 +84,7 @@ func (s *IPTestSuite) TestAddIpMapping() {
 
 	f, err := os.CreateTemp("", "hosts")
 	require.NoError(err)
-	_ = f.Close()
+	require.NoError(f.Close())
 
 	config := txeh.HostsConfig{
 		ReadFilePath:  "testdata/hosts1",

@@ -78,14 +78,46 @@ func ConfigureClusterCommand(flagSet *flag.FlagSet, ikniteConfig *v1alpha1.Iknit
 
 func StartPersistentPreRun(cmd *cobra.Command, _ []string) {
 	flags := cmd.Flags()
-	_ = viper.BindPFlag(IP, flags.Lookup(options.Ip))
-	_ = viper.BindPFlag(IPCreate, flags.Lookup(options.IpCreate))
-	_ = viper.BindPFlag(IPNetworkInterface, flags.Lookup(options.IpNetworkInterface))
-	_ = viper.BindPFlag(DomainName, flags.Lookup(options.DomainName))
-	_ = viper.BindPFlag(KubernetesVersion, flags.Lookup(koptions.KubernetesVersion))
-	_ = viper.BindPFlag(EnableMDNS, flags.Lookup(options.EnableMDNS))
-	_ = viper.BindPFlag(ClusterName, flags.Lookup(options.ClusterName))
-	_ = viper.BindPFlag(Kustomization, flags.Lookup(options.Kustomization))
+	//nolint:errcheck // flag exists
+	_ = viper.BindPFlag(
+		IP,
+		flags.Lookup(options.Ip),
+	)
+	//nolint:errcheck // flag exists
+	_ = viper.BindPFlag(
+		IPCreate,
+		flags.Lookup(options.IpCreate),
+	)
+	//nolint:errcheck // flag exists
+	_ = viper.BindPFlag(
+		IPNetworkInterface,
+		flags.Lookup(options.IpNetworkInterface),
+	)
+	//nolint:errcheck // flag exists
+	_ = viper.BindPFlag(
+		DomainName,
+		flags.Lookup(options.DomainName),
+	)
+	//nolint:errcheck // flag exists
+	_ = viper.BindPFlag(
+		KubernetesVersion,
+		flags.Lookup(koptions.KubernetesVersion),
+	)
+	//nolint:errcheck // flag exists
+	_ = viper.BindPFlag(
+		EnableMDNS,
+		flags.Lookup(options.EnableMDNS),
+	)
+	//nolint:errcheck // flag exists
+	_ = viper.BindPFlag(
+		ClusterName,
+		flags.Lookup(options.ClusterName),
+	)
+	//nolint:errcheck // flag exists
+	_ = viper.BindPFlag(
+		Kustomization,
+		flags.Lookup(options.Kustomization),
+	)
 }
 
 // DecodeIkniteConfig decodes the configuration from the viper configuration.

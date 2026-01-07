@@ -500,7 +500,10 @@ func newInitData(
 		ikniteCluster:           ikniteCluster,
 		ctx:                     ctx,
 		ctxCancel:               cancel,
-		dryRun: cmdUtil.ValueFromFlagsOrConfig(cmd.Flags(), options.DryRun, cfg.DryRun,
+		dryRun: cmdUtil.ValueFromFlagsOrConfig( //nolint:errcheck // default value is false
+			cmd.Flags(),
+			options.DryRun,
+			cfg.DryRun,
 			initOptions.dryRun).(bool),
 	}, nil
 }

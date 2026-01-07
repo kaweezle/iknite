@@ -99,7 +99,10 @@ func GetOutboundIP() (net.IP, error) {
 		err = conn.Close()
 	}()
 
-	localAddr := conn.LocalAddr().(*net.UDPAddr)
+	localAddr, ok := conn.LocalAddr().(*net.UDPAddr)
+	if !ok {
+		return nil, fmt.Errorf("failed to get local address")
+	}
 
 	return localAddr.IP, nil
 }
@@ -128,6 +131,9 @@ func RemoveDirectoryContents(dir string, predicate func(string) bool) error {
 }
 
 func IsOnWSL() bool {
-	wsl, _ := afs.DirExists("/run/WSL")
+	wsl, err := afs.DirExists("/run/WSL")
+	if err != nil {
+		return false
+	}
 	return wsl
 }

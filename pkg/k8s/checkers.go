@@ -364,7 +364,10 @@ func PrettyPrintWorkloadState(prefix string, r *v1alpha1.WorkloadState) string {
 }
 
 func CheckWorkloadResultPrinter(result *CheckResult, prefix, spinView string) string {
-	data := result.CheckData.(CheckWorkloadData)
+	data, ok := result.CheckData.(CheckWorkloadData)
+	if !ok {
+		return result.FormatResult(prefix, spinView)
+	}
 
 	ready := data.ReadyWorkloads()
 	unready := data.NotReadyWorkloads()
@@ -413,7 +416,10 @@ func CheckWorkloadResultPrinter(result *CheckResult, prefix, spinView string) st
 }
 
 func CheckWorkloads(ctx context.Context, data CheckData) (bool, string, error) {
-	workloadData := (data).(CheckWorkloadData)
+	workloadData, ok := (data).(CheckWorkloadData)
+	if !ok {
+		return false, "", errors.New("invalid check data type")
+	}
 	config, err := LoadFromFile(
 		filepath.Join(kubeadmConstants.KubernetesDir, kubeadmConstants.AdminKubeConfigFileName),
 	)

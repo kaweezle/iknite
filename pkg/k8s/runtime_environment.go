@@ -83,18 +83,24 @@ func PrepareKubernetesEnvironment(ikniteConfig *v1alpha1.IkniteClusterSpec) erro
 
 	// Allow forwarding (kubeadm requirement)
 	log.Info("Ensuring basic settings...")
-	_ = utils.WriteFile("/proc/sys/net/ipv4/ip_forward", []byte("1\n"), os.FileMode(int(0o644)))
+	err := utils.WriteFile("/proc/sys/net/ipv4/ip_forward", []byte("1\n"), os.FileMode(int(0o644)))
+	if err != nil {
+		log.WithError(err).Info("Could not write to /proc/sys/net/ipv4/ip_forward")
+	}
 
 	if err := alpine.EnsureNetFilter(); err != nil {
 		return errors.Wrap(err, "While ensuring netfilter")
 	}
 
 	// Make bridge use ip-tables
-	_ = utils.WriteFile(
+	err = utils.WriteFile(
 		"/proc/sys/net/bridge/bridge-nf-call-iptables",
 		[]byte("1\n"),
 		os.FileMode(int(0o644)),
 	)
+	if err != nil {
+		log.WithError(err).Info("While enabling bridge-nf-call-iptables")
+	}
 
 	if err := alpine.EnsureMachineID(); err != nil {
 		return errors.Wrap(err, "While ensuring machine ID")
