@@ -72,6 +72,14 @@ repos:
               .*\.(png|jpg|jpeg|gif|svg|ico|zip|gz|xz|7z|tar|nupkg)$
           )$
 
+  # golangci-lint for Go files
+  - repo: https://github.com/golangci/golangci-lint
+    rev: v2.7.2
+    hooks:
+      - id: golangci-lint-config-verify
+      - id: golangci-lint
+      - id: golangci-lint-fmt
+
 # Global exclusions for all hooks
 exclude: |
   ^docs/assets/|

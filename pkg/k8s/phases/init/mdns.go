@@ -1,5 +1,6 @@
 package init
 
+// cSpell: disable
 import (
 	"fmt"
 	"net"
@@ -10,6 +11,8 @@ import (
 	"golang.org/x/net/ipv4"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 )
+
+// cSpell: enable
 
 func NewMDnsPublishPhase() workflow.Phase {
 	return workflow.Phase{

@@ -45,6 +45,7 @@
     "gocognit",
     "gocritic",
     "gocyclo",
+    "Golangci",
     "GOPATH",
     "gosec",
     "govet",
