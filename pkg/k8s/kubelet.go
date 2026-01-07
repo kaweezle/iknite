@@ -50,10 +50,10 @@ var (
 func CheckPidFile(service string, cmd *exec.Cmd) (int, error) {
 	pidFilePath := fmt.Sprintf("/run/%s.pid", service)
 	logger := log.WithField("pidfile", pidFilePath)
-	pidBytes, err := os.ReadFile(pidFilePath)
+	pidBytes, err := os.ReadFile(pidFilePath) //nolint:gosec // Controlled file path
 	if err != nil && errors.Is(err, os.ErrNotExist) {
 		pidFilePath = fmt.Sprintf("/var/run/supervise-%s.pid", service)
-		pidBytes, err = os.ReadFile(pidFilePath)
+		pidBytes, err = os.ReadFile(pidFilePath) //nolint:gosec // Controlled file path
 	}
 	if err == nil {
 		pidStr := strings.TrimSpace(string(pidBytes))
@@ -158,7 +158,7 @@ func StartKubelet() (*exec.Cmd, error) {
 	}
 
 	// Create the kubelet log directory if it doesn't exist
-	err = os.MkdirAll(kubeletLogDir, os.ModePerm)
+	err = os.MkdirAll(kubeletLogDir, 0o755) //nolint:gosec // Want read access
 	if err != nil {
 		return nil, errors.WithMessagef(
 			err,
@@ -168,7 +168,8 @@ func StartKubelet() (*exec.Cmd, error) {
 	}
 
 	// Open the kubelet log file for writing
-	logFile, err := os.OpenFile(kubeletLogFile, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0o644)
+	logFile, err := os.OpenFile( //nolint:gosec // Want read access
+		kubeletLogFile, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0o644)
 	if err != nil {
 		return nil, errors.WithMessagef(err, "Failed to open kubelet log file %s", kubeletLogFile)
 	}
@@ -195,7 +196,8 @@ func StartKubelet() (*exec.Cmd, error) {
 	}
 
 	// Write the PID to the /run/kubelet.pid file
-	err = os.WriteFile(kubeletPidFile, fmt.Appendf(nil, "%d", cmd.Process.Pid), 0o644)
+	err = os.WriteFile( //nolint:gosec // Want read access
+		kubeletPidFile, fmt.Appendf(nil, "%d", cmd.Process.Pid), 0o644)
 	if err != nil {
 		log.WithFields(log.Fields{
 			"pid":     cmd.Process.Pid,

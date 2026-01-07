@@ -159,7 +159,7 @@ func CleanDir(filePath string) error {
 		return nil
 	}
 
-	d, err := os.Open(filePath)
+	d, err := os.Open(filePath) //nolint:gosec // Controlled file path
 	if err != nil {
 		return fmt.Errorf("failed to open directory for cleanup: %w", err)
 	}
@@ -180,7 +180,7 @@ func CleanDir(filePath string) error {
 
 // IsDirEmpty returns true if a directory is empty.
 func IsDirEmpty(dir string) (bool, error) {
-	d, err := os.Open(dir)
+	d, err := os.Open(dir) //nolint:gosec // Just checking directory contents
 	if err != nil {
 		return false, fmt.Errorf("failed to open directory: %w", err)
 	}

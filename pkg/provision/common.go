@@ -104,7 +104,7 @@ func applyResmap(resources resmap.ResMap) error {
 	buffer := bytes.Buffer{}
 	buffer.Write(out)
 
-	cmd := exec.Command(constants.KubectlCmd, "apply", "-f", "-")
+	cmd := exec.Command(constants.KubectlCmd, "apply", "-f", "-") //nolint:gosec // Controlled input
 	cmd.Env = append(cmd.Env, "KUBECONFIG=/root/.kube/config")
 	cmd.Stdin = &buffer
 	out, err = cmd.CombinedOutput()

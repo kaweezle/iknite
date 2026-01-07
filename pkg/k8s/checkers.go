@@ -32,7 +32,7 @@ func SystemFileCheck(name, description, path, expectedContent string) *Check {
 		Name:        name,
 		Description: description,
 		CheckFn: func(_ context.Context, _ CheckData) (bool, string, error) {
-			content, err := os.ReadFile(path)
+			content, err := os.ReadFile(path) //nolint:gosec // Content not sensitive
 			if err != nil {
 				return false, "", fmt.Errorf("failed to read %s: %w", path, err)
 			}

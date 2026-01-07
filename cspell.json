@@ -42,6 +42,7 @@
     "gitmoji",
     "gocritic",
     "GOPATH",
+    "gosec",
     "govet",
     "Healthz",
     "iknite",

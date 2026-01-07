@@ -108,7 +108,7 @@ func GetOutboundIP() (net.IP, error) {
 }
 
 func RemoveDirectoryContents(dir string, predicate func(string) bool) error {
-	d, err := os.Open(dir)
+	d, err := os.Open(dir) //nolint:gosec // Controlled file path
 	if err != nil {
 		return fmt.Errorf("failed to open directory: %w", err)
 	}
