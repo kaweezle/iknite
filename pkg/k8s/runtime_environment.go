@@ -50,21 +50,23 @@ func IsKubeletServiceRunnable(confFilePath string) (bool, error) {
 // PreventKubeletServiceFromStarting ensures that the kubelet service is not started
 // by the OpenRC init system. It does so by adding a line to the confFilePath file.
 func PreventKubeletServiceFromStarting(confFilePath string) error {
-	if present, err := script.File(confFilePath).Match(rcConfPreventKubeletRunning).CountLines(); err == nil {
-		if present == 0 {
-			log.Info("Preventing kubelet from running")
-			var lines []string
-			if lines, err = script.File(confFilePath).Slice(); err == nil {
-				lines = append(lines, rcConfPreventKubeletRunning)
-				if _, err = script.Slice(lines).WriteFile(confFilePath); err != nil {
-					return errors.Wrapf(err, "While writing %s", confFilePath)
-				}
-			} else {
-				return errors.Wrapf(err, "While reading %s", confFilePath)
-			}
+	present, err := script.File(confFilePath).Match(rcConfPreventKubeletRunning).CountLines()
+	if err != nil {
+		return fmt.Errorf("while checking %s: %w", confFilePath, err)
+	}
+	if present > 0 {
+		log.Info("Kubelet service is already prevented from running")
+		return nil
+	}
+	log.Info("Preventing kubelet from running")
+	var lines []string
+	if lines, err = script.File(confFilePath).Slice(); err == nil {
+		lines = append(lines, rcConfPreventKubeletRunning)
+		if _, err = script.Slice(lines).WriteFile(confFilePath); err != nil {
+			return errors.Wrapf(err, "While writing %s", confFilePath)
 		}
 	} else {
-		return errors.Wrapf(err, "While checking %s", confFilePath)
+		return fmt.Errorf("while reading %s: %w", confFilePath, err)
 	}
 	return nil
 }

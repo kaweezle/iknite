@@ -626,31 +626,32 @@ func (d *initData) OutputWriter() io.Writer {
 // Important. This function must be called after the admin.conf kubeconfig file is created.
 func (d *initData) Client() (clientset.Interface, error) {
 	var err error
-	if d.client == nil {
-		if d.dryRun {
-			d.client, err = getDryRunClient(d)
-			if err != nil {
-				return nil, err
-			}
-		} else { // Use a real client
-			isDefaultKubeConfigPath := d.KubeConfigPath() == kubeadmConstants.GetAdminKubeConfigPath()
-			// Only bootstrap the admin.conf if it's used by the user (i.e. --kubeconfig has its default value)
-			// and if the bootstrapping was not already done
-			if !d.adminKubeConfigBootstrapped && isDefaultKubeConfigPath {
-				// Call EnsureAdminClusterRoleBinding() to obtain a working client from admin.conf.
-				d.client, err = kubeconfigPhase.EnsureAdminClusterRoleBinding(kubeadmConstants.KubernetesDir, nil)
-				if err != nil {
-					return nil, errors.Wrapf(err, "could not bootstrap the admin user in file %s",
-						kubeadmConstants.AdminKubeConfigFileName)
-				}
-				d.adminKubeConfigBootstrapped = true
-			} else {
-				// Alternatively, just load the config pointed at the --kubeconfig path
-				d.client, err = kubeConfigUtil.ClientSetFromFile(d.KubeConfigPath())
-				if err != nil {
-					return nil, fmt.Errorf("failed to create client set from file: %w", err)
-				}
-			}
+	if d.client != nil {
+		return d.client, nil
+	}
+	if d.dryRun {
+		return getDryRunClient(d)
+	}
+	// Use a real client
+	isDefaultKubeConfigPath := d.KubeConfigPath() == kubeadmConstants.GetAdminKubeConfigPath()
+	// Only bootstrap the admin.conf if it's used by the user (i.e. --kubeconfig has its default value)
+	// and if the bootstrapping was not already done
+	if !d.adminKubeConfigBootstrapped && isDefaultKubeConfigPath {
+		// Call EnsureAdminClusterRoleBinding() to obtain a working client from admin.conf.
+		d.client, err = kubeconfigPhase.EnsureAdminClusterRoleBinding(
+			kubeadmConstants.KubernetesDir,
+			nil,
+		)
+		if err != nil {
+			return nil, errors.Wrapf(err, "could not bootstrap the admin user in file %s",
+				kubeadmConstants.AdminKubeConfigFileName)
+		}
+		d.adminKubeConfigBootstrapped = true
+	} else {
+		// Alternatively, just load the config pointed at the --kubeconfig path
+		d.client, err = kubeConfigUtil.ClientSetFromFile(d.KubeConfigPath())
+		if err != nil {
+			return nil, fmt.Errorf("failed to create client set from file: %w", err)
 		}
 	}
 	return d.client, nil

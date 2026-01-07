@@ -165,33 +165,32 @@ func performStatus(ikniteConfig *v1alpha1.IkniteClusterSpec) {
 				Name:        "domain_name",
 				Description: "Check if the domain name is set",
 				CheckFn: func(_ context.Context, _ k8s.CheckData) (bool, string, error) {
-					if ikniteConfig.DomainName != "" {
-						ipString := ikniteConfig.Ip.String()
-						if contains, ips := alpine.IsHostMapped(ikniteConfig.Ip, ikniteConfig.DomainName); contains {
-							mapped := func() bool {
-								for _, ip := range ips {
-									if ip.String() == ipString {
-										return true
-									}
-								}
-								return false
-							}()
-							if mapped {
-								return true, fmt.Sprintf(
-									"Domain name %s is mapped to IP %s",
-									ikniteConfig.DomainName,
-									ipString,
-								), nil
-							}
-						}
-						return false, fmt.Sprintf(
-							"Domain name %s is not mapped to IP %s",
-							ikniteConfig.DomainName,
-							ipString,
-						), nil
-					} else {
+					if ikniteConfig.DomainName == "" {
 						return true, "Domain name is not set", nil
 					}
+					ipString := ikniteConfig.Ip.String()
+					if contains, ips := alpine.IsHostMapped(ikniteConfig.Ip, ikniteConfig.DomainName); contains {
+						mapped := func() bool {
+							for _, ip := range ips {
+								if ip.String() == ipString {
+									return true
+								}
+							}
+							return false
+						}()
+						if mapped {
+							return true, fmt.Sprintf(
+								"Domain name %s is mapped to IP %s",
+								ikniteConfig.DomainName,
+								ipString,
+							), nil
+						}
+					}
+					return false, fmt.Sprintf(
+						"Domain name %s is not mapped to IP %s",
+						ikniteConfig.DomainName,
+						ipString,
+					), nil
 				},
 			},
 		}),

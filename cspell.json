@@ -64,6 +64,7 @@
     "Messagef",
     "mkdocs",
     "nerdctl",
+    "nestif",
     "netns",
     "nohup",
     "nolint",

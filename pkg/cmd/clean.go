@@ -220,7 +220,7 @@ func performClean(ikniteConfig *v1alpha1.IkniteClusterSpec, cleanOptions *cleanO
 	}
 
 	kubeletProcess, err := k8s.IsKubeletRunning()
-	if err != nil {
+	if err != nil { //nolint:nestif // Want method to go through
 		logger.WithError(err).Warn("Error checking kubelet process")
 	} else {
 		if kubeletProcess != nil {

@@ -52,7 +52,15 @@ var (
 
 func WaitForContainerService() (bool, error) {
 	retries := 3
-	for retries > 0 {
+	first := true
+	serviceIsReady := false
+	for ; retries > 0; retries-- {
+		if !first {
+			log.Debug("Waiting 2 seconds...")
+			time.Sleep(2 * time.Second)
+		}
+		first = false
+
 		exist, err := afs.Exists(constants.ContainerServiceSock)
 		if err != nil {
 			return false, errors.Wrapf(
@@ -61,36 +69,38 @@ func WaitForContainerService() (bool, error) {
 				constants.ContainerServiceSock,
 			)
 		}
-		if exist {
-			out, err := utils.Exec.Run(false, "/usr/bin/crictl", "--runtime-endpoint",
-				"unix://"+constants.ContainerServiceSock, "info")
-			if err == nil {
-				log.Trace(string(out))
-				response := &CRIStatusResponse{}
-				err = json.Unmarshal(out, &response)
-				if err == nil {
-					conditions := 0
-					falseConditions := 0
-					for _, v := range response.Status.Conditions {
-						conditions += 1
-						if !v.Status {
-							falseConditions += 1
-						}
-					}
-					if conditions >= 2 && falseConditions == 0 {
-						break
-					}
-				} else {
-					log.WithError(err).Warn("Error while parsing crictl status")
-				}
-			} else {
-				log.WithError(err).Warn("Error while checking container service sock")
-			}
+		if !exist {
+			log.Debugf(
+				"Container service sock %s does not exist yet",
+				constants.ContainerServiceSock,
+			)
+			continue
 		}
-		retries--
-
-		log.Debug("Waiting 2 seconds...")
-		time.Sleep(2 * time.Second)
+		out, err := utils.Exec.Run(false, "/usr/bin/crictl", "--runtime-endpoint",
+			"unix://"+constants.ContainerServiceSock, "info")
+		if err != nil {
+			log.WithError(err).Warn("Error while checking container service sock")
+			continue
+		}
+		log.Trace(string(out))
+		response := &CRIStatusResponse{}
+		err = json.Unmarshal(out, &response)
+		if err == nil {
+			conditions := 0
+			falseConditions := 0
+			for _, v := range response.Status.Conditions {
+				conditions += 1
+				if !v.Status {
+					falseConditions += 1
+				}
+			}
+			if conditions >= 2 && falseConditions == 0 {
+				serviceIsReady = true
+				break
+			}
+		} else {
+			log.WithError(err).Warn("Error while parsing crictl status")
+		}
 	}
-	return retries > 0, nil
+	return serviceIsReady, nil
 }

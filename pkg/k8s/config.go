@@ -124,36 +124,39 @@ func (config *Config) CheckClusterRunning(retries, okResponses, waitTime int) er
 
 	okTries := 0
 	query := client.Discovery().RESTClient().Get().AbsPath("/readyz")
-	for retries > 0 {
-		var content []byte
-		content, err = query.DoRaw(context.Background())
-		if err == nil {
-			contentStr := string(content)
-			if contentStr != "ok" {
-				err = fmt.Errorf("cluster health API returned: %s", contentStr)
-				log.WithError(err).Debug("Bad response")
-			} else {
-				okTries += 1
-				log.WithField("okTries", okTries).Trace("Ok response from server")
-				if okTries == okResponses {
-					break
-				}
-			}
-		} else {
-			log.WithError(err).Debug("while querying cluster readiness")
-		}
-
-		retries -= 1
-		if retries == 0 {
-			log.Trace("No more retries left.")
-			return err
-		} else {
+	first := true
+	for ; retries > 0; retries-- {
+		if !first {
 			log.WithFields(log.Fields{
 				"err":       err,
 				"wait_time": waitTime,
 			}).Debug("Waiting...")
 			time.Sleep(time.Duration(waitTime) * time.Millisecond)
 		}
+		first = false
+
+		var content []byte
+		content, err = query.DoRaw(context.Background())
+		if err != nil {
+			log.WithError(err).Debug("while querying cluster readiness")
+			continue
+		}
+
+		contentStr := string(content)
+		if contentStr != "ok" {
+			err = fmt.Errorf("cluster health API returned: %s", contentStr)
+			log.WithError(err).Debug("Bad response")
+		} else {
+			okTries++
+			log.WithField("okTries", okTries).Trace("Ok response from server")
+			if okTries == okResponses {
+				break
+			}
+		}
+	}
+
+	if retries == 0 && okTries < okResponses {
+		log.Trace("No more retries left.")
 	}
 
 	return err
@@ -200,6 +203,22 @@ func (config *Config) RestartProxy() error {
 	return nil
 }
 
+// DoKustomization applies Kubernetes kustomizations to configure the cluster.
+// It takes an outbound IP address, a kustomization path or content, a force flag,
+// and a wait timeout in seconds.
+//
+// The function checks if configuration has already been applied by reading the
+// 'configured' field in the iknite ConfigMap. If already configured and force is
+// false, it logs a warning and skips configuration. Otherwise, it applies the
+// provided kustomization using provision.ApplyBaseKustomizations and marks the
+// cluster as configured by updating the ConfigMap.
+//
+// If waitTimeout is greater than 0, the function waits for all workloads to be
+// ready for the specified duration before returning.
+//
+// Returns an error if the client cannot be created, the ConfigMap cannot be read
+// or written, kustomizations fail to apply, or workloads don't become ready within
+// the timeout period.
 func (config *Config) DoKustomization(
 	ip net.IP,
 	kustomization string,
@@ -217,35 +236,34 @@ func (config *Config) DoKustomization(
 	}
 	if cm.Data["configured"] == "true" && !force {
 		log.Info("configuration has already occurred. Use -C to force.")
+		return nil
+	}
+	logContext := log.Fields{
+		"OutboundIP": ip,
+	}
+	var ids []resid.ResId
+	if kustomization == "" {
+		log.Warn("Empty kustomization.")
 	} else {
-		logContext := log.Fields{
-			"OutboundIP": ip,
-		}
-		var ids []resid.ResId
-		var err error
-		if kustomization == "" {
-			log.Warn("Empty kustomization.")
-		} else {
-			log.WithFields(log.Fields{
-				"kustomization": kustomization,
-			}).Info("Performing configuration")
-
-			if ids, err = provision.ApplyBaseKustomizations(kustomization, logContext); err != nil {
-				return fmt.Errorf("failed to apply base kustomizations: %w", err)
-			}
-		}
-
-		cm.Data["configured"] = "true"
-		_, err = WriteIkniteConfigMap(client, cm)
-		if err != nil {
-			return errors.Wrap(err, "While writing configuration")
-		}
-
 		log.WithFields(log.Fields{
 			"kustomization": kustomization,
-			"resources":     ids,
-		}).Info("Configuration applied")
+		}).Info("Performing configuration")
+
+		if ids, err = provision.ApplyBaseKustomizations(kustomization, logContext); err != nil {
+			return fmt.Errorf("failed to apply base kustomizations: %w", err)
+		}
 	}
+
+	cm.Data["configured"] = "true"
+	_, err = WriteIkniteConfigMap(client, cm)
+	if err != nil {
+		return errors.Wrap(err, "While writing configuration")
+	}
+
+	log.WithFields(log.Fields{
+		"kustomization": kustomization,
+		"resources":     ids,
+	}).Info("Configuration applied")
 
 	if waitTimeout > 0 {
 		log.Infof("Waiting for workloads for %d seconds...", waitTimeout)

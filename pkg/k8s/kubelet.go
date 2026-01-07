@@ -55,32 +55,34 @@ func CheckPidFile(service string, cmd *exec.Cmd) (int, error) {
 		pidFilePath = fmt.Sprintf("/var/run/supervise-%s.pid", service)
 		pidBytes, err = os.ReadFile(pidFilePath) //nolint:gosec // Controlled file path
 	}
-	if err == nil {
-		pidStr := strings.TrimSpace(string(pidBytes))
-		var pid int
-		pid, err = strconv.Atoi(pidStr)
-		if err != nil {
-			logger.WithField("content", pidStr).Warn("Failed to convert pid file to integer")
-		} else {
-			var process *os.Process
-			process, err = os.FindProcess(pid)
-			if err == nil && process.Signal(syscall.Signal(0)) == nil {
-				if cmd != nil {
-					cmd.Process = process
-				}
-				return pid, nil
-			} else {
-				logger.WithField("pid", pid).Warn("Pidfile contained an invalid pid")
-				// remove kubeletPidFile
-				err = os.Remove(pidFilePath)
-				if err != nil {
-					return 0, fmt.Errorf("failed to remove pid file: %w", err)
-				}
-			}
+	if err != nil {
+		if !errors.Is(err, os.ErrNotExist) {
+			// only return error is the error is not a file not found error
+			return 0, fmt.Errorf("failed to read pid file: %w", err)
 		}
-	} else if !errors.Is(err, os.ErrNotExist) {
-		// only return error is the error is not a file not found error
-		return 0, fmt.Errorf("failed to read pid file: %w", err)
+		return 0, nil
+	}
+
+	pidStr := strings.TrimSpace(string(pidBytes))
+	var pid int
+	pid, err = strconv.Atoi(pidStr)
+	if err != nil {
+		logger.WithField("content", pidStr).Warn("Failed to convert pid file to integer")
+		return 0, nil
+	}
+	var process *os.Process
+	process, err = os.FindProcess(pid)
+	if err == nil && process.Signal(syscall.Signal(0)) == nil {
+		if cmd != nil {
+			cmd.Process = process
+		}
+		return pid, nil
+	}
+	logger.WithField("pid", pid).Warn("Pidfile contained an invalid pid")
+	// remove kubeletPidFile
+	err = os.Remove(pidFilePath)
+	if err != nil {
+		return 0, fmt.Errorf("failed to remove pid file: %w", err)
 	}
 	return 0, nil
 }
@@ -88,31 +90,33 @@ func CheckPidFile(service string, cmd *exec.Cmd) (int, error) {
 // IsKubeletRunning checks if the kubelet process is running.
 func IsKubeletRunning() (*os.Process, error) {
 	pidBytes, err := os.ReadFile(kubeletPidFile)
-	if err == nil {
-		pidStr := strings.TrimSpace(string(pidBytes))
-		var pid int
-		pid, err = strconv.Atoi(pidStr)
-		if err != nil {
-			log.WithField("pidfile", kubeletPidFile).
-				Warnf("Failed to convert kubelet PID to integer: %s", pidStr)
-		} else {
-			var process *os.Process
-			process, err = os.FindProcess(pid)
-			if err == nil && process.Signal(syscall.Signal(0)) == nil {
-				log.WithField("pid", pid).Warnf("Kubelet is already running with pid: %d. Swallowing...", pid)
-				return process, nil
-			} else {
-				log.WithField("pid", pid).Warnf("Kubelet pidfile contained an invalid pid: %d", pid)
-				// remove kubeletPidFile
-				err = os.Remove(kubeletPidFile)
-				if err != nil {
-					return nil, fmt.Errorf("failed to remove kubelet pidfile: %w", err)
-				}
-			}
+	if err != nil {
+		if !errors.Is(err, os.ErrNotExist) {
+			// only return error is the error is not a file not found error
+			return nil, fmt.Errorf("failed to read kubelet pid file: %w", err)
 		}
-	} else if !errors.Is(err, os.ErrNotExist) {
-		// only return error is the error is not a file not found error
-		return nil, fmt.Errorf("failed to read kubelet pid file: %w", err)
+		return nil, nil
+	}
+	pidStr := strings.TrimSpace(string(pidBytes))
+	var pid int
+	pid, err = strconv.Atoi(pidStr)
+	if err != nil {
+		log.WithField("pidfile", kubeletPidFile).
+			Warnf("Failed to convert kubelet PID to integer: %s", pidStr)
+		return nil, nil
+	}
+	var process *os.Process
+	process, err = os.FindProcess(pid)
+	if err == nil && process.Signal(syscall.Signal(0)) == nil {
+		log.WithField("pid", pid).
+			Warnf("Kubelet is already running with pid: %d. Swallowing...", pid)
+		return process, nil
+	}
+	log.WithField("pid", pid).Warnf("Kubelet pidfile contained an invalid pid: %d", pid)
+	// remove kubeletPidFile
+	err = os.Remove(kubeletPidFile)
+	if err != nil {
+		return nil, fmt.Errorf("failed to remove kubelet pidfile: %w", err)
 	}
 	return nil, nil
 }
@@ -321,43 +325,45 @@ func StartAndConfigureKubelet(kubeConfig *v1alpha1.IkniteClusterSpec) error {
 
 func CheckKubeletRunning(retries, okResponses, waitTime int) (err error) {
 	okTries := 0
-	for retries > 0 {
-		var resp *http.Response
-		log.WithField("retries", retries).Debug("Checking kubelet health...")
-		resp, err = http.Get("http://localhost:10248/healthz")
-		if err == nil {
-			defer func() { err = resp.Body.Close() }() //nolint:gocritic // TODO: check potential leak
-			var body []byte
-			body, err = io.ReadAll(resp.Body)
-			if err == nil {
-				contentStr := string(body)
-				if contentStr != "ok" {
-					err = fmt.Errorf("cluster health API returned: %s", contentStr)
-					log.WithError(err).Debug("Bad response")
-				} else {
-					okTries += 1
-					log.WithField("okTries", okTries).Trace("Ok response from server")
-					if okTries == okResponses {
-						break
-					}
-				}
-			} else {
-				log.WithError(err).Debug("while reading response body")
-			}
-		} else {
-			log.WithError(err).Debug("while making HTTP request")
-		}
-		retries -= 1
-		if retries == 0 {
-			log.Trace("No more retries left.")
-			return err
-		} else {
+	first := true
+	for ; retries > 0; retries-- {
+		if !first {
 			log.WithFields(log.Fields{
 				"err":       err,
 				"wait_time": waitTime,
 			}).Debug("Waiting...")
 			time.Sleep(time.Duration(waitTime) * time.Millisecond)
 		}
+		first = false
+		var resp *http.Response
+		log.WithField("retries", retries).Debug("Checking kubelet health...")
+		resp, err = http.Get("http://localhost:10248/healthz")
+		if err != nil {
+			log.WithError(err).Debug("while making HTTP request")
+			continue
+		}
+
+		defer func() { err = resp.Body.Close() }() //nolint:gocritic // TODO: check potential leak
+		var body []byte
+		body, err = io.ReadAll(resp.Body)
+		if err != nil {
+			log.WithError(err).Debug("while reading response body")
+			continue
+		}
+		contentStr := string(body)
+		if contentStr != "ok" {
+			err = fmt.Errorf("cluster health API returned: %s", contentStr)
+			log.WithError(err).Debug("Bad response")
+		} else {
+			okTries += 1
+			log.WithField("okTries", okTries).Trace("Ok response from server")
+			if okTries == okResponses {
+				break
+			}
+		}
+	}
+	if retries == 0 && okTries < okResponses {
+		log.Trace("No more retries left.")
 	}
 	return err
 }
