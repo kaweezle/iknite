@@ -26,15 +26,14 @@ const (
 // includes br_netfilter in the kernel and modprobe is not available.
 // On other linuxes, netfilter is provided as a module.
 func EnsureNetFilter() error {
-	if err := utils.ExecuteIfNotExist(brNetfilterDir, func() (err error) {
+	if err := utils.ExecuteIfNotExist(brNetfilterDir, func() error {
 		log.Debug("Enabling netfilter...")
-		var out []byte
-		if out, err = utils.Exec.Run(true, "/sbin/modprobe", netfilter_module); err == nil {
+		if out, err := utils.Exec.Run(true, "/sbin/modprobe", netfilter_module); err == nil {
 			log.Trace(string(out))
 		} else {
-			err = errors.Wrapf(err, "Error while enabling netfilter: %s", string(out))
+			return errors.Wrapf(err, "Error while enabling netfilter: %s", string(out))
 		}
-		return err
+		return nil
 	}); err != nil {
 		return fmt.Errorf("failed to ensure netfilter: %w", err)
 	}
@@ -42,17 +41,17 @@ func EnsureNetFilter() error {
 }
 
 func EnsureMachineID() error {
-	if err := utils.ExecuteIfNotExist(machineIDFile, func() (err error) {
+	if err := utils.ExecuteIfNotExist(machineIDFile, func() error {
 		id := uuid.New()
 		log.WithFields(log.Fields{
 			"uuid":     id,
 			"filename": machineIDFile,
 		}).Info("Generating machine ID...")
 
-		if err = utils.WriteFile(machineIDFile, []byte(id.String()), os.FileMode(int(0o644))); err != nil {
-			err = errors.Wrapf(err, "Error while creating machine id: %s", machineIDFile)
+		if err := utils.WriteFile(machineIDFile, []byte(id.String()), os.FileMode(int(0o644))); err != nil {
+			return errors.Wrapf(err, "Error while creating machine id: %s", machineIDFile)
 		}
-		return err
+		return nil
 	}); err != nil {
 		return fmt.Errorf("failed to ensure machine ID: %w", err)
 	}

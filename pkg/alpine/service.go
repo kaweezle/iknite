@@ -53,7 +53,7 @@ func EnsureOpenRC(level string) error {
 // StartOpenRC starts the openrc services in the default runlevel.
 // If one of the services is already started, it is not restarted. It one is
 // not started, it is started.
-func StartOpenRC() (err error) {
+func StartOpenRC() error {
 	if err := utils.ExecuteIfNotExist(constants.SoftLevelPath, func() error {
 		return EnsureOpenRC("default")
 	}); err != nil {

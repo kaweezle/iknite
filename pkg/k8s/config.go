@@ -31,7 +31,6 @@ import (
 	metaV1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/clientcmd/api"
 	kubeadmConstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
@@ -100,16 +99,15 @@ func (config *Config) IsConfigServerAddress(address string) bool {
 }
 
 // Client returns a clientset for config.
-func (config *Config) Client() (client *kubernetes.Clientset, err error) {
+func (config *Config) Client() (*kubernetes.Clientset, error) {
 	clientConfig := clientcmd.NewDefaultClientConfig(api.Config(*config), nil)
-	var restConfig *rest.Config
-	restConfig, err = clientConfig.ClientConfig()
+	restConfig, err := clientConfig.ClientConfig()
 	if err != nil {
-		return client, fmt.Errorf("failed to get client config: %w", err)
+		return nil, fmt.Errorf("failed to get client config: %w", err)
 	}
-	client, err = kubernetes.NewForConfig(restConfig)
+	client, err := kubernetes.NewForConfig(restConfig)
 	if err != nil {
-		return client, fmt.Errorf("failed to create kubernetes client: %w", err)
+		return nil, fmt.Errorf("failed to create kubernetes client: %w", err)
 	}
 	return client, nil
 }
@@ -175,8 +173,9 @@ func (config *Config) WriteToFile(filename string) error {
 // The restart method is taken from kubectl:
 // https://github.com/kubernetes/kubectl/blob/
 // 652881798563c00c1895ded6ced819030bfaa4d7/pkg/polymorphichelpers/objectrestarter.go#L81.
-func (config *Config) RestartProxy() (err error) {
+func (config *Config) RestartProxy() error {
 	var client *kubernetes.Clientset
+	var err error
 	if client, err = config.Client(); err != nil {
 		return err
 	}
@@ -261,8 +260,8 @@ func (config *Config) DoKustomization(
 	return nil
 }
 
-func GetIkniteConfigMap(client kubernetes.Interface) (cm *coreV1.ConfigMap, err error) {
-	cm, err = client.CoreV1().
+func GetIkniteConfigMap(client kubernetes.Interface) (*coreV1.ConfigMap, error) {
+	cm, err := client.CoreV1().
 		ConfigMaps("kube-system").
 		Get(context.TODO(), "iknite-config", metaV1.GetOptions{})
 	if k8Errors.IsNotFound(err) {
@@ -281,7 +280,9 @@ func GetIkniteConfigMap(client kubernetes.Interface) (cm *coreV1.ConfigMap, err 
 func WriteIkniteConfigMap(
 	client kubernetes.Interface,
 	cm *coreV1.ConfigMap,
-) (res *coreV1.ConfigMap, err error) {
+) (*coreV1.ConfigMap, error) {
+	var res *coreV1.ConfigMap
+	var err error
 	if cm.UID != "" {
 		res, err = client.CoreV1().
 			ConfigMaps("kube-system").

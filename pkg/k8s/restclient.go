@@ -114,10 +114,10 @@ func StatusViewerFor(kind schema.GroupKind) (polymorphichelpers.StatusViewer, er
 func (s *ApplicationStatusViewer) Status(
 	obj runtime.Unstructured,
 	_ int64,
-) (message string, success bool, err error) {
+) (string, bool, error) {
 	application := &Application{}
 
-	err = runtime.DefaultUnstructuredConverter.FromUnstructured(
+	err := runtime.DefaultUnstructuredConverter.FromUnstructured(
 		obj.UnstructuredContent(),
 		application,
 	)
@@ -128,15 +128,16 @@ func (s *ApplicationStatusViewer) Status(
 	healthStatusString := application.Status.Health.Status
 	syncStatusString := application.Status.Sync.Status
 
-	message = fmt.Sprintf("application %q sync status: %s, health status: %s",
+	message := fmt.Sprintf("application %q sync status: %s, health status: %s",
 		application.Name, syncStatusString, healthStatusString)
 	return message, healthStatusString == "Healthy" && syncStatusString == "Synced", nil
 }
 
-func (client *RESTClientGetter) HasApplications() (has bool, err error) {
+func (client *RESTClientGetter) HasApplications() (bool, error) {
 	var mapper meta.RESTMapper
+	var err error
 	if mapper, err = client.ToRESTMapper(); err != nil {
-		return has, err
+		return false, err
 	}
 
 	_, err = mapper.RESTMapping(
@@ -147,21 +148,20 @@ func (client *RESTClientGetter) HasApplications() (has bool, err error) {
 		if meta.IsNoMatchError(err) {
 			err = nil
 		} else {
-			return has, err
+			return false, err
 		}
-	} else {
-		has = true
 	}
-	return has, err
+	return true, nil
 }
 
-func (client *RESTClientGetter) AllWorkloadStates() (result []*v1alpha1.WorkloadState, err error) {
-	var _result []*v1alpha1.WorkloadState
+func (client *RESTClientGetter) AllWorkloadStates() ([]*v1alpha1.WorkloadState, error) {
+	var result []*v1alpha1.WorkloadState
 
 	resourceTypes := "deployments,statefulsets,daemonsets"
 	var hasApplications bool
+	var err error
 	if hasApplications, err = client.HasApplications(); err != nil {
-		return result, err
+		return nil, err
 	}
 	if hasApplications {
 		resourceTypes += ",applications"
@@ -177,37 +177,36 @@ func (client *RESTClientGetter) AllWorkloadStates() (result []*v1alpha1.Workload
 
 	var infos []*resource.Info
 	if infos, err = r.Infos(); err != nil {
-		return result, fmt.Errorf("failed to get resource infos: %w", err)
+		return nil, fmt.Errorf("failed to get resource infos: %w", err)
 	}
 
 	for _, info := range infos {
 		var u map[string]any
 
 		if u, err = runtime.DefaultUnstructuredConverter.ToUnstructured(info.Object); err != nil {
-			return result, fmt.Errorf("failed to convert object to unstructured: %w", err)
+			return nil, fmt.Errorf("failed to convert object to unstructured: %w", err)
 		}
 
 		var v polymorphichelpers.StatusViewer
 		if v, err = StatusViewerFor(info.Object.GetObjectKind().GroupVersionKind().GroupKind()); err != nil {
-			return result, fmt.Errorf("failed to get status viewer: %w", err)
+			return nil, fmt.Errorf("failed to get status viewer: %w", err)
 		}
 
 		var msg string
 		var ok bool
 		if msg, ok, err = v.Status(&unstructured.Unstructured{Object: u}, 0); err != nil {
-			return result, fmt.Errorf("failed to get workload status: %w", err)
+			return nil, fmt.Errorf("failed to get workload status: %w", err)
 		}
-		_result = append(_result, &v1alpha1.WorkloadState{
+		result = append(result, &v1alpha1.WorkloadState{
 			Namespace: info.Namespace,
 			Name:      info.ObjectName(),
 			Ok:        ok,
 			Message:   strings.TrimSuffix(msg, "\n"),
 		})
 	}
-	sort.SliceStable(_result, func(i, j int) bool {
-		return _result[i].String() < _result[j].String()
+	sort.SliceStable(result, func(i, j int) bool {
+		return result[i].String() < result[j].String()
 	})
-	result = _result
 	return result, nil
 }
 

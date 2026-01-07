@@ -15,10 +15,9 @@ import (
 
 // cSpell: enable
 
-func CheckIpExists(ip net.IP) (result bool, err error) {
-	result = false
-	var ifaces []net.Interface
-	ifaces, err = net.Interfaces()
+func CheckIpExists(ip net.IP) (bool, error) {
+	result := false
+	ifaces, err := net.Interfaces()
 	if err != nil {
 		return result, fmt.Errorf("failed to get network interfaces: %w", err)
 	}
@@ -47,7 +46,7 @@ func CheckIpExists(ip net.IP) (result bool, err error) {
 //
 // It uses the default mask of the IP address class as the mask, and the default
 // broadcast address as the broadcast address.
-func AddIpAddress(iface string, address net.IP) (err error) {
+func AddIpAddress(iface string, address net.IP) error {
 	ones, _ := address.DefaultMask().Size()
 	ipWithMask := fmt.Sprintf("%v/%d", address, ones)
 
@@ -62,12 +61,10 @@ func AddIpAddress(iface string, address net.IP) (err error) {
 		"broadcast", "+", // This will set the broadcast address automatically
 		"dev", iface,
 	}
-
-	var out []byte
-	if out, err = utils.Exec.Run(true, "/sbin/ip", parameters...); err != nil {
-		err = errors.Wrap(err, string(out))
+	if out, err := utils.Exec.Run(true, "/sbin/ip", parameters...); err != nil {
+		return errors.Wrap(err, string(out))
 	}
-	return err
+	return nil
 }
 
 func removeIpAddresses(hosts *txeh.Hosts, toRemove []net.IP) {
@@ -94,9 +91,8 @@ func AddIpMapping(
 	ip net.IP,
 	domainName string,
 	toRemove []net.IP,
-) (err error) {
-	var hosts *txeh.Hosts
-	hosts, err = txeh.NewHosts(hostConfig)
+) error {
+	hosts, err := txeh.NewHosts(hostConfig)
 	if err != nil {
 		return fmt.Errorf("failed to create hosts file handler: %w", err)
 	}

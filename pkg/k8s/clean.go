@@ -61,10 +61,10 @@ func ResetIPAddress(ikniteConfig *v1alpha1.IkniteClusterSpec, isDryRun bool) err
 	return nil
 }
 
-func ResetIPTables(isDryRun bool) (err error) {
+func ResetIPTables(isDryRun bool) error {
 	log.WithField("isDryRun", isDryRun).Info("Cleaning up iptables rules...")
 	if !isDryRun {
-		_, err = s.Exec("iptables-save").
+		_, err := s.Exec("iptables-save").
 			Reject("KUBE-").
 			Reject("CNI-").
 			Reject("FLANNEL").
@@ -76,7 +76,7 @@ func ResetIPTables(isDryRun bool) (err error) {
 	}
 	log.WithField("isDryRun", isDryRun).Info("Cleaning up ip6tables rules...")
 	if !isDryRun {
-		_, err = s.Exec("ip6tables-save").
+		_, err := s.Exec("ip6tables-save").
 			Reject("KUBE-").
 			Reject("CNI-").
 			Reject("FLANNEL").
@@ -89,31 +89,30 @@ func ResetIPTables(isDryRun bool) (err error) {
 	return nil
 }
 
-func RemoveKubeletFiles(isDryRun bool) (err error) {
+func RemoveKubeletFiles(isDryRun bool) error {
 	if isDryRun {
 		log.Info(
 			"Would remove cpu_manager_state, memory_manager_state, pod/* files in /var/lib/kubelet...",
 		)
 	} else {
 		log.Info("Removing cpu_manager_state, memory_manager_state, pod/* files in /var/lib/kubelet...")
-		var out string
-		out, err = s.Exec(
+		out, err := s.Exec(
 			"sh -c 'rm -rf /var/lib/kubelet/{cpu_manager_state,memory_manager_state} /var/lib/kubelet/pods/*'").String()
 		if err != nil {
 			err = errors.Wrapf(err, "failed to remove kubelet files: %s", out)
 		}
 	}
-	return err
+	return nil
 }
 
-func StopAllContainers(isDryRun bool) (err error) {
+func StopAllContainers(isDryRun bool) error {
 	if isDryRun {
 		log.Info(
 			"Would stop all containers with command /bin/sh -c 'crictl rmp -f $(crictl pods -q)'...",
 		)
 	} else {
 		log.Info("Stopping all containers with command /bin/sh -c 'crictl rmp -f $(crictl pods -q)'...")
-		_, err = s.Exec("/bin/sh -c 'crictl rmp -f $(crictl pods -q)'").String()
+		_, err := s.Exec("/bin/sh -c 'crictl rmp -f $(crictl pods -q)'").String()
 		if err != nil {
 			return fmt.Errorf("failed to stop all containers: %w", err)
 		}

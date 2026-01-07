@@ -52,10 +52,10 @@ func SystemFileCheck(name, description, path, expectedContent string) *Check {
 func CheckService(
 	serviceName string,
 	checkOpenRC, checkPidFile bool,
-) (success bool, message string, err error) {
+) (bool, string, error) {
 	pid := 0
 	if checkOpenRC {
-		success, err = alpine.IsServiceStarted(serviceName)
+		success, err := alpine.IsServiceStarted(serviceName)
 		if err != nil {
 			return false, "", fmt.Errorf(
 				"failed to check if service %s is started: %w",
@@ -136,10 +136,9 @@ func difference(a, b []string) []string {
 func FileTreeDifference(
 	path string,
 	expectedFiles []string,
-) (missingFiles, extraFiles []string, err error) {
+) ([]string, []string, error) {
 	foundFiles := []string{}
-	var actualPath string
-	actualPath, err = filepath.EvalSymlinks(path)
+	actualPath, err := filepath.EvalSymlinks(path)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to evaluate symlinks for %s: %w", path, err)
 	}
@@ -159,8 +158,8 @@ func FileTreeDifference(
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to walk file tree: %w", err)
 	}
-	missingFiles = difference(expectedFiles, foundFiles)
-	extraFiles = difference(foundFiles, expectedFiles)
+	missingFiles := difference(expectedFiles, foundFiles)
+	extraFiles := difference(foundFiles, expectedFiles)
 	return missingFiles, extraFiles, nil
 }
 
@@ -192,9 +191,9 @@ func FileTreeCheck(name, description, path string, expectedFiles []string) *Chec
 	}
 }
 
-func CheckKubeletHealth(timeout time.Duration) (success bool, message string, err error) {
+func CheckKubeletHealth(timeout time.Duration) (bool, string, error) {
 	var client clientset.Interface
-	client, err = kubeConfigUtil.ClientSetFromFile(kubeadmConstants.GetAdminKubeConfigPath())
+	client, err := kubeConfigUtil.ClientSetFromFile(kubeadmConstants.GetAdminKubeConfigPath())
 	if err != nil {
 		return false, "", fmt.Errorf(
 			"failed to create client set for kubelet health check: %w",
@@ -213,9 +212,9 @@ func CheckKubeletHealth(timeout time.Duration) (success bool, message string, er
 func CheckApiServerHealth(
 	timeout time.Duration,
 	checkData CheckData,
-) (success bool, message string, err error) {
+) (bool, string, error) {
 	var data *checkWorkloadData
-	data, success = checkData.(*checkWorkloadData)
+	data, success := checkData.(*checkWorkloadData)
 	if !success {
 		return false, "", fmt.Errorf(
 			"wait-control-plane phase invoked with an invalid data struct %T",
@@ -223,8 +222,7 @@ func CheckApiServerHealth(
 		)
 	}
 
-	var client clientset.Interface
-	client, err = kubeConfigUtil.ClientSetFromFile(kubeadmConstants.GetAdminKubeConfigPath())
+	client, err := kubeConfigUtil.ClientSetFromFile(kubeadmConstants.GetAdminKubeConfigPath())
 	if err != nil {
 		return false, "", fmt.Errorf(
 			"failed to create client set for API server health check: %w",
@@ -414,7 +412,7 @@ func CheckWorkloadResultPrinter(result *CheckResult, prefix, spinView string) st
 	return output
 }
 
-func CheckWorkloads(ctx context.Context, data CheckData) (success bool, message string, err error) {
+func CheckWorkloads(ctx context.Context, data CheckData) (bool, string, error) {
 	workloadData := (data).(CheckWorkloadData)
 	config, err := LoadFromFile(
 		filepath.Join(kubeadmConstants.KubernetesDir, kubeadmConstants.AdminKubeConfigFileName),

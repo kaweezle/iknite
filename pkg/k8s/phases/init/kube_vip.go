@@ -40,9 +40,9 @@ func CreateKubeVipConfiguration(wr io.Writer, config *v1alpha1.IkniteClusterSpec
 
 func WriteKubeVipConfiguration(
 	fs afero.Fs, manifestDir string, config *v1alpha1.IkniteClusterSpec,
-) (f afero.File, err error) {
+) (afero.File, error) {
 	afs := &afero.Afero{Fs: fs}
-	f, err = afs.Create(filepath.Join(manifestDir, "kube-vip.yaml"))
+	f, err := afs.Create(filepath.Join(manifestDir, "kube-vip.yaml"))
 	if err != nil {
 		return f, fmt.Errorf("failed to create kube-vip.yaml file: %w", err)
 	}

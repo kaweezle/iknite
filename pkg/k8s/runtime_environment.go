@@ -38,13 +38,13 @@ const (
 	rcConfPreventKubeletRunning = "rc_kubelet_need=\"non-existing-service\""
 )
 
-func IsKubeletServiceRunnable(confFilePath string) (present bool, err error) {
+func IsKubeletServiceRunnable(confFilePath string) (bool, error) {
 	var lines int
+	var err error
 	if lines, err = script.File(confFilePath).Match(rcConfPreventKubeletRunning).CountLines(); err != nil {
 		return false, fmt.Errorf("failed to count lines in config file: %w", err)
 	}
-	present = lines == 0
-	return present, nil
+	return lines == 0, nil
 }
 
 // PreventKubeletServiceFromStarting ensures that the kubelet service is not started

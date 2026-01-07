@@ -94,8 +94,9 @@ func createTempKustomizeDirectory(
 	return nil
 }
 
-func applyResmap(resources resmap.ResMap) (err error) {
+func applyResmap(resources resmap.ResMap) error {
 	var out []byte
+	var err error
 	if out, err = resources.AsYaml(); err != nil {
 		return fmt.Errorf("failed to convert resources to YAML: %w", err)
 	}
@@ -112,37 +113,35 @@ func applyResmap(resources resmap.ResMap) (err error) {
 		log.WithFields(log.Fields{
 			"code": cmd.ProcessState.ExitCode(),
 		}).Error(string(out))
-		err = errors.Wrap(err, "While applying templates")
-		return err
+		return errors.Wrap(err, "While applying templates")
 	}
-	return err
+	return nil
 }
 
-func ApplyKustomizations(fs filesys.FileSystem, dirname string) (ids []resid.ResId, err error) {
-	var resources, crds resmap.ResMap
-	resources, err = RunKustomizations(fs, dirname)
+func ApplyKustomizations(fs filesys.FileSystem, dirname string) ([]resid.ResId, error) {
+	resources, err := RunKustomizations(fs, dirname)
 	if err != nil {
 		err = errors.Wrap(err, "While building templates")
-		return ids, err
+		return nil, err
 	}
 
-	ids = resources.AllIds()
+	ids := resources.AllIds()
 
 	// The set of resources may contain CRDs and CRs. If there are cluster wide
 	// resources (CRDs are cluster wide), we apply them first and then the rest.
 	// TODO: Don't apply CRDs twice
-	crds = resmap.NewFactory(provider.NewDefaultDepProvider().GetResourceFactory()).
+	crds := resmap.NewFactory(provider.NewDefaultDepProvider().GetResourceFactory()).
 		FromResourceSlice(resources.ClusterScoped())
 
 	if crds.Size() != 0 {
 		crdIds := crds.AllIds()
 		log.WithField("resources", crdIds).Debug("Cluster resources")
 		if err := applyResmap(crds); err != nil {
-			return ids, err
+			return nil, err
 		}
 		for _, curId := range crdIds {
 			if err = resources.Remove(curId); err != nil {
-				return ids, fmt.Errorf("failed to remove CRD resource: %w", err)
+				return nil, fmt.Errorf("failed to remove CRD resource: %w", err)
 			}
 		}
 	}
@@ -185,10 +184,10 @@ func EnablePlugins(opts *krusty.Options) *krusty.Options {
 	return opts
 }
 
-func RunKustomizations(fs filesys.FileSystem, dirname string) (resources resmap.ResMap, err error) {
+func RunKustomizations(fs filesys.FileSystem, dirname string) (resmap.ResMap, error) {
 	opts := EnablePlugins(krusty.MakeDefaultOptions())
 	k := krusty.MakeKustomizer(opts)
-	resources, err = k.Run(fs, dirname)
+	resources, err := k.Run(fs, dirname)
 	if err != nil {
 		return resources, fmt.Errorf("failed to run kustomize: %w", err)
 	}
