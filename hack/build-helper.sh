@@ -7,9 +7,26 @@ export IKNITE_REPO_URL=http://kwzl-apkrepo.s3-website.gra.io.cloud.ovh.net/test/
 
 KUBERNETES_VERSION=${KUBERNETES_VERSION:-"1.34.3"}
 ROOTLESS=false
-SUDO_CMD="doas"
+SUDO_CMD=""
 WITH_CACHE=false
 BUILDKIT_NAMESPACE="k8s.io"
+
+# Auto-detect if running as root
+if [ "$(id -u)" -eq 0 ]; then
+    ROOTLESS=true
+fi
+
+# Auto-detect sudo command (doas or sudo)
+if [ "$ROOTLESS" = false ]; then
+    if command -v doas >/dev/null 2>&1; then
+        SUDO_CMD="doas"
+    elif command -v sudo >/dev/null 2>&1; then
+        SUDO_CMD="sudo"
+    else
+        error "Error: Neither doas nor sudo is available. Please install one to proceed."
+        exit 1
+    fi
+fi
 
 # Step names for dynamic --skip-* and --only-* handling
 STEP_NAMES="goreleaser build images add-images export rootfs-image clean"
@@ -191,13 +208,29 @@ fi
 
 # Check that buildkit is available
 if [ "$ROOTLESS" = true ]; then
-    if ! systemctl --user is-active --quiet buildkit; then
-        error "Error: buildkit user service is not running. Please start it with 'systemctl --user start buildkit'."
-        exit 1
+    # Check if we're on a systemd-based OS
+    if command -v systemctl >/dev/null 2>&1 && systemctl --version >/dev/null 2>&1; then
+        if ! systemctl --user is-active --quiet buildkit; then
+            error "Error: buildkit user service is not running. Please start it with 'systemctl --user start buildkit'."
+            exit 1
+        fi
+    # Check if we're on an OpenRC-based OS (Alpine)
+    elif command -v rc-service >/dev/null 2>&1; then
+        # On OpenRC, check if buildkit socket exists for user service
+        if [ ! -S "/run/user/$(id -u)/buildkit/buildkitd.sock" ] && [ ! -S "$HOME/.local/share/buildkit/buildkitd.sock" ]; then
+            error "Error: buildkit is not running. Please ensure buildkit is started."
+            exit 1
+        fi
+    else
+        # Generic check - just verify BUILDKIT_HOST is set and socket exists
+        if [ -z "$BUILDKIT_HOST" ]; then
+            error "Error: BUILDKIT_HOST is not set. Please set it to your buildkit socket."
+            exit 1
+        fi
     fi
 else
-    if ! [ -f "/run/buildkitd.pid" ]; then
-        error "Error: buildkit is not available. Please ensure buildkit is installed and configured to proceed."
+    if ! [ -f "/run/buildkitd.pid" ] && ! pgrep -x buildkitd >/dev/null 2>&1; then
+        error "Error: buildkit is not available. Please ensure buildkit is installed and running."
         exit 1
     fi
 fi
