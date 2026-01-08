@@ -155,7 +155,7 @@ func resetConfigDir(configPathDir string, dirsToClean []string, isDryRun bool) {
 func CleanDir(filePath string) error {
 	// If the directory doesn't even exist there's nothing to do, and we do
 	// not consider this an error
-	if _, err := os.Stat(filePath); os.IsNotExist(err) {
+	if _, err := os.Stat(filePath); errors.Is(err, os.ErrNotExist) {
 		return nil
 	}
 

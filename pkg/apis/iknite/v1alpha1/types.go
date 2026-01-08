@@ -3,6 +3,7 @@ package v1alpha1
 // cSpell: disable
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net"
 	"os"
@@ -141,7 +142,7 @@ func LoadIkniteCluster() (*IkniteCluster, error) {
 
 func LoadIkniteClusterOrDefault() (*IkniteCluster, error) {
 	ikniteCluster, err := LoadIkniteCluster()
-	if err != nil && os.IsNotExist(err) {
+	if errors.Is(err, os.ErrNotExist) {
 		ikniteCluster = &IkniteCluster{}
 		SetDefaults_IkniteCluster(ikniteCluster)
 	}

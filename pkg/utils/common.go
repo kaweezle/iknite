@@ -17,6 +17,7 @@ package utils
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"os"
@@ -78,7 +79,7 @@ func WriteFile(filename string, data []byte, perm os.FileMode) error {
 func MoveFileIfExists(src, dst string) error {
 	err := os.Link(src, dst)
 	if err != nil {
-		if os.IsNotExist(err) {
+		if errors.Is(err, os.ErrNotExist) {
 			return nil
 		}
 		return fmt.Errorf("error while linking %s to %s: %w", src, dst, err)

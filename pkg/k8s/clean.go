@@ -3,6 +3,7 @@ package k8s
 // cSpell:words txeh netnsid ifname
 // cSpell: disable
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -222,7 +223,7 @@ func processMounts(path string, remove bool, message string, isDryRun bool) erro
 	var err error
 	path, err = filepath.EvalSymlinks(path)
 	if err != nil {
-		if os.IsNotExist(err) {
+		if errors.Is(err, os.ErrNotExist) {
 			return nil
 		}
 		return fmt.Errorf("failed to evaluate symlinks for path %s: %w", path, err)

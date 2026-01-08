@@ -112,7 +112,7 @@ func performStart(ikniteConfig *v1alpha1.IkniteClusterSpec) {
 			cobra.CheckErr(cmd.RunE(cmd, []string{}))
 		}
 	} else {
-		if !os.IsNotExist(err) {
+		if !errors.Is(err, os.ErrNotExist) {
 			cobra.CheckErr(fmt.Errorf("while loading existing kubeconfig: %w", err))
 		}
 		log.Info("No current configuration found. Initializing...")

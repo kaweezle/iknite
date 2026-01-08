@@ -101,7 +101,7 @@ func KubernetesFileCheck(name, path string) *Check {
 		CheckFn: func(_ context.Context, _ CheckData) (bool, string, error) {
 			// Check if file at path exists
 			info, err := os.Stat(path)
-			if os.IsNotExist(err) {
+			if errors.Is(err, os.ErrNotExist) {
 				return false, "", fmt.Errorf("%s does not exist", path)
 			} else if err != nil {
 				return false, "", fmt.Errorf("error checking %s: %w", path, err)
