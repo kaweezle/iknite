@@ -23,7 +23,6 @@ import (
 	"net"
 	"time"
 
-	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	appsV1 "k8s.io/api/apps/v1"
 	coreV1 "k8s.io/api/core/v1"
@@ -257,7 +256,7 @@ func (config *Config) DoKustomization(
 	cm.Data["configured"] = "true"
 	_, err = WriteIkniteConfigMap(client, cm)
 	if err != nil {
-		return errors.Wrap(err, "While writing configuration")
+		return fmt.Errorf("while writing configuration: %w", err)
 	}
 
 	log.WithFields(log.Fields{

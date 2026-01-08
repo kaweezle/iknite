@@ -9,7 +9,6 @@ import (
 	"syscall"
 
 	s "github.com/bitfield/script"
-	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/txn2/txeh"
 	resetPhases "k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/reset"
@@ -99,7 +98,7 @@ func RemoveKubeletFiles(isDryRun bool) error {
 		out, err := s.Exec(
 			"sh -c 'rm -rf /var/lib/kubelet/{cpu_manager_state,memory_manager_state} /var/lib/kubelet/pods/*'").String()
 		if err != nil {
-			return errors.Wrapf(err, "failed to remove kubelet files: %s", out)
+			return fmt.Errorf("failed to remove kubelet files: %s: %w", out, err)
 		}
 	}
 	return nil
@@ -226,7 +225,7 @@ func processMounts(path string, remove bool, message string, isDryRun bool) erro
 		if os.IsNotExist(err) {
 			return nil
 		}
-		return errors.Wrapf(err, "failed to evaluate symlinks for path %s", path)
+		return fmt.Errorf("failed to evaluate symlinks for path %s: %w", path, err)
 	}
 
 	p := s.File("/proc/self/mounts").Column(2).Match(path).FilterLine(func(s string) string {
@@ -311,7 +310,7 @@ func DeleteEtcdData(isDryRun bool) error {
 	etcdPod, err := utilStaticPod.ReadStaticPodFromDisk(etcdManifestPath)
 	if err != nil {
 		if !os.IsNotExist(err) {
-			return errors.Wrap(err, "failed to read etcd pod from disk")
+			return fmt.Errorf("failed to read etcd pod from disk: %w", err)
 		}
 		// If the etcd manifest does not exist, we assume the default data directory.
 	} else {

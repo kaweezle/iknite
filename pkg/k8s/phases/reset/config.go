@@ -19,13 +19,13 @@ package reset
 // cSpell:words klog cleanupconfig
 // cSpell:disable
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
 	"path"
 	"path/filepath"
 
-	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"k8s.io/klog/v2"
 	kubeadmApiV1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"

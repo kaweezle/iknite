@@ -4,6 +4,7 @@ package k8s
 // cSpell: disable
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -12,7 +13,6 @@ import (
 	"time"
 
 	"github.com/charmbracelet/lipgloss"
-	"github.com/pkg/errors"
 	v1 "k8s.io/api/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	kubeadmConstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
@@ -424,7 +424,7 @@ func CheckWorkloads(ctx context.Context, data CheckData) (bool, string, error) {
 		filepath.Join(kubeadmConstants.KubernetesDir, kubeadmConstants.AdminKubeConfigFileName),
 	)
 	if err != nil {
-		return false, "", errors.Wrap(err, "While loading local cluster configuration")
+		return false, "", fmt.Errorf("while loading local cluster configuration: %w", err)
 	}
 	workloadData.Start()
 
@@ -441,7 +441,7 @@ func CheckWorkloads(ctx context.Context, data CheckData) (bool, string, error) {
 			return false
 		})
 	if err != nil {
-		return false, "", errors.Wrap(err, "While waiting for workloads")
+		return false, "", fmt.Errorf("while waiting for workloads: %w", err)
 	}
 	return workloadData.IsOk(), "", nil
 }

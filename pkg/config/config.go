@@ -20,7 +20,6 @@ import (
 	"fmt"
 
 	"github.com/mitchellh/mapstructure"
-	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	flag "github.com/spf13/pflag"
 	"github.com/spf13/viper"
@@ -133,7 +132,7 @@ func DecodeIkniteConfig(ikniteConfig *v1alpha1.IkniteClusterSpec) error {
 
 	decoder, err := mapstructure.NewDecoder(&decoderConfig)
 	if err != nil {
-		return errors.Wrap(err, "While creating decoder")
+		return fmt.Errorf("while creating decoder: %w", err)
 	}
 
 	if err := decoder.Decode(viper.AllSettings()["cluster"]); err != nil {

@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 
@@ -37,7 +36,7 @@ func runMonitorWorkloads(c workflow.RunData) error {
 	ticker := time.NewTicker(5 * time.Second)
 	config, err := k8s.LoadFromFile(constants.KubernetesRootConfig)
 	if err != nil {
-		return errors.Wrap(err, "Cannot load the kubernetes configuration")
+		return fmt.Errorf("cannot load the kubernetes configuration: %w", err)
 	}
 	updateWorkloads := k8s.AreWorkloadsReady(config,
 		func(state bool, _ int, ready, unready []*v1alpha1.WorkloadState, _ int) bool {

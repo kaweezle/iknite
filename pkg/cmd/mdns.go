@@ -16,11 +16,11 @@ limitations under the License.
 package cmd
 
 import (
+	"fmt"
 	"net"
 	"os"
 
 	"github.com/pion/mdns"
-	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"golang.org/x/net/ipv4"
@@ -64,14 +64,14 @@ func mdnsPersistentPreRun(cmd *cobra.Command, _ []string) {
 
 func performMdns(_ *cobra.Command, _ []string) {
 	addr, err := net.ResolveUDPAddr("udp", mdns.DefaultAddress)
-	cobra.CheckErr(errors.Wrap(err, "Cannot resolve default address"))
+	cobra.CheckErr(fmt.Errorf("cannot resolve default address: %w", err))
 
 	l, err := net.ListenUDP("udp4", addr)
-	cobra.CheckErr(errors.Wrap(err, "Cannot Listen on default address"))
+	cobra.CheckErr(fmt.Errorf("cannot listen on default address: %w", err))
 
 	_, err = mdns.Server(ipv4.NewPacketConn(l), &mdns.Config{
 		LocalNames: []string{viper.GetString(config.DomainName)},
 	})
-	cobra.CheckErr(errors.Wrap(err, "Cannot create server"))
+	cobra.CheckErr(fmt.Errorf("cannot create server: %w", err))
 	select {}
 }

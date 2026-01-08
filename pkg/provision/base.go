@@ -18,10 +18,10 @@ package provision
 // cSpell: disable
 import (
 	"embed"
+	"fmt"
 	"net/url"
 	"path"
 
-	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"sigs.k8s.io/kustomize/kyaml/resid"
 
@@ -42,7 +42,7 @@ func ApplyBaseKustomizations(dirname string, data any) ([]resid.ResId, error) {
 	} else {
 		exists, err = utils.Exists(path.Join(dirname, "kustomization.yaml"))
 		if err != nil {
-			return nil, errors.Wrap(err, "While testing for directory")
+			return nil, fmt.Errorf("while testing for directory: %w", err)
 		}
 	}
 

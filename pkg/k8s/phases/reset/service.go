@@ -19,7 +19,8 @@ package reset
 // cSpell:words klog cleanupservice
 // cSpell:disable
 import (
-	"github.com/pkg/errors"
+	"errors"
+
 	"github.com/sirupsen/logrus"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"

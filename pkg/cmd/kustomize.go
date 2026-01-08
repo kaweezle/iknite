@@ -16,7 +16,8 @@ limitations under the License.
 package cmd
 
 import (
-	"github.com/pkg/errors"
+	"fmt"
+
 	"github.com/spf13/cobra"
 	flag "github.com/spf13/pflag"
 	"github.com/spf13/viper"
@@ -103,11 +104,11 @@ func initializeKustomization(flagSet *flag.FlagSet) {
 
 func performKustomize(_ *cobra.Command, _ []string) {
 	ip, err := utils.GetOutboundIP()
-	cobra.CheckErr(errors.Wrap(err, "While getting IP address"))
+	cobra.CheckErr(fmt.Errorf("while getting IP address: %w", err))
 
 	// We need to get it from root as we will apply configuration
 	kubeConfig, err := k8s.LoadFromFile(constants.KubernetesRootConfig)
-	cobra.CheckErr(errors.Wrap(err, "While loading local cluster configuration"))
+	cobra.CheckErr(fmt.Errorf("while loading local cluster configuration: %w", err))
 	err = kubeConfig.CheckClusterRunning(
 		clusterCheckRetries,
 		clusterCheckOkResponses,

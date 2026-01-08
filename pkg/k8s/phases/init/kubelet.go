@@ -18,7 +18,9 @@ package init
 
 // cSpell: disable
 import (
-	"github.com/pkg/errors"
+	"errors"
+	"fmt"
+
 	"github.com/sirupsen/logrus"
 	kubeletConfig "k8s.io/kubelet/config/v1beta1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
@@ -71,7 +73,7 @@ func runKubeletStart(c workflow.RunData) error {
 	// mark-control-plane phase?
 	if err := kubeletPhase.WriteKubeletDynamicEnvFile(
 		&data.Cfg().ClusterConfiguration, &data.Cfg().NodeRegistration, false, data.KubeletDir()); err != nil {
-		return errors.Wrap(err, "error writing a dynamic environment file for the kubelet")
+		return fmt.Errorf("error writing a dynamic environment file for the kubelet: %w", err)
 	}
 
 	// Write the instance kubelet configuration file to disk.
@@ -80,7 +82,7 @@ func runKubeletStart(c workflow.RunData) error {
 			ContainerRuntimeEndpoint: data.Cfg().NodeRegistration.CRISocket,
 		}
 		if err := kubeletPhase.WriteInstanceConfigToDisk(kubeletConf, data.KubeletDir()); err != nil {
-			return errors.Wrap(err, "error writing instance kubelet configuration to disk")
+			return fmt.Errorf("error writing instance kubelet configuration to disk: %w", err)
 		}
 	} else {
 		logrus.WithField("phase", "kubelet-start").
@@ -90,14 +92,14 @@ func runKubeletStart(c workflow.RunData) error {
 	// Write the kubelet configuration file to disk.
 	if err := kubeletPhase.WriteConfigToDisk(
 		&data.Cfg().ClusterConfiguration, data.KubeletDir(), data.PatchesDir(), data.OutputWriter()); err != nil {
-		return errors.Wrap(err, "error writing kubelet configuration to disk")
+		return fmt.Errorf("error writing kubelet configuration to disk: %w", err)
 	}
 	// Try to start the kubelet service in case it's inactive
 	if !data.DryRun() {
 		logrus.WithField("phase", "kubelet-start").Info("Starting the kubelet")
 		cmd, err := k8s.StartKubelet()
 		if err != nil {
-			return errors.Wrap(err, "Failed to start kubelet")
+			return fmt.Errorf("failed to start kubelet: %w", err)
 		}
 		data.SetKubeletCmd(cmd)
 	}

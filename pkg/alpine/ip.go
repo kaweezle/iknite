@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/txn2/txeh"
 
@@ -63,7 +62,7 @@ func AddIpAddress(iface string, address net.IP) error {
 		"dev", iface,
 	}
 	if out, err := utils.Exec.Run(true, "/sbin/ip", parameters...); err != nil {
-		return errors.Wrap(err, string(out))
+		return fmt.Errorf("%s: %w", string(out), err)
 	}
 	return nil
 }

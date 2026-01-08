@@ -18,11 +18,11 @@ package cmd
 // cSpell: disable
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"time"
 
-	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -113,7 +113,7 @@ func performStart(ikniteConfig *v1alpha1.IkniteClusterSpec) {
 		}
 	} else {
 		if !os.IsNotExist(err) {
-			cobra.CheckErr(errors.Wrap(err, "While loading existing kubeconfig"))
+			cobra.CheckErr(fmt.Errorf("while loading existing kubeconfig: %w", err))
 		}
 		log.Info("No current configuration found. Initializing...")
 	}

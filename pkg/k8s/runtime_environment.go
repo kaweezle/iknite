@@ -23,7 +23,6 @@ import (
 	"os"
 
 	"github.com/bitfield/script"
-	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/txn2/txeh"
 
@@ -64,7 +63,7 @@ func PreventKubeletServiceFromStarting(confFilePath string) error {
 	if lines, err = script.File(confFilePath).Slice(); err == nil {
 		lines = append(lines, RcConfPreventKubeletRunning)
 		if _, err = script.Slice(lines).WriteFile(confFilePath); err != nil {
-			return errors.Wrapf(err, "While writing %s", confFilePath)
+			return fmt.Errorf("while writing %s: %w", confFilePath, err)
 		}
 	} else {
 		return fmt.Errorf("while reading %s: %w", confFilePath, err)
@@ -92,7 +91,7 @@ func PrepareKubernetesEnvironment(ikniteConfig *v1alpha1.IkniteClusterSpec) erro
 	}
 
 	if err = alpine.EnsureNetFilter(); err != nil {
-		return errors.Wrap(err, "While ensuring netfilter")
+		return fmt.Errorf("while ensuring netfilter: %w", err)
 	}
 
 	// Make bridge use ip-tables
@@ -106,19 +105,19 @@ func PrepareKubernetesEnvironment(ikniteConfig *v1alpha1.IkniteClusterSpec) erro
 	}
 
 	if err = alpine.EnsureMachineID(); err != nil {
-		return errors.Wrap(err, "While ensuring machine ID")
+		return fmt.Errorf("while ensuring machine ID: %w", err)
 	}
 
 	// Check that the IP address we are targeting is bound to an interface
 	ipExists, err := alpine.CheckIpExists(ikniteConfig.Ip)
 	if err != nil {
-		return errors.Wrap(err, "While getting local ip addresses")
+		return fmt.Errorf("while getting local ip addresses: %w", err)
 	}
 	if !ipExists {
 		if ikniteConfig.CreateIp {
 			if err := alpine.AddIpAddress(ikniteConfig.NetworkInterface, ikniteConfig.Ip); err != nil {
-				return errors.Wrapf(err, "While adding ip address %v to interface %v",
-					ikniteConfig.Ip, ikniteConfig.NetworkInterface)
+				return fmt.Errorf("while adding ip address %v to interface %v: %w",
+					ikniteConfig.Ip, ikniteConfig.NetworkInterface, err)
 			}
 		} else {
 			return fmt.Errorf("ip address %v is not available locally", ikniteConfig.Ip)
@@ -145,11 +144,11 @@ func PrepareKubernetesEnvironment(ikniteConfig *v1alpha1.IkniteClusterSpec) erro
 				ips,
 			) // cSpell: disable-line
 			if err != nil {
-				return errors.Wrapf(
-					err,
-					"While adding domain name %s to hosts file with ip %s",
+				return fmt.Errorf(
+					"while adding domain name %s to hosts file with ip %s: %w",
 					ikniteConfig.DomainName,
 					ikniteConfig.Ip,
+					err,
 				)
 			}
 		}
@@ -157,12 +156,12 @@ func PrepareKubernetesEnvironment(ikniteConfig *v1alpha1.IkniteClusterSpec) erro
 
 	log.Info("Preventing Kubelet from being started by OpenRC...")
 	if err := PreventKubeletServiceFromStarting(constants.RcConfFile); err != nil {
-		return errors.Wrap(err, "While preventing kubelet service from starting")
+		return fmt.Errorf("while preventing kubelet service from starting: %w", err)
 	}
 
 	log.Info("Ensuring Iknite is launched by OpenRC...")
 	if err := alpine.EnableService(constants.IkniteService); err != nil {
-		return errors.Wrap(err, "While enabling iknite service")
+		return fmt.Errorf("while enabling iknite service: %w", err)
 	}
 
 	log.Infof("Ensuring %s existence...", constants.CrictlYaml)
@@ -172,7 +171,7 @@ func PrepareKubernetesEnvironment(ikniteConfig *v1alpha1.IkniteClusterSpec) erro
 			[]byte("runtime-endpoint: unix://"+constants.ContainerServiceSock+"\n"),
 			os.FileMode(int(0o644)))
 	}); err != nil {
-		return errors.Wrapf(err, "While ensuring %s existence", constants.CrictlYaml)
+		return fmt.Errorf("while ensuring %s existence: %w", constants.CrictlYaml, err)
 	}
 	return nil
 }

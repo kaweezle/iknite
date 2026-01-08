@@ -22,7 +22,6 @@ import (
 	"os"
 	"path"
 
-	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
 	"github.com/kaweezle/iknite/pkg/constants"
@@ -46,7 +45,7 @@ func EnsureOpenRC(level string) error {
 		log.Trace(string(out))
 		return nil
 	} else {
-		return errors.Wrap(err, "Error while starting openrc")
+		return fmt.Errorf("error while starting openrc: %w", err)
 	}
 }
 
@@ -76,7 +75,7 @@ func IsServiceStarted(serviceName string) (bool, error) {
 func ExecuteIfServiceNotStarted(serviceName string, fn func() error) error {
 	exists, err := IsServiceStarted(serviceName)
 	if err != nil {
-		return errors.Wrapf(err, "Error while checking if service %s exists", serviceName)
+		return fmt.Errorf("error while checking if service %s exists: %w", serviceName, err)
 	}
 	if !exists {
 		return fn()
@@ -90,7 +89,7 @@ func ExecuteIfServiceNotStarted(serviceName string, fn func() error) error {
 func ExecuteIfServiceStarted(serviceName string, fn func() error) error {
 	exists, err := IsServiceStarted(serviceName)
 	if err != nil {
-		return errors.Wrapf(err, "Error while checking if service %s exists", serviceName)
+		return fmt.Errorf("error while checking if service %s exists: %w", serviceName, err)
 	}
 	if exists {
 		return fn()
@@ -129,7 +128,7 @@ func StartService(serviceName string) error {
 			log.Trace(string(out))
 			return nil
 		} else {
-			return errors.Wrapf(err, "Error while starting service %s", serviceName)
+			return fmt.Errorf("error while starting service %s: %w", serviceName, err)
 		}
 	})
 }
@@ -141,7 +140,7 @@ func StopService(serviceName string) error {
 			log.Trace(string(out))
 			return nil
 		} else {
-			return errors.Wrapf(err, "Error while starting service %s", serviceName)
+			return fmt.Errorf("error while starting service %s: %w", serviceName, err)
 		}
 	})
 }

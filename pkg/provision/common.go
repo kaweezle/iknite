@@ -27,7 +27,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"sigs.k8s.io/kustomize/api/krusty"
 	"sigs.k8s.io/kustomize/api/provider"
@@ -52,7 +51,7 @@ func createTempKustomizeDirectory(
 
 	files, err := content.ReadDir(dirname)
 	if err != nil {
-		return errors.Wrapf(err, "While reading files of %s", dirname)
+		return fmt.Errorf("while reading files of %s: %w", dirname, err)
 	}
 	for _, entry := range files {
 		if entry.IsDir() {
@@ -65,7 +64,7 @@ func createTempKustomizeDirectory(
 		log.WithField("path", inPath).Trace("Reading file")
 		payload, err := content.ReadFile(inPath)
 		if err != nil {
-			return errors.Wrapf(err, "While reading embedded file %s", entry.Name())
+			return fmt.Errorf("while reading embedded file %s: %w", entry.Name(), err)
 		}
 
 		if filepath.Ext(entry.Name()) == ".tmpl" {
@@ -73,7 +72,7 @@ func createTempKustomizeDirectory(
 			var t *template.Template
 			t, err = template.New("tmp").Parse(string(payload))
 			if err != nil {
-				return errors.Wrapf(err, "While reading template %s", entry.Name())
+				return fmt.Errorf("while reading template %s: %w", entry.Name(), err)
 			}
 			buf := new(bytes.Buffer)
 			log.WithField("path", inPath).
@@ -81,7 +80,7 @@ func createTempKustomizeDirectory(
 				Trace("Rendering")
 			err = t.Execute(buf, data)
 			if err != nil {
-				return errors.Wrap(err, "failed to create a manifest file")
+				return fmt.Errorf("failed to create a manifest file: %w", err)
 			}
 			payload = buf.Bytes()
 			outPath = strings.TrimSuffix(outPath, ".tmpl")
@@ -89,7 +88,7 @@ func createTempKustomizeDirectory(
 		log.WithField("outPath", outPath).Trace("Writing content")
 		err = fs.WriteFile(outPath, payload)
 		if err != nil {
-			return errors.Wrapf(err, "While writing %s to temp dir %s", entry.Name(), tempdir)
+			return fmt.Errorf("while writing %s to temp dir %s: %w", entry.Name(), tempdir, err)
 		}
 	}
 	return nil
@@ -120,7 +119,7 @@ func applyResmap(resources resmap.ResMap) error {
 		log.WithFields(log.Fields{
 			"code": cmd.ProcessState.ExitCode(),
 		}).Error(string(out))
-		return errors.Wrap(err, "While applying templates")
+		return fmt.Errorf("while applying templates: %w", err)
 	}
 	return nil
 }
@@ -128,7 +127,7 @@ func applyResmap(resources resmap.ResMap) error {
 func ApplyKustomizations(fs filesys.FileSystem, dirname string) ([]resid.ResId, error) {
 	resources, err := RunKustomizations(fs, dirname)
 	if err != nil {
-		err = errors.Wrap(err, "While building templates")
+		err = fmt.Errorf("while building templates: %w", err)
 		return nil, err
 	}
 

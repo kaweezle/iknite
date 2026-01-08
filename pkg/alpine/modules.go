@@ -7,7 +7,6 @@ import (
 	"os"
 
 	"github.com/google/uuid"
-	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
 	"github.com/kaweezle/iknite/pkg/utils"
@@ -31,7 +30,7 @@ func EnsureNetFilter() error {
 		if out, err := utils.Exec.Run(true, "/sbin/modprobe", netfilter_module); err == nil {
 			log.Trace(string(out))
 		} else {
-			return errors.Wrapf(err, "Error while enabling netfilter: %s", string(out))
+			return fmt.Errorf("error while enabling netfilter: %s: %w", string(out), err)
 		}
 		return nil
 	}); err != nil {
@@ -49,7 +48,7 @@ func EnsureMachineID() error {
 		}).Info("Generating machine ID...")
 
 		if err := utils.WriteFile(machineIDFile, []byte(id.String()), os.FileMode(int(0o644))); err != nil {
-			return errors.Wrapf(err, "Error while creating machine id: %s", machineIDFile)
+			return fmt.Errorf("error while creating machine id: %s: %w", machineIDFile, err)
 		}
 		return nil
 	}); err != nil {

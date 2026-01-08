@@ -20,6 +20,7 @@ package cmd
 // cSpell: disable
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -32,7 +33,6 @@ import (
 	_ "unsafe"
 
 	"github.com/pion/mdns"
-	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	flag "github.com/spf13/pflag"
@@ -183,17 +183,17 @@ func newCmdInit(out io.Writer, initOptions *initOptions) *cobra.Command {
 			if kubeletCmd != nil {
 				err = kubeletCmd.Process.Signal(syscall.SIGTERM)
 				if err != nil {
-					return errors.Wrapf(
-						err,
-						"failed to terminate the kubelet process %d",
+					return fmt.Errorf(
+						"failed to terminate the kubelet process %d: %w",
 						kubeletCmd.Process.Pid,
+						err,
 					)
 				}
 				if err = kubeletCmd.Wait(); err != nil {
-					return errors.Wrapf(
-						err,
-						"kubelet process %d exited with error",
+					return fmt.Errorf(
+						"kubelet process %d exited with error: %w",
 						kubeletCmd.Process.Pid,
+						err,
 					)
 				}
 			}
@@ -435,7 +435,7 @@ func newInitData(
 		// tests without root.
 		if dryRunDir, err = kubeadmConstants.CreateTempDir(os.Getenv("KUBEADM_INIT_DRYRUN_DIR"),
 			"kubeadm-init-dryrun"); err != nil {
-			return nil, errors.Wrap(err, "couldn't create a temporary directory")
+			return nil, fmt.Errorf("couldn't create a temporary directory: %w", err)
 		}
 	}
 
@@ -445,7 +445,7 @@ func newInitData(
 		// In case the certificates signed by CA (that should be provided by the user) are missing or invalid,
 		// returns, because kubeadm can't regenerate them without the CA Key
 		if err != nil {
-			return nil, errors.Wrapf(err, "invalid or incomplete external CA")
+			return nil, fmt.Errorf("invalid or incomplete external CA: %w", err)
 		}
 
 		// Validate that also the required kubeconfig files exists and are invalid, because
@@ -463,7 +463,7 @@ func newInitData(
 		// In case the certificates signed by Front-Proxy CA (that should be provided by the user) are missing or
 		// invalid, returns, because kubeadm can't regenerate them without the Front-Proxy CA Key
 		if err != nil {
-			return nil, errors.Wrapf(err, "invalid or incomplete external front-proxy CA")
+			return nil, fmt.Errorf("invalid or incomplete external front-proxy CA: %w", err)
 		}
 	}
 
@@ -645,8 +645,8 @@ func (d *initData) Client() (clientset.Interface, error) {
 			nil,
 		)
 		if err != nil {
-			return nil, errors.Wrapf(err, "could not bootstrap the admin user in file %s",
-				kubeadmConstants.AdminKubeConfigFileName)
+			return nil, fmt.Errorf("could not bootstrap the admin user in file %s: %w",
+				kubeadmConstants.AdminKubeConfigFileName, err)
 		}
 		d.adminKubeConfigBootstrapped = true
 	} else {

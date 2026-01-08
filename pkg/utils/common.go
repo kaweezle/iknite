@@ -23,7 +23,6 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/pkg/errors"
 	"github.com/spf13/afero"
 )
 
@@ -37,7 +36,7 @@ var (
 func ExecuteOnExistence(file string, existence bool, fn func() error) error {
 	exists, err := afs.Exists(file)
 	if err != nil {
-		return errors.Wrapf(err, "Error while checking if %s exists", file)
+		return fmt.Errorf("error while checking if %s exists: %w", file, err)
 	}
 
 	if exists == existence {
@@ -82,7 +81,7 @@ func MoveFileIfExists(src, dst string) error {
 		if os.IsNotExist(err) {
 			return nil
 		}
-		return errors.Wrapf(err, "Error while linking %s to %s", src, dst)
+		return fmt.Errorf("error while linking %s to %s: %w", src, dst, err)
 	}
 
 	if err := os.Remove(src); err != nil {
@@ -99,7 +98,7 @@ func GetOutboundIP() (net.IP, error) {
 
 	conn, err := d.DialContext(ctx, "udp", "8.8.8.8:80")
 	if err != nil {
-		return nil, errors.Wrap(err, "Error while getting IP address")
+		return nil, fmt.Errorf("error while getting IP address: %w", err)
 	}
 	defer func() {
 		err = conn.Close()

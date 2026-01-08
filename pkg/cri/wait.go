@@ -18,9 +18,9 @@ package cri
 // cSpell: disable
 import (
 	"encoding/json"
+	"fmt"
 	"time"
 
-	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
 
@@ -63,10 +63,10 @@ func WaitForContainerService() (bool, error) {
 
 		exist, err := afs.Exists(constants.ContainerServiceSock)
 		if err != nil {
-			return false, errors.Wrapf(
-				err,
-				"Error while checking container service sock %s",
+			return false, fmt.Errorf(
+				"error while checking container service sock %s: %w",
 				constants.ContainerServiceSock,
+				err,
 			)
 		}
 		if !exist {

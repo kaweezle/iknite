@@ -4,7 +4,6 @@ package init
 import (
 	"fmt"
 
-	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
@@ -40,13 +39,13 @@ func runKustomize(c workflow.RunData) error {
 
 	k8sConfig, err := k8s.LoadFromDefault()
 	if err != nil {
-		return errors.Wrap(err, "failed to load configuration")
+		return fmt.Errorf("failed to load configuration: %w", err)
 	}
 	// TODO: This probably should be elsewhere
 	err = k8sConfig.RenameConfig(ikniteConfig.ClusterName).
 		WriteToFile(constants.KubernetesRootConfig)
 	if err != nil {
-		return errors.Wrap(err, "failed to write configuration")
+		return fmt.Errorf("failed to write configuration: %w", err)
 	}
 	if err := k8sConfig.DoKustomization(ikniteConfig.Ip, ikniteConfig.Kustomization, force_config, 0); err != nil {
 		return fmt.Errorf("failed to apply kustomization: %w", err)

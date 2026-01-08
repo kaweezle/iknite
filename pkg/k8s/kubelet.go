@@ -4,6 +4,7 @@ package k8s
 // cSpell: disable
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -16,7 +17,6 @@ import (
 	"time"
 
 	"github.com/joho/godotenv"
-	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 
@@ -128,7 +128,7 @@ func StartKubelet() (*exec.Cmd, error) {
 
 	envData, err := godotenv.Read(kubeletEnvFile, kubeAdmFlagsFile)
 	if err != nil {
-		return nil, errors.WithMessagef(err, "Failed to read environment file %s", kubeletEnvFile)
+		return nil, fmt.Errorf("failed to read environment file %s: %w", kubeletEnvFile, err)
 	}
 
 	args := make([]string, 0)
@@ -154,7 +154,7 @@ func StartKubelet() (*exec.Cmd, error) {
 	// ignore the error if for some reason the pid file is not found
 	kubeletPid, err := CheckPidFile("kubelet", cmd)
 	if err != nil {
-		return nil, errors.WithMessagef(err, "Failed to check kubelet pid file %s", kubeletPidFile)
+		return nil, fmt.Errorf("failed to check kubelet pid file %s: %w", kubeletPidFile, err)
 	}
 	if kubeletPid > 0 {
 		log.WithField("pid", kubeletPid).
@@ -165,10 +165,10 @@ func StartKubelet() (*exec.Cmd, error) {
 	// Create the kubelet log directory if it doesn't exist
 	err = os.MkdirAll(kubeletLogDir, 0o755) //nolint:gosec // Want read access
 	if err != nil {
-		return nil, errors.WithMessagef(
-			err,
-			"Failed to create kubelet log directory %s",
+		return nil, fmt.Errorf(
+			"failed to create kubelet log directory %s: %w",
 			kubeletLogDir,
+			err,
 		)
 	}
 
@@ -176,7 +176,7 @@ func StartKubelet() (*exec.Cmd, error) {
 	logFile, err := os.OpenFile( //nolint:gosec // Want read access
 		kubeletLogFile, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0o644)
 	if err != nil {
-		return nil, errors.WithMessagef(err, "Failed to open kubelet log file %s", kubeletLogFile)
+		return nil, fmt.Errorf("failed to open kubelet log file %s: %w", kubeletLogFile, err)
 	}
 	defer func() {
 		err = logFile.Close()
@@ -197,7 +197,7 @@ func StartKubelet() (*exec.Cmd, error) {
 	// Start the subprocess and get the PID
 	err = cmd.Start()
 	if err != nil {
-		return nil, errors.WithMessage(err, "Failed to start subprocess")
+		return nil, fmt.Errorf("failed to start subprocess: %w", err)
 	}
 
 	// Write the PID to the /run/kubelet.pid file
@@ -227,7 +227,7 @@ func RemovePidFiles() {
 func StartAndConfigureKubelet(kubeConfig *v1alpha1.IkniteClusterSpec) error {
 	cmd, err := StartKubelet()
 	if err != nil {
-		return errors.Wrap(err, "Failed to start kubelet")
+		return fmt.Errorf("failed to start kubelet: %w", err)
 	}
 
 	// Wait for SIGTERM and SIGKILL signals

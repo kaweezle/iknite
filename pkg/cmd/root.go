@@ -22,7 +22,6 @@ import (
 	"os"
 	"strings"
 
-	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -120,7 +119,7 @@ func SetUpLogs(out io.Writer, level string, json bool) error {
 	}
 	lvl, err := log.ParseLevel(level)
 	if err != nil {
-		return errors.Wrap(err, "parsing log level")
+		return fmt.Errorf("parsing log level: %w", err)
 	}
 	log.SetLevel(lvl)
 	return nil

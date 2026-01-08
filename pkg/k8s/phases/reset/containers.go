@@ -19,9 +19,9 @@ package reset
 // cSpell:words klog cleanupnode
 // cSpell:disable
 import (
+	"errors"
 	"fmt"
 
-	"github.com/pkg/errors"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 
