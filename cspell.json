@@ -9,19 +9,15 @@
     "**/testdata/**",
     "pkg/provision/base/**",
     "**/zz_generated.*",
-    "docs/js/**",
-    "docs/css/**",
+    "docs/docs/js/**",
+    "docs/docs/css/**",
+    "docs/docs/assets/**",
+    "docs/pyproject.toml",
     "*-requirements.txt",
     "**/rc.conf"
   ],
   "dictionaryDefinitions": [],
-  "dictionaries": [
-    "bash",
-    "docker",
-    "golang",
-    "terraform",
-    "softwareTerms"
-  ],
+  "dictionaries": ["bash", "docker", "golang", "terraform", "softwareTerms"],
   "words": [
     "afero",
     "antoinemartin",
@@ -80,6 +76,7 @@
     "pflag",
     "pidfile",
     "pipx",
+    "pyproject",
     "resid",
     "Resmap",
     "rootfs",

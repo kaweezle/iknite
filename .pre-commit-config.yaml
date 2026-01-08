@@ -60,7 +60,7 @@ repos:
         types_or: ["text"]
         exclude: |
           (?x)^(
-              docs/assets/.* |
+              docs/docs/assets/.* |
               ^.gitignore |
               ^.git/.* |
               ^.github/.* |
@@ -82,6 +82,6 @@ repos:
 
 # Global exclusions for all hooks
 exclude: |
-  ^docs/assets/|
+  ^docs/docs/assets/|
   ^.git/|
   .*\.(png|jpg|jpeg|gif|svg|ico|zip|gz|xz|7z|tar|nupkg)$
