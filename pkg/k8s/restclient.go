@@ -144,17 +144,20 @@ func (client *RESTClientGetter) HasApplications() (bool, error) {
 		ApplicationSchemaGroupVersionKind.GroupKind(),
 		ApplicationSchemaGroupVersionKind.Version,
 	)
-	if err != nil && !meta.IsNoMatchError(err) {
-		return false, fmt.Errorf("failed to get REST mapping for applications: %w", err)
+	if err != nil {
+		if meta.IsNoMatchError(err) {
+			return false, nil
+		} else {
+			return false, fmt.Errorf("failed to get REST mapping for applications: %w", err)
+		}
 	}
 	return true, nil
 }
 
 func (client *RESTClientGetter) AllWorkloadStates() ([]*v1alpha1.WorkloadState, error) {
 	resourceTypes := "deployments,statefulsets,daemonsets"
-	var hasApplications bool
-	var err error
-	if hasApplications, err = client.HasApplications(); err != nil {
+	hasApplications, err := client.HasApplications()
+	if err != nil {
 		return nil, err
 	}
 	if hasApplications {
