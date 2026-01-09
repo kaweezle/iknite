@@ -1,5 +1,5 @@
 #!/bin/sh
-# cSpell: words libstdc skopeo tenv doas socat rootlesskit slirp4netns buildkit buildctl nerdctl goreleaser
+# cSpell: words libstdc skopeo tenv doas socat rootlesskit slirp4netns buildkit buildctl nerdctl goreleaser signingkey gpgsign sopsdiffer textconv
 
 _step_counter=0
 step() {
@@ -12,7 +12,7 @@ echo "Setting up development environment..."
 step "Installing packages..."
 apk update --quiet && \
 apk add --quiet --no-progress --no-cache zsh tzdata git libstdc++ doas iproute2 gnupg socat openssh openrc curl tar zstd && \
-apk add --quiet --no-progress --no-cache pipx uv go jq skopeo tenv kubectl k9s golangci-lint gnupg sops age nodejs npm && \
+apk add --quiet --no-progress --no-cache pipx uv go jq skopeo tenv kubectl k9s golangci-lint gnupg sops age nodejs npm openssl abuild && \
 apk add --quiet --no-progress --no-cache ip6tables containerd kubelet kubeadm cni-plugins cni-plugin-flannel util-linux-misc buildkit buildctl nerdctl rootlesskit slirp4netns && \
 GORELEASER_VERSION=$(curl --silent  https://api.github.com/repos/goreleaser/goreleaser/releases/latest | jq -r .tag_name | sed -e 's/^v//') && \
 wget -q -O /tmp/goreleaser.apk "https://github.com/goreleaser/goreleaser/releases/download/v${GORELEASER_VERSION}/goreleaser_${GORELEASER_VERSION}_x86_64.apk" && \

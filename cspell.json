@@ -17,8 +17,15 @@
     "**/rc.conf"
   ],
   "dictionaryDefinitions": [],
-  "dictionaries": ["bash", "docker", "golang", "terraform", "softwareTerms"],
+  "dictionaries": [
+    "bash",
+    "docker",
+    "golang",
+    "terraform",
+    "softwareTerms"
+  ],
   "words": [
+    "abuild",
     "afero",
     "antoinemartin",
     "buildctl",
@@ -43,6 +50,7 @@
     "gocyclo",
     "Golangci",
     "GOPATH",
+    "goreleaser",
     "gosec",
     "govet",
     "Healthz",

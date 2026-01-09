@@ -36,7 +36,7 @@ resource "aws_s3_object" "this" {
   content      = each.value.file.content
   acl          = "public-read"
 
-  lifecycle {
-    ignore_changes = [source]
-  }
+  #   lifecycle {
+  #     ignore_changes = [source]
+  #   }
 }

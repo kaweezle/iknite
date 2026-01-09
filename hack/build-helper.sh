@@ -1,19 +1,24 @@
 #!/bin/sh
 
-# cSpell: words goreleaser iknite kaweezle nerdctl doas chainguard apks
+# cSpell: words nerdctl doas chainguard apks rootfull krmfn krmfnbuiltin apkrepo apkindex tenv testrepo
 
 set -e
 export IKNITE_REPO_URL=http://kwzl-apkrepo.s3-website.gra.io.cloud.ovh.net/test/
 
 KUBERNETES_VERSION=${KUBERNETES_VERSION:-"1.34.3"}
+KEY_NAME=${KEY_NAME:-kaweezle-devel@kaweezle.com-c9d89864.rsa}
 ROOTLESS=false
+ROOTFULL=true
 SUDO_CMD=""
-WITH_CACHE=false
 BUILDKIT_NAMESPACE="k8s.io"
+CACHE_FLAG="--no-cache"
+TF_VERSION="1.14.3"
+TG_VERSION="0.97.2"
 
 # Auto-detect if running as root
 if [ "$(id -u)" -eq 0 ]; then
     ROOTLESS=true
+    ROOTFULL=true
 fi
 
 # Auto-detect sudo command (doas or sudo)
@@ -29,19 +34,20 @@ if [ "$ROOTLESS" = false ]; then
 fi
 
 # Step names for dynamic --skip-* and --only-* handling
-STEP_NAMES="goreleaser build images add-images export rootfs-image clean"
-
-# Initialize skip flags
-SKIP_GORELEASER=false
-SKIP_BUILD=false
-SKIP_IMAGES=false
-SKIP_ADD_IMAGES=false
-SKIP_EXPORT=false
-SKIP_ROOTFS_IMAGE=false
-SKIP_CLEAN=false
+STEP_NAMES="goreleaser build images add-images export rootfs-image fetch-krmfnbuiltin make-apk-repo upload-repo clean"
 
 # Only run this specific step (empty means run all non-skipped steps)
-ONLY_STEP=""
+ONLY_CALLED=false
+
+skip_all() {
+    if [ "$ONLY_CALLED" != false ]; then
+        return
+    fi
+    for s in $STEP_NAMES; do
+        eval "SKIP_$(step_to_var "$s")=true"
+    done
+}
+
 
 usage() {
     cat << EOF
@@ -96,15 +102,6 @@ should_run_step() {
     local step_name="$1"
     local skip_var="SKIP_$(step_to_var "$step_name")"
 
-    # If --only-<step> was specified, only run that step
-    if [ -n "$ONLY_STEP" ]; then
-        if [ "$step_name" == "$ONLY_STEP" ]; then
-            return 0
-        else
-            return 1
-        fi
-    fi
-
     # Otherwise, check the skip flag
     eval "local skip_value=\$$skip_var"
     if [ "$skip_value" == "true" ]; then
@@ -139,7 +136,9 @@ while [ $# -gt 0 ]; do
         --only-*)
             step_name="${1#--only-}"
             if is_valid_step "$step_name"; then
-                ONLY_STEP="$step_name"
+                skip_all
+                ONLY_CALLED=true
+                eval "SKIP_$(step_to_var "$step_name")=false"
             else
                 error "Unknown step: $step_name"
                 usage
@@ -148,7 +147,7 @@ while [ $# -gt 0 ]; do
             shift
             ;;
         --with-cache)
-            WITH_CACHE=true
+            CACHE_FLAG=""
             shift
             ;;
         *)
@@ -181,10 +180,17 @@ if ! command -v goreleaser >/dev/null 2>&1; then
     exit 1
 fi
 
-# Check buildctl is installed
-if ! command -v buildctl >/dev/null 2>&1; then
-    error "Error: buildctl is not installed. Please install buildctl to proceed."
+# Check that the signing key file is present
+if [ ! -f "$KEY_NAME" ]; then
+    error "Error: Signing key file '$KEY_NAME' is not present. Please provide the signing key to proceed."
     exit 1
+fi
+
+if should_run_step "goreleaser"; then
+    step "Building Iknite package..."
+    goreleaser --skip=publish --snapshot --clean
+else
+    skip "Building Iknite package"
 fi
 
 # Check nerdctl is installed
@@ -206,8 +212,14 @@ else
     fi
 fi
 
+# Check buildctl is installed
+if ! command -v buildctl >/dev/null 2>&1; then
+    error "Error: buildctl is not installed. Please install buildctl to proceed."
+    exit 1
+fi
+
 # Check that buildkit is available
-if [ "$ROOTLESS" = true ]; then
+if [ "$ROOTLESS" = true -a "$ROOTFULL" = false ]; then
     # Check if we're on a systemd-based OS
     if command -v systemctl >/dev/null 2>&1 && systemctl --version >/dev/null 2>&1; then
         if ! systemctl --user is-active --quiet buildkit; then
@@ -235,22 +247,8 @@ else
     fi
 fi
 
-# Check that the signing key file is present
-if [ ! -f "kaweezle-devel@kaweezle.com-c9d89864.rsa" ]; then
-    error "Error: Signing key file 'kaweezle-devel@kaweezle.com-c9d89864.rsa' is not present. Please provide the signing key to proceed."
-    exit 1
-fi
-
-if should_run_step "goreleaser"; then
-    step "Building Iknite package..."
-    goreleaser --skip=publish --snapshot --clean
-else
-    skip "Building Iknite package"
-fi
-
 export IKNITE_LAST_TAG=$(jq -Mr ".tag" dist/metadata.json)
 export IKNITE_VERSION=$(jq -Mr ".version" dist/metadata.json)
-
 
 IKNITE_ROOTFS_BASE="iknite-rootfs-base:${IKNITE_VERSION}"
 if should_run_step "build"; then
@@ -258,12 +256,6 @@ if should_run_step "build"; then
 
     rm -f rootfs/iknite.rootfs.tar.gz rootfs/*.apk || /bin/true
     cp dist/iknite-${IKNITE_VERSION}.x86_64.apk rootfs/
-
-    # Set cache flag based on option
-    CACHE_FLAG="--no-cache"
-    if [ "$WITH_CACHE" = true ]; then
-        CACHE_FLAG=""
-    fi
 
     $SUDO_CMD buildctl build \
                  --frontend dockerfile.v0 \
@@ -285,12 +277,13 @@ if should_run_step "images"; then
     if [ "$ROOTLESS" = false ]; then
         $SUDO_CMD chown -R $(id -u):$(id -g) packages
     fi
+    (cd packages/$(uname -m)/ && \
+    for f in *.apk; do mv $f ../../dist/$(echo $f | sed 's/\-r0.apk$//').$(uname -m).apk; done)
 else
     skip "Building Iknite images package"
 fi
 
 IKNITE_IMAGES_APK="iknite-images-${KUBERNETES_VERSION}-r0.apk"
-
 
 if should_run_step "add-images"; then
     step "Adding images to Iknite rootfs..."
@@ -322,12 +315,6 @@ IKNITE_ROOTFS_IMAGE="ghcr.io/kaweezle/iknite/iknite:${IKNITE_VERSION}-${KUBERNET
 if should_run_step "rootfs-image"; then
     step "Building Iknite rootfs image..."
 
-    # Set cache flag based on option
-    CACHE_FLAG="--no-cache"
-    if [ "$WITH_CACHE" = true ]; then
-        CACHE_FLAG=""
-    fi
-
     $SUDO_CMD buildctl build \
                  --frontend dockerfile.v0 \
                  --local context=rootfs \
@@ -339,9 +326,54 @@ else
     skip "Building Iknite rootfs image"
 fi
 
+if should_run_step "fetch-krmfnbuiltin"; then
+    step "Fetching krmfnbuiltin image..."
+
+    cd dist
+    KRMFN_LATEST_VERSION=$(curl --silent  https://api.github.com/repos/kaweezle/krmfnbuiltin/releases/latest | jq -r .tag_name)
+    echo "Latest krmfnbuiltin version is ${KRMFN_LATEST_VERSION}"
+    curl -O -L "https://github.com/kaweezle/krmfnbuiltin/releases/download/${KRMFN_LATEST_VERSION}/krmfnbuiltin-${KRMFN_LATEST_VERSION#v}.x86_64.apk"
+    curl -O -L "https://github.com/kaweezle/krmfnbuiltin/releases/download/${KRMFN_LATEST_VERSION}/krmfnbuiltin-${KRMFN_LATEST_VERSION#v}.i386.apk"
+    cd ..
+else
+    skip "Fetching krmfnbuiltin image"
+fi
+
+
+if should_run_step make-apk-repo; then
+    step "Creating APK repository in dist/repo..."
+    rm -rf dist/repo || /bin/true
+    mkdir -p dist/repo
+
+    INPUT_APK_FILES="dist/*.apk" \
+    INPUT_DESTINATION="dist/repo" \
+    INPUT_SIGNATURE_KEY_NAME="$KEY_NAME" \
+    INPUT_SIGNATURE_KEY="$(cat $KEY_NAME)" \
+    GITHUB_WORKSPACE=$(pwd) \
+    .github/actions/make-apkindex/entrypoint.sh
+else
+    skip "Creating APK repository in dist/repo"
+fi
+
+if should_run_step upload-repo; then
+    step "Uploading APK repository to Iknite repo URL..."
+
+    tenv tf install $TF_VERSION
+    tenv tg install $TG_VERSION
+
+    export TF_PLUGIN_CACHE_DIR="$HOME/.cache/terraform/plugin-cache"
+    mkdir -p $TF_PLUGIN_CACHE_DIR
+    (cd support/iac/iknite/testrepo && \
+          terragrunt init && \
+          terragrunt apply -auto-approve )
+else
+    skip "Uploading APK repository to Iknite repo URL"
+fi
+
 if should_run_step "clean"; then
     step "Cleaning up..."
     rm -f rootfs/*.apk || /bin/true
+    rm -rf dis/repo
     $SUDO_CMD rm -rf packages || /bin/true
     $SUDO_CMD nerdctl -n $BUILDKIT_NAMESPACE rm -f iknite-rootfs >/dev/null 2>&1 || /bin/true
 else
