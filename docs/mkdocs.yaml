@@ -88,6 +88,7 @@ markdown_extensions:
   - pymdownx.tasklist:
       custom_checkbox: true
   - pymdownx.tilde
+  - sane_lists
 
 plugins:
   - search:
