@@ -85,7 +85,7 @@ EOF
 # Check if a step name is valid
 is_valid_step() {
     for s in $STEP_NAMES; do
-        if [ "$s" == "$1" ]; then
+        if [ "$s" = "$1" ]; then
             return 0
         fi
     done
@@ -100,11 +100,13 @@ step_to_var() {
 # Check if a step should run
 should_run_step() {
     local step_name="$1"
-    local skip_var="SKIP_$(step_to_var "$step_name")"
+    local skip_var
+    skip_var="SKIP_$(step_to_var "$step_name")"
 
     # Otherwise, check the skip flag
     eval "local skip_value=\$$skip_var"
-    if [ "$skip_value" == "true" ]; then
+    # shellcheck disable=SC2154
+    if [ "$skip_value" = "true" ]; then
         return 1
     fi
     return 0
@@ -193,6 +195,20 @@ else
     skip "Building Iknite package"
 fi
 
+
+if should_run_step "fetch-krmfnbuiltin"; then
+    step "Fetching krmfnbuiltin image..."
+
+    cd dist
+    KRMFN_LATEST_VERSION=$(curl --silent  https://api.github.com/repos/kaweezle/krmfnbuiltin/releases/latest | jq -r .tag_name)
+    echo "Latest krmfnbuiltin version is ${KRMFN_LATEST_VERSION}"
+    curl -O -L "https://github.com/kaweezle/krmfnbuiltin/releases/download/${KRMFN_LATEST_VERSION}/krmfnbuiltin-${KRMFN_LATEST_VERSION#v}.x86_64.apk"
+    curl -O -L "https://github.com/kaweezle/krmfnbuiltin/releases/download/${KRMFN_LATEST_VERSION}/krmfnbuiltin-${KRMFN_LATEST_VERSION#v}.i386.apk"
+    cd ..
+else
+    skip "Fetching krmfnbuiltin image"
+fi
+
 # Check nerdctl is installed
 if ! command -v nerdctl >/dev/null 2>&1; then
     error "Error: nerdctl is not installed. Please install nerdctl to proceed."
@@ -219,7 +235,7 @@ if ! command -v buildctl >/dev/null 2>&1; then
 fi
 
 # Check that buildkit is available
-if [ "$ROOTLESS" = true -a "$ROOTFULL" = false ]; then
+if [ "$ROOTLESS" = true ] && [ "$ROOTFULL" = false ]; then
     # Check if we're on a systemd-based OS
     if command -v systemctl >/dev/null 2>&1 && systemctl --version >/dev/null 2>&1; then
         if ! systemctl --user is-active --quiet buildkit; then
@@ -247,25 +263,28 @@ else
     fi
 fi
 
-export IKNITE_LAST_TAG=$(jq -Mr ".tag" dist/metadata.json)
-export IKNITE_VERSION=$(jq -Mr ".version" dist/metadata.json)
+IKNITE_LAST_TAG=$(jq -Mr ".tag" dist/metadata.json)
+IKNITE_VERSION=$(jq -Mr ".version" dist/metadata.json)
+export IKNITE_LAST_TAG
+export IKNITE_VERSION
 
 IKNITE_ROOTFS_BASE="iknite-rootfs-base:${IKNITE_VERSION}"
 if should_run_step "build"; then
     step "Building Iknite rootfs base image..."
 
     rm -f rootfs/iknite.rootfs.tar.gz rootfs/*.apk || /bin/true
-    cp dist/iknite-${IKNITE_VERSION}.x86_64.apk rootfs/
+    cp "dist/iknite-${IKNITE_VERSION}.$(uname -m).apk" rootfs/
+    cp "dist/krmfnbuiltin-${KRMFN_LATEST_VERSION#v}.$(uname -m).apk" rootfs/
 
     $SUDO_CMD buildctl build \
                  --frontend dockerfile.v0 \
                  --local context=rootfs \
                  --local dockerfile=rootfs \
-                 --opt build-arg:IKNITE_REPO_URL=$IKNITE_REPO_URL \
-                 --opt build-arg:IKNITE_VERSION=$IKNITE_VERSION \
-                 --opt build-arg:IKNITE_LAST_TAG=$IKNITE_LAST_TAG \
+                 --opt "build-arg:IKNITE_REPO_URL=$IKNITE_REPO_URL" \
+                 --opt "build-arg:IKNITE_VERSION=$IKNITE_VERSION" \
+                 --opt "build-arg:IKNITE_LAST_TAG=$IKNITE_LAST_TAG" \
                  $CACHE_FLAG \
-                 --output type=image,name=${IKNITE_ROOTFS_BASE},push=false
+                 --output "type=image,name=${IKNITE_ROOTFS_BASE},push=false"
 else
     skip "Building Iknite rootfs base image"
 fi
@@ -273,31 +292,31 @@ fi
 if should_run_step "images"; then
     step "Building Iknite images package..."
     rm -rf packages
-    $SUDO_CMD nerdctl run --privileged --rm -v $(pwd):/work cgr.dev/chainguard/melange build support/apk/iknite-images.yaml --arch $(uname -m) --signing-key kaweezle-devel@kaweezle.com-c9d89864.rsa --generate-index=false
+    $SUDO_CMD nerdctl run --privileged --rm -v "$(pwd):/work" cgr.dev/chainguard/melange build support/apk/iknite-images.yaml --arch "$(uname -m)" --signing-key kaweezle-devel@kaweezle.com-c9d89864.rsa --generate-index=false
     if [ "$ROOTLESS" = false ]; then
-        $SUDO_CMD chown -R $(id -u):$(id -g) packages
+        $SUDO_CMD chown -R "$(id -u):$(id -g)" packages
     fi
-    (cd packages/$(uname -m)/ && \
-    for f in *.apk; do mv $f ../../dist/$(echo $f | sed 's/\-r0.apk$//').$(uname -m).apk; done)
+    (cd "packages/$(uname -m)/" && \
+    for f in *.apk; do mv "$f" "../../dist/$(echo "$f" | sed 's/\-r0.apk$//').$(uname -m).apk"; done)
 else
     skip "Building Iknite images package"
 fi
 
-IKNITE_IMAGES_APK="iknite-images-${KUBERNETES_VERSION}-r0.apk"
+IKNITE_IMAGES_APK="iknite-images-${KUBERNETES_VERSION}.$(uname -m).apk"
 
 if should_run_step "add-images"; then
     step "Adding images to Iknite rootfs..."
-    rm -f rootfs/*.apk || /bin/true
-    cp packages/$(uname -m)/${IKNITE_IMAGES_APK} rootfs/
 
     $SUDO_CMD nerdctl -n $BUILDKIT_NAMESPACE rm -f iknite-rootfs 2>/dev/null || /bin/true
 
+    # shellcheck disable=SC2016
     $SUDO_CMD nerdctl -n $BUILDKIT_NAMESPACE run \
         --name iknite-rootfs \
         --device /dev/fuse --cap-add SYS_ADMIN \
-        -v packages/$(uname -m):/apks \
-        ${IKNITE_ROOTFS_BASE} \
-        /bin/sh -c 'apk --no-cache add /apks/*.apk; apk del iknite-images'
+        -v "$(pwd)/dist:/apks" \
+        -e "IKNITE_IMAGES_APK=${IKNITE_IMAGES_APK}" \
+        "${IKNITE_ROOTFS_BASE}" \
+        /bin/sh -c 'apk --no-cache add /apks/$IKNITE_IMAGES_APK; apk del iknite-images'
 else
     skip "Adding images to Iknite rootfs"
 fi
@@ -321,24 +340,10 @@ if should_run_step "rootfs-image"; then
                  --local dockerfile=rootfs \
                  --opt filename=Dockerfile.rootfs \
                  $CACHE_FLAG \
-                 --output type=image,name=${IKNITE_ROOTFS_IMAGE},push=false
+                 --output "type=image,name=${IKNITE_ROOTFS_IMAGE},push=false"
 else
     skip "Building Iknite rootfs image"
 fi
-
-if should_run_step "fetch-krmfnbuiltin"; then
-    step "Fetching krmfnbuiltin image..."
-
-    cd dist
-    KRMFN_LATEST_VERSION=$(curl --silent  https://api.github.com/repos/kaweezle/krmfnbuiltin/releases/latest | jq -r .tag_name)
-    echo "Latest krmfnbuiltin version is ${KRMFN_LATEST_VERSION}"
-    curl -O -L "https://github.com/kaweezle/krmfnbuiltin/releases/download/${KRMFN_LATEST_VERSION}/krmfnbuiltin-${KRMFN_LATEST_VERSION#v}.x86_64.apk"
-    curl -O -L "https://github.com/kaweezle/krmfnbuiltin/releases/download/${KRMFN_LATEST_VERSION}/krmfnbuiltin-${KRMFN_LATEST_VERSION#v}.i386.apk"
-    cd ..
-else
-    skip "Fetching krmfnbuiltin image"
-fi
-
 
 if should_run_step make-apk-repo; then
     step "Creating APK repository in dist/repo..."
@@ -348,7 +353,7 @@ if should_run_step make-apk-repo; then
     INPUT_APK_FILES="dist/*.apk" \
     INPUT_DESTINATION="dist/repo" \
     INPUT_SIGNATURE_KEY_NAME="$KEY_NAME" \
-    INPUT_SIGNATURE_KEY="$(cat $KEY_NAME)" \
+    INPUT_SIGNATURE_KEY="$(cat "$KEY_NAME")" \
     GITHUB_WORKSPACE=$(pwd) \
     .github/actions/make-apkindex/entrypoint.sh
 else
@@ -362,7 +367,7 @@ if should_run_step upload-repo; then
     tenv tg install $TG_VERSION
 
     export TF_PLUGIN_CACHE_DIR="$HOME/.cache/terraform/plugin-cache"
-    mkdir -p $TF_PLUGIN_CACHE_DIR
+    mkdir -p "$TF_PLUGIN_CACHE_DIR"
     (cd support/iac/iknite/testrepo && \
           terragrunt init && \
           terragrunt apply -auto-approve )
