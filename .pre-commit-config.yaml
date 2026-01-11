@@ -80,6 +80,12 @@ repos:
       - id: golangci-lint
       - id: golangci-lint-fmt
 
+  - repo: https://github.com/shellcheck-py/shellcheck-py
+    rev: v0.11.0.1
+    hooks:
+      - id: shellcheck
+        args: ["--exclude=SC3014,SC3043"] # Ignore source-related warnings
+
 # Global exclusions for all hooks
 exclude: |
   ^docs/docs/assets/|

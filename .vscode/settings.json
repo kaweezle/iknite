@@ -17,5 +17,6 @@
   "editor.formatOnSaveMode": "file",
   "editor.renderWhitespace": "boundary",
   "editor.rulers": [80, 120],
-  "go.formatTool": "default"
+  "go.formatTool": "default",
+  "shellcheck.exclude": ["3043"]
 }
