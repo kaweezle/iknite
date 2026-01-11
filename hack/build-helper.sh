@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# cSpell: words nerdctl doas chainguard apks rootfull krmfn krmfnbuiltin apkrepo apkindex tenv testrepo
+# cSpell: words nerdctl doas chainguard apks rootfull krmfn krmfnbuiltin apkrepo apkindex tenv testrepo qcow2 vhdx
 
 set -e
 export IKNITE_REPO_URL=http://kwzl-apkrepo.s3-website.gra.io.cloud.ovh.net/test/
@@ -34,7 +34,7 @@ if [ "$ROOTLESS" = false ]; then
 fi
 
 # Step names for dynamic --skip-* and --only-* handling
-STEP_NAMES="goreleaser build images add-images export rootfs-image fetch-krmfnbuiltin make-apk-repo upload-repo clean"
+STEP_NAMES="goreleaser build images add-images export rootfs-image fetch-krmfnbuiltin make-apk-repo upload-repo vm-image clean"
 
 # Only run this specific step (empty means run all non-skipped steps)
 ONLY_CALLED=false
@@ -69,6 +69,10 @@ STEPS:
     add-images          Add images to rootfs container
     export              Export rootfs tarball
     rootfs-image        Build final rootfs image
+    fetch-krmfnbuiltin  Fetch krmfnbuiltin APKs
+    make-apk-repo       Create APK repository in dist/repo
+    upload-repo         Upload APK repository to IKNITE_REPO_URL
+    vm-image            Build VM images (qcow2, vhdx)
     clean               Cleanup temporary files
 
 ENVIRONMENT VARIABLES:
@@ -196,11 +200,11 @@ else
 fi
 
 
+KRMFN_LATEST_VERSION=$(curl --silent  https://api.github.com/repos/kaweezle/krmfnbuiltin/releases/latest | jq -r .tag_name)
 if should_run_step "fetch-krmfnbuiltin"; then
     step "Fetching krmfnbuiltin image..."
 
     cd dist
-    KRMFN_LATEST_VERSION=$(curl --silent  https://api.github.com/repos/kaweezle/krmfnbuiltin/releases/latest | jq -r .tag_name)
     echo "Latest krmfnbuiltin version is ${KRMFN_LATEST_VERSION}"
     curl -O -L "https://github.com/kaweezle/krmfnbuiltin/releases/download/${KRMFN_LATEST_VERSION}/krmfnbuiltin-${KRMFN_LATEST_VERSION#v}.x86_64.apk"
     curl -O -L "https://github.com/kaweezle/krmfnbuiltin/releases/download/${KRMFN_LATEST_VERSION}/krmfnbuiltin-${KRMFN_LATEST_VERSION#v}.i386.apk"
@@ -373,6 +377,16 @@ if should_run_step upload-repo; then
           terragrunt apply -auto-approve )
 else
     skip "Uploading APK repository to Iknite repo URL"
+fi
+
+if should_run_step vm-image; then
+    step "Building VM images (qcow2, vhdx)..."
+
+    rm -f "rootfs/*.{qcow2,vhdx}" || /bin/true
+
+    ./hack/build-vm-image.sh
+else
+    skip "Building VM images (qcow2, vhdx)"
 fi
 
 if should_run_step "clean"; then

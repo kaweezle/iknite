@@ -205,7 +205,7 @@ pipeline:
       registry.k8s.io/kube-apiserver:v${KUBERNETES_VERSION}
       registry.k8s.io/kube-proxy:v${KUBERNETES_VERSION}
       registry.k8s.io/coredns/coredns:v1.11.1
-      docker.io/rancher/local-path-provisioner:v0.0.33
+      docker.io/rancher/local-path-provisioner:v0.0.34
       registry.k8s.io/metrics-server/metrics-server:v0.8.0
       ghcr.io/flannel-io/flannel:v0.26.5
       docker.io/alpine/kubectl:${KUBECTL_VERSION}

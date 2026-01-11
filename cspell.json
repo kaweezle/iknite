@@ -6,6 +6,7 @@
     "dist",
     "rootfs",
     "go.*",
+    ".gitignore",
     "**/testdata/**",
     "pkg/provision/base/**",
     "**/zz_generated.*",
@@ -17,13 +18,7 @@
     "**/rc.conf"
   ],
   "dictionaryDefinitions": [],
-  "dictionaries": [
-    "bash",
-    "docker",
-    "golang",
-    "terraform",
-    "softwareTerms"
-  ],
+  "dictionaries": ["bash", "docker", "golang", "terraform", "softwareTerms"],
   "words": [
     "abuild",
     "afero",

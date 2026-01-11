@@ -34,3 +34,7 @@ rootfs/*.apk
 *.dec.sops.yaml
 *.rootfs.tar.gz
 *.rootfs.tar
+
+*.qcow2
+*.vhdx
+*.iso
