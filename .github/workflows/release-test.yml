@@ -197,3 +197,50 @@ jobs:
         run: |
           rm -rf /tmp/.buildx-cache
           mv /tmp/.buildx-cache-new /tmp/.buildx-cache
+
+  build-vm-images:
+    name: Build VM images
+    needs: [build-rootfs]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Get packages artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: packages
+          path: dist
+
+      - name: Get root fs artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: rootfs
+
+      # What is needed: qemu-img qemu-nbd genisoimage
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y qemu-utils qemu-guest-agent genisoimage
+          ls -Rl rootfs/
+          ls -Rl dist/
+
+      - name: Build VM images
+        run: |
+          sudo ./hack/build-vm-image.sh
+
+      - name: Upload VM images
+        uses: actions/upload-artifact@v4
+        with:
+          name: vm-images
+          path: |
+            rootfs/iknite-*.vhdx
+            rootfs/iknite-*.qcow2
+            rootfs/*.iso
+
+      # TODO: Add test step for VM images
+      # - name: Test VM images
+      #   run: |
+      #     ./hack/test-vm-images.sh
