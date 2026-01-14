@@ -231,6 +231,47 @@ jobs:
         run: |
           sudo ./hack/build-vm-image.sh
 
+      - name: Create OpenStack image and test VM deployment
+        env:
+          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+          AGE_PRIVATE_KEY: ${{ secrets.AGE_PRIVATE_KEY }}
+        run: |
+          echo "::group::Import Age key"
+          mkdir -p ~/.config/sops/age
+          echo -e "$AGE_PRIVATE_KEY" > ~/.config/sops/age/keys.txt
+          chmod 600 ~/.config/sops/age/keys.txt
+          echo "::endgroup::"
+
+          echo "::group::Instaling tenv"
+          LATEST_VERSION=$(curl --silent https://api.github.com/repos/tofuutils/tenv/releases/latest | jq -r .tag_name)
+          curl -O -L "https://github.com/tofuutils/tenv/releases/latest/download/tenv_${LATEST_VERSION}_amd64.deb"
+          sudo dpkg -i "tenv_${LATEST_VERSION}_amd64.deb"
+          echo "::endgroup::"
+
+          echo "::group::Installing terraform ($tf_version) and terragrunt ($tg_version)"
+          tenv tf install $tf_version
+          tenv tg install $tg_version
+          echo "::endgroup::"
+
+          echo "::group::Running terragrunt module with instance creation"
+          export TF_PLUGIN_CACHE_DIR="$HOME/.cache/terraform/plugin-cache"
+          mkdir -p $TF_PLUGIN_CACHE_DIR
+          cd support/iac/iknite/iknite-vm
+          export IKNITE_CREATE_INSTANCE=true
+          terragrunt init
+          terragrunt apply -auto-approve
+          echo "::endgroup::"
+
+          echo "::group::Testing VM instance"
+          # Add commands to test the VM instance here
+          echo "Should test Kubernetes presence..."
+          echo "::endgroup::"
+
+          echo "::group::Teardown VM instance"
+          export IKNITE_CREATE_INSTANCE=false
+          terragrunt apply -auto-approve
+          echo "::endgroup::"
+
       - name: Upload VM images
         uses: actions/upload-artifact@v4
         with:
@@ -239,8 +280,3 @@ jobs:
             rootfs/iknite-*.vhdx
             rootfs/iknite-*.qcow2
             rootfs/*.iso
-
-      # TODO: Add test step for VM images
-      # - name: Test VM images
-      #   run: |
-      #     ./hack/test-vm-images.sh

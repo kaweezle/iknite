@@ -25,6 +25,7 @@ RUN --mount=type=bind,target=/conf sed -ie '/^root:/ s#:/bin/.*$#:/bin/zsh#' /et
     mkdir -p /lib/rc/init.d && \
     ln -s /lib/rc/init.d /run/openrc && \
     touch /lib/rc/init.d/softlevel && \
+    cp /etc/rc.conf /etc/rc.conf.orig && \
     install -m 644 -o root -g root /conf/rc.conf /etc/rc.conf
 
 # Add Oh-my-zsh

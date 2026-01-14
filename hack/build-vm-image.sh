@@ -1,6 +1,7 @@
 #!/usr/bin/env sh
 # cSpell: words nocloud genisoimage volid cidata subformat qcow2 cdrkit nodiscard blockdev getsize writeback blkid fsprogs progname wgets
 # cSpell: words mountpoint resolv resolvconf runlevel runlevels hotplug udevadm mdev extlinux virt mkinitfs virtio syslinux relatime vhdx
+# cSpell: words inittab securetty
 set -e
 
 # Step names for dynamic --skip-* and --only-* handling
@@ -9,6 +10,7 @@ STEP_NAMES="create-image mount-image copy-rootfs install-kernel install-bootload
 # Only run this specific step (empty means run all non-skipped steps)
 ONLY_CALLED=false
 IMAGE_SIZE="3G"
+SERIAL_PORT="ttyS0"
 KUBERNETES_VERSION=$(cat .goreleaser.yaml | grep 'KUBERNETES_VERSION=' | sed 's/^.*KUBERNETES_VERSION=//')
 IKNITE_VERSION=$(jq -Mr ".version" dist/metadata.json)
 readonly PROGNAME='build-vm-image'
@@ -202,7 +204,7 @@ setup_extlinux() {
 	local default_kernel="$kernel_flavor"
 	local kernel_opts=''
 
-	[ -z "$serial_port" ] || kernel_opts="console=$serial_port"
+	[ -z "$serial_port" ] || kernel_opts="console=tty0 console=$serial_port,115200n8"
 
 	if [ "$kernel_flavor" = 'virt' ]; then
 		_apk search --root . --exact --quiet linux-lts | grep -q . \
@@ -485,7 +487,7 @@ if should_run_step "install-bootloader"; then
 
     info "Setting up extlinux bootloader"
     _apk add --root "$mount_dir" --no-scripts syslinux
-    setup_extlinux "$mount_dir" "UUID=$root_uuid" "ext4" "virt" ""
+    setup_extlinux "$mount_dir" "UUID=$root_uuid" "ext4" "virt" "$SERIAL_PORT"
 
     eval "DONE_$(step_to_var "install-bootloader")=true"
 else
@@ -501,6 +503,11 @@ if should_run_step "configure-vm"; then
 # <fs>		<mountpoint>	<type>	<opts>		<dump/pass>
 UUID=$root_uuid	/		ext4	relatime	0 1
 EOF
+
+    info "Setting up serial console"
+	echo "$SERIAL_PORT" >> "$mount_dir/etc/securetty"
+	sed -Ei "s|^[# ]*($SERIAL_PORT:.*)|\1|" "$mount_dir/etc/inittab"
+
 
     script_dir=$(dirname "$(realpath "$0")")
     info "Executing script in chroot: $script_dir/configure-vm-image.sh"

@@ -18,7 +18,13 @@
     "**/rc.conf"
   ],
   "dictionaryDefinitions": [],
-  "dictionaries": ["bash", "docker", "golang", "terraform", "softwareTerms"],
+  "dictionaries": [
+    "bash",
+    "docker",
+    "golang",
+    "terraform",
+    "softwareTerms"
+  ],
   "words": [
     "abuild",
     "afero",
@@ -36,6 +42,7 @@
     "Debugf",
     "deepcopy",
     "DRYRUN",
+    "fieldtype",
     "fontawesome",
     "forcetypeassert",
     "gitmoji",
@@ -54,6 +61,8 @@
     "Infoln",
     "interfacebloat",
     "kaweezle",
+    "keypair",
+    "keypairs",
     "killall",
     "koptions",
     "krmfnbuiltin",
@@ -80,6 +89,7 @@
     "pidfile",
     "pipx",
     "pyproject",
+    "qcow",
     "resid",
     "Resmap",
     "rootfs",

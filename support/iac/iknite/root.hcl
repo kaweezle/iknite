@@ -95,12 +95,12 @@ locals {
   }
   ovh_region             = "ovh-eu"
   os_project_id          = "40d343bb6eb54b57af7a367a31cd3898"
-  os_username            = "user-hwzkgzsQzVfr"
-  os_tenant_name         = "5089596319932557"
-  os_region_name         = "GRA5"
   os_storage_region_name = "GRA"
   s3_access_key_id       = "a56154691503423d82fe101b6cbd956e"
   s3_user_id             = "a99acb7ecb2f4120b44eddc0b9fd580b"
+
+  kubernetes_version = "1.34.3"
+  iknite_version     = jsondecode(file("${get_repo_root()}/dist/metadata.json")).version
 }
 
 terraform {

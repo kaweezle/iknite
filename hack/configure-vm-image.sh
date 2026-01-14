@@ -26,7 +26,7 @@ rc_add() {
 }
 
 step 'Add services packages...'
-apk add --quiet --no-cache --no-progress less logrotate openssh chrony cloud-init doas acpi e2fsprogs-extra py3-pyserial py3-netifaces alpine-base
+apk add --quiet --no-cache --no-progress less logrotate openssh chrony cloud-init dhcpcd doas acpi e2fsprogs-extra py3-pyserial py3-netifaces alpine-base
 
 step 'Set up timezone'
 setup-timezone -z Europe/Paris
@@ -34,13 +34,19 @@ setup-timezone -z Europe/Paris
 step 'Set up keymap'
 setup-keymap fr fr-azerty
 
+step 'Restore default rc.conf'
+cp /etc/rc.conf.orig /etc/rc.conf
+echo "" >> /etc/rc.conf
+# shellcheck disable=SC2140
+echo "rc_kubelet_need="non-existing-service"" >> /etc/rc.conf
+
 step 'Set up networking'
 cat > /etc/network/interfaces <<-EOF
 	auto lo
 	iface lo inet loopback
 
 	auto eth0
-	iface eth0 inet dhcp
+	iface eth0 inet manual
 
 	post-up /etc/network/if-post-up.d/*
 	post-down /etc/network/if-post-down.d/*
@@ -108,7 +114,7 @@ step 'Enable shutdown services'
 rc_add shutdown killprocs savecache mount-ro
 
 step 'Enable defaultservices'
-rc_add default acpid chronyd crond networking termencoding sshd cloud-init-ds-identify cloud-init cloud-config cloud-final iknite
+rc_add default acpid chronyd crond dhcpcd networking termencoding sshd cloud-init-ds-identify cloud-init cloud-config cloud-final iknite
 
 step 'Clean up apk cache'
 if [ -L /etc/apk/cache ]; then
