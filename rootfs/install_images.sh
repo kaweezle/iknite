@@ -1,4 +1,4 @@
-#!/bin/zsh
+#!/bin/sh
 
 set -ex
 
@@ -29,24 +29,24 @@ export CONTAINERD_SNAPSHOTTER=fuse-overlayfs
 containerd >/var/log/containerd.log 2>&1 &
 sleep 3
 
-nerdctl --namespace=k8s.io pull -q registry.k8s.io/pause:3.10.1
-nerdctl --namespace=k8s.io pull -q registry.k8s.io/pause:3.9
-nerdctl --namespace=k8s.io pull -q registry.k8s.io/etcd:3.6.5-0
-nerdctl --namespace=k8s.io pull -q registry.k8s.io/kube-controller-manager:v${KUBERNETES_VERSION}
-nerdctl --namespace=k8s.io pull -q registry.k8s.io/kube-scheduler:v${KUBERNETES_VERSION}
-nerdctl --namespace=k8s.io pull -q registry.k8s.io/kube-apiserver:v${KUBERNETES_VERSION}
-nerdctl --namespace=k8s.io pull -q registry.k8s.io/kube-proxy:v${KUBERNETES_VERSION}
-nerdctl --namespace=k8s.io pull -q registry.k8s.io/coredns/coredns:v1.11.1
-nerdctl --namespace=k8s.io pull -q docker.io/rancher/local-path-provisioner:v0.0.33
-nerdctl --namespace=k8s.io pull -q registry.k8s.io/metrics-server/metrics-server:v0.8.0
-nerdctl --namespace=k8s.io pull -q ghcr.io/flannel-io/flannel:v0.26.5
-nerdctl --namespace=k8s.io pull -q docker.io/alpine/kubectl:${KUBECTL_VERSION}
-nerdctl --namespace=k8s.io pull -q ghcr.io/kube-vip/kube-vip:v0.8.9
-nerdctl --namespace=k8s.io pull -q ghcr.io/kube-vip/kube-vip-cloud-provider:v0.0.12
+nerdctl --namespace=k8s.io pull -q "registry.k8s.io/pause:3.10.1"
+nerdctl --namespace=k8s.io pull -q "registry.k8s.io/pause:3.9"
+nerdctl --namespace=k8s.io pull -q "registry.k8s.io/etcd:3.6.5-0"
+nerdctl --namespace=k8s.io pull -q "registry.k8s.io/kube-controller-manager:v${KUBERNETES_VERSION}"
+nerdctl --namespace=k8s.io pull -q "registry.k8s.io/kube-scheduler:v${KUBERNETES_VERSION}"
+nerdctl --namespace=k8s.io pull -q "registry.k8s.io/kube-apiserver:v${KUBERNETES_VERSION}"
+nerdctl --namespace=k8s.io pull -q "registry.k8s.io/kube-proxy:v${KUBERNETES_VERSION}"
+nerdctl --namespace=k8s.io pull -q "registry.k8s.io/coredns/coredns:v1.11.1"
+nerdctl --namespace=k8s.io pull -q "docker.io/rancher/local-path-provisioner:v0.0.33"
+nerdctl --namespace=k8s.io pull -q "registry.k8s.io/metrics-server/metrics-server:v0.8.0"
+nerdctl --namespace=k8s.io pull -q "ghcr.io/flannel-io/flannel:v0.26.5"
+nerdctl --namespace=k8s.io pull -q "docker.io/alpine/kubectl:${KUBECTL_VERSION}"
+nerdctl --namespace=k8s.io pull -q "ghcr.io/kube-vip/kube-vip:v0.8.9"
+nerdctl --namespace=k8s.io pull -q "ghcr.io/kube-vip/kube-vip-cloud-provider:v0.0.12"
 
 kill %1 %2
 rm -f /var/log/containerd.log /var/log/fuse-overlayfs.log
 mv /etc/containerd/config.toml.bak /etc/containerd/config.toml
 rm -f containerd-fuse-overlayfs-grpc containerd-fuse-overlayfs-1.0.8-linux-amd64.tar.gz
 apk del fuse-overlayfs
-rm -rf `find /var/cache/apk/ -type f`
+rm -rf "$(find /var/cache/apk/ -type f)"

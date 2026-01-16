@@ -1,13 +1,15 @@
 #!/bin/sh
+# shellcheck disable=SC2329,SC3037
 set -e
 
 # This script checks if fuse-overlayfs is needed by testing if the overlay filesystem can be mounted directly.
 is_fuse_overlayfs_needed() {
-    local tmpdir=$(mktemp -d)
+    local tmpdir
+    tmpdir=$(mktemp -d)
     mkdir -p "$tmpdir/lower" "$tmpdir/upper" "$tmpdir/work" "$tmpdir/merged"
     echo -n "test" > "$tmpdir/lower/hello.txt"
 
-    if mount -t overlay overlay -o lowerdir="${tmpdir}/lower",upperdir="${tmpdir}/upper",workdir="${tmpdir}/work" "${tmpdir}/merged" 2>/dev/null; then
+    if mount -t overlay overlay -o lowerdir="${tmpdir}/lower,upperdir=${tmpdir}/upper,workdir=${tmpdir}/work" "${tmpdir}/merged" 2>/dev/null; then
         if mountpoint -q "${tmpdir}/merged"; then
             umount "${tmpdir}/merged"
             rm -rf "$tmpdir"
@@ -21,19 +23,20 @@ is_fuse_overlayfs_needed() {
 # This function installs fuse-overlayfs and checks if it works by creating a simple overlay filesystem.
 add_and_check_fuse_overlayfs() {
     apk add --update --no-progress --no-cache fuse-overlayfs
-    local tmpdir=$(mktemp -d)
+    local tmpdir
+    tmpdir=$(mktemp -d)
     local result=1
     mkdir -p "$tmpdir/lower" "$tmpdir/upper" "$tmpdir/work" "$tmpdir/merged"
     echo -n "test" > "$tmpdir/lower/hello.txt"
 
-    if fuse-overlayfs -o lowerdir="${tmpdir}/lower",upperdir="${tmpdir}/upper",workdir="${tmpdir}/work" "${tmpdir}/merged" 2>/dev/null; then
-        if [ -f "${tmpdir}/merged/hello.txt" ] && [ $(cat "${tmpdir}/merged/hello.txt") == "test" ]; then
+    if fuse-overlayfs -o lowerdir="${tmpdir}/lower,upperdir=${tmpdir}/upper,workdir=${tmpdir}/work" "${tmpdir}/merged" 2>/dev/null; then
+        if [ -f "${tmpdir}/merged/hello.txt" ] && [ "$(cat "${tmpdir}/merged/hello.txt")" = "test" ]; then
             result=0
         fi
         fusermount3 -u "${tmpdir}/merged"
     fi
     rm -rf "$tmpdir"
-    return $result
+    return "$result"
 }
 
 # This function removes fuse-overlayfs after testing.

@@ -9,5 +9,9 @@ terraform {
       source  = "ovh/ovh"
       version = "2.10.0"
     }
+    null = {
+      source  = "hashicorp/null"
+      version = "3.2.4"
+    }
   }
 }

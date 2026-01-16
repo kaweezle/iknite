@@ -15,20 +15,16 @@
     "docs/docs/assets/**",
     "docs/pyproject.toml",
     "*-requirements.txt",
-    "**/rc.conf"
+    "**/rc.conf",
+    "**/**.sops.yaml"
   ],
   "dictionaryDefinitions": [],
-  "dictionaries": [
-    "bash",
-    "docker",
-    "golang",
-    "terraform",
-    "softwareTerms"
-  ],
+  "dictionaries": ["bash", "docker", "golang", "terraform", "softwareTerms"],
   "words": [
     "abuild",
     "afero",
     "antoinemartin",
+    "apkrepo",
     "buildctl",
     "buildkit",
     "buildkitd",
@@ -73,6 +69,7 @@
     "kubelet",
     "Kustomization",
     "Kustomizations",
+    "kwzl",
     "mapstructure",
     "MDNS",
     "Messagef",
@@ -99,6 +96,7 @@
     "tfstate",
     "traefik",
     "unparam",
+    "vancluever",
     "Warnf",
     "Warningf",
     "Warningln",

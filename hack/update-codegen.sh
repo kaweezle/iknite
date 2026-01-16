@@ -21,6 +21,7 @@ set -o pipefail
 SCRIPT_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 CODEGEN_PKG=${CODEGEN_PKG:-"$(go env GOPATH)/pkg/mod/k8s.io/code-generator@v0.30.1"}
 
+# shellcheck disable=SC1091
 source "${CODEGEN_PKG}/kube_codegen.sh"
 
 THIS_PKG="github.com/kaweezle/iknite"

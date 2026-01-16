@@ -4,6 +4,8 @@ FROM alpine:3.23 as builder
 
 ARG USERNAME=alpine
 ARG GROUPNAME=alpine
+ARG TFLINT_VERSION=0.60.0
+ARG TERRAFORM_DOCS_VERSION=0.21.0
 
 # Add the dependencies
 RUN echo "http://dl-cdn.alpinelinux.org/alpine/edge/testing/" >> /etc/apk/repositories && \
@@ -14,6 +16,13 @@ RUN echo "http://dl-cdn.alpinelinux.org/alpine/edge/testing/" >> /etc/apk/reposi
     GORELEASER_VERSION=$(curl --silent  https://api.github.com/repos/goreleaser/goreleaser/releases/latest | jq -r .tag_name | sed -e 's/^v//') && \
     wget -q -O /tmp/goreleaser.apk "https://github.com/goreleaser/goreleaser/releases/download/v${GORELEASER_VERSION}/goreleaser_${GORELEASER_VERSION}_x86_64.apk" && \
     apk add --quiet --no-progress --allow-untrusted --no-cache /tmp/goreleaser.apk && \
+    rm -f /tmp/goreleaser.apk && \
+    wget -q -O /tmp/tflint.zip "https://github.com/terraform-linters/tflint/releases/download/v${TFLINT_VERSION}/tflint_linux_amd64.zip" && \
+    unzip -q /tmp/tflint.zip -d /usr/local/bin/ && \
+    rm -f /tmp/tflint.zip && \
+    wget -q -O /tmp/terraform-docs.tar.gz "https://github.com/terraform-docs/terraform-docs/releases/download/v${TERRAFORM_DOCS_VERSION}/terraform-docs-v${TERRAFORM_DOCS_VERSION}-linux-amd64.tar.gz" && \
+    tar -xzf /tmp/terraform-docs.tar.gz -C /usr/local/bin/ terraform-docs && \
+    rm -f /tmp/terraform-docs.tar.gz && \
     rm -rf `find /var/cache/apk/ -type f`
 
 # Change root shell

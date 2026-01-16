@@ -67,7 +67,7 @@ resource "ovh_domain_zone_record" "this" {
   subdomain = each.value.name
   fieldtype = "A"
   ttl       = each.value.ttl
-  target    = openstack_compute_instance_v2.this[each.key].network.0.fixed_ip_v4
+  target    = openstack_compute_instance_v2.this[each.key].network[0].fixed_ip_v4
 }
 
 // Wait for SSH to be available on resource
@@ -77,7 +77,7 @@ resource "null_resource" "wait_ssh" {
   provisioner "remote-exec" {
     connection {
       type        = "ssh"
-      host        = openstack_compute_instance_v2.this[each.key].network.0.fixed_ip_v4
+      host        = openstack_compute_instance_v2.this[each.key].network[0].fixed_ip_v4
       user        = "root"
       private_key = var.private_keys[each.value.key_name]
       timeout     = "1m"
