@@ -57,9 +57,9 @@ mkdir -p etc/network/if-post-down.d
 
 step "Setting resolv.conf"
 cat > /etc/resolv.conf <<-EOF
-    # Default nameservers, replace them with your own.
-    nameserver 1.1.1.1
-    nameserver 2606:4700:4700::1111
+# Default nameservers, replace them with your own.
+nameserver 1.1.1.1
+nameserver 2606:4700:4700::1111
 EOF
 
 # FIXME: remove root and alpine password

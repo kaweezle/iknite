@@ -273,6 +273,8 @@ cleanup() {
         rmdir "$mount_dir" || warning "Failed to remove mount directory $mount_dir"
         if [ -n "$disk_dev" ] && ! [ -b "$IMAGE_FILE" ]; then
             info "Detaching NBD device $disk_dev"
+            sync
+            sleep 1
             qemu-nbd --disconnect "$disk_dev"
         else
             warning "No NBD device to detach."

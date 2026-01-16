@@ -38,3 +38,4 @@ rootfs/*.apk
 *.qcow2
 *.vhdx
 *.iso
+*.log

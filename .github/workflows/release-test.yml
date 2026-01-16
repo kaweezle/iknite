@@ -6,8 +6,8 @@ on:
     branches: ["main"]
 
 env:
-  tf_version: "1.11.1"
-  tg_version: "0.77.6"
+  tf_version: "1.14.3"
+  tg_version: "0.97.2"
   REGISTRY: ghcr.io
   KUBERNETES_VERSION: "1.34.3"
   IMAGE_NAME: ${{ github.repository_owner }}/iknite
@@ -144,6 +144,9 @@ jobs:
 
       - name: Build root fs
         run: |
+          sudo apt-get update -y
+          sudo apt-get install -y --no-install-recommends libarchive-tools
+
           export IKNITE_VERSION=$(jq -Mr ".version" packages/metadata.json)
           export IKNITE_LAST_TAG=$(jq -Mr ".tag" packages/metadata.json)
           echo "Version is $IKNITE_VERSION"
@@ -171,7 +174,7 @@ jobs:
             iknite-rootfs-base:${IKNITE_VERSION} \
             /bin/sh -c 'apk --no-cache add /apks/iknite-images-*.apk; apk del iknite-images'
 
-          docker export iknite-rootfs | gzip > rootfs/iknite.rootfs.tar.gz
+          docker export iknite-rootfs | bsdtar -zcf rootfs/iknite.rootfs.tar.gz --exclude=.dockerenv --exclude=dev/console @-
           sha256sum rootfs/iknite.rootfs.tar.gz >> packages/SHA256SUMS
           echo "::endgroup::"
 
@@ -256,6 +259,11 @@ jobs:
           echo "::group::Running terragrunt module with instance creation"
           export TF_PLUGIN_CACHE_DIR="$HOME/.cache/terraform/plugin-cache"
           mkdir -p $TF_PLUGIN_CACHE_DIR
+          echo "Qcow2 and VHDX images stats and sha256sums:"
+          stat rootfs/iknite-*.qcow2
+          stat rootfs/iknite-*.vhdx
+          sha512sum rootfs/iknite-*.qcow2
+          sha512sum rootfs/iknite-*.vhdx
           cd support/iac/iknite/iknite-vm
           export IKNITE_CREATE_INSTANCE=true
           terragrunt init
