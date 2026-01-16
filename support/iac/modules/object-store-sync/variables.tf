@@ -4,6 +4,7 @@ variable "s3" {
     region     = string
     access_key = string
     secret_key = string
+    endpoint   = string
   })
   description = "S3 credentials for the object store"
   sensitive   = true

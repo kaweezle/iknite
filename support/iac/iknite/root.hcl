@@ -82,7 +82,7 @@ locals {
   label               = "Kaweezle"
   domain_prefix       = "kaweezle"
   slug                = "kaweezle"
-  domain_suffix       = "kaweezle.com"
+  domain_suffix       = "iknite.app"
   github_organization = "kaweezle"
   email               = "info@kaweezle.com"
 
@@ -98,6 +98,8 @@ locals {
   os_storage_region_name = "GRA"
   s3_access_key_id       = "a56154691503423d82fe101b6cbd956e"
   s3_user_id             = "a99acb7ecb2f4120b44eddc0b9fd580b"
+
+  cloudflare_account_id = "a54f6b2557d54a9bff5eef36482b7fe6"
 
   kubernetes_version = "1.34.3"
   iknite_version     = jsondecode(file("${get_repo_root()}/dist/metadata.json")).version

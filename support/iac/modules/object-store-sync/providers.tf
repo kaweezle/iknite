@@ -10,7 +10,7 @@ provider "aws" {
   # s3_use_path_style          = true
 
   endpoints {
-    s3 = "https://s3.${var.s3.region}.io.cloud.ovh.net/"
+    s3 = var.s3.endpoint
   }
 
   # Required dummy values

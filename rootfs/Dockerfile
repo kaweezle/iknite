@@ -3,7 +3,7 @@ FROM alpine:3.23
 
 ARG IKNITE_VERSION=0.5.3-devel
 ARG IKNITE_LAST_TAG=v0.2.4
-ARG IKNITE_REPO_URL=http://kwzl-apkrepo.s3-website.gra.io.cloud.ovh.net/repo/
+ARG IKNITE_REPO_URL=https://static.iknite.app/test/
 ARG IKNITE_KEY_NAME=kaweezle-devel@kaweezle.com-c9d89864.rsa.pub
 ARG IKNITE_BASE_URL=https://github.com/kaweezle/iknite/releases/download
 ARG KUBERNETES_VERSION=1.34.3

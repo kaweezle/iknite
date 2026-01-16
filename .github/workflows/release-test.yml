@@ -153,7 +153,7 @@ jobs:
           mkdir -p /tmp/.buildx-cache-new
           echo "::group::Building iknite-rootfs-base:${IKNITE_VERSION}"
           docker buildx build \
-             --build-arg IKNITE_REPO_URL=http://kwzl-apkrepo.s3-website.gra.io.cloud.ovh.net/test/ \
+             --build-arg IKNITE_REPO_URL=https://static.iknite.app/test/ \
              --build-arg IKNITE_VERSION=$IKNITE_VERSION \
              --build-arg IKNITE_LAST_TAG=$IKNITE_LAST_TAG \
              --cache-from type=local,src=/tmp/.buildx-cache \

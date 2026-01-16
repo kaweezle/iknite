@@ -3,7 +3,7 @@
 # cSpell: words nerdctl doas chainguard apks rootfull krmfn krmfnbuiltin apkrepo apkindex tenv testrepo qcow2 vhdx
 
 set -e
-export IKNITE_REPO_URL=http://kwzl-apkrepo.s3-website.gra.io.cloud.ovh.net/test/
+export IKNITE_REPO_URL=https://static.iknite.app/test/
 
 KUBERNETES_VERSION=${KUBERNETES_VERSION:-"1.34.3"}
 KEY_NAME=${KEY_NAME:-kaweezle-devel@kaweezle.com-c9d89864.rsa}
