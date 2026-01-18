@@ -13,6 +13,8 @@ import (
 	"github.com/kaweezle/iknite/pkg/utils"
 )
 
+var KubernetesVersionDefault = constants.KubernetesVersion
+
 // cSpell: enable
 
 func addDefaultingFuncs(scheme *runtime.Scheme) error {
@@ -33,7 +35,7 @@ func SetDefaults_IkniteClusterSpec(obj *IkniteClusterSpec) {
 	}
 	obj.EnableMDNS = wsl
 	if obj.KubernetesVersion == "" {
-		obj.KubernetesVersion = constants.KubernetesVersion
+		obj.KubernetesVersion = KubernetesVersionDefault
 	}
 	if obj.NetworkInterface == "" {
 		obj.NetworkInterface = constants.NetworkInterface

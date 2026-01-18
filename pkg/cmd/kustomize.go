@@ -13,6 +13,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
+// cSpell: words filesys kyaml forbidigo
 package cmd
 
 import (
@@ -21,11 +22,14 @@ import (
 	"github.com/spf13/cobra"
 	flag "github.com/spf13/pflag"
 	"github.com/spf13/viper"
+	"sigs.k8s.io/kustomize/api/resmap"
+	"sigs.k8s.io/kustomize/kyaml/filesys"
 
 	"github.com/kaweezle/iknite/pkg/cmd/options"
 	"github.com/kaweezle/iknite/pkg/config"
 	"github.com/kaweezle/iknite/pkg/constants"
 	"github.com/kaweezle/iknite/pkg/k8s"
+	"github.com/kaweezle/iknite/pkg/provision"
 	"github.com/kaweezle/iknite/pkg/utils"
 )
 
@@ -36,6 +40,31 @@ var (
 	clusterCheckRetries          = 1
 	clusterCheckOkResponses      = 1
 )
+
+func NewPrintKustomizeCmd() *cobra.Command {
+	printKustomizeCmd := &cobra.Command{
+		Use:   "print",
+		Short: "Print the kustomize configuration",
+		Long: `Prints the kustomize configuration that would be applied to the cluster.
+Checks if a /etc/iknite.d/kustomization.yaml file exists. In this case, it
+prints the configuration in this directory. If there is no kustomization, it
+prints the Embedded configuration that installs the following components:
+
+- Flannel for networking.
+- MetalLB for Load balancer services.
+- Local-path provisioner to make PVCs available.
+- metrics-server to make resources work on payloads.
+
+`,
+		Run: performPrintKustomize,
+		PreRun: func(cmd *cobra.Command, _ []string) {
+			flags := cmd.Flags()
+			_ = viper.BindPFlag( //nolint:errcheck // flag exists
+				config.Kustomization, flags.Lookup(options.Kustomization))
+		},
+	}
+	return printKustomizeCmd
+}
 
 func NewKustomizeCmd() *cobra.Command {
 	kustomizeCmd := &cobra.Command{
@@ -65,10 +94,11 @@ applies the Embedded configuration that installs the following components:
 	}
 
 	initializeKustomization(kustomizeCmd.Flags())
-	kustomizeCmd.Flags().
+	kustomizeCmd.PersistentFlags().
 		StringVarP(&kustomization, options.Kustomization, "d", constants.DefaultKustomization,
 			"The directory to look for kustomization. Can be an URL")
 
+	kustomizeCmd.AddCommand(NewPrintKustomizeCmd())
 	return kustomizeCmd
 }
 
@@ -119,4 +149,25 @@ func performKustomize(_ *cobra.Command, _ []string) {
 	force := viper.GetBool(config.ForceConfig)
 	kustomization := viper.GetString(config.Kustomization)
 	cobra.CheckErr(kubeConfig.DoKustomization(ip, kustomization, force, waitTimeout))
+}
+
+func performPrintKustomize(_ *cobra.Command, _ []string) {
+	kustomization := viper.GetString(config.Kustomization)
+	if kustomization == "" {
+		kustomization = constants.DefaultKustomization
+	}
+	if ok, err := provision.IsBaseKustomizationAvailable(kustomization); ok {
+		var resources resmap.ResMap
+		resources, err = provision.RunKustomizations(filesys.MakeFsOnDisk(), kustomization)
+		if err != nil {
+			cobra.CheckErr(fmt.Errorf("while applying local kustomization: %w", err))
+		}
+		// Dump resources as YAML to stdout
+		var out []byte
+		out, err = resources.AsYaml()
+		cobra.CheckErr(err)
+		fmt.Println(string(out)) //nolint:forbidigo // printing is expected here
+	} else {
+		cobra.CheckErr(fmt.Errorf("bad kustomization: %s: %w", kustomization, err))
+	}
 }

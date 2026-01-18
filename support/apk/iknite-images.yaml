@@ -3,9 +3,13 @@
 # images for the iknite project.
 # Build with this command:
 # doas nerdctl run --privileged --rm -v $(pwd):/work cgr.dev/chainguard/melange build support/apk/iknite-images.yaml --arch $(uname -m)
+# The following entries will be replaced at build time from the file provided by the --vars-file option
+vars:
+  KUBERNETES_VERSION: "${KUBERNETES_VERSION}"
+  CONTAINERD_PAUSE_IMAGE:
 package:
   name: iknite-images
-  version: 1.34.3
+  version: "${{vars.KUBERNETES_VERSION}}"
   description: A collection of containerd images for the iknite project.
   copyright:
     - license: Apache-2.0
@@ -182,35 +186,24 @@ environment:
 pipeline:
   - name: Download images
     runs: |
+      LOCAL_IMAGES=$(cat image-list.txt)
       DEST_DIR=${{targets.destdir}}/usr/share/iknite/images
-      KUBERNETES_VERSION=1.34.3
-      KUBECTL_VERSION=1.34.2
+      KUBERNETES_VERSION=${{vars.KUBERNETES_VERSION}}
 
       mkdir -p $DEST_DIR
       mkdir -p /var/tmp
       cd $DEST_DIR
 
       # Download and compress each image
+      #
+      # Last images come from the command: kubectl kustomize apk/iknite.d | grep image: | awk '{ print $2; }'
       while IFS= read -r IMAGE; do
         FILENAME=$(echo "$IMAGE" | sed 's|[/:]|_|g')
         echo "Downloading $IMAGE..."
         skopeo copy docker://$IMAGE oci-archive:${FILENAME}.tar:$IMAGE
         gzip ${FILENAME}.tar
       done << END
-      registry.k8s.io/pause:3.10.1
-      registry.k8s.io/pause:3.9
-      registry.k8s.io/etcd:3.6.5-0
-      registry.k8s.io/kube-controller-manager:v${KUBERNETES_VERSION}
-      registry.k8s.io/kube-scheduler:v${KUBERNETES_VERSION}
-      registry.k8s.io/kube-apiserver:v${KUBERNETES_VERSION}
-      registry.k8s.io/kube-proxy:v${KUBERNETES_VERSION}
-      registry.k8s.io/coredns/coredns:v1.11.1
-      docker.io/rancher/local-path-provisioner:v0.0.34
-      registry.k8s.io/metrics-server/metrics-server:v0.8.0
-      ghcr.io/flannel-io/flannel:v0.26.5
-      docker.io/alpine/kubectl:${KUBECTL_VERSION}
-      ghcr.io/kube-vip/kube-vip:v0.8.9
-      ghcr.io/kube-vip/kube-vip-cloud-provider:v0.0.12
+      $LOCAL_IMAGES
       END
 
 test:

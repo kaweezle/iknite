@@ -72,22 +72,24 @@ import (
 // initOptions defines all the init options exposed via flags by kubeadm init.
 // Please note that this structure includes the public kubeadm config API, but only a subset of the options
 // supported by this api will be exposed as a flag.
+//
+//nolint:govet // Data structure alignment matches kubeadm
 type initOptions struct {
-	bto                     *options.BootstrapTokenOptions
-	ikniteCfg               *v1alpha1.IkniteClusterSpec
-	externalClusterCfg      *kubeadmApiV1.ClusterConfiguration
-	externalInitCfg         *kubeadmApiV1.InitConfiguration
-	kubeconfigDir           string
-	featureGatesString      string
-	kubeconfigPath          string
 	cfgPath                 string
-	patchesDir              string
-	ignorePreflightErrors   []string
+	skipTokenPrint          bool
 	dryRun                  bool
+	kubeconfigDir           string
+	kubeconfigPath          string
+	featureGatesString      string
+	ignorePreflightErrors   []string
+	bto                     *options.BootstrapTokenOptions
+	externalInitCfg         *kubeadmApiV1.InitConfiguration
+	externalClusterCfg      *kubeadmApiV1.ClusterConfiguration
 	uploadCerts             bool
 	skipCertificateKeyPrint bool
+	patchesDir              string
 	skipCRIDetect           bool
-	skipTokenPrint          bool
+	ikniteCfg               *v1alpha1.IkniteClusterSpec
 }
 
 const (
@@ -106,28 +108,30 @@ var _ phases.InitData = &initData{}
 
 // initData defines all the runtime information used when running the kubeadm init workflow;
 // this data is shared across all the phases that are included in the workflow.
+//
+//nolint:govet // Data structure alignment matches kubeadm
 type initData struct {
-	client                      clientset.Interface
-	ctx                         context.Context //nolint:containedctx // passed around but not stored
-	outputWriter                io.Writer
-	ctxCancel                   context.CancelFunc
-	kubeconfig                  *clientcmdapi.Config
-	mdnsConn                    *mdns.Conn
 	cfg                         *kubeadmApi.InitConfiguration
-	ignorePreflightErrors       sets.Set[string]
-	kubeletCmd                  *exec.Cmd
-	ikniteCluster               *v1alpha1.IkniteCluster
-	kubeconfigPath              string
-	patchesDir                  string
-	dryRunDir                   string
-	certificatesDir             string
+	skipTokenPrint              bool
+	dryRun                      bool
+	kubeconfig                  *clientcmdapi.Config
 	kubeconfigDir               string
+	kubeconfigPath              string
+	ignorePreflightErrors       sets.Set[string]
+	certificatesDir             string
+	dryRunDir                   string
 	externalCA                  bool
+	client                      clientset.Interface
+	outputWriter                io.Writer
 	uploadCerts                 bool
 	skipCertificateKeyPrint     bool
+	patchesDir                  string
 	adminKubeConfigBootstrapped bool
-	dryRun                      bool
-	skipTokenPrint              bool
+	ikniteCluster               *v1alpha1.IkniteCluster
+	kubeletCmd                  *exec.Cmd
+	mdnsConn                    *mdns.Conn
+	ctx                         context.Context //nolint:containedctx // passed around but not stored
+	ctxCancel                   context.CancelFunc
 }
 
 // HACK: This is a hack to allow the use of the unexported initOptions struct in the kubeadm codebase.
@@ -365,6 +369,12 @@ func newInitData(
 	kubeadmScheme.Scheme.Default(ikniteCluster)
 	ikniteCluster.Spec = *initOptions.ikniteCfg
 
+	// Apply IkniteClusterSpec to InitConfiguration
+	config.ApplyIkniteClusterSpecToClusterConfigurationV1(
+		initOptions.ikniteCfg,
+		initOptions.externalClusterCfg,
+	)
+
 	// Validate standalone flags values and/or combination of flags and then assigns
 	// validated values to the public kubeadm config API when applicable
 	var err error
@@ -473,16 +483,8 @@ func newInitData(
 		)
 	}
 
-	// Apply the IkniteConfig to the InitConfiguration
-	cfg.KubernetesVersion = fmt.Sprintf("v%s", initOptions.ikniteCfg.KubernetesVersion)
-	if initOptions.ikniteCfg.DomainName != "" {
-		cfg.ControlPlaneEndpoint = initOptions.ikniteCfg.DomainName
-	}
-	// Apply configured IP to the configuration
-	ips := initOptions.ikniteCfg.Ip.String()
-	cfg.LocalAPIEndpoint.AdvertiseAddress = ips
-	arg := &kubeadmApi.Arg{Name: "node-ip", Value: ips}
-	cfg.NodeRegistration.KubeletExtraArgs = append(cfg.NodeRegistration.KubeletExtraArgs, *arg)
+	// Apply ikniteCluster spec to the internal InitConfiguration
+	config.ApplyIkniteClusterSpecToInitConfiguration(&(ikniteCluster.Spec), cfg)
 
 	ctx, cancel := context.WithCancel(context.Background())
 

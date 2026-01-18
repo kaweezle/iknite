@@ -12,6 +12,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
+	ikniteConfig "github.com/kaweezle/iknite/pkg/config"
 )
 
 func NewKubeVipControlPlanePhase() workflow.Phase {
@@ -27,7 +28,12 @@ func NewKubeVipControlPlanePhase() workflow.Phase {
 }
 
 func CreateKubeVipConfiguration(wr io.Writer, config *v1alpha1.IkniteClusterSpec) error {
-	manifestTemplate, err := template.New("config").Parse(kubeVipManifestTemplate)
+	if wr == nil {
+		return errors.New("writer cannot be nil")
+	}
+	manifestTemplate, err := template.New("config").Funcs(template.FuncMap{
+		"KubeVipImage": ikniteConfig.GetKubeVipImage,
+	}).Parse(kubeVipManifestTemplate)
 	if err != nil {
 		return fmt.Errorf("failed to parse kube-vip manifest template: %w", err)
 	}
@@ -69,10 +75,10 @@ func runKubeVipControlPlane(c workflow.RunData) error {
 	}
 
 	// Getting the cluster configuration
-	ikniteConfig := data.IkniteCluster().Spec
+	currentConfig := data.IkniteCluster().Spec
 
 	// Write the kube-vip configuration
-	_, err := WriteKubeVipConfiguration(afero.NewOsFs(), data.ManifestDir(), &ikniteConfig)
+	_, err := WriteKubeVipConfiguration(afero.NewOsFs(), data.ManifestDir(), &currentConfig)
 
 	return err
 }

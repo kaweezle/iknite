@@ -33,7 +33,9 @@ import (
 //go:embed base
 var content embed.FS
 
-func ApplyBaseKustomizations(dirname string, data any) ([]resid.ResId, error) {
+// IsBaseKustomizationAvailable checks if a kustomization.yaml file is available
+// in the specified directory or if the directory is a URL.
+func IsBaseKustomizationAvailable(dirname string) (bool, error) {
 	var exists bool
 	var err error
 	_, err = url.Parse(dirname)
@@ -42,11 +44,16 @@ func ApplyBaseKustomizations(dirname string, data any) ([]resid.ResId, error) {
 	} else {
 		exists, err = utils.Exists(path.Join(dirname, "kustomization.yaml"))
 		if err != nil {
-			return nil, fmt.Errorf("while testing for directory: %w", err)
+			return false, fmt.Errorf("while testing for directory: %w", err)
 		}
 	}
+	return exists, nil
+}
 
-	if exists {
+// ApplyBaseKustomizations applies the kustomizations located in the specified
+// directory if available, otherwise applies the embedded kustomizations.
+func ApplyBaseKustomizations(dirname string, data any) ([]resid.ResId, error) {
+	if ok, _ := IsBaseKustomizationAvailable(dirname); ok { //nolint:errcheck // ignore error here
 		log.WithField("directory", dirname).Info("Applying base kustomization...")
 		return ApplyLocalKustomizations(dirname)
 	} else {

@@ -32,4 +32,8 @@ const (
 	CleanIPAddress     = "clean-ip-address"
 	CleanAll           = "clean-all"
 	CleanClusterConfig = "clean-cluster-config"
+
+	// Info.
+	OutputFormat      = "output-format"
+	OutputDestination = "output-destination"
 )

@@ -86,6 +86,7 @@ kubernetes.`,
 	rootCmd.AddCommand(NewPrepareCommand(ikniteConfig))
 	rootCmd.AddCommand(NewStartCmd(ikniteConfig))
 	rootCmd.AddCommand(NewStatusCmd(ikniteConfig))
+	rootCmd.AddCommand(NewInfoCmd(ikniteConfig))
 
 	return rootCmd
 }

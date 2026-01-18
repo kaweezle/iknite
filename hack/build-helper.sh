@@ -1,11 +1,13 @@
 #!/bin/sh
 
-# cSpell: words nerdctl doas chainguard apks rootfull krmfn krmfnbuiltin apkrepo apkindex tenv testrepo qcow2 vhdx
+# cSpell: words nerdctl doas chainguard apks rootfull krmfn krmfnbuiltin apkrepo apkindex tenv testrepo qcow2 vhdx gsub
 
 set -e
 export IKNITE_REPO_URL=https://static.iknite.app/test/
 
-KUBERNETES_VERSION=${KUBERNETES_VERSION:-"1.34.3"}
+ROOT_DIR=$(cd "$(dirname "$0")/.." && pwd)
+
+KUBERNETES_VERSION=${KUBERNETES_VERSION:-$(grep k8s.io/kubernetes "$ROOT_DIR/go.mod" | awk '{gsub(/^v/,"",$2);print $2;}')}
 KEY_NAME=${KEY_NAME:-kaweezle-devel@kaweezle.com-c9d89864.rsa}
 ROOTLESS=false
 ROOTFULL=true
@@ -78,6 +80,7 @@ STEPS:
 ENVIRONMENT VARIABLES:
     IKNITE_REPO_URL     APK repository URL (default: $IKNITE_REPO_URL)
     KUBERNETES_VERSION  Kubernetes version (default: $KUBERNETES_VERSION)
+    KEY_NAME            Signing key file name (default: $KEY_NAME)
 
 In rootless mode, ensure that the buildkit user service is running and
 that the BUILDKIT_HOST environment variable is set:
@@ -296,12 +299,27 @@ fi
 if should_run_step "images"; then
     step "Building Iknite images package..."
     rm -rf packages
-    $SUDO_CMD nerdctl run --privileged --rm -v "$(pwd):/work" cgr.dev/chainguard/melange build support/apk/iknite-images.yaml --arch "$(uname -m)" --signing-key kaweezle-devel@kaweezle.com-c9d89864.rsa --generate-index=false
+    echo "KUBERNETES_VERSION: ${KUBERNETES_VERSION}" > support/apk/.env
+
+    mkdir -p support/apk/iknite-images
+    ./dist/iknite_linux_amd64_v1/iknite kustomize  -d apk/iknite.d print  | grep image: | awk '{ print $2; }' > support/apk/iknite-images/image-list.txt
+    ./dist/iknite_linux_amd64_v1/iknite info images >> support/apk/iknite-images/image-list.txt
+    sort -u support/apk/iknite-images/image-list.txt -o support/apk/iknite-images/image-list.txt
+
+    $SUDO_CMD nerdctl run --privileged --rm -v "$(pwd):/work" \
+        cgr.dev/chainguard/melange \
+        build support/apk/iknite-images.yaml \
+        --arch "$(uname -m)" \
+        --vars-file support/apk/.env \
+        --source-dir support/apk/iknite-images \
+        --out-dir ./dist/ \
+        --signing-key kaweezle-devel@kaweezle.com-c9d89864.rsa \
+        --generate-index=false
     if [ "$ROOTLESS" = false ]; then
-        $SUDO_CMD chown -R "$(id -u):$(id -g)" packages
+        $SUDO_CMD chown -R "$(id -u):$(id -g)" dist
     fi
-    (cd "packages/$(uname -m)/" && \
-    for f in *.apk; do mv "$f" "../../dist/$(echo "$f" | sed 's/\-r0.apk$//').$(uname -m).apk"; done)
+    (cd "dist/$(uname -m)/" && \
+    for f in *.apk; do mv "$f" "../$(echo "$f" | sed 's/\-r0.apk$//').$(uname -m).apk"; done)
 else
     skip "Building Iknite images package"
 fi
