@@ -9,7 +9,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
 	log "github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -25,6 +24,8 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/kubectl/pkg/polymorphichelpers"
+
+	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
 )
 
 // cSpell: enable
@@ -38,17 +39,21 @@ func (config *Config) RESTClient() *RESTClientGetter {
 }
 
 func (r *RESTClientGetter) ToRESTConfig() (*rest.Config, error) {
-	return r.clientconfig.ClientConfig()
+	restConfig, err := r.clientconfig.ClientConfig()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get REST config: %w", err)
+	}
+	return restConfig, nil
 }
 
 func (r *RESTClientGetter) ToDiscoveryClient() (discovery.CachedDiscoveryInterface, error) {
 	restconfig, err := r.clientconfig.ClientConfig()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get REST config for discovery: %w", err)
 	}
 	dc, err := discovery.NewDiscoveryClientForConfig(restconfig)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create discovery client: %w", err)
 	}
 	return memory.NewMemCacheClient(dc), nil
 }
@@ -65,7 +70,11 @@ func (r *RESTClientGetter) ToRawKubeConfigLoader() clientcmd.ClientConfig {
 	return r.clientconfig
 }
 
-var ApplicationSchemaGroupVersionKind = schema.GroupVersionKind{Group: "argoproj.io", Version: "v1alpha1", Kind: "Application"}
+var ApplicationSchemaGroupVersionKind = schema.GroupVersionKind{
+	Group:   "argoproj.io",
+	Version: "v1alpha1",
+	Kind:    "Application",
+}
 
 type SyncStatus struct {
 	Status string `json:"status" protobuf:"bytes,1,opt,name=status,casttype=SyncStatusCode"`
@@ -73,20 +82,20 @@ type SyncStatus struct {
 
 type HealthStatus struct {
 	// Status holds the status code of the application or resource
-	Status string `json:"status,omitempty" protobuf:"bytes,1,opt,name=status"`
+	Status string `json:"status,omitempty"  protobuf:"bytes,1,opt,name=status"`
 	// Message is a human-readable informational message describing the health status
 	Message string `json:"message,omitempty" protobuf:"bytes,2,opt,name=message"`
 }
 
 type ApplicationStatus struct {
-	Sync   SyncStatus   `json:"sync,omitempty" protobuf:"bytes,2,opt,name=sync"`
+	Sync   SyncStatus   `json:"sync,omitempty"   protobuf:"bytes,2,opt,name=sync"`
 	Health HealthStatus `json:"health,omitempty" protobuf:"bytes,3,opt,name=health"`
 }
 
 type Application struct {
-	metav1.TypeMeta   `json:",inline"`
-	metav1.ObjectMeta `json:"metadata" protobuf:"bytes,1,opt,name=metadata"`
 	Status            ApplicationStatus `json:"status,omitempty" protobuf:"bytes,3,opt,name=status"`
+	metav1.TypeMeta   `                  json:",inline"`
+	metav1.ObjectMeta `                  json:"metadata"         protobuf:"bytes,1,opt,name=metadata"`
 }
 
 type ApplicationStatusViewer struct{}
@@ -95,50 +104,61 @@ func StatusViewerFor(kind schema.GroupKind) (polymorphichelpers.StatusViewer, er
 	if kind == ApplicationSchemaGroupVersionKind.GroupKind() {
 		return &ApplicationStatusViewer{}, nil
 	}
-	return polymorphichelpers.StatusViewerFor(kind)
+	sv, err := polymorphichelpers.StatusViewerFor(kind)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get status viewer for %v: %w", kind, err)
+	}
+	return sv, nil
 }
 
-func (s *ApplicationStatusViewer) Status(obj runtime.Unstructured, revision int64) (string, bool, error) {
+func (s *ApplicationStatusViewer) Status(
+	obj runtime.Unstructured,
+	_ int64,
+) (string, bool, error) {
 	application := &Application{}
 
-	err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.UnstructuredContent(), application)
+	err := runtime.DefaultUnstructuredConverter.FromUnstructured(
+		obj.UnstructuredContent(),
+		application,
+	)
 	if err != nil {
-		return "", false, fmt.Errorf("failed to convert %T to %T: %v", obj, application, err)
+		return "", false, fmt.Errorf("failed to convert %T to %T: %w", obj, application, err)
 	}
 
 	healthStatusString := application.Status.Health.Status
 	syncStatusString := application.Status.Sync.Status
 
-	msg := fmt.Sprintf("application \"%s\" sync status: %s, health status: %s", application.Name, syncStatusString, healthStatusString)
-	return msg, healthStatusString == "Healthy" && syncStatusString == "Synced", nil
+	message := fmt.Sprintf("application %q sync status: %s, health status: %s",
+		application.Name, syncStatusString, healthStatusString)
+	return message, healthStatusString == "Healthy" && syncStatusString == "Synced", nil
 }
 
-func (client *RESTClientGetter) HasApplications() (has bool, err error) {
+func (client *RESTClientGetter) HasApplications() (bool, error) {
 	var mapper meta.RESTMapper
+	var err error
 	if mapper, err = client.ToRESTMapper(); err != nil {
-		return
+		return false, err
 	}
 
-	_, err = mapper.RESTMapping(ApplicationSchemaGroupVersionKind.GroupKind(), ApplicationSchemaGroupVersionKind.Version)
+	_, err = mapper.RESTMapping(
+		ApplicationSchemaGroupVersionKind.GroupKind(),
+		ApplicationSchemaGroupVersionKind.Version,
+	)
 	if err != nil {
 		if meta.IsNoMatchError(err) {
-			err = nil
+			return false, nil
 		} else {
-			return
+			return false, fmt.Errorf("failed to get REST mapping for applications: %w", err)
 		}
-	} else {
-		has = true
 	}
-	return
+	return true, nil
 }
 
-func (client *RESTClientGetter) AllWorkloadStates() (result []*v1alpha1.WorkloadState, err error) {
-	var _result []*v1alpha1.WorkloadState
-
-	var resourceTypes = "deployments,statefulsets,daemonsets"
-	var hasApplications bool
-	if hasApplications, err = client.HasApplications(); err != nil {
-		return
+func (client *RESTClientGetter) AllWorkloadStates() ([]*v1alpha1.WorkloadState, error) {
+	resourceTypes := "deployments,statefulsets,daemonsets"
+	hasApplications, err := client.HasApplications()
+	if err != nil {
+		return nil, err
 	}
 	if hasApplications {
 		resourceTypes += ",applications"
@@ -154,46 +174,56 @@ func (client *RESTClientGetter) AllWorkloadStates() (result []*v1alpha1.Workload
 
 	var infos []*resource.Info
 	if infos, err = r.Infos(); err != nil {
-		return
+		return nil, fmt.Errorf("failed to get resource infos: %w", err)
 	}
+
+	result := make([]*v1alpha1.WorkloadState, 0, len(infos))
 
 	for _, info := range infos {
 		var u map[string]any
 
 		if u, err = runtime.DefaultUnstructuredConverter.ToUnstructured(info.Object); err != nil {
-			return
+			return nil, fmt.Errorf("failed to convert object to unstructured: %w", err)
 		}
 
 		var v polymorphichelpers.StatusViewer
-		if v, err = /* polymorphichelpers. */ StatusViewerFor(info.Object.GetObjectKind().GroupVersionKind().GroupKind()); err != nil {
-			return
+		if v, err = StatusViewerFor(info.Object.GetObjectKind().GroupVersionKind().GroupKind()); err != nil {
+			return nil, fmt.Errorf("failed to get status viewer: %w", err)
 		}
 
 		var msg string
 		var ok bool
 		if msg, ok, err = v.Status(&unstructured.Unstructured{Object: u}, 0); err != nil {
-			return
+			return nil, fmt.Errorf("failed to get workload status: %w", err)
 		}
-		_result = append(_result, &v1alpha1.WorkloadState{Namespace: info.Namespace, Name: info.ObjectName(), Ok: ok, Message: strings.TrimSuffix(msg, "\n")})
+		result = append(result, &v1alpha1.WorkloadState{
+			Namespace: info.Namespace,
+			Name:      info.ObjectName(),
+			Ok:        ok,
+			Message:   strings.TrimSuffix(msg, "\n"),
+		})
 	}
-	sort.SliceStable(_result, func(i, j int) bool {
-		return _result[i].String() < _result[j].String()
+	sort.SliceStable(result, func(i, j int) bool {
+		return result[i].String() < result[j].String()
 	})
-	result = _result
-	return
+	return result, nil
 }
 
-type WorkloadStateCallbackFunc func(state bool, total int, ready []*v1alpha1.WorkloadState, unready []*v1alpha1.WorkloadState, iteration int) bool
+type WorkloadStateCallbackFunc func(state bool, total int, ready []*v1alpha1.WorkloadState,
+	unready []*v1alpha1.WorkloadState, iteration int) bool
 
-func AreWorkloadsReady(config *Config, callback WorkloadStateCallbackFunc) wait.ConditionWithContextFunc {
+func AreWorkloadsReady(
+	config *Config,
+	callback WorkloadStateCallbackFunc,
+) wait.ConditionWithContextFunc {
 	client := config.RESTClient()
 	iteration := 0
-	return func(ctx context.Context) (bool, error) {
+	return func(_ context.Context) (bool, error) {
 		states, err := client.AllWorkloadStates()
 		if err != nil {
 			return false, err
 		}
-		var result bool = true
+		result := true
 		var ready, unready []*v1alpha1.WorkloadState
 		for _, state := range states {
 			if !state.Ok {
@@ -218,11 +248,20 @@ func AreWorkloadsReady(config *Config, callback WorkloadStateCallbackFunc) wait.
 	}
 }
 
-func (config *Config) WaitForWorkloads(ctx context.Context, timeout time.Duration, callback WorkloadStateCallbackFunc) error {
+func (config *Config) WaitForWorkloads(
+	ctx context.Context, timeout time.Duration, callback WorkloadStateCallbackFunc,
+) error {
 	if timeout > 0 {
-		return wait.PollUntilContextTimeout(ctx, time.Second*time.Duration(2), timeout, true, AreWorkloadsReady(config, callback))
+		if err := wait.PollUntilContextTimeout(ctx, time.Second*time.Duration(2), timeout, true,
+			AreWorkloadsReady(config, callback)); err != nil {
+			return fmt.Errorf("failed to wait for workloads (timeout): %w", err)
+		}
+		return nil
 	} else {
-		return wait.PollUntilContextCancel(ctx, time.Second*time.Duration(2), true, AreWorkloadsReady(config, callback))
+		if err := wait.PollUntilContextCancel(ctx, time.Second*time.Duration(2), true,
+			AreWorkloadsReady(config, callback)); err != nil {
+			return fmt.Errorf("failed to wait for workloads: %w", err)
+		}
+		return nil
 	}
-
 }

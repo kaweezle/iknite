@@ -15,7 +15,7 @@ limitations under the License.
 */
 package k8s
 
-// cSpell: words clientcmd readyz
+// cSpell: words clientcmd readyz polymorphichelpers objectrestarter
 // cSpell: disable
 import (
 	"context"
@@ -23,8 +23,6 @@ import (
 	"net"
 	"time"
 
-	"github.com/kaweezle/iknite/pkg/provision"
-	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	appsV1 "k8s.io/api/apps/v1"
 	coreV1 "k8s.io/api/core/v1"
@@ -32,11 +30,12 @@ import (
 	metaV1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/clientcmd/api"
 	kubeadmConstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"sigs.k8s.io/kustomize/kyaml/resid"
+
+	"github.com/kaweezle/iknite/pkg/provision"
 )
 
 // cSpell: enable
@@ -47,7 +46,7 @@ type Config api.Config
 func LoadFromFile(filename string) (*Config, error) {
 	_config, err := clientcmd.LoadFromFile(filename)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to load kubeconfig from file: %w", err)
 	}
 	config := (*Config)(_config)
 	return config, nil
@@ -87,7 +86,7 @@ func (c *Config) RenameConfig(newName string) *Config {
 }
 
 // IsConfigServerAddress checks that config points to the server at ip IP
-// address
+// address.
 func (config *Config) IsConfigServerAddress(address string) bool {
 	expectedURL := fmt.Sprintf("https://%v:6443", address)
 	for _, cluster := range config.Clusters {
@@ -99,15 +98,17 @@ func (config *Config) IsConfigServerAddress(address string) bool {
 }
 
 // Client returns a clientset for config.
-func (config *Config) Client() (client *kubernetes.Clientset, err error) {
+func (config *Config) Client() (*kubernetes.Clientset, error) {
 	clientConfig := clientcmd.NewDefaultClientConfig(api.Config(*config), nil)
-	var rest *rest.Config
-	rest, err = clientConfig.ClientConfig()
+	restConfig, err := clientConfig.ClientConfig()
 	if err != nil {
-		return
+		return nil, fmt.Errorf("failed to get client config: %w", err)
 	}
-	client, err = kubernetes.NewForConfig(rest)
-	return
+	client, err := kubernetes.NewForConfig(restConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create kubernetes client: %w", err)
+	}
+	return client, nil
 }
 
 // CheckClusterRunning checks that the cluster is running by requesting the
@@ -115,7 +116,6 @@ func (config *Config) Client() (client *kubernetes.Clientset, err error) {
 // milliseconds between each check. It needs at least okResponses good responses
 // from the server.
 func (config *Config) CheckClusterRunning(retries, okResponses, waitTime int) error {
-
 	client, err := config.Client()
 	if err != nil {
 		return err
@@ -123,72 +123,107 @@ func (config *Config) CheckClusterRunning(retries, okResponses, waitTime int) er
 
 	okTries := 0
 	query := client.Discovery().RESTClient().Get().AbsPath("/readyz")
-	for retries > 0 {
-		content, err := query.DoRaw(context.Background())
-		if err == nil {
-			contentStr := string(content)
-			if contentStr != "ok" {
-				err = fmt.Errorf("cluster health API returned: %s", contentStr)
-				log.WithError(err).Debug("Bad response")
-			} else {
-				okTries = okTries + 1
-				log.WithField("okTries", okTries).Trace("Ok response from server")
-				if okTries == okResponses {
-					break
-				}
-			}
-		} else {
-			log.WithError(err).Debug("while querying cluster readiness")
-		}
-
-		retries = retries - 1
-		if retries == 0 {
-			log.Trace("No more retries left.")
-			return err
-		} else {
+	first := true
+	for ; retries > 0; retries-- {
+		if !first {
 			log.WithFields(log.Fields{
 				"err":       err,
-				"wait_time": waitTime}).Debug("Waiting...")
+				"wait_time": waitTime,
+			}).Debug("Waiting...")
 			time.Sleep(time.Duration(waitTime) * time.Millisecond)
 		}
+		first = false
+
+		var content []byte
+		content, err = query.DoRaw(context.Background())
+		if err != nil {
+			log.WithError(err).Debug("while querying cluster readiness")
+			continue
+		}
+
+		contentStr := string(content)
+		if contentStr != "ok" {
+			err = fmt.Errorf("cluster health API returned: %s", contentStr)
+			log.WithError(err).Debug("Bad response")
+		} else {
+			okTries++
+			log.WithField("okTries", okTries).Trace("Ok response from server")
+			if okTries == okResponses {
+				break
+			}
+		}
+	}
+
+	if retries == 0 && okTries < okResponses {
+		log.Trace("No more retries left.")
 	}
 
 	return err
 }
 
 // WriteToFile writes the config configuration to the file pointed by filename.
-// it returns the appropriate error in case of failure.
+// It returns the appropriate error in case of failure.
 func (config *Config) WriteToFile(filename string) error {
-	return clientcmd.WriteToFile(*(*api.Config)(config), filename)
+	if err := clientcmd.WriteToFile(*(*api.Config)(config), filename); err != nil {
+		return fmt.Errorf("failed to write kubeconfig to file: %w", err)
+	}
+	return nil
 }
 
 // RestartProxy restarts kube-proxy after config has been updated. This needs to
 // be done after an IP address change.
-// The restart method is taken from kubectl: https://github.com/kubernetes/kubectl/blob/652881798563c00c1895ded6ced819030bfaa4d7/pkg/polymorphichelpers/objectrestarter.go#L81
-func (config *Config) RestartProxy() (err error) {
-
+// The restart method is taken from kubectl:
+// https://github.com/kubernetes/kubectl/blob/
+// 652881798563c00c1895ded6ced819030bfaa4d7/pkg/polymorphichelpers/objectrestarter.go#L81.
+func (config *Config) RestartProxy() error {
 	var client *kubernetes.Clientset
+	var err error
 	if client, err = config.Client(); err != nil {
-		return
+		return err
 	}
 
 	ctx := context.Background()
 
 	var ds *appsV1.DaemonSet
 	if ds, err = client.AppsV1().DaemonSets("kube-system").Get(ctx, "kube-proxy", metaV1.GetOptions{}); err != nil {
-		return
+		return fmt.Errorf("failed to get kube-proxy daemonset: %w", err)
 	}
 
-	if ds.Spec.Template.ObjectMeta.Annotations == nil {
-		ds.Spec.Template.ObjectMeta.Annotations = make(map[string]string)
+	if ds.Spec.Template.Annotations == nil {
+		ds.Spec.Template.Annotations = make(map[string]string)
 	}
-	ds.Spec.Template.ObjectMeta.Annotations["kubectl.kubernetes.io/restartedAt"] = time.Now().Format(time.RFC3339)
+	ds.Spec.Template.Annotations["kubectl.kubernetes.io/restartedAt"] = time.Now().
+		Format(time.RFC3339)
 
 	_, err = client.AppsV1().DaemonSets("kube-system").Update(ctx, ds, metaV1.UpdateOptions{})
-	return
+	if err != nil {
+		return fmt.Errorf("failed to update kube-proxy daemonset: %w", err)
+	}
+	return nil
 }
 
-func (config *Config) DoKustomization(ip net.IP, kustomization string, force bool, waitTimeout int) error {
+// DoKustomization applies Kubernetes kustomizations to configure the cluster.
+// It takes an outbound IP address, a kustomization path or content, a force flag,
+// and a wait timeout in seconds.
+//
+// The function checks if configuration has already been applied by reading the
+// 'configured' field in the iknite ConfigMap. If already configured and force is
+// false, it logs a warning and skips configuration. Otherwise, it applies the
+// provided kustomization using provision.ApplyBaseKustomizations and marks the
+// cluster as configured by updating the ConfigMap.
+//
+// If waitTimeout is greater than 0, the function waits for all workloads to be
+// ready for the specified duration before returning.
+//
+// Returns an error if the client cannot be created, the ConfigMap cannot be read
+// or written, kustomizations fail to apply, or workloads don't become ready within
+// the timeout period.
+func (config *Config) DoKustomization(
+	ip net.IP,
+	kustomization string,
+	force bool,
+	waitTimeout int,
+) error {
 	client, err := config.Client()
 	if err != nil {
 		return err
@@ -200,48 +235,52 @@ func (config *Config) DoKustomization(ip net.IP, kustomization string, force boo
 	}
 	if cm.Data["configured"] == "true" && !force {
 		log.Info("configuration has already occurred. Use -C to force.")
+		return nil
+	}
+	logContext := log.Fields{
+		"OutboundIP": ip,
+	}
+	var ids []resid.ResId
+	if kustomization == "" {
+		log.Warn("Empty kustomization.")
 	} else {
-		context := log.Fields{
-			"OutboundIP": ip,
-		}
-		var ids []resid.ResId
-		var err error
-		if kustomization == "" {
-			log.Warn("Empty kustomization.")
-		} else {
-			log.WithFields(log.Fields{
-				"kustomization": kustomization,
-			}).Info("Performing configuration")
-
-			if ids, err = provision.ApplyBaseKustomizations(kustomization, context); err != nil {
-				return err
-			}
-		}
-
-		cm.Data["configured"] = "true"
-		_, err = WriteIkniteConfigMap(client, cm)
-		if err != nil {
-			return errors.Wrap(err, "While writing configuration")
-		}
-
 		log.WithFields(log.Fields{
 			"kustomization": kustomization,
-			"resources":     ids,
-		}).Info("Configuration applied")
+		}).Info("Performing configuration")
+
+		if ids, err = provision.ApplyBaseKustomizations(kustomization, logContext); err != nil {
+			return fmt.Errorf("failed to apply base kustomizations: %w", err)
+		}
 	}
+
+	cm.Data["configured"] = "true"
+	_, err = WriteIkniteConfigMap(client, cm)
+	if err != nil {
+		return fmt.Errorf("while writing configuration: %w", err)
+	}
+
+	log.WithFields(log.Fields{
+		"kustomization": kustomization,
+		"resources":     ids,
+	}).Info("Configuration applied")
 
 	if waitTimeout > 0 {
 		log.Infof("Waiting for workloads for %d seconds...", waitTimeout)
-		runtime.ErrorHandlers = runtime.ErrorHandlers[:0]
-		return config.WaitForWorkloads(context.Background(), time.Second*time.Duration(waitTimeout), nil)
+		runtime.ErrorHandlers = runtime.ErrorHandlers[:0] //nolint:reassign // disabling printing of errors to stderr
+		return config.WaitForWorkloads(
+			context.Background(),
+			time.Second*time.Duration(waitTimeout),
+			nil,
+		)
 	}
 
 	return nil
-
 }
 
-func GetIkniteConfigMap(client kubernetes.Interface) (cm *coreV1.ConfigMap, err error) {
-	cm, err = client.CoreV1().ConfigMaps("kube-system").Get(context.TODO(), "iknite-config", metaV1.GetOptions{})
+func GetIkniteConfigMap(client kubernetes.Interface) (*coreV1.ConfigMap, error) {
+	cm, err := client.CoreV1().
+		ConfigMaps("kube-system").
+		Get(context.TODO(), "iknite-config", metaV1.GetOptions{})
 	if k8Errors.IsNotFound(err) {
 		err = nil
 		cm = &coreV1.ConfigMap{
@@ -252,15 +291,24 @@ func GetIkniteConfigMap(client kubernetes.Interface) (cm *coreV1.ConfigMap, err 
 			BinaryData: map[string][]byte{},
 		}
 	}
-	return
+	return cm, err
 }
 
-func WriteIkniteConfigMap(client kubernetes.Interface, cm *coreV1.ConfigMap) (res *coreV1.ConfigMap, err error) {
+func WriteIkniteConfigMap(
+	client kubernetes.Interface,
+	cm *coreV1.ConfigMap,
+) (*coreV1.ConfigMap, error) {
+	var res *coreV1.ConfigMap
+	var err error
 	if cm.UID != "" {
-		res, err = client.CoreV1().ConfigMaps("kube-system").Update(context.TODO(), cm, metaV1.UpdateOptions{})
+		res, err = client.CoreV1().
+			ConfigMaps("kube-system").
+			Update(context.TODO(), cm, metaV1.UpdateOptions{})
 	} else {
 		res, err = client.CoreV1().ConfigMaps("kube-system").Create(context.TODO(), cm, metaV1.CreateOptions{})
 	}
-
-	return
+	if err != nil {
+		return res, fmt.Errorf("failed to write iknite config map: %w", err)
+	}
+	return res, nil
 }

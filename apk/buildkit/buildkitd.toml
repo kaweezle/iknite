@@ -1,4 +1,8 @@
 debug = false
+
+# insecure-entitlements allows insecure entitlements, disabled by default.
+# insecure-entitlements = [ "network.host", "security.insecure" ]
+
 [worker.oci]
   enabled = false
 

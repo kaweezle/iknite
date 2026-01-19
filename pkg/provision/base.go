@@ -18,13 +18,14 @@ package provision
 // cSpell: disable
 import (
 	"embed"
+	"fmt"
 	"net/url"
 	"path"
 
-	"github.com/kaweezle/iknite/pkg/utils"
-	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"sigs.k8s.io/kustomize/kyaml/resid"
+
+	"github.com/kaweezle/iknite/pkg/utils"
 )
 
 // cSpell: enable
@@ -32,9 +33,10 @@ import (
 //go:embed base
 var content embed.FS
 
-func ApplyBaseKustomizations(dirname string, data any) ([]resid.ResId, error) {
-
-	exists := false
+// IsBaseKustomizationAvailable checks if a kustomization.yaml file is available
+// in the specified directory or if the directory is a URL.
+func IsBaseKustomizationAvailable(dirname string) (bool, error) {
+	var exists bool
 	var err error
 	_, err = url.Parse(dirname)
 	if err == nil {
@@ -42,11 +44,16 @@ func ApplyBaseKustomizations(dirname string, data any) ([]resid.ResId, error) {
 	} else {
 		exists, err = utils.Exists(path.Join(dirname, "kustomization.yaml"))
 		if err != nil {
-			return nil, errors.Wrap(err, "While testing for directory")
+			return false, fmt.Errorf("while testing for directory: %w", err)
 		}
 	}
+	return exists, nil
+}
 
-	if exists {
+// ApplyBaseKustomizations applies the kustomizations located in the specified
+// directory if available, otherwise applies the embedded kustomizations.
+func ApplyBaseKustomizations(dirname string, data any) ([]resid.ResId, error) {
+	if ok, _ := IsBaseKustomizationAvailable(dirname); ok { //nolint:errcheck // ignore error here
 		log.WithField("directory", dirname).Info("Applying base kustomization...")
 		return ApplyLocalKustomizations(dirname)
 	} else {

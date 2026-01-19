@@ -1,0 +1,7 @@
+#cloud-config
+#cSpell:disable
+password: "passw0rd"
+chpasswd: { expire: False }
+ssh_pwauth: True
+ssh_authorized_keys:
+  - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGMa8HgZLBsVHVFln02BrPOfZIYlLHgoPjD78cQ+Zjeb antoinemartin@LAPTOP-VKHDD5JR

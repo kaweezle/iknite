@@ -5,13 +5,13 @@ import (
 	"fmt"
 	"time"
 
+	log "github.com/sirupsen/logrus"
+	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
+
 	"github.com/kaweezle/iknite/pkg/apis/iknite"
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
 	"github.com/kaweezle/iknite/pkg/constants"
 	"github.com/kaweezle/iknite/pkg/k8s"
-	"github.com/pkg/errors"
-	log "github.com/sirupsen/logrus"
-	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 )
 
 // cSpell: enable
@@ -36,23 +36,24 @@ func runMonitorWorkloads(c workflow.RunData) error {
 	ticker := time.NewTicker(5 * time.Second)
 	config, err := k8s.LoadFromFile(constants.KubernetesRootConfig)
 	if err != nil {
-		return errors.Wrap(err, "Cannot load the kubernetes configuration")
+		return fmt.Errorf("cannot load the kubernetes configuration: %w", err)
 	}
-	updateWorkloads := k8s.AreWorkloadsReady(config, func(state bool, total int, ready, unready []*v1alpha1.WorkloadState, iteration int) bool {
-		var status iknite.ClusterState
-		if state && cluster.Status.State != iknite.Running {
-			log.Info("All workloads are ready. Going to 60 seconds interval.")
-			ticker.Reset(60 * time.Second)
-		}
-		if state || cluster.Status.State == iknite.Running {
-			status = iknite.Running
-		} else {
-			status = iknite.Stabilizing
-		}
+	updateWorkloads := k8s.AreWorkloadsReady(config,
+		func(state bool, _ int, ready, unready []*v1alpha1.WorkloadState, _ int) bool {
+			var status iknite.ClusterState
+			if state && cluster.Status.State != iknite.Running {
+				log.Info("All workloads are ready. Going to 60 seconds interval.")
+				ticker.Reset(60 * time.Second)
+			}
+			if state || cluster.Status.State == iknite.Running {
+				status = iknite.Running
+			} else {
+				status = iknite.Stabilizing
+			}
 
-		cluster.Update(status, "daemonize", ready, unready)
-		return true
-	})
+			cluster.Update(status, "daemonize", ready, unready)
+			return true
+		})
 
 	log.Debug("Starting workloads timer...")
 	go func() {
@@ -64,10 +65,14 @@ func runMonitorWorkloads(c workflow.RunData) error {
 				return
 			case <-ticker.C:
 				log.Debug("Getting workloads information...")
-				updateWorkloads(ctx)
+				_, err := updateWorkloads(ctx)
+				if err != nil {
+					log.Errorf("While getting workloads information: %v", err)
+					ticker.Stop()
+					return
+				}
 			}
 		}
-
 	}()
 
 	return nil

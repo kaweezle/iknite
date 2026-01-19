@@ -9,11 +9,12 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/kaweezle/iknite/pkg/apis/iknite"
-	"github.com/kaweezle/iknite/pkg/k8s"
 	"github.com/pion/mdns"
 	log "github.com/sirupsen/logrus"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
+
+	"github.com/kaweezle/iknite/pkg/apis/iknite"
+	"github.com/kaweezle/iknite/pkg/k8s"
 )
 
 // cSpell: enable
@@ -27,7 +28,6 @@ func NewDaemonizePhase() workflow.Phase {
 }
 
 func WaitForKubelet(cmd *exec.Cmd, conn *mdns.Conn, cancel context.CancelFunc) error {
-
 	// Wait for SIGTERM and SIGKILL signals
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, syscall.SIGTERM)
@@ -47,7 +47,10 @@ func WaitForKubelet(cmd *exec.Cmd, conn *mdns.Conn, cancel context.CancelFunc) e
 			log.Info("Received TERM Signal. Stopping kubelet...")
 			err = cmd.Process.Signal(syscall.SIGTERM)
 			if err == nil {
-				cmd.Wait()
+				err = cmd.Wait()
+				if err != nil {
+					log.WithError(err).Warn("Error while waiting for kubelet to stop")
+				}
 			}
 
 			alive = false
@@ -56,20 +59,22 @@ func WaitForKubelet(cmd *exec.Cmd, conn *mdns.Conn, cancel context.CancelFunc) e
 			log.Infof("Kubelet stopped with state: %s", cmd.ProcessState.String())
 			alive = false
 		}
-
 	}
 
 	if err == nil && conn != nil {
 		log.Info("Stopping the mdns responder...")
 		err = conn.Close()
+		if err != nil {
+			return fmt.Errorf("failed to close mdns responder: %w", err)
+		}
 	}
 
 	if err == nil && cancel != nil {
-		log.Info("Cancelling the context...")
+		log.Info("Canceling the context...")
 		cancel()
 	}
 
-	return err
+	return fmt.Errorf("failed to wait for kubelet: %w", err)
 }
 
 // runPrepare executes the node initialization process.
@@ -93,7 +98,10 @@ func runDaemonize(c workflow.RunData) error {
 		data.SetKubeletCmd(nil)
 	}
 	data.IkniteCluster().Update(iknite.Cleaning, "clean", nil, nil)
-	_ = k8s.CleanAll(&data.IkniteCluster().Spec, true, false, false, false)
+	err = k8s.CleanAll(&data.IkniteCluster().Spec, true, false, false, false)
+	if err != nil {
+		log.WithError(err).Warn("Error during cleanup after kubelet stopped")
+	}
 	data.IkniteCluster().Update(iknite.Stopped, "", nil, nil)
-	return err
+	return nil
 }

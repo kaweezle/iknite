@@ -19,29 +19,26 @@ package reset
 // cSpell:words klog cleanupconfig
 // cSpell:disable
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
 	"path"
 	"path/filepath"
 
-	"github.com/pkg/errors"
-
+	log "github.com/sirupsen/logrus"
 	"k8s.io/klog/v2"
-
 	kubeadmApiV1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	kubeadmConstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
-
-	log "github.com/sirupsen/logrus"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/users"
 )
 
 // cSpell:enable
 
-// NewCleanupNodePhase creates a kubeadm workflow phase that cleanup the node
+// NewCleanupNodePhase creates a kubeadm workflow phase that cleanup the node.
 func NewCleanupConfigPhase() workflow.Phase {
 	return workflow.Phase{
 		Name:    "cleanup-config",
@@ -58,7 +55,9 @@ func NewCleanupConfigPhase() workflow.Phase {
 }
 
 func runCleanupConfig(c workflow.RunData) error {
-	dirsToClean := []string{filepath.Join(kubeadmConstants.KubernetesDir, kubeadmConstants.ManifestsSubDirName)}
+	dirsToClean := []string{
+		filepath.Join(kubeadmConstants.KubernetesDir, kubeadmConstants.ManifestsSubDirName),
+	}
 	r, ok := c.(IkniteResetData)
 	if !ok {
 		return errors.New("cleanup-config phase invoked with an invalid data struct")
@@ -82,7 +81,10 @@ func runCleanupConfig(c workflow.RunData) error {
 
 	// Remove contents from the config and pki directories
 	if certsDir != kubeadmApiV1.DefaultCertificatesDir {
-		klog.Warningf("[reset] WARNING: Cleaning a non-default certificates directory: %q\n", certsDir)
+		klog.Warningf(
+			"[reset] WARNING: Cleaning a non-default certificates directory: %q\n",
+			certsDir,
+		)
 	}
 
 	dirsToClean = append(dirsToClean, certsDir)
@@ -94,12 +96,12 @@ func runCleanupConfig(c workflow.RunData) error {
 
 	if r.Cfg() != nil && features.Enabled(r.Cfg().FeatureGates, features.RootlessControlPlane) {
 		if !r.DryRun() {
-			klog.V(1).Infoln("[reset] Removing users and groups created for rootless control-plane")
+			klog.Infoln("[reset] Removing users and groups created for rootless control-plane")
 			if err := users.RemoveUsersAndGroups(); err != nil {
 				klog.Warningf("[reset] Failed to remove users and groups: %v\n", err)
 			}
 		} else {
-			fmt.Println("[reset] Would remove users and groups created for rootless control-plane")
+			klog.Infoln("[reset] Would remove users and groups created for rootless control-plane")
 		}
 	}
 
@@ -149,40 +151,44 @@ func resetConfigDir(configPathDir string, dirsToClean []string, isDryRun bool) {
 	}
 }
 
-// CleanDir removes everything in a directory, but not the directory itself
+// CleanDir removes everything in a directory, but not the directory itself.
 func CleanDir(filePath string) error {
 	// If the directory doesn't even exist there's nothing to do, and we do
 	// not consider this an error
-	if _, err := os.Stat(filePath); os.IsNotExist(err) {
+	if _, err := os.Stat(filePath); errors.Is(err, os.ErrNotExist) {
 		return nil
 	}
 
-	d, err := os.Open(filePath)
+	d, err := os.Open(filePath) //nolint:gosec // Controlled file path
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to open directory for cleanup: %w", err)
 	}
-	defer d.Close()
+	defer func() {
+		err = d.Close()
+	}()
 	names, err := d.Readdirnames(-1)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to read directory names: %w", err)
 	}
 	for _, name := range names {
 		if err = os.RemoveAll(filepath.Join(filePath, name)); err != nil {
-			return err
+			return fmt.Errorf("failed to remove %s: %w", name, err)
 		}
 	}
 	return nil
 }
 
-// IsDirEmpty returns true if a directory is empty
+// IsDirEmpty returns true if a directory is empty.
 func IsDirEmpty(dir string) (bool, error) {
-	d, err := os.Open(dir)
+	d, err := os.Open(dir) //nolint:gosec // Just checking directory contents
 	if err != nil {
-		return false, err
+		return false, fmt.Errorf("failed to open directory: %w", err)
 	}
-	defer d.Close()
+	defer func() {
+		err = d.Close()
+	}()
 	_, err = d.Readdirnames(1)
-	if err == io.EOF {
+	if errors.Is(err, io.EOF) {
 		return true, nil
 	}
 	return false, nil

@@ -15,10 +15,11 @@ limitations under the License.
 */
 package provision
 
-// cSpell: words kustomizer filesys crds tmpl
+// cSpell: words kustomizer filesys crds tmpl Bplo
 // cSpell: disable
 import (
 	"bytes"
+	"context"
 	"embed"
 	"fmt"
 	"html/template"
@@ -26,8 +27,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/kaweezle/iknite/pkg/constants"
-	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"sigs.k8s.io/kustomize/api/krusty"
 	"sigs.k8s.io/kustomize/api/provider"
@@ -35,11 +34,15 @@ import (
 	"sigs.k8s.io/kustomize/api/types"
 	"sigs.k8s.io/kustomize/kyaml/filesys"
 	"sigs.k8s.io/kustomize/kyaml/resid"
+
+	"github.com/kaweezle/iknite/pkg/constants"
 )
 
 // cSpell: enable
 
-func createTempKustomizeDirectory(content *embed.FS, fs filesys.FileSystem, tempdir string, dirname string, data any) error {
+func createTempKustomizeDirectory(
+	content *embed.FS, fs filesys.FileSystem, tempdir string, dirname string, data any,
+) error {
 	log.WithFields(log.Fields{
 		"tempdir": tempdir,
 		"dirname": dirname,
@@ -48,56 +51,66 @@ func createTempKustomizeDirectory(content *embed.FS, fs filesys.FileSystem, temp
 
 	files, err := content.ReadDir(dirname)
 	if err != nil {
-		return errors.Wrapf(err, "While reading files of %s", dirname)
+		return fmt.Errorf("while reading files of %s: %w", dirname, err)
 	}
 	for _, entry := range files {
-		if !entry.IsDir() {
-			inPath := fmt.Sprintf("%s/%s", dirname, entry.Name())
-			outPath := fmt.Sprintf("%s/%s", tempdir, entry.Name())
+		if entry.IsDir() {
+			continue
+		}
 
-			log.WithField("path", inPath).Trace("Reading file")
-			payload, err := content.ReadFile(inPath)
-			if err != nil {
-				return errors.Wrapf(err, "While reading embedded file %s", entry.Name())
-			}
+		inPath := fmt.Sprintf("%s/%s", dirname, entry.Name())
+		outPath := fmt.Sprintf("%s/%s", tempdir, entry.Name())
 
-			if filepath.Ext(entry.Name()) == ".tmpl" {
-				log.WithField("path", inPath).Trace("Is template")
-				t, err := template.New("tmp").Parse(string(payload))
-				if err != nil {
-					return errors.Wrapf(err, "While reading template %s", entry.Name())
-				}
-				buf := new(bytes.Buffer)
-				log.WithField("path", inPath).
-					WithField("data", data).
-					Trace("Rendering")
-				err = t.Execute(buf, data)
-				if err != nil {
-					return errors.Wrap(err, "failed to create a manifest file")
-				}
-				payload = buf.Bytes()
-				outPath = strings.TrimSuffix(outPath, ".tmpl")
-			}
-			log.WithField("outPath", outPath).Trace("Writing content")
-			err = fs.WriteFile(outPath, payload)
+		log.WithField("path", inPath).Trace("Reading file")
+		payload, err := content.ReadFile(inPath)
+		if err != nil {
+			return fmt.Errorf("while reading embedded file %s: %w", entry.Name(), err)
+		}
+
+		if filepath.Ext(entry.Name()) == ".tmpl" {
+			log.WithField("path", inPath).Trace("Is template")
+			var t *template.Template
+			t, err = template.New("tmp").Parse(string(payload))
 			if err != nil {
-				return errors.Wrapf(err, "While writing %s to temp dir %s", entry.Name(), tempdir)
+				return fmt.Errorf("while reading template %s: %w", entry.Name(), err)
 			}
+			buf := new(bytes.Buffer)
+			log.WithField("path", inPath).
+				WithField("data", data).
+				Trace("Rendering")
+			err = t.Execute(buf, data)
+			if err != nil {
+				return fmt.Errorf("failed to create a manifest file: %w", err)
+			}
+			payload = buf.Bytes()
+			outPath = strings.TrimSuffix(outPath, ".tmpl")
+		}
+		log.WithField("outPath", outPath).Trace("Writing content")
+		err = fs.WriteFile(outPath, payload)
+		if err != nil {
+			return fmt.Errorf("while writing %s to temp dir %s: %w", entry.Name(), tempdir, err)
 		}
 	}
 	return nil
 }
 
-func applyResmap(resources resmap.ResMap) (err error) {
+func applyResmap(resources resmap.ResMap) error {
 	var out []byte
+	var err error
 	if out, err = resources.AsYaml(); err != nil {
-		return
+		return fmt.Errorf("failed to convert resources to YAML: %w", err)
 	}
 
 	buffer := bytes.Buffer{}
 	buffer.Write(out)
 
-	cmd := exec.Command(constants.KubectlCmd, "apply", "-f", "-")
+	cmd := exec.CommandContext( //nolint:gosec // Input is controlled
+		context.TODO(),
+		constants.KubectlCmd,
+		"apply",
+		"-f",
+		"-",
+	)
 	cmd.Env = append(cmd.Env, "KUBECONFIG=/root/.kube/config")
 	cmd.Stdin = &buffer
 	out, err = cmd.CombinedOutput()
@@ -106,37 +119,36 @@ func applyResmap(resources resmap.ResMap) (err error) {
 		log.WithFields(log.Fields{
 			"code": cmd.ProcessState.ExitCode(),
 		}).Error(string(out))
-		err = errors.Wrap(err, "While applying templates")
-		return
+		return fmt.Errorf("while applying templates: %w", err)
 	}
-	return
-
+	return nil
 }
 
-func ApplyKustomizations(fs filesys.FileSystem, dirname string) (ids []resid.ResId, err error) {
-
-	var resources, crds resmap.ResMap
-	resources, err = RunKustomizations(fs, dirname)
+func ApplyKustomizations(fs filesys.FileSystem, dirname string) ([]resid.ResId, error) {
+	resources, err := RunKustomizations(fs, dirname)
 	if err != nil {
-		err = errors.Wrap(err, "While building templates")
-		return
+		err = fmt.Errorf("while building templates: %w", err)
+		return nil, err
 	}
 
-	ids = resources.AllIds()
+	ids := resources.AllIds()
 
 	// The set of resources may contain CRDs and CRs. If there are cluster wide
 	// resources (CRDs are cluster wide), we apply them first and then the rest.
 	// TODO: Don't apply CRDs twice
-	crds = resmap.NewFactory(provider.NewDefaultDepProvider().GetResourceFactory()).FromResourceSlice(resources.ClusterScoped())
+	crds := resmap.NewFactory(provider.NewDefaultDepProvider().GetResourceFactory()).
+		FromResourceSlice(resources.ClusterScoped())
 
 	if crds.Size() != 0 {
 		crdIds := crds.AllIds()
 		log.WithField("resources", crdIds).Debug("Cluster resources")
-		if err = applyResmap(crds); err != nil {
-			return
+		if applyErr := applyResmap(crds); applyErr != nil {
+			return nil, applyErr
 		}
 		for _, curId := range crdIds {
-			resources.Remove(curId)
+			if removeErr := resources.Remove(curId); removeErr != nil {
+				return nil, fmt.Errorf("failed to remove CRD resource: %w", removeErr)
+			}
 		}
 	}
 
@@ -144,17 +156,21 @@ func ApplyKustomizations(fs filesys.FileSystem, dirname string) (ids []resid.Res
 
 	err = applyResmap(resources)
 
-	return
+	return ids, err
 }
 
 func ApplyLocalKustomizations(dirname string) ([]resid.ResId, error) {
 	return ApplyKustomizations(filesys.MakeFsOnDisk(), dirname)
 }
 
-func ApplyEmbeddedKustomizations(content *embed.FS, dirname string, data any) ([]resid.ResId, error) {
+func ApplyEmbeddedKustomizations(
+	content *embed.FS,
+	dirname string,
+	data any,
+) ([]resid.ResId, error) {
 	fs := filesys.MakeFsInMemory()
 	if err := fs.MkdirAll(dirname); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create directory in memory: %w", err)
 	}
 
 	if err := createTempKustomizeDirectory(content, fs, dirname, dirname, data); err != nil {
@@ -164,7 +180,9 @@ func ApplyEmbeddedKustomizations(content *embed.FS, dirname string, data any) ([
 }
 
 func EnablePlugins(opts *krusty.Options) *krusty.Options {
-	opts.PluginConfig = types.EnabledPluginConfig(types.BploUseStaticallyLinked) // cSpell: disable-line
+	opts.PluginConfig = types.EnabledPluginConfig(
+		types.BploUseStaticallyLinked,
+	) // cSpell: disable-line
 	opts.PluginConfig.FnpLoadingOptions.EnableExec = true
 	opts.PluginConfig.FnpLoadingOptions.AsCurrentUser = true
 	opts.PluginConfig.HelmConfig.Command = "helm"
@@ -172,10 +190,12 @@ func EnablePlugins(opts *krusty.Options) *krusty.Options {
 	return opts
 }
 
-func RunKustomizations(fs filesys.FileSystem, dirname string) (resources resmap.ResMap, err error) {
-
+func RunKustomizations(fs filesys.FileSystem, dirname string) (resmap.ResMap, error) {
 	opts := EnablePlugins(krusty.MakeDefaultOptions())
 	k := krusty.MakeKustomizer(opts)
-	resources, err = k.Run(fs, dirname)
-	return
+	resources, err := k.Run(fs, dirname)
+	if err != nil {
+		return resources, fmt.Errorf("failed to run kustomize: %w", err)
+	}
+	return resources, nil
 }

@@ -1,14 +1,17 @@
 package reset
 
+// cSpell: disable
 import (
 	"io"
 
-	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
-
 	kubeadmApi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+
+	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
 )
+
+// cSpell: enable
 
 type IkniteResetData interface {
 	// From k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/reset.resetData

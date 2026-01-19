@@ -1,0 +1,4 @@
+# cloud-config
+# cSpell:disable
+instance-id: iid-local01
+local-hostname: cloudimg

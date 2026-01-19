@@ -4,32 +4,37 @@ package k8s
 // cSpell: disable
 import (
 	"context"
+	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/charmbracelet/lipgloss"
-	"github.com/kaweezle/iknite/pkg/alpine"
-	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
-	"github.com/pkg/errors"
+	v1 "k8s.io/api/core/v1"
+	clientset "k8s.io/client-go/kubernetes"
 	kubeadmConstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	kubeConfigUtil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
+	staticPodUtil "k8s.io/kubernetes/cmd/kubeadm/app/util/staticpod"
+
+	"github.com/kaweezle/iknite/pkg/alpine"
+	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
 )
 
 // cSpell: enable
 
-// SystemFileCheck checks if a file exists and has specific content
+// SystemFileCheck checks if a file exists and has specific content.
 func SystemFileCheck(name, description, path, expectedContent string) *Check {
 	return &Check{
 		Name:        name,
 		Description: description,
-		CheckFn: func(ctx context.Context, data CheckData) (bool, string, error) {
-			content, err := os.ReadFile(path)
+		CheckFn: func(_ context.Context, _ CheckData) (bool, string, error) {
+			content, err := os.ReadFile(path) //nolint:gosec // Content not sensitive
 			if err != nil {
-				return false, "", fmt.Errorf("failed to read %s: %v", path, err)
+				return false, "", fmt.Errorf("failed to read %s: %w", path, err)
 			}
 			contentMessage := ""
 			if expectedContent != "" {
@@ -44,14 +49,21 @@ func SystemFileCheck(name, description, path, expectedContent string) *Check {
 	}
 }
 
-func CheckService(serviceName string, checkOpenRC, checkPidFile bool) (bool, string, error) {
+func CheckService(
+	serviceName string,
+	checkOpenRC, checkPidFile bool,
+) (bool, string, error) {
 	pid := 0
 	if checkOpenRC {
-		started, err := alpine.IsServiceStarted(serviceName)
+		success, err := alpine.IsServiceStarted(serviceName)
 		if err != nil {
-			return false, "", err
+			return false, "", fmt.Errorf(
+				"failed to check if service %s is started: %w",
+				serviceName,
+				err,
+			)
 		}
-		if !started {
+		if !success {
 			return false, "", fmt.Errorf("service %s is not running", serviceName)
 		}
 	}
@@ -68,31 +80,31 @@ func CheckService(serviceName string, checkOpenRC, checkPidFile bool) (bool, str
 	return true, fmt.Sprintf("Service %s is running with pid %d", serviceName, pid), nil
 }
 
-// ServiceCheck checks if a service is running
+// ServiceCheck checks if a service is running.
 func ServiceCheck(name, serviceName string) *Check {
 	return &Check{
 		Name:        name,
 		DependsOn:   []string{"openrc"},
 		Description: fmt.Sprintf("Check if %s service is running", serviceName),
-		CheckFn: func(ctx context.Context, data CheckData) (bool, string, error) {
+		CheckFn: func(_ context.Context, _ CheckData) (bool, string, error) {
 			return CheckService(serviceName, true, true)
 		},
 	}
 }
 
-// KubernetesFileCheck checks if kubernetes configuration files exist
+// KubernetesFileCheck checks if kubernetes configuration files exist.
 func KubernetesFileCheck(name, path string) *Check {
 	return &Check{
 		Name:        name,
 		Description: fmt.Sprintf("Check %s", path),
 		DependsOn:   []string{},
-		CheckFn: func(ctx context.Context, data CheckData) (bool, string, error) {
+		CheckFn: func(_ context.Context, _ CheckData) (bool, string, error) {
 			// Check if file at path exists
 			info, err := os.Stat(path)
-			if os.IsNotExist(err) {
+			if errors.Is(err, os.ErrNotExist) {
 				return false, "", fmt.Errorf("%s does not exist", path)
 			} else if err != nil {
-				return false, "", fmt.Errorf("error checking %s: %v", path, err)
+				return false, "", fmt.Errorf("error checking %s: %w", path, err)
 			}
 
 			// Check if path is a file and not a directory
@@ -120,12 +132,15 @@ func difference(a, b []string) []string {
 	return diff
 }
 
-// FileTreeDifference computes the difference between an actual path and an expected file tree
-func FileTreeDifference(path string, expectedFiles []string) ([]string, []string, error) {
+// FileTreeDifference computes the difference between an actual path and an expected file tree.
+func FileTreeDifference(
+	path string,
+	expectedFiles []string,
+) ([]string, []string, error) {
 	foundFiles := []string{}
 	actualPath, err := filepath.EvalSymlinks(path)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("failed to evaluate symlinks for %s: %w", path, err)
 	}
 	err = filepath.Walk(actualPath, func(filePath string, info os.FileInfo, err error) error {
 		if err != nil {
@@ -134,68 +149,97 @@ func FileTreeDifference(path string, expectedFiles []string) ([]string, []string
 		if !info.IsDir() {
 			relativePath, err := filepath.Rel(actualPath, filePath)
 			if err != nil {
-				return err
+				return fmt.Errorf("failed to get relative path: %w", err)
 			}
 			foundFiles = append(foundFiles, relativePath)
 		}
 		return nil
 	})
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("failed to walk file tree: %w", err)
 	}
 	missingFiles := difference(expectedFiles, foundFiles)
 	extraFiles := difference(foundFiles, expectedFiles)
 	return missingFiles, extraFiles, nil
 }
 
-// FileTreeCheck checks if a file tree exists
+// FileTreeCheck checks if a file tree exists.
 func FileTreeCheck(name, description, path string, expectedFiles []string) *Check {
 	return &Check{
 		Name:        name,
 		Description: description,
-		CheckFn: func(ctx context.Context, data CheckData) (bool, string, error) {
+		CheckFn: func(_ context.Context, _ CheckData) (bool, string, error) {
 			missingFiles, extraFiles, err := FileTreeDifference(path, expectedFiles)
 			if err != nil {
 				return false, "", err
 			}
 			if len(missingFiles) > 0 {
-				return false, fmt.Sprintf("Missing files: %s", strings.Join(missingFiles, ", ")), nil
+				return false, fmt.Sprintf(
+					"Missing files: %s",
+					strings.Join(missingFiles, ", "),
+				), nil
 			}
 			if len(extraFiles) > 0 {
 				return false, fmt.Sprintf("Extra files: %s", strings.Join(extraFiles, ", ")), nil
 			}
-			return true, fmt.Sprintf("All expected %d files found in %s", len(expectedFiles), path), nil
+			return true, fmt.Sprintf(
+				"All expected %d files found in %s",
+				len(expectedFiles),
+				path,
+			), nil
 		},
 	}
 }
 
 func CheckKubeletHealth(timeout time.Duration) (bool, string, error) {
-
+	var client clientset.Interface
 	client, err := kubeConfigUtil.ClientSetFromFile(kubeadmConstants.GetAdminKubeConfigPath())
 	if err != nil {
-		return false, "", err
+		return false, "", fmt.Errorf(
+			"failed to create client set for kubelet health check: %w",
+			err,
+		)
 	}
 
-	waiter := apiclient.NewKubeWaiter(client, timeout, nil)
+	waiter := apiclient.NewKubeWaiter(client, timeout, io.Discard)
 	err = waiter.WaitForKubelet("127.0.0.1", 10248)
 	if err != nil {
-		return false, "", err
+		return false, "", fmt.Errorf("kubelet health check failed: %w", err)
 	}
 	return true, "Kubelet is healthy", nil
-
 }
 
-func CheckApiServerHealth(timeout time.Duration) (bool, string, error) {
+func CheckApiServerHealth(
+	timeout time.Duration,
+	checkData CheckData,
+) (bool, string, error) {
+	var data *checkWorkloadData
+	data, success := checkData.(*checkWorkloadData)
+	if !success {
+		return false, "", fmt.Errorf(
+			"wait-control-plane phase invoked with an invalid data struct %T",
+			checkData,
+		)
+	}
 
 	client, err := kubeConfigUtil.ClientSetFromFile(kubeadmConstants.GetAdminKubeConfigPath())
 	if err != nil {
-		return false, "", err
+		return false, "", fmt.Errorf(
+			"failed to create client set for API server health check: %w",
+			err,
+		)
 	}
 
-	waiter := apiclient.NewKubeWaiter(client, timeout, nil)
-	err = waiter.WaitForAPI()
+	waiter := apiclient.NewKubeWaiter(client, timeout, io.Discard)
+	var podMap map[string]*v1.Pod
+	podMap, err = staticPodUtil.ReadMultipleStaticPodsFromDisk(data.ManifestDir(),
+		kubeadmConstants.ControlPlaneComponents...)
+	if err == nil {
+		err = waiter.WaitForControlPlaneComponents(podMap, data.ApiAdvertiseAddress())
+	}
+
 	if err != nil {
-		return false, "", err
+		return false, "", fmt.Errorf("control plane health check failed: %w", err)
 	}
 	return true, "API Server is healthy", nil
 }
@@ -213,15 +257,18 @@ type CheckWorkloadData interface {
 	SetNotReadyWorkloads([]*v1alpha1.WorkloadState)
 	SetIteration(int)
 	Start()
+	ApiAdvertiseAddress() string
+	ManifestDir() string
 }
 
 type checkWorkloadData struct {
-	ok                bool
-	workloadCount     int
-	readyWorkloads    []*v1alpha1.WorkloadState
-	notReadyWorkloads []*v1alpha1.WorkloadState
-	iteration         int
-	startTime         time.Time
+	startTime           time.Time
+	apiAdvertiseAddress string
+	readyWorkloads      []*v1alpha1.WorkloadState
+	notReadyWorkloads   []*v1alpha1.WorkloadState
+	workloadCount       int
+	iteration           int
+	ok                  bool
 }
 
 func (c *checkWorkloadData) IsOk() bool {
@@ -275,8 +322,18 @@ func (c *checkWorkloadData) Duration() time.Duration {
 	return time.Since(c.startTime)
 }
 
-func CreateCheckWorkloadData() CheckData {
-	return &checkWorkloadData{}
+func (c *checkWorkloadData) ApiAdvertiseAddress() string {
+	return c.apiAdvertiseAddress
+}
+
+func (c *checkWorkloadData) ManifestDir() string {
+	return kubeadmConstants.GetStaticPodDirectory()
+}
+
+func CreateCheckWorkloadData(apiAdvertiseAddress string) CheckData {
+	return &checkWorkloadData{
+		apiAdvertiseAddress: apiAdvertiseAddress,
+	}
 }
 
 var (
@@ -306,8 +363,11 @@ func PrettyPrintWorkloadState(prefix string, r *v1alpha1.WorkloadState) string {
 	)
 }
 
-func CheckWorkloadResultPrinter(result *CheckResult, prefix string, spinView string) string {
-	data := result.CheckData.(CheckWorkloadData)
+func CheckWorkloadResultPrinter(result *CheckResult, prefix, spinView string) string {
+	data, ok := result.CheckData.(CheckWorkloadData)
+	if !ok {
+		return result.FormatResult(prefix, spinView)
+	}
 
 	ready := data.ReadyWorkloads()
 	unready := data.NotReadyWorkloads()
@@ -338,7 +398,7 @@ func CheckWorkloadResultPrinter(result *CheckResult, prefix string, spinView str
 	if result.Status == StatusSkipped {
 		return output
 	}
-	prefix = prefix + "  "
+	prefix += "  "
 
 	if len(ready) > 0 {
 		for _, state := range ready {
@@ -356,26 +416,32 @@ func CheckWorkloadResultPrinter(result *CheckResult, prefix string, spinView str
 }
 
 func CheckWorkloads(ctx context.Context, data CheckData) (bool, string, error) {
-	workloadData := data.(CheckWorkloadData)
-	config, err := LoadFromFile(filepath.Join(kubeadmConstants.KubernetesDir, kubeadmConstants.AdminKubeConfigFileName))
+	workloadData, ok := (data).(CheckWorkloadData)
+	if !ok {
+		return false, "", errors.New("invalid check data type")
+	}
+	config, err := LoadFromFile(
+		filepath.Join(kubeadmConstants.KubernetesDir, kubeadmConstants.AdminKubeConfigFileName),
+	)
 	if err != nil {
-		return false, "", errors.Wrap(err, "While loading local cluster configuration")
+		return false, "", fmt.Errorf("while loading local cluster configuration: %w", err)
 	}
 	workloadData.Start()
 
-	err = config.WaitForWorkloads(context.Background(), 0, func(state bool, total int, ready, unready []*v1alpha1.WorkloadState, iteration int) bool {
-		workloadData.SetOk(state)
-		workloadData.SetWorkloadCount(total)
-		workloadData.SetReadyWorkloads(ready)
-		workloadData.SetNotReadyWorkloads(unready)
-		workloadData.SetIteration(iteration)
-		if iteration > 5 {
-			return state
-		}
-		return false
-	})
+	err = config.WaitForWorkloads(ctx, 0,
+		func(state bool, total int, ready, unready []*v1alpha1.WorkloadState, iteration int) bool {
+			workloadData.SetOk(state)
+			workloadData.SetWorkloadCount(total)
+			workloadData.SetReadyWorkloads(ready)
+			workloadData.SetNotReadyWorkloads(unready)
+			workloadData.SetIteration(iteration)
+			if iteration > 5 {
+				return state
+			}
+			return false
+		})
 	if err != nil {
-		return false, "", errors.Wrap(err, "While waiting for workloads")
+		return false, "", fmt.Errorf("while waiting for workloads: %w", err)
 	}
 	return workloadData.IsOk(), "", nil
 }

@@ -5,12 +5,15 @@ package v1alpha1
 import (
 	"net"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+
 	"github.com/kaweezle/iknite/pkg/apis/iknite"
 	"github.com/kaweezle/iknite/pkg/constants"
 	"github.com/kaweezle/iknite/pkg/utils"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 )
+
+var KubernetesVersionDefault = constants.KubernetesVersion
 
 // cSpell: enable
 
@@ -24,7 +27,7 @@ func SetDefaults_IkniteClusterSpec(obj *IkniteClusterSpec) {
 		if wsl {
 			obj.Ip = net.ParseIP(constants.WslIPAddress)
 		} else {
-			obj.Ip, _ = utils.GetOutboundIP()
+			obj.Ip, _ = utils.GetOutboundIP() //nolint:errcheck // it fails, no default
 		}
 	}
 	if obj.DomainName == "" && wsl {
@@ -32,7 +35,7 @@ func SetDefaults_IkniteClusterSpec(obj *IkniteClusterSpec) {
 	}
 	obj.EnableMDNS = wsl
 	if obj.KubernetesVersion == "" {
-		obj.KubernetesVersion = constants.KubernetesVersion
+		obj.KubernetesVersion = KubernetesVersionDefault
 	}
 	if obj.NetworkInterface == "" {
 		obj.NetworkInterface = constants.NetworkInterface

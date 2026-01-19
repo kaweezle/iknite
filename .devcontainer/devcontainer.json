@@ -1,0 +1,21 @@
+{
+  "name": "iknite",
+  "image": "ghcr.io/kaweezle/iknite-dev-container:pr171",
+  "features": {},
+  // More info: https://aka.ms/dev-containers-non-root.
+  "remoteUser": "alpine",
+  // This is need for doing containerd in containerd or docker in docker.
+  "privileged": true,
+  // Use 'forwardPorts' to make a list of ports inside the container available locally.
+  // "forwardPorts": [],
+  // Use 'postCreateCommand' to run commands after the container is created.
+  // "postCreateCommand": "kubectl version",
+  // Use 'postStartCommand' to run commands after the container is created like starting minikube.
+  // "postStartCommand": "nohup bash -c 'minikube start &' > minikube.log 2>&1",
+  // Configure tool-specific properties.
+  "customizations": {
+    "vscode": {
+      "extensions": []
+    }
+  }
+}

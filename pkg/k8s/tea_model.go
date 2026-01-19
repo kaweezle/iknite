@@ -15,12 +15,12 @@ import (
 
 type CheckModel struct {
 	executor *CheckExecutor
-	ctx      context.Context
+	ctx      context.Context //nolint:containedctx // passed around to sub-checks
 	cancel   context.CancelFunc
 	spinner  spinner.Model
 }
 
-func (m CheckModel) Init() tea.Cmd {
+func (m CheckModel) Init() tea.Cmd { //nolint:gocritic // Implements tea.Model
 	go m.executor.Run(m.ctx)
 
 	return tea.Batch(
@@ -30,10 +30,12 @@ func (m CheckModel) Init() tea.Cmd {
 	)
 }
 
-func (m CheckModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m CheckModel) Update( //nolint:gocritic // Implements tea.Model
+	msg tea.Msg,
+) (tea.Model, tea.Cmd) {
 	switch msg.(type) {
 	case tea.KeyMsg:
-		log.Infof("Cancelling checks %v", m.cancel)
+		log.Infof("Canceling checks %v", m.cancel)
 		m.cancel()
 		return m, tea.Batch(
 			// tea.ExitAltScreen,
@@ -59,7 +61,7 @@ func (m CheckModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 }
 
-func (m CheckModel) View() string {
+func (m CheckModel) View() string { //nolint:gocritic // Implements tea.Model
 	var output string
 	for _, result := range m.executor.Results {
 		output += result.Format("", m.spinner.View())

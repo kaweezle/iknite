@@ -25,7 +25,7 @@ const (
 	DefaultKustomization = "/etc/iknite.d"
 	WSLHostName          = "kaweezle.local"
 	WslIPAddress         = "192.168.99.2"
-	KubernetesVersion    = "1.32.3"
+	KubernetesVersion    = "1.34.3"
 	NetworkInterface     = "eth0"
 	PodSubnet            = "10.244.0.0/16"
 	StatusDirectory      = "/run/iknite"

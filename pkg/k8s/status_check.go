@@ -21,7 +21,7 @@ const (
 	StatusFailed
 )
 
-type CheckData = any
+type CheckData any
 
 type CheckDataBuilder func() CheckData
 
@@ -30,36 +30,35 @@ type CheckFn func(ctx context.Context, data CheckData) (bool, string, error)
 type CustomResultPrinter func(result *CheckResult, prefix string, spinView string) string
 
 type Check struct {
+	CheckFn          CheckFn
+	CheckDataBuilder CheckDataBuilder
+	CustomPrinter    CustomResultPrinter
 	Name             string
 	Description      string
 	Message          string
 	DependsOn        []string
 	SubChecks        []*Check
-	CheckFn          CheckFn
-	CheckDataBuilder CheckDataBuilder
-	CustomPrinter    CustomResultPrinter
 }
 
 type CheckResult struct {
-	Check         *Check
-	Status        CheckStatus
-	Message       string
 	Error         error
+	CheckData     CheckData
+	Check         *Check
+	Done          chan struct{}
+	Message       string
 	SubResults    []*CheckResult
 	ParentResults []*CheckResult
-	Done          chan struct{}
-	CheckData     CheckData
+	Status        CheckStatus
 }
 
 type CheckExecutor struct {
-	Checks  []*Check
-	Results []*CheckResult
-
 	resultNameMap map[string]*CheckResult
+	Checks        []*Check
+	Results       []*CheckResult
 }
 
 func (c *Check) NewResult() *CheckResult {
-	var subResults []*CheckResult
+	subResults := make([]*CheckResult, 0, len(c.SubChecks))
 	for _, subCheck := range c.SubChecks {
 		subResults = append(subResults, subCheck.NewResult())
 	}
@@ -197,8 +196,11 @@ func NewPhase(name, description string, subChecks []*Check) *Check {
 	}
 }
 
-// FillResultNameMap fills a map with check results by name
-func FillResultNameMap(results []*CheckResult, resultNameMap map[string]*CheckResult) map[string]*CheckResult {
+// FillResultNameMap fills a map with check results by name.
+func FillResultNameMap(
+	results []*CheckResult,
+	resultNameMap map[string]*CheckResult,
+) map[string]*CheckResult {
 	if resultNameMap == nil {
 		resultNameMap = make(map[string]*CheckResult)
 	}
@@ -211,10 +213,9 @@ func FillResultNameMap(results []*CheckResult, resultNameMap map[string]*CheckRe
 	return resultNameMap
 }
 
-// PrepareChecks prepares the checks for running
+// PrepareChecks prepares the checks for running.
 func PrepareChecks(checks []*Check) []*CheckResult {
-
-	var results []*CheckResult
+	results := make([]*CheckResult, 0, len(checks))
 	for _, check := range checks {
 		results = append(results, check.NewResult())
 	}
@@ -227,7 +228,7 @@ func PrepareChecks(checks []*Check) []*CheckResult {
 	return results
 }
 
-// RunChecks runs the checks
+// RunChecks runs the checks.
 func RunChecks(ctx context.Context, results []*CheckResult) []*CheckResult {
 	for _, result := range results {
 		result.Run(ctx)
@@ -235,7 +236,7 @@ func RunChecks(ctx context.Context, results []*CheckResult) []*CheckResult {
 	return results
 }
 
-// NewCheckExecutor creates a new CheckExecutor
+// NewCheckExecutor creates a new CheckExecutor.
 func NewCheckExecutor(checks []*Check) *CheckExecutor {
 	e := &CheckExecutor{
 		Checks:        checks,
@@ -280,7 +281,7 @@ func (result *CheckResult) StatusString(spinView string) string {
 	return statusStyle.Render(status)
 }
 
-func (result *CheckResult) FormatResult(prefix string, spinView string) string {
+func (result *CheckResult) FormatResult(prefix, spinView string) string {
 	status := result.StatusString(spinView)
 
 	description := result.Check.Description
@@ -306,14 +307,14 @@ func (result *CheckResult) FormatResult(prefix string, spinView string) string {
 	return output
 }
 
-func (result *CheckResult) Format(prefix string, spinView string) string {
+func (result *CheckResult) Format(prefix, spinView string) string {
 	if result.Check.CustomPrinter != nil {
 		return result.Check.CustomPrinter(result, prefix, spinView)
 	}
 	return result.FormatResult(prefix, spinView)
 }
 
-// Run runs the checks
+// Run runs the checks.
 func (e *CheckExecutor) Run(ctx context.Context) []*CheckResult {
 	// Start all top-level checks
 	for _, result := range e.Results {

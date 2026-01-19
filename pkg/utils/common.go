@@ -16,23 +16,28 @@ limitations under the License.
 package utils
 
 import (
+	"context"
+	"errors"
+	"fmt"
 	"net"
 	"os"
 	"path/filepath"
+	"time"
 
-	"github.com/pkg/errors"
 	"github.com/spf13/afero"
 )
 
-var fs = afero.NewOsFs()
-var afs = &afero.Afero{Fs: fs}
+var (
+	fs  = afero.NewOsFs()
+	afs = &afero.Afero{Fs: fs}
+)
 
 // ExecuteOnExistence executes the function fn if the file existence is the
 // one given by the parameter.
 func ExecuteOnExistence(file string, existence bool, fn func() error) error {
 	exists, err := afs.Exists(file)
 	if err != nil {
-		return errors.Wrapf(err, "Error while checking if %s exists", file)
+		return fmt.Errorf("error while checking if %s exists: %w", file, err)
 	}
 
 	if exists == existence {
@@ -41,69 +46,90 @@ func ExecuteOnExistence(file string, existence bool, fn func() error) error {
 	return nil
 }
 
-// ExecuteIfNotExist executes the function fn if the file file
+// ExecuteIfNotExist executes the function fn if the file
 // doesn't exist.
 func ExecuteIfNotExist(file string, fn func() error) error {
 	return ExecuteOnExistence(file, false, fn)
 }
 
-// ExecuteIfExist executes the function fn if the file file
+// ExecuteIfExist executes the function fn if the file
 // exists.
 func ExecuteIfExist(file string, fn func() error) error {
 	return ExecuteOnExistence(file, true, fn)
 }
 
-// Exists tells if file exists
+// Exists tells if file exists.
 func Exists(path string) (bool, error) {
-	return afs.Exists(path)
+	exists, err := afs.Exists(path)
+	if err != nil {
+		return false, fmt.Errorf("failed to check if path exists: %w", err)
+	}
+	return exists, nil
 }
 
 func WriteFile(filename string, data []byte, perm os.FileMode) error {
-	return afs.WriteFile(filename, data, perm)
+	if err := afs.WriteFile(filename, data, perm); err != nil {
+		return fmt.Errorf("failed to write file: %w", err)
+	}
+	return nil
 }
 
 // MoveFileIfExists moves the file src to the destination dst
-// if it exists
-func MoveFileIfExists(src string, dst string) error {
+// if it exists.
+func MoveFileIfExists(src, dst string) error {
 	err := os.Link(src, dst)
 	if err != nil {
-		if os.IsNotExist(err) {
+		if errors.Is(err, os.ErrNotExist) {
 			return nil
 		}
-		return errors.Wrapf(err, "Error while linking %s to %s", src, dst)
+		return fmt.Errorf("error while linking %s to %s: %w", src, dst, err)
 	}
 
-	return os.Remove(src)
+	if err := os.Remove(src); err != nil {
+		return fmt.Errorf("failed to remove source file: %w", err)
+	}
+	return nil
 }
 
-// GetOutboundIP returns the preferred outbound ip of this machine
+// GetOutboundIP returns the preferred outbound ip of this machine.
 func GetOutboundIP() (net.IP, error) {
-	conn, err := net.Dial("udp", "8.8.8.8:80")
-	if err != nil {
-		return nil, errors.Wrap(err, "Error while getting IP address")
-	}
-	defer conn.Close()
+	var d net.Dialer
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
 
-	localAddr := conn.LocalAddr().(*net.UDPAddr)
+	conn, err := d.DialContext(ctx, "udp", "8.8.8.8:80")
+	if err != nil {
+		return nil, fmt.Errorf("error while getting IP address: %w", err)
+	}
+	defer func() {
+		err = conn.Close()
+	}()
+
+	localAddr, ok := conn.LocalAddr().(*net.UDPAddr)
+	if !ok {
+		return nil, fmt.Errorf("failed to get local address")
+	}
 
 	return localAddr.IP, nil
 }
 
 func RemoveDirectoryContents(dir string, predicate func(string) bool) error {
-	d, err := os.Open(dir)
+	d, err := os.Open(dir) //nolint:gosec // Controlled file path
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to open directory: %w", err)
 	}
-	defer d.Close()
+	defer func() {
+		err = d.Close()
+	}()
 	names, err := d.Readdirnames(-1)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to read directory names: %w", err)
 	}
 	for _, name := range names {
 		if predicate == nil || predicate(name) {
 			err = os.RemoveAll(filepath.Join(dir, name))
 			if err != nil {
-				return err
+				return fmt.Errorf("failed to remove %s: %w", name, err)
 			}
 		}
 	}
@@ -111,6 +137,9 @@ func RemoveDirectoryContents(dir string, predicate func(string) bool) error {
 }
 
 func IsOnWSL() bool {
-	wsl, _ := afs.DirExists("/run/WSL")
+	wsl, err := afs.DirExists("/run/WSL")
+	if err != nil {
+		return false
+	}
 	return wsl
 }

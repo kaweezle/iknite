@@ -17,19 +17,19 @@ package cmd
 
 // cSpell: disable
 import (
+	log "github.com/sirupsen/logrus"
+	"github.com/spf13/cobra"
+
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
 	"github.com/kaweezle/iknite/pkg/config"
 	"github.com/kaweezle/iknite/pkg/k8s"
-	log "github.com/sirupsen/logrus"
-	"github.com/spf13/cobra"
 )
 
 // cSpell: enable
 
 func NewPrepareCommand(ikniteConfig *v1alpha1.IkniteClusterSpec) *cobra.Command {
-
 	// prepareCmd represents the start command
-	var prepareCmd = &cobra.Command{
+	prepareCmd := &cobra.Command{
 		Use:   "prepare",
 		Short: "Prepare the VM for Kubernetes",
 		Long: `Prepare the VM for Kubernetes. Performs the following operations:
@@ -40,7 +40,7 @@ func NewPrepareCommand(ikniteConfig *v1alpha1.IkniteClusterSpec) *cobra.Command 
 - Ensures Iknite is started with OpenRC.
 `,
 		PersistentPreRun: config.StartPersistentPreRun,
-		Run:              func(cmd *cobra.Command, args []string) { performPrepare(ikniteConfig) },
+		Run:              func(_ *cobra.Command, _ []string) { performPrepare(ikniteConfig) },
 	}
 	flags := prepareCmd.Flags()
 
@@ -50,7 +50,6 @@ func NewPrepareCommand(ikniteConfig *v1alpha1.IkniteClusterSpec) *cobra.Command 
 }
 
 func performPrepare(ikniteConfig *v1alpha1.IkniteClusterSpec) {
-
 	cobra.CheckErr(config.DecodeIkniteConfig(ikniteConfig))
 	cobra.CheckErr(k8s.PrepareKubernetesEnvironment(ikniteConfig))
 	log.Info("VM is ready")

@@ -3,14 +3,16 @@ package v1alpha1
 // cSpell: disable
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net"
 	"os"
 
-	ikniteApi "github.com/kaweezle/iknite/pkg/apis/iknite"
-	"github.com/kaweezle/iknite/pkg/constants"
 	log "github.com/sirupsen/logrus"
 	metaV1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	ikniteApi "github.com/kaweezle/iknite/pkg/apis/iknite"
+	"github.com/kaweezle/iknite/pkg/constants"
 )
 
 // cSpell: enable
@@ -20,28 +22,28 @@ import (
 type IkniteCluster struct {
 	metaV1.TypeMeta `json:",inline"`
 
-	Spec IkniteClusterSpec `json:"spec" protobuf:"bytes,2,opt,name=spec"`
+	Spec IkniteClusterSpec `json:"spec"             protobuf:"bytes,2,opt,name=spec"`
 	// +optional
 	Status IkniteClusterStatus `json:"status,omitempty" protobuf:"bytes,3,opt,name=status"`
 }
 
 type IkniteClusterSpec struct {
 	// +optional
-	Ip net.IP `json:"ip,omitempty" protobuf:"bytes,1,opt,name=ip" mapstructure:"ip"`
+	KubernetesVersion string `json:"kubernetesVersion,omitempty" protobuf:"bytes,2,opt,name=kubernetesVersion" mapstructure:"kubernetes_version"` //nolint:lll // for readability
 	// +optional
-	KubernetesVersion string `json:"kubernetesVersion,omitempty" protobuf:"bytes,2,opt,name=kubernetesVersion" mapstructure:"kubernetes_version"`
+	DomainName string `json:"domainName,omitempty"        protobuf:"bytes,3,opt,name=domainName"        mapstructure:"domain_name"` //nolint:lll // for readability
 	// +optional
-	DomainName string `json:"domainName,omitempty" protobuf:"bytes,3,opt,name=domainName" mapstructure:"domain_name"`
+	NetworkInterface string `json:"networkInterface,omitempty"  protobuf:"bytes,5,opt,name=networkInterface"  mapstructure:"network_interface"` //nolint:lll // for readability
 	// +optional
-	CreateIp bool `json:"createIp,omitempty" protobuf:"bytes,4,opt,name=createIp" mapstructure:"create_ip"`
+	ClusterName string `json:"clusterName,omitempty"       protobuf:"bytes,7,opt,name=clusterName"       mapstructure:"cluster_name"` //nolint:lll // for readability
 	// +optional
-	NetworkInterface string `json:"networkInterface,omitempty" protobuf:"bytes,5,opt,name=networkInterface" mapstructure:"network_interface"`
+	Kustomization string `json:"kustomization,omitempty"     protobuf:"bytes,8,opt,name=kustomization"`
 	// +optional
-	EnableMDNS bool `json:"enableMDNS,omitempty" protobuf:"bytes,6,opt,name=enableMDNS" mapstructure:"enable_mdns"`
+	Ip net.IP `json:"ip,omitempty"                protobuf:"bytes,1,opt,name=ip"                mapstructure:"ip"`
 	// +optional
-	ClusterName string `json:"clusterName,omitempty" protobuf:"bytes,7,opt,name=clusterName" mapstructure:"cluster_name"`
+	CreateIp bool `json:"createIp,omitempty"          protobuf:"bytes,4,opt,name=createIp"          mapstructure:"create_ip"` //nolint:lll // for readability
 	// +optional
-	Kustomization string `json:"kustomization,omitempty" protobuf:"bytes,8,opt,name=kustomization"`
+	EnableMDNS bool `json:"enableMDNS,omitempty"        protobuf:"bytes,6,opt,name=enableMDNS"        mapstructure:"enable_mdns"` //nolint:lll // for readability
 }
 
 func (c *IkniteClusterSpec) GetApiEndPoint() string {
@@ -53,33 +55,31 @@ func (c *IkniteClusterSpec) GetApiEndPoint() string {
 
 type IkniteClusterStatus struct {
 	LastUpdateTimeStamp metaV1.Time            `json:"lastUpdateTimeStamp" protobuf:"bytes,1,opt,name=lastUpdateTimeStamp"`
-	State               ikniteApi.ClusterState `json:"state" protobuf:"bytes,1,opt,name=state"`
-	CurrentPhase        string                 `json:"currentPhase" protobuf:"bytes,2,opt,name=currentPhase"`
-	WorkloadsState      ClusterWorkloadsState  `json:"workloadsState" protobuf:"bytes,3,opt,name=workloadsState"`
+	CurrentPhase        string                 `json:"currentPhase"        protobuf:"bytes,2,opt,name=currentPhase"`
+	WorkloadsState      ClusterWorkloadsState  `json:"workloadsState"      protobuf:"bytes,3,opt,name=workloadsState"`
+	State               ikniteApi.ClusterState `json:"state"               protobuf:"bytes,1,opt,name=state"`
 }
 
 type ClusterWorkloadsState struct {
-	Count        int              `json:"count" protobuf:"bytes,1,opt,name=count"`
-	ReadyCount   int              `json:"readyCount" protobuf:"bytes,2,opt,name=readyCount"`
+	Ready        []*WorkloadState `json:"ready"        protobuf:"bytes,4,opt,name=ready"`
+	Unready      []*WorkloadState `json:"unready"      protobuf:"bytes,5,opt,name=unready"`
+	Count        int              `json:"count"        protobuf:"bytes,1,opt,name=count"`
+	ReadyCount   int              `json:"readyCount"   protobuf:"bytes,2,opt,name=readyCount"`
 	UnreadyCount int              `json:"unreadyCount" protobuf:"bytes,3,opt,name=unreadyCount"`
-	Ready        []*WorkloadState `json:"ready" protobuf:"bytes,4,opt,name=ready"`
-	Unready      []*WorkloadState `json:"unready" protobuf:"bytes,5,opt,name=unready"`
 }
 
 type WorkloadState struct {
 	Namespace string
 	Name      string
-	Ok        bool
 	Message   string
+	Ok        bool
 }
 
 func (r *WorkloadState) LongString() string {
-
 	return fmt.Sprintf("%s %-20s %-54s %s", OkString(r.Ok), r.Namespace, r.Name, r.Message)
 }
 
 func (r *WorkloadState) String() string {
-
 	return fmt.Sprintf("%s/%s:%s", r.Namespace, r.Name, OkString(r.Ok))
 }
 
@@ -90,7 +90,9 @@ func OkString(b bool) string {
 	return "🟥"
 }
 
-func (ikniteCluster *IkniteCluster) Update(state ikniteApi.ClusterState, phase string, ready, unready []*WorkloadState) {
+func (ikniteCluster *IkniteCluster) Update(
+	state ikniteApi.ClusterState, phase string, ready, unready []*WorkloadState,
+) {
 	ikniteCluster.Status.State = state
 	ikniteCluster.Status.CurrentPhase = phase
 	ikniteCluster.Status.LastUpdateTimeStamp = metaV1.Now()
@@ -102,12 +104,20 @@ func (ikniteCluster *IkniteCluster) Update(state ikniteApi.ClusterState, phase s
 	ikniteCluster.Persist()
 }
 
-func (ikniteCluster IkniteCluster) Persist() {
+func (ikniteCluster *IkniteCluster) Persist() {
 	ikniteClusterJSON, err := json.MarshalIndent(ikniteCluster, "", "  ")
 	if err == nil {
 		// Write JSON to file
-		os.MkdirAll(constants.StatusDirectory, 0755)
-		err = os.WriteFile(constants.StatusFile, ikniteClusterJSON, 0644)
+		err = os.MkdirAll(constants.StatusDirectory, 0o755) //nolint:gosec // Want read access
+		if err != nil {
+			log.WithError(err).Warn("Failed to create status directory")
+			return
+		}
+		err = os.WriteFile( //nolint:gosec // Want read access
+			constants.StatusFile,
+			ikniteClusterJSON,
+			0o644,
+		)
 		if err != nil {
 			log.WithError(err).Warn("Failed to write status.json")
 		}
@@ -122,17 +132,17 @@ func LoadIkniteCluster() (*IkniteCluster, error) {
 	if err == nil {
 		err = json.Unmarshal(ikniteClusterJSON, ikniteCluster)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to unmarshal iknite cluster: %w", err)
 		}
 	} else {
-		return nil, err
+		return nil, fmt.Errorf("failed to read status file: %w", err)
 	}
 	return ikniteCluster, nil
 }
 
 func LoadIkniteClusterOrDefault() (*IkniteCluster, error) {
 	ikniteCluster, err := LoadIkniteCluster()
-	if err != nil && os.IsNotExist(err) {
+	if errors.Is(err, os.ErrNotExist) {
 		ikniteCluster = &IkniteCluster{}
 		SetDefaults_IkniteCluster(ikniteCluster)
 	}

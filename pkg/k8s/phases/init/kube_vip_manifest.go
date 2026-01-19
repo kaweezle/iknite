@@ -49,7 +49,7 @@ spec:
           value: {{ .Ip }}
         - name: prometheus_server
           value: :2112
-      image: ghcr.io/kube-vip/kube-vip:v0.8.9
+      image: {{ KubeVipImage }}
       imagePullPolicy: IfNotPresent
       name: kube-vip
       resources: {}

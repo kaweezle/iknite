@@ -1,213 +1,244 @@
-# Contributing to Octave Cloud Platform
+# Contributing to Iknite
 
-<!-- cspell:ignore venv mvenv -->
+<!-- cspell:words venv mvenv Riseup Susam -->
 
-!!! wip "Work in progress"
-
-    This documentation is in draft form and may change frequently.
-
-#### Table Of Contents
-
-[Code of conduct](#code-of-conduct)
-
-- [General considerations](#general-considerations)
-- [Normal contribution flow](#general-considerations)
-- [Creating issues](#creating-issues)
-- [Commit guidelines](#commit-guidelines)
-- [Code style](#code-style)
+Thank you for considering contributing to Iknite! We welcome contributions from
+the community to help improve the project.
 
 ## Code of Conduct
 
 This project and everyone participating in it is governed by the
-[Octave Code of Conduct](CODE_OF_CONDUCT.md). By participating, you are expected
+[Iknite Code of Conduct](CODE_OF_CONDUCT.md). By participating, you are expected
 to uphold this code. Please report unacceptable behavior to
-[antoine@openance.com](mailto:antoine@openance.com).
+[antoine@mrtn.me](mailto:antoine@mrtn.me).
 
-## General considerations
+## Getting Started
 
-- `main` is the development branch.
-- Branches prefixed with `deploy/` are continuous deployment branches created
-  for CI/CD builds. They may be created by scripts.
-- Tags with the form `component_vX.Y.Z` trigger builds in Github Actions.
-- We use [Semantic Versioning](https://semver.org/)
-- Use only lower case in branch names. Prefer minus (`-`) instead of underscore
-  (`_`) for symbolizing spaces as github replaces them with spaces in PR titles.
-- Please prefix your branch names. Try not to be too creative with prefixes and
-  choose one of the following:
-  - `feature/`
-  - `fix/`
-  - `build/`
-  - `doc/`
-- We use [gitmoji](https://gitmoji.dev/) in particular with the
-  [Visual Studio Code Plugin](https://marketplace.visualstudio.com/items?itemName=seatonjiang.gitmoji-vscode)
+### Branch Naming Conventions
 
-## Internal contribution flow
+- `main` - Main development branch
+- `deploy/*` - Continuous deployment branches (created by CI/CD)
+- Use lowercase with hyphens (`-`) instead of underscores
+- You can create a branch from an issue in the Github UI. It will prefix the
+  branch name with the issue number.
+- If you create a branch manually, use one of these prefixes:
+  - `feature/` - New features
+  - `fix/` - Bug fixes
+  - `build/` - Build system changes
+  - `doc/` - Documentation updates
+  - `chore/` - Miscellaneous tasks (e.g., refactoring, tooling)
 
-The contribution flow is the following:
+**Example**: `feature/add-container-support` or `fix/memory-leak`
 
-1. Creating an issue to track the contribution.
-2. Create a branch from **main** and add the `OnGoing` label to the issue.
-3. Do some work in the branch.
-4. Rebase your branch before pushing.
-5. Push your branch. If needed, it should trigger some CI building and testing.
-6. Create a pull request. If your pull request must not be included in staging
-   builds, label it as `WIP` (Work In Progress).
-7. Assign the PR to one of your colleagues for review. Don't ask for a review on
-   a PR that doesn't build or for which test fails. Remove the `OnGoing` flag
-   from the issue and add the `To Review` Flag.
-8. Wait for approval from one of your peers and from QA or the PO (on the
-   issue). Answer to each comment and mark them as resolved if needed. The
-   approval from the peer goes in the PR and the one from QA is given by adding
-   the `OkQA` flag.
-9. Once the PR is approved, you can merge it into main. Don't forget to delete
-   the branch. The issue will be closed automatically.
+### Commit Style
 
-You have more information in
-[this blog post](https://about.gitlab.com/2016f/03/08/gitlab-tutorial-its-all-connected/).
+We use [gitmoji](https://gitmoji.dev/) for commit messages. Consider using the
+[VS Code Plugin](https://marketplace.visualstudio.com/items?itemName=seatonjiang.gitmoji-vscode)
+to make this easier.
 
-## Creating issues
+**Examples**:
 
-Each contribution must be related to an issue in
-[Github](https://github.com/kaweezle/iknite/issues). Each issue should be of the
-appropriate type: Task, Epic, Bug...
+- `✨ add container registry support`
+- `🐛 fix memory leak in image builder`
+- `📝 update installation guide`
 
-### Story
+## Creating Issues
 
-This [gist](https://gist.github.com/xpepper/4ed5638d5a431b32f573) shows the
-basic idea to follow on the story issue title:
+Before creating a new issue, please search
+[existing issues](https://github.com/kaweezle/iknite/issues) to avoid
+duplicates.
 
-    As a <user or stakeholder type>
-    I want <some software feature>
-    So that <some business value>
+### Bug Reports
 
-The content of the story should at least detail the acceptance criteria. For the
-contents, you can follow
-[this guide](https://github.com/AlphaFounders/style-guide/blob/master/agile-user-story.md)
+Include the following information:
 
-### Epic
+- **Title**: Concise description of the problem
+- **Steps to reproduce**: Detailed steps to trigger the bug
+- **Expected vs actual behavior**: What should happen and what does happen
+- **Environment**: OS, Go version, Iknite version, relevant configuration
+- **Additional context**: Screenshots, logs, or error messages
 
-An Epic is a subject matter of the project, that will be relevant for several
-Stories and will cross multiple Milestones. A good example is for instance
-_Authentication_. There will be several Stories related to it. Creating an Epic
-titled `Epic: Security` allows to present and discuss the principles related to
-the feature And link the various stories and bugs related to it.
+### Feature Requests
 
-For most if not all of them, it is interesting to also create a Label and a
-Documentation page. The former is an easier way to group issues related to the
-Epic and the latter allows to document the feature globally. The interest of
-having an issue related to the epic is the ability to track down work related to
-it and have a conversation about it.
+Describe:
 
-### Bug
+- **Problem**: What problem does this solve?
+- **Proposed solution**: Your suggested approach
+- **Alternatives**: Other solutions you've considered
+- **Use cases**: Examples or scenarios that illustrate the need
 
-As the term _Issue_ covers also the stories and epics, we are left with _Bug_
-for describing real issues in the project. They can be real bugs, but also
-crashes and other annoyances.
+### Questions
 
-I don't like to be too specific on the contents of a Bug, but please try to
-follow at least these guidelines:
+For questions about using Iknite:
 
-- Describe how to reproduce.
-- Describe what happens.
-- Describe **what is expected** and how this is different from what happens.
-- Describe the context as thoroughly as possible. In particular, give
-  information about: OS, device model, user context
+1. Check the [documentation](https://kaweezle.github.io/iknite/) first
+2. Search existing issues and discussions
+3. If still needed, open an issue with context and relevant code snippets
 
-## Commit guidelines
+Consider using
+[GitHub Discussions](https://github.com/kaweezle/iknite/discussions) for general
+questions and community support.
 
-Before reading this, you need to know how to
-[rebase](https://www.atlassian.com/git/tutorials/rewriting-history/git-rebase)
+#### Helpful Resources
+
+- [GitHub: Creating an Issue](https://docs.github.com/en/issues/tracking-your-work-with-issues/creating-an-issue)
+- [How to Write a Good Bug Report](https://testlio.com/blog/the-ideal-bug-report/)
+- [Mozilla: Bug Writing Guidelines](https://developer.mozilla.org/en-US/docs/Mozilla/QA/Bug_writing_guidelines)
+- [RStudio: Writing Good Feature Requests](https://github.com/rstudio/rstudio/wiki/Writing-Good-Feature-Requests)
+
+## Contribution Workflow
+
+### Step-by-Step Process
+
+1. **Fork and clone**:
+
+   ```bash
+   git clone https://github.com/YOUR-USERNAME/iknite.git
+   cd iknite
+   git remote add upstream https://github.com/kaweezle/iknite.git
+   ```
+
+2. **Create an issue** at
+   [github.com/kaweezle/iknite/issues](https://github.com/kaweezle/iknite/issues)
+   to track your contribution.
+
+3. **Create a branch** from `main`:
+
+   ```bash
+   git checkout -b feature/your-feature-name
+   ```
+
+4. **Make your changes**:
+
+   - Write code following the [code style guidelines](#code-style)
+   - Add unit tests (aim for >85% coverage)
+   - Test locally: `go test ./...`
+
+5. **Prepare for submission**:
+
+   ```bash
+   # Fetch and rebase on latest main
+   git fetch upstream
+   git rebase upstream/main
+
+   # Run pre-commit checks
+   pre-commit run --all-files
+   ```
+
+6. **Push and create PR**:
+
+   ```bash
+   git push origin feature/your-feature-name
+   ```
+
+   - Create a pull request to `main`
+   - Reference the issue (e.g., "Fixes #123")
+
+7. **Respond to review**:
+
+   - Address feedback promptly
+   - Push additional commits as needed
+   - Once approved, a maintainer will merge your PR
+
+### Additional Resources
+
+- [How to Contribute to Open Source](https://opensource.guide/how-to-contribute/)
+- [GitHub Flow](https://guides.github.com/introduction/flow/)
+- [Fork and Pull Request Workflow](https://github.com/susam/gitpr)
+- [Git Forks and Upstreams](https://www.atlassian.com/git/tutorials/git-forks-and-upstreams)
+
+## Development Guidelines
+
+### Commit Guidelines
+
+**Key principles**:
+
+- Keep commits focused and atomic
+- Squash commits that fix issues introduced in the PR with the commit that
+  introduced them
+- Rebase to maintain a clean history
+- Separate formatting changes from functional changes
+- Remove empty commits from rebases
+
+Learn about
+[rebasing](https://www.atlassian.com/git/tutorials/rewriting-history/git-rebase)
 and
-[rewrite history](https://git-scm.com/book/en/v2/Git-Tools-Rewriting-History).
+[rewriting history](https://git-scm.com/book/en/v2/Git-Tools-Rewriting-History).
 
-Please follow these rules in your commits:
+#### Commit Messages
 
-- Keep your commit as minimal as possible.
-- When a commit fixes an issue introduced in preceding commit, please squash it
-  with the preceding one.
-- keep formatting changes and/or renames in their own commits. Don't reformat
-  files if they don't need to.
-- When you fix a test in a latter commit, please squash it with the preceding
-  one.
-- Remove empty commits occurring from rebase.
+Follow
+[this guide](https://gist.github.com/robertpainsi/b632364184e70900af4ab688decf6f53)
+for writing good commit messages. Keeping the first line under 50 characters is
+recommended but not enforced. Keep it short but descriptive.
 
-### Commit messages
+**Using gitmoji with Conventional Commits**:
 
-Please follow
-[this guide](https://gist.github.com/robertpainsi/b632364184e70900af4ab688decf6f53).
+- Replace conventional types (`feat:`, `fix:`) with emojis (e.g., `✨`, `🐛`)
+- Link to issues with `#` (e.g., "Fixes #123")
 
-For those who like it, you can follow the
-[Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/)
-guidelines and use the [gitmoji](https://gitmoji.dev/) convention for the commit
-type.
+### Code Style
 
-You can add link in messages:
+**Follow the platform conventions**. For Go, reference:
 
-- To reference an issue: `#123`
-- To reference a PR: `!123`
-- To reference a snippet `$123`
+- [Effective Go](https://go.dev/doc/effective_go)
+- [The Go Style Guide](https://google.github.io/styleguide/go/)
 
-## Code style
+**General guidelines**:
 
-The general guideline here is: **FOLLOW THE CODE STYLE OF THE PLATFORM**. In the
-case of the current project, good references are
-[Effective Go](https://go.dev/doc/effective_go) and
-[The Go Style Guide](https://google.github.io/styleguide/go/).
+- ✅ Use consistent naming conventions (camelCase, snake_case, etc.)
+- ✅ Write descriptive names - avoid abbreviations
+- ✅ Fix typos immediately (project uses [CSpell](https://cspell.org/) with
+  [pre-commit](https://pre-commit.com/))
+- ✅ Use English for all identifiers
+- ✅ Use verbs for methods, nouns for properties
+- ✅ Keep methods small and focused
+- ✅ Prefer loose coupling
+- ✅ Fail fast and explicitly - never fail silently
 
-Here is some dos and don'ts:
+### Testing
 
-- Use something to separate words: case, underscore... Use what you see in the
-  constructs of the language and use this pattern **consistently**.
-- Don't abbreviate. Really, don't.
-- Fix typos as soon as you see them.
-- Use only plain english in names.
-- Use verbs for methods and nouns for properties.
-- Keep you methods small.
-- Use loose coupling where you can.
-- When you fail, fail fast and vocally. Never fail silently.
+- Write unit tests for all changes
+- Aim for >85% code coverage
+- Run tests locally before submitting: `go test ./...`
+
+### Versioning
+
+We follow [Semantic Versioning](https://semver.org/) (MAJOR.MINOR.PATCH).
 
 ## Documentation
 
-You are greatly encouraged to contribute documentation to the project. The main
-project documentation is located in the `docs` directory. It is written in
-[Markdown](https://daringfireball.net/projects/markdown/syntax) and is produced
-with the [MkDocs](https://www.mkdocs.org/) tool with the help of
-[Material for MKDocs](https://squidfunk.github.io/mkdocs-material/) and
-[PyMdown Extensions](https://facelessuser.github.io/pymdown-extensions/). You
-may write documentation in other parts of the project but please don't forget to
-create a link for the created file somewhere in the `docs` directory tree and
-make sure that one of the existing pages link to it or that it is linked in the
-`mkdocs.yml` file.
+We encourage documentation contributions! Documentation is in the `docs`
+directory, written in
+[Markdown](https://daringfireball.net/projects/markdown/syntax) and built with
+[MkDocs](https://www.mkdocs.org/) using
+[Material for MkDocs](https://squidfunk.github.io/mkdocs-material/).
 
-For other that pull your changes from git, the link you create needs to be
-relative:
+### Adding Documentation
+
+Navigation is managed by
+[awesome-nav](https://github.com/lukasgeiter/mkdocs-awesome-nav). Main
+categories are defined in `docs/docs/.nav.yml`.
+
+**For files outside `docs/docs`**, create symbolic links:
 
 ```bash
-$ cd docs
-$ mkdir -p some/new/documentation/category
-$ cd some/new/documentation/category
-$ ln -s ../../../../my/project/subdir/README.md .
+cd docs/docs/some/category
+ln -s ../../../../path/to/your/README.md .
 ```
 
-You can add categories inside the `/mkdocs.yml` file.
+### Local Preview
 
-You can see and browse the documentation while you're editing it by installing
-[MkDocs](https://www.mkdocs.org/) locally and serving the documentation (In the
-following we assume that you are either on Linux or MacOS with python3
-installed):
+!!! tip "Required Tools"
 
-```console
-$ python3 -mvenv .venv
-$ source .venv/bin/activate
-(env) $ pip install -r mkdocs-requirements.txt
-(env) $ mkdocs serve
-INFO    -  Building documentation...
-INFO    -  Cleaning site directory
-[I 190315 09:36:39 server:298] Serving on http://127.0.0.1:8000
-[I 190315 09:36:39 handlers:59] Start watching changes
-[I 190315 09:36:39 handlers:61] Start detecting changes
-...
+Python and [uv](https://github.com/astral-sh/uv)
+
+Preview documentation while editing:
+
+```bash
+cd docs
+uv run mkdocs serve --livereload
 ```
 
-Then you can browse the documentation at
-[http://localhost:8000/](http://localhost:8000/)
+Then browse at [http://localhost:8000/](http://localhost:8000/). Stop with
+`CTRL+C`.

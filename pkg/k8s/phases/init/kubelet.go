@@ -16,31 +16,35 @@ limitations under the License.
 
 package init
 
+// cSpell: disable
 import (
+	"errors"
 	"fmt"
 
-	"github.com/kaweezle/iknite/pkg/k8s"
-	"github.com/pkg/errors"
-
+	"github.com/sirupsen/logrus"
+	kubeletConfig "k8s.io/kubelet/config/v1beta1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	cmdUtil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
+	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	kubeletPhase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubelet"
+
+	"github.com/kaweezle/iknite/pkg/k8s"
 )
 
-var (
-	kubeletStartPhaseExample = cmdUtil.Examples(`
+// cSpell: enable
+
+var kubeletStartPhaseExample = cmdUtil.Examples(`
 		# Writes a dynamic environment file with kubelet flags from a InitConfiguration file.
 		kubeadm init phase kubelet-start --config config.yaml
 		`)
-)
 
 // NewKubeletStartPhase creates a kubeadm workflow phase that start kubelet on a node.
 func NewKubeletStartPhase() workflow.Phase {
 	return workflow.Phase{
 		Name:    "kubelet-start",
 		Short:   "Write kubelet settings and (re)start the kubelet",
-		Long:    "Write a file with KubeletConfiguration and an environment file with node specific kubelet settings, and then (re)start kubelet.",
+		Long:    "Write a file with KubeletConfiguration and an environment file with node specific kubelet settings, and then (re)start kubelet.", //nolint:lll // Ignore long line linter warning
 		Example: kubeletStartPhaseExample,
 		Run:     runKubeletStart,
 		InheritFlags: []string{
@@ -63,24 +67,39 @@ func runKubeletStart(c workflow.RunData) error {
 
 	// TODO: Do we need to try to stop the kubelet ?
 
-	// Write env file with flags for the kubelet to use. We do not need to write the --register-with-taints for the control-plane,
-	// as we handle that ourselves in the mark-control-plane phase
-	// TODO: Maybe we want to do that some time in the future, in order to remove some logic from the mark-control-plane phase?
-	if err := kubeletPhase.WriteKubeletDynamicEnvFile(&data.Cfg().ClusterConfiguration, &data.Cfg().NodeRegistration, false, data.KubeletDir()); err != nil {
-		return errors.Wrap(err, "error writing a dynamic environment file for the kubelet")
+	// Write env file with flags for the kubelet to use. We do not need to write the --register-with-taints for the
+	// control-plane, as we handle that ourselves in the mark-control-plane phase.
+	// TODO: Maybe we want to do that some time in the future, in order to remove some logic from the
+	// mark-control-plane phase?
+	if err := kubeletPhase.WriteKubeletDynamicEnvFile(
+		&data.Cfg().ClusterConfiguration, &data.Cfg().NodeRegistration, false, data.KubeletDir()); err != nil {
+		return fmt.Errorf("error writing a dynamic environment file for the kubelet: %w", err)
+	}
+
+	// Write the instance kubelet configuration file to disk.
+	if features.Enabled(data.Cfg().FeatureGates, features.NodeLocalCRISocket) {
+		kubeletConf := &kubeletConfig.KubeletConfiguration{
+			ContainerRuntimeEndpoint: data.Cfg().NodeRegistration.CRISocket,
+		}
+		if err := kubeletPhase.WriteInstanceConfigToDisk(kubeletConf, data.KubeletDir()); err != nil {
+			return fmt.Errorf("error writing instance kubelet configuration to disk: %w", err)
+		}
+	} else {
+		logrus.WithField("phase", "kubelet-start").
+			Info("Skipping writing instance kubelet configuration file as the NodeLocalCRISocket feature gate is disabled")
 	}
 
 	// Write the kubelet configuration file to disk.
-	if err := kubeletPhase.WriteConfigToDisk(&data.Cfg().ClusterConfiguration, data.KubeletDir(), data.PatchesDir(), data.OutputWriter()); err != nil {
-		return errors.Wrap(err, "error writing kubelet configuration to disk")
+	if err := kubeletPhase.WriteConfigToDisk(
+		&data.Cfg().ClusterConfiguration, data.KubeletDir(), data.PatchesDir(), data.OutputWriter()); err != nil {
+		return fmt.Errorf("error writing kubelet configuration to disk: %w", err)
 	}
-
 	// Try to start the kubelet service in case it's inactive
 	if !data.DryRun() {
-		fmt.Println("[kubelet-start] Starting the kubelet")
+		logrus.WithField("phase", "kubelet-start").Info("Starting the kubelet")
 		cmd, err := k8s.StartKubelet()
 		if err != nil {
-			return errors.Wrap(err, "Failed to start kubelet")
+			return fmt.Errorf("failed to start kubelet: %w", err)
 		}
 		data.SetKubeletCmd(cmd)
 	}

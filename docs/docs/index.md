@@ -22,8 +22,8 @@ As mentioned in the
     of kubeadm, and ideally, using kubeadm as the basis of all deployments will
     make it easier to create conformant clusters.
 
-**Iknite** comes as an Alpine Linux package, installing `kubeadm`, `kubectl`,
-`kubelet` and others automatically as dependencies.
+**Iknite** comes as an Alpine Linux package, installing among others `kubeadm`,
+`kubectl`, `kubelet` automatically as dependencies.
 
 Using [containerd](https://containerd.io/) as the runtime, it also deploys
 [buildkit](https://docs.docker.com/build/buildkit/) for straightforward image

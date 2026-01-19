@@ -1,14 +1,16 @@
-package k8s
+package k8s_test
 
 // cSpell: disable
 import (
 	"testing"
 
-	tu "github.com/kaweezle/iknite/pkg/testutils"
-	"github.com/kaweezle/iknite/pkg/utils"
 	"github.com/lithammer/dedent"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/suite"
+
+	"github.com/kaweezle/iknite/pkg/k8s"
+	tu "github.com/kaweezle/iknite/pkg/testutils"
+	"github.com/kaweezle/iknite/pkg/utils"
 )
 
 // cSpell: enable
@@ -45,19 +47,21 @@ func (s *RuntimeEnvironmentTestSuite) TestPreventKubeletServiceFromStarting() {
 
 	tempFile, err := afero.TempFile(fs, "", "rc.conf")
 	require.NoError(err)
-	defer tempFile.Close()
+	defer func() {
+		err = tempFile.Close()
+	}()
 
 	_, err = tempFile.WriteString(rcConfFileContent)
 	require.NoError(err)
 
 	confFilePath := tempFile.Name()
 
-	err = PreventKubeletServiceFromStarting(confFilePath)
+	err = k8s.PreventKubeletServiceFromStarting(confFilePath)
 	require.NoError(err)
 
 	content, err := afs.ReadFile(confFilePath)
 	require.NoError(err)
-	require.Equal(rcConfFileContent+rcConfPreventKubeletRunning+"\n", string(content))
+	require.Equal(rcConfFileContent+k8s.RcConfPreventKubeletRunning+"\n", string(content))
 }
 
 func (s *RuntimeEnvironmentTestSuite) TestPreventKubeletServiceFromStartingWhenLineIsPresent() {
@@ -77,14 +81,16 @@ func (s *RuntimeEnvironmentTestSuite) TestPreventKubeletServiceFromStartingWhenL
 
 	tempFile, err := afero.TempFile(fs, "", "rc.conf")
 	require.NoError(err)
-	defer tempFile.Close()
+	defer func() {
+		err = tempFile.Close()
+	}()
 
 	_, err = tempFile.WriteString(existingContent)
 	require.NoError(err)
 
 	confFilePath := tempFile.Name()
 
-	err = PreventKubeletServiceFromStarting(confFilePath)
+	err = k8s.PreventKubeletServiceFromStarting(confFilePath)
 	require.NoError(err)
 
 	content, err := afs.ReadFile(confFilePath)
@@ -93,5 +99,6 @@ func (s *RuntimeEnvironmentTestSuite) TestPreventKubeletServiceFromStartingWhenL
 }
 
 func TestRuntimeEnvironment(t *testing.T) {
+	t.Parallel()
 	suite.Run(t, new(RuntimeEnvironmentTestSuite))
 }

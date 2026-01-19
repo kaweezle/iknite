@@ -18,8 +18,14 @@ package cmd
 // cSpell: disable
 import (
 	"context"
+	"errors"
+	"fmt"
 	"os"
 	"time"
+
+	log "github.com/sirupsen/logrus"
+	"github.com/spf13/cobra"
+	"k8s.io/apimachinery/pkg/util/wait"
 
 	"github.com/kaweezle/iknite/pkg/alpine"
 	"github.com/kaweezle/iknite/pkg/apis/iknite"
@@ -27,18 +33,13 @@ import (
 	"github.com/kaweezle/iknite/pkg/cmd/options"
 	"github.com/kaweezle/iknite/pkg/config"
 	"github.com/kaweezle/iknite/pkg/k8s"
-	"github.com/pkg/errors"
-	log "github.com/sirupsen/logrus"
-	"github.com/spf13/cobra"
-	"k8s.io/apimachinery/pkg/util/wait"
 )
 
 // cSpell: enable
 
 func NewStartCmd(ikniteConfig *v1alpha1.IkniteClusterSpec) *cobra.Command {
-
 	// startCmd represents the start command
-	var startCmd = &cobra.Command{
+	startCmd := &cobra.Command{
 		Use:   "start",
 		Short: "Creates or starts the cluster",
 		Long: `Starts the cluster. Performs the following operations:
@@ -51,7 +52,7 @@ func NewStartCmd(ikniteConfig *v1alpha1.IkniteClusterSpec) *cobra.Command {
 - Installs flannel, metal-lb and local-path-provisioner.
 `,
 		PersistentPreRun: config.StartPersistentPreRun,
-		Run:              func(cmd *cobra.Command, args []string) { performStart(ikniteConfig) },
+		Run:              func(_ *cobra.Command, _ []string) { performStart(ikniteConfig) },
 	}
 	flags := startCmd.Flags()
 
@@ -62,11 +63,10 @@ func NewStartCmd(ikniteConfig *v1alpha1.IkniteClusterSpec) *cobra.Command {
 	return startCmd
 }
 
-func IsIkniteReady(ctx context.Context) (bool, error) {
-
+func IsIkniteReady(_ context.Context) (bool, error) {
 	cluster, err := v1alpha1.LoadIkniteCluster()
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
-		return false, err
+		return false, fmt.Errorf("failed to load iknite cluster: %w", err)
 	}
 	if errors.Is(err, os.ErrNotExist) {
 		return false, nil
@@ -94,15 +94,14 @@ func IsIkniteReady(ctx context.Context) (bool, error) {
 }
 
 func performStart(ikniteConfig *v1alpha1.IkniteClusterSpec) {
-
 	cobra.CheckErr(config.DecodeIkniteConfig(ikniteConfig))
 	cobra.CheckErr(k8s.PrepareKubernetesEnvironment(ikniteConfig))
 
 	// If Kubernetes is already installed, check that the configuration has not
 	// Changed.
-	config, err := k8s.LoadFromDefault()
+	apiConfig, err := k8s.LoadFromDefault()
 	if err == nil {
-		if config.IsConfigServerAddress(ikniteConfig.GetApiEndPoint()) {
+		if apiConfig.IsConfigServerAddress(ikniteConfig.GetApiEndPoint()) {
 			log.Info("Kubeconfig already exists")
 		} else {
 			// If the configuration has changed, we stop and disable the kubelet
@@ -113,8 +112,8 @@ func performStart(ikniteConfig *v1alpha1.IkniteClusterSpec) {
 			cobra.CheckErr(cmd.RunE(cmd, []string{}))
 		}
 	} else {
-		if !os.IsNotExist(err) {
-			cobra.CheckErr(errors.Wrap(err, "While loading existing kubeconfig"))
+		if !errors.Is(err, os.ErrNotExist) {
+			cobra.CheckErr(fmt.Errorf("while loading existing kubeconfig: %w", err))
 		}
 		log.Info("No current configuration found. Initializing...")
 	}
@@ -124,7 +123,13 @@ func performStart(ikniteConfig *v1alpha1.IkniteClusterSpec) {
 
 	ctx := context.Background()
 	if timeout > 0 {
-		err = wait.PollUntilContextTimeout(ctx, time.Second*time.Duration(2), time.Duration(timeout), true, IsIkniteReady)
+		err = wait.PollUntilContextTimeout(
+			ctx,
+			time.Second*time.Duration(2),
+			time.Duration(timeout),
+			true,
+			IsIkniteReady,
+		)
 	} else {
 		err = wait.PollUntilContextCancel(ctx, time.Second*time.Duration(2), true, IsIkniteReady)
 	}

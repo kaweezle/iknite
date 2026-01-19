@@ -1,13 +1,13 @@
 package options
 
 const (
-	// General
+	// General.
 	Config    = "config"
 	Verbosity = "verbosity"
 	Json      = "json"
 	Timeout   = "timeout"
 
-	// Kustomization
+	// Kustomization.
 	Kustomization           = "kustomization"
 	Wait                    = "wait"
 	ForceConfig             = "force-config"
@@ -15,7 +15,7 @@ const (
 	ClusterCheckRetries     = "cluster-check-retries"
 	ClusterCheckOkResponses = "cluster-check-ok-responses"
 
-	// Configuration
+	// Configuration.
 	Ip                 = "ip"
 	IpCreate           = "ip-create"
 	IpNetworkInterface = "ip-network-interface"
@@ -23,7 +23,7 @@ const (
 	EnableMDNS         = "enable-mdns"
 	ClusterName        = "cluster-name"
 
-	// Clean
+	// Clean.
 	StopContainers     = "stop-containers"
 	UnmountPaths       = "unmount-paths"
 	CleanCNI           = "clean-cni"
@@ -32,4 +32,8 @@ const (
 	CleanIPAddress     = "clean-ip-address"
 	CleanAll           = "clean-all"
 	CleanClusterConfig = "clean-cluster-config"
+
+	// Info.
+	OutputFormat      = "output-format"
+	OutputDestination = "output-destination"
 )

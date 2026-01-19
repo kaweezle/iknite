@@ -25,7 +25,6 @@ type MockExecutor struct {
 //   - A byte slice containing the command output.
 //   - An error if the command execution fails.
 func (m *MockExecutor) Run(combined bool, cmd string, arguments ...string) ([]byte, error) {
-
 	items := append(make([]any, 0), combined, cmd)
 	for _, arg := range arguments {
 		items = append(items, arg)
@@ -47,7 +46,12 @@ func (m *MockExecutor) Run(combined bool, cmd string, arguments ...string) ([]by
 // Returns:
 //   - A byte slice containing the command's output.
 //   - An error if the command execution fails.
-func (m *MockExecutor) Pipe(stdin io.Reader, combined bool, cmd string, arguments ...string) ([]byte, error) {
+func (m *MockExecutor) Pipe(
+	stdin io.Reader,
+	combined bool,
+	cmd string,
+	arguments ...string,
+) ([]byte, error) {
 	items := append(make([]any, 0), stdin, combined, cmd)
 	for _, arg := range arguments {
 		items = append(items, arg)

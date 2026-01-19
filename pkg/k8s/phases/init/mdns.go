@@ -1,14 +1,17 @@
 package init
 
+// cSpell: disable
 import (
 	"fmt"
 	"net"
 
 	"github.com/pion/mdns"
-	"github.com/pkg/errors"
+	log "github.com/sirupsen/logrus"
 	"golang.org/x/net/ipv4"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 )
+
+// cSpell: enable
 
 func NewMDnsPublishPhase() workflow.Phase {
 	return workflow.Phase{
@@ -32,21 +35,21 @@ func runMDnsPublish(c workflow.RunData) error {
 
 	addr, err := net.ResolveUDPAddr("udp", mdns.DefaultAddress)
 	if err != nil {
-		return errors.Wrap(err, "Cannot resolve default address")
+		return fmt.Errorf("cannot resolve default address: %w", err)
 	}
 
 	l, err := net.ListenUDP("udp4", addr)
 	if err != nil {
-		return errors.Wrap(err, "Cannot Listen on default address")
+		return fmt.Errorf("cannot listen on default address: %w", err)
 	}
 
 	var conn *mdns.Conn
-	fmt.Println("[mdns-publish] Starting the mdns responder...")
+	log.WithField("phase", "mdns-publish").Info("Starting the mdns responder...")
 	conn, err = mdns.Server(ipv4.NewPacketConn(l), &mdns.Config{
 		LocalNames: []string{ikniteConfig.DomainName},
 	})
 	if err != nil {
-		return errors.Wrap(err, "Cannot create server")
+		return fmt.Errorf("cannot create server: %w", err)
 	}
 	data.SetMDnsConn(conn)
 

@@ -19,12 +19,10 @@ package reset
 // cSpell:words klog cleanupservice
 // cSpell:disable
 import (
-	"fmt"
+	"errors"
 
-	"github.com/pkg/errors"
-
+	"github.com/sirupsen/logrus"
 	"k8s.io/klog/v2"
-
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	initSystem "k8s.io/kubernetes/cmd/kubeadm/app/util/initsystem"
@@ -32,7 +30,7 @@ import (
 
 // cSpell:enable
 
-// NewCleanupNodePhase creates a kubeadm workflow phase that cleanup the node
+// NewCleanupNodePhase creates a kubeadm workflow phase that cleanup the node.
 func NewCleanupServicePhase() workflow.Phase {
 	return workflow.Phase{
 		Name:    "cleanup-service",
@@ -55,21 +53,23 @@ func runCleanupService(c workflow.RunData) error {
 	}
 
 	// Try to stop the kubelet service
-	klog.V(1).Infoln("[reset] Getting init system")
-	initSystem, err := initSystem.GetInitSystem()
+	logrus.WithField("phase", "reset").Info("Getting the init system...")
+	osInitSystem, err := initSystem.GetInitSystem()
 	if err != nil {
-		klog.Warningln("[reset] The iknite service could not be stopped by kubeadm. Unable to detect a supported init system!")
+		klog.Warningln(
+			"[reset] The iknite service could not be stopped by kubeadm. Unable to detect a supported init system!",
+		)
 		klog.Warningln("[reset] Please ensure iknite is stopped manually")
-	} else {
-		if !r.DryRun() {
-			fmt.Println("[reset] Stopping the iknite service")
-			if err := initSystem.ServiceStop("iknite"); err != nil {
-				klog.Warningf("[reset] The iknite service could not be stopped by kubeadm: [%v]\n", err)
-				klog.Warningln("[reset] Please ensure iknite is stopped manually")
-			}
-		} else {
-			fmt.Println("[reset] Would stop the iknite service")
+		return nil //nolint:nilerr // TODO: return error?
+	}
+	if !r.DryRun() {
+		logrus.WithField("phase", "reset").Info("Stopping the iknite service...")
+		if err := osInitSystem.ServiceStop("iknite"); err != nil {
+			klog.Warningf("[reset] The iknite service could not be stopped by kubeadm: [%v]\n", err)
+			klog.Warningln("[reset] Please ensure iknite is stopped manually")
 		}
+	} else {
+		logrus.WithField("phase", "reset").Info("Would stop the iknite service")
 	}
 
 	return nil

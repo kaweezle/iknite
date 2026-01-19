@@ -1,0 +1,23 @@
+#cloud-config
+#cSpell:disable
+password: passw0rd
+chpasswd: { expire: False }
+ssh_pwauth: True
+ssh_authorized_keys:
+    - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGMa8HgZLBsVHVFln02BrPOfZIYlLHgoPjD78cQ+Zjeb antoinemartin@LAPTOP-VKHDD5JR
+
+write_files:
+    - path: /etc/iknite.d/iknite.yaml
+      owner: "root:root"
+      permissions: "0640"
+      defer: true
+      content: |
+          cluster:
+            ip: 192.168.99.2
+            create_ip: true
+            kubernetes_version: "1.34.3"
+            domain_name: iknite.local
+            network_interface: eth0
+            enable_mdns: true
+
+final_message: "The system is finally up, after $UPTIME seconds"

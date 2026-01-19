@@ -88,9 +88,20 @@ markdown_extensions:
   - pymdownx.tasklist:
       custom_checkbox: true
   - pymdownx.tilde
+  - sane_lists
 
 plugins:
-  - search
+  - search:
+      separator: '[\s\-,:!=\[\]()"`/]+|\.(?!\d)|&[lg]t;|(?!\b)(?=[A-Z][a-z])'
+  - git-revision-date-localized:
+      enable_creation_date: true
+      type: timeago
+      enable_git_follow: false
+  - git-authors
+  - mermaid2
+  - awesome-nav
+  - open-in-new-tab:
+      add_icon: false
   - glightbox:
       touchNavigation: true
       loop: false
@@ -105,17 +116,6 @@ plugins:
       background: white
       shadow: true
       manual: false
-  - git-revision-date-localized:
-      type: datetime
-  - build_plantuml:
-      render: local
-      bin_path: "hack/ci/plantuml.sh"
-      output_format: "png"
-      allow_multiple_roots: false
-      diagram_root: "docs/diagrams" # should reside under docs_dir
-      output_folder: "out"
-      input_folder: "src"
-      input_extensions: "plantuml"
 
 extra_css:
   - "css/termynal.css"
@@ -131,20 +131,33 @@ extra_javascript:
 ##############################################################################
 
 site_name: Iknite
-repo_url: https://github.com/kaweezle/iknite
+site_description: Documentation for Iknite - The Ultimate Kubernetes Development Environment bootstrapping tool.
+site_author: Antoine Martin
+site_url: https://iknite.app/
+
 repo_name: kaweezle/iknite
+repo_url: https://github.com/kaweezle/iknite
 edit_uri: edit/main/docs/
 
-copyright: Copyright &copy; Antoine Martin 2025. All rights reserved.
-license: Apache 2.0
+docs_dir: docs
+site_dir: site
+
 extra:
   social:
     - icon: fontawesome/brands/github
-      link: https://github.com/kaweezle/iknite
+      link: https://github.com/kaweezle
+      name: Kaweezle project on GitHub
+    - icon: fontawesome/solid/globe
+      link: https://mrtn.me
+      name: Antoine Martin's Website
 
-nav:
-  - Introduction:
-      - Welcome: README.md
-  - About:
-      - Contributing: CONTRIBUTING.md
-      - "Code of Conduct": CODE_OF_CONDUCT.md
+copyright: |
+  Copyright &copy; Antoine Martin 2025-2026. All rights reserved.
+  Distributed under the <a href="https://github.com/antoinemartin/PowerShell-Wsl-Manager/tree/main/LICENSE">Apache 2.0 license</a>.
+
+# nav:
+#   - Introduction:
+#       - Welcome: README.md
+#   - About:
+#       - Contributing: CONTRIBUTING.md
+#       - "Code of Conduct": CODE_OF_CONDUCT.md

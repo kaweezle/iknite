@@ -1,15 +1,18 @@
 package init
 
 import (
+	"errors"
+	"fmt"
 	"html/template"
 	"io"
 	"path/filepath"
 
-	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
-	"github.com/pkg/errors"
 	"github.com/spf13/afero"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
+
+	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
+	ikniteConfig "github.com/kaweezle/iknite/pkg/config"
 )
 
 func NewKubeVipControlPlanePhase() workflow.Phase {
@@ -25,29 +28,44 @@ func NewKubeVipControlPlanePhase() workflow.Phase {
 }
 
 func CreateKubeVipConfiguration(wr io.Writer, config *v1alpha1.IkniteClusterSpec) error {
-	template, err := template.New("config").Parse(kubeVipManifestTemplate)
+	if wr == nil {
+		return errors.New("writer cannot be nil")
+	}
+	manifestTemplate, err := template.New("config").Funcs(template.FuncMap{
+		"KubeVipImage": ikniteConfig.GetKubeVipImage,
+	}).Parse(kubeVipManifestTemplate)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to parse kube-vip manifest template: %w", err)
 	}
 
-	return template.Execute(wr, config)
+	if err := manifestTemplate.Execute(wr, config); err != nil {
+		return fmt.Errorf("failed to execute kube-vip manifest template: %w", err)
+	}
+	return nil
 }
 
-func WriteKubeVipConfiguration(fs afero.Fs, manifestDir string, config *v1alpha1.IkniteClusterSpec) (f afero.File, err error) {
+func WriteKubeVipConfiguration(
+	fs afero.Fs, manifestDir string, config *v1alpha1.IkniteClusterSpec,
+) (afero.File, error) {
 	afs := &afero.Afero{Fs: fs}
-	f, err = afs.Create(filepath.Join(manifestDir, "kube-vip.yaml"))
+	f, err := afs.Create(filepath.Join(manifestDir, "kube-vip.yaml"))
 	if err != nil {
-		return
+		return f, fmt.Errorf("failed to create kube-vip.yaml file: %w", err)
 	}
-	defer f.Close()
+	defer func() {
+		closeErr := f.Close()
+		if err == nil {
+			err = closeErr
+		} else if closeErr == nil {
+			closeErr = afs.Remove(f.Name())
+			if closeErr != nil {
+				err = errors.Join(err, fmt.Errorf("while removing file %s: %w", f.Name(), closeErr))
+			}
+		}
+	}()
 
 	err = CreateKubeVipConfiguration(f, config)
-	if err != nil {
-		f.Close()
-		afs.Remove(f.Name())
-		f = nil
-	}
-	return
+	return f, err
 }
 
 func runKubeVipControlPlane(c workflow.RunData) error {
@@ -57,10 +75,10 @@ func runKubeVipControlPlane(c workflow.RunData) error {
 	}
 
 	// Getting the cluster configuration
-	ikniteConfig := data.IkniteCluster().Spec
+	currentConfig := data.IkniteCluster().Spec
 
 	// Write the kube-vip configuration
-	_, err := WriteKubeVipConfiguration(afero.NewOsFs(), data.ManifestDir(), &ikniteConfig)
+	_, err := WriteKubeVipConfiguration(afero.NewOsFs(), data.ManifestDir(), &currentConfig)
 
 	return err
 }

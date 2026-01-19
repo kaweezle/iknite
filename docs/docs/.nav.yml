@@ -1,0 +1,25 @@
+# Navigation
+# TODO: Implement the following kind of navigation structure
+# nav:
+#   - Introduction:
+#       - Home: index.md
+#       - Quick Start: quick_start.md
+#       - Installation: installation.md
+#       - Features: features.md
+#   - Usage:
+#       - Basic Usage: usage/basic_usage.md
+#       - Advanced Usage: usage/advanced_usage.md
+#   - Configuration:
+#       - Configuration File: configuration/configuration_file.md
+#       - Settings Reference: configuration/settings_reference.md
+#   - Development:
+#       - Contributing: development/contributing.md
+#       - Code Structure: development/code_structure.md
+#   - FAQ: faq.md
+#   - Changelog: changelog.md
+nav:
+  - Introduction:
+      - Welcome: index.md
+  - About:
+      - Contributing: CONTRIBUTING.md
+      - "Code of Conduct": CODE_OF_CONDUCT.md

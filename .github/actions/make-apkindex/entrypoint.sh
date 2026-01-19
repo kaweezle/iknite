@@ -1,46 +1,49 @@
 #!/usr/bin/env sh
-
+# cSpell: words archs endgroup apkindex pubout
 set -e
 
 echo "::group::Setup"
 
-cd $GITHUB_WORKSPACE
+cd "$GITHUB_WORKSPACE"
 
-if [[ -z "$INPUT_APK_FILES" ]]; then
+if [ -z "$INPUT_APK_FILES" ]; then
     echo "No APK files given!"
     exit 1
 fi
 
-if  [[ -z "$INPUT_SIGNATURE_KEY_NAME" ]]; then
+if  [ -z "$INPUT_SIGNATURE_KEY_NAME" ]; then
     echo "No signature key name given!"
     exit 1
 fi
 
-if  [[ -z "$INPUT_SIGNATURE_KEY" ]]; then
+if  [ -z "$INPUT_SIGNATURE_KEY" ]; then
     echo "No signature key given!"
     exit 1
 else
     signature_file="/root/$INPUT_SIGNATURE_KEY_NAME"
+    # shellcheck disable=SC2059
     printf "$INPUT_SIGNATURE_KEY" > "$signature_file"
     # Makes signature file trusted
-    openssl rsa -in $signature_file -pubout -out "/etc/apk/keys/${INPUT_SIGNATURE_KEY_NAME}.pub"
+    openssl rsa -in "$signature_file" -pubout -out "/etc/apk/keys/${INPUT_SIGNATURE_KEY_NAME}.pub"
 fi
 
-if [[ -z "$INPUT_DESTINATION" ]]; then
+if [ -z "$INPUT_DESTINATION" ]; then
     echo "No destination given!"
     exit 1
 fi
 
+# shellcheck disable=SC2086
 files=$(ls -1 $INPUT_APK_FILES 2>/dev/null)
 files_count=$(echo "$files" | wc -l)
-if [[ "$files_count" -eq 0 ]]; then
+if [ "$files_count" -eq 0 ]; then
     echo "There are no apk files matching $INPUT_APK_FILES"
     exit 1
 fi
 
+# shellcheck disable=SC2086,SC2012
 archs=$(ls -1 $INPUT_APK_FILES 2>/dev/null | sed -E 's/^.*\.(.*)\.apk$/\1/g')
 archs_count=$(echo "$archs" | wc -l)
-if [[ "$archs_count" -eq 0 ]]; then
+if [ "$archs_count" -eq 0 ]; then
     echo "No architectures found in APK files: $files"
     exit 1
 fi
@@ -53,8 +56,8 @@ echo "::endgroup::"
 echo "::group::Creating repo in $INPUT_DESTINATION"
 
 
-rm -rf $INPUT_DESTINATION
-mkdir -p $INPUT_DESTINATION
+rm -rf "$INPUT_DESTINATION"
+mkdir -p "$INPUT_DESTINATION"
 
 for arch in $archs; do
     arch_directory="${INPUT_DESTINATION}/$arch"
@@ -62,6 +65,7 @@ for arch in $archs; do
     mkdir -p "$arch_directory"
 done
 
+# shellcheck disable=SC2116
 for file in $(echo "$files"); do
     file_basename=$(basename "$file")
     file_arch=$(echo "$file_basename" | sed -E 's/^.*\.(.*)\.apk$/\1/g')
@@ -85,5 +89,3 @@ for arch in $archs; do
 done
 
 echo "::endgroup::"
-
-

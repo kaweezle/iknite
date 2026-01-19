@@ -107,7 +107,7 @@ Some additional components are also installed:
 - [flannel](https://github.com/flannel-io/flannel) as the CNI (Common Network
   Interface) provider
 - [metrics-server](https://github.com/kubernetes-sigs/metrics-server) for
-  providing basic metrics to tools like K9s and for use by
+  providing basic metrics to tools like [K9s](https://k9scli.io/) and for use by
   [Horizontal Pod Autoscaling](https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/)
 - [MetalLB](https://metallb.universe.tf/) allowing to created a `LoadBalancer`
   service.

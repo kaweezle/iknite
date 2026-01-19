@@ -18,22 +18,23 @@ package cri
 // cSpell: disable
 import (
 	"encoding/json"
+	"fmt"
 	"time"
+
+	log "github.com/sirupsen/logrus"
+	"github.com/spf13/afero"
 
 	"github.com/kaweezle/iknite/pkg/constants"
 	"github.com/kaweezle/iknite/pkg/utils"
-	"github.com/pkg/errors"
-	log "github.com/sirupsen/logrus"
-	"github.com/spf13/afero"
 )
 
 // cSpell: enable
 
 type CRICondition struct {
 	Type    string `json:"type"`
-	Status  bool   `json:"status"`
 	Reason  string `json:"reason"`
 	Message string `json:"message"`
+	Status  bool   `json:"status"`
 }
 
 type CRIStatus struct {
@@ -44,45 +45,62 @@ type CRIStatusResponse struct {
 	Status CRIStatus `json:"status"`
 }
 
-var fs = afero.NewOsFs()
-var afs = &afero.Afero{Fs: fs}
+var (
+	fs  = afero.NewOsFs()
+	afs = &afero.Afero{Fs: fs}
+)
 
 func WaitForContainerService() (bool, error) {
 	retries := 3
-	for retries > 0 {
+	first := true
+	serviceIsReady := false
+	for ; retries > 0; retries-- {
+		if !first {
+			log.Debug("Waiting 2 seconds...")
+			time.Sleep(2 * time.Second)
+		}
+		first = false
+
 		exist, err := afs.Exists(constants.ContainerServiceSock)
 		if err != nil {
-			return false, errors.Wrapf(err, "Error while checking container service sock %s", constants.ContainerServiceSock)
+			return false, fmt.Errorf(
+				"error while checking container service sock %s: %w",
+				constants.ContainerServiceSock,
+				err,
+			)
 		}
-		if exist {
-			out, err := utils.Exec.Run(false, "/usr/bin/crictl", "--runtime-endpoint", "unix://"+constants.ContainerServiceSock, "info")
-			if err == nil {
-				log.Trace(string(out))
-				response := &CRIStatusResponse{}
-				err = json.Unmarshal(out, &response)
-				if err == nil {
-					conditions := 0
-					falseConditions := 0
-					for _, v := range response.Status.Conditions {
-						conditions += 1
-						if !v.Status {
-							falseConditions += 1
-						}
-					}
-					if conditions >= 2 && falseConditions == 0 {
-						break
-					}
-				} else {
-					log.WithError(err).Warn("Error while parsing crictl status")
+		if !exist {
+			log.Debugf(
+				"Container service sock %s does not exist yet",
+				constants.ContainerServiceSock,
+			)
+			continue
+		}
+		out, err := utils.Exec.Run(false, "/usr/bin/crictl", "--runtime-endpoint",
+			"unix://"+constants.ContainerServiceSock, "info")
+		if err != nil {
+			log.WithError(err).Warn("Error while checking container service sock")
+			continue
+		}
+		log.Trace(string(out))
+		response := &CRIStatusResponse{}
+		err = json.Unmarshal(out, &response)
+		if err == nil {
+			conditions := 0
+			falseConditions := 0
+			for _, v := range response.Status.Conditions {
+				conditions += 1
+				if !v.Status {
+					falseConditions += 1
 				}
-			} else {
-				log.WithError(err).Warn("Error while checking container service sock")
 			}
+			if conditions >= 2 && falseConditions == 0 {
+				serviceIsReady = true
+				break
+			}
+		} else {
+			log.WithError(err).Warn("Error while parsing crictl status")
 		}
-		retries = retries - 1
-
-		log.Debug("Waiting 2 seconds...")
-		time.Sleep(2 * time.Second)
 	}
-	return retries > 0, nil
+	return serviceIsReady, nil
 }

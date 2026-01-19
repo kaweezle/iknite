@@ -16,24 +16,24 @@ limitations under the License.
 package cmd
 
 import (
+	"fmt"
 	"net"
 	"os"
+
+	"github.com/pion/mdns"
+	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
+	"golang.org/x/net/ipv4"
 
 	"github.com/kaweezle/iknite/pkg/cmd/options"
 	"github.com/kaweezle/iknite/pkg/config"
 	"github.com/kaweezle/iknite/pkg/constants"
 	"github.com/kaweezle/iknite/pkg/utils"
-	"github.com/pion/mdns"
-	"github.com/pkg/errors"
-	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
-	"golang.org/x/net/ipv4"
 )
 
 func NewMdnsCmd() *cobra.Command {
-
 	// configureCmd represents the start command
-	var mdnsCmd = &cobra.Command{
+	mdnsCmd := &cobra.Command{
 		Use:   "mdns",
 		Short: "Publish cluster hostname through mdns",
 		Long: `On WSL, publishing the localhost over mdns allows avoiding messing
@@ -55,21 +55,23 @@ It assumes that mDNS is not use elsewhere inside WSL.
 	return mdnsCmd
 }
 
-func mdnsPersistentPreRun(cmd *cobra.Command, args []string) {
-	viper.BindPFlag(config.DomainName, cmd.Flags().Lookup(options.DomainName))
+func mdnsPersistentPreRun(cmd *cobra.Command, _ []string) {
+	_ = viper.BindPFlag( //nolint:errcheck // flag exists
+		config.DomainName,
+		cmd.Flags().Lookup(options.DomainName),
+	)
 }
 
-func performMdns(cmd *cobra.Command, args []string) {
-
+func performMdns(_ *cobra.Command, _ []string) {
 	addr, err := net.ResolveUDPAddr("udp", mdns.DefaultAddress)
-	cobra.CheckErr(errors.Wrap(err, "Cannot resolve default address"))
+	cobra.CheckErr(fmt.Errorf("cannot resolve default address: %w", err))
 
 	l, err := net.ListenUDP("udp4", addr)
-	cobra.CheckErr(errors.Wrap(err, "Cannot Listen on default address"))
+	cobra.CheckErr(fmt.Errorf("cannot listen on default address: %w", err))
 
 	_, err = mdns.Server(ipv4.NewPacketConn(l), &mdns.Config{
 		LocalNames: []string{viper.GetString(config.DomainName)},
 	})
-	cobra.CheckErr(errors.Wrap(err, "Cannot create server"))
+	cobra.CheckErr(fmt.Errorf("cannot create server: %w", err))
 	select {}
 }

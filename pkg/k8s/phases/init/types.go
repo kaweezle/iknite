@@ -4,9 +4,10 @@ import (
 	"context"
 	"os/exec"
 
-	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
 	"github.com/pion/mdns"
 	initPhases "k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/init"
+
+	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
 )
 
 type IkniteInitData interface {

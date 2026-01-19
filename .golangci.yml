@@ -1,0 +1,186 @@
+# cSpell: disable
+version: "2"
+
+run:
+  timeout: 5m
+  tests: true
+  build-tags: []
+  modules-download-mode: readonly
+
+output:
+  sort-order:
+    - file
+  formats:
+    text:
+      print-issued-lines: true
+      print-linter-name: true
+      colors: true
+
+formatters:
+  enable:
+    - goimports
+    - gci
+    - gofmt
+    - gofumpt
+    - golines
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/kaweezle/iknite
+    gci:
+      sections:
+        - standard
+        - default
+        - prefix(github.com/kaweezle/iknite)
+
+linters:
+  enable:
+    - asasalint
+    - asciicheck
+    - bidichk
+    - bodyclose
+    - containedctx
+    - contextcheck
+    - copyloopvar
+    - decorder
+    - dogsled
+    - dupl
+    - dupword
+    - durationcheck
+    - errcheck
+    - errchkjson
+    - errname
+    - errorlint
+    - exhaustive
+    - forbidigo
+    - forcetypeassert
+    - gocheckcompilerdirectives
+    # Not ready yet for this one
+    # - gochecknoglobals
+    - gochecknoinits
+    - gocognit
+    - goconst
+    - gocritic
+    - gocyclo
+    - godot
+    # Reports TODOs in code
+    # - godox
+    - goheader
+    - gomoddirectives
+    - gomodguard
+    - goprintffuncname
+    - gosec
+    - govet
+    - grouper
+    - importas
+    - ineffassign
+    - interfacebloat
+    - lll
+    - loggercheck
+    - makezero
+    - misspell
+    - nakedret
+    - nestif
+    - nilerr
+    - nilnil
+    - noctx
+    - nolintlint
+    - nonamedreturns
+    - nosprintfhostport
+    - paralleltest
+    - prealloc
+    - predeclared
+    - promlinter
+    - reassign
+    - revive
+    - staticcheck
+    - testableexamples
+    - testpackage
+    - thelper
+    - tparallel
+    - unconvert
+    - unparam
+    - unused
+    - usestdlibvars
+    - wastedassign
+    - whitespace
+    - wrapcheck
+
+  settings:
+    errcheck:
+      check-type-assertions: true
+      check-blank: true
+
+    govet:
+      enable-all: true
+
+    gocyclo:
+      min-complexity: 15
+
+    dupl:
+      threshold: 100
+
+    goconst:
+      min-len: 3
+      min-occurrences: 3
+
+    misspell:
+      locale: US
+
+    lll:
+      line-length: 120
+      tab-width: 1
+
+    gocritic:
+      disabled-checks:
+        - unnamedResult
+
+      enabled-tags:
+        - diagnostic
+        - experimental
+        - opinionated
+        - performance
+        - style
+
+    revive:
+      rules:
+        - name: unexported-return
+          disabled: false
+        - name: unused-parameter
+          disabled: false
+
+    gosec:
+      excludes:
+        - G104
+
+    nolintlint:
+      allow-unused: false
+      allow-no-explanation: []
+      require-explanation: true
+      require-specific: true
+
+    godot:
+      period: true
+      capital: true
+      check-all: false
+
+    interfacebloat:
+      max: 15
+
+  exclusions:
+    rules:
+      - linters:
+          - godot
+        source: "^// cSpell:"
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
+  # exclude-rules:
+  #   - path: _test\.go
+  #     linters:
+  #       - dupl
+  #       - gosec
+  #       - gocyclo
+  #       - errcheck
+  #       - forcetypeassert

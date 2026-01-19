@@ -16,12 +16,27 @@ build/
 # vendor/
 
 dist/
+*.rsa
 gpg_key.asc
-kaweezle-devel@kaweezle.com-c9d89864.rsa.pub
 
 *-tls.yaml
 
 .vscode/*.log
 .venv/
+.env
 
-iknite
+/iknite
+packages/
+rootfs/*.apk
+
+.terraform/
+.terragrunt-cache/
+*.dec.sops.yaml
+*.rootfs.tar.gz
+*.rootfs.tar
+
+*.qcow2
+*.vhdx
+*.iso
+*.log
+support/apk/iknite-images/*

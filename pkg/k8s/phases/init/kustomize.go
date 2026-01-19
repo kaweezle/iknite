@@ -4,14 +4,13 @@ package init
 import (
 	"fmt"
 
-	"github.com/kaweezle/iknite/pkg/config"
-	"github.com/kaweezle/iknite/pkg/constants"
-	"github.com/kaweezle/iknite/pkg/k8s"
-	"github.com/pkg/errors"
+	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 
-	log "github.com/sirupsen/logrus"
+	"github.com/kaweezle/iknite/pkg/config"
+	"github.com/kaweezle/iknite/pkg/constants"
+	"github.com/kaweezle/iknite/pkg/k8s"
 )
 
 // cSpell: enable
@@ -38,14 +37,18 @@ func runKustomize(c workflow.RunData) error {
 		"kustomization": ikniteConfig.Kustomization,
 	}).Info("Performing kustomize configuration")
 
-	config, err := k8s.LoadFromDefault()
+	k8sConfig, err := k8s.LoadFromDefault()
 	if err != nil {
-		return errors.Wrap(err, "failed to load configuration")
+		return fmt.Errorf("failed to load configuration: %w", err)
 	}
 	// TODO: This probably should be elsewhere
-	err = config.RenameConfig(ikniteConfig.ClusterName).WriteToFile(constants.KubernetesRootConfig)
+	err = k8sConfig.RenameConfig(ikniteConfig.ClusterName).
+		WriteToFile(constants.KubernetesRootConfig)
 	if err != nil {
-		return errors.Wrap(err, "failed to write configuration")
+		return fmt.Errorf("failed to write configuration: %w", err)
 	}
-	return config.DoKustomization(ikniteConfig.Ip, ikniteConfig.Kustomization, force_config, 0)
+	if err := k8sConfig.DoKustomization(ikniteConfig.Ip, ikniteConfig.Kustomization, force_config, 0); err != nil {
+		return fmt.Errorf("failed to apply kustomization: %w", err)
+	}
+	return nil
 }

@@ -1,0 +1,129 @@
+# Pre-commit hooks configuration
+# Install hooks locally with:
+#   pip install pre-commit  # or pipx install pre-commit
+#   pre-commit install
+# Run on all files:
+#   pre-commit run --all-files
+
+repos:
+  # General, language-agnostic sanity checks
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: check-yaml
+        args: ["--unsafe"]
+      - id: end-of-file-fixer
+        # exclude: |
+        #   (?x)^(
+        #       docs/examples/Dockerfile
+        #   )$
+      - id: trailing-whitespace
+      - id: mixed-line-ending
+        args: ["--fix=lf"]
+        # exclude: |
+        #   (?x)^(
+        #       .*\.sh |
+        #       .*\.zsh |
+        #       Dockerfile
+        #   )$
+      - id: check-merge-conflict
+      - id: detect-private-key
+      - id: check-added-large-files
+        args: ["--maxkb=10240"] # 10 MB
+
+  - repo: https://gitlab.com/bmares/check-json5
+    rev: v1.0.0
+    hooks:
+      - id: check-json5
+
+  # Spell checking via cspell
+  - repo: https://github.com/streetsidesoftware/cspell-cli
+    rev: v9.2.0
+    hooks:
+      - id: cspell
+        name: cspell (Spelling)
+        language_version: system
+        args:
+          - "--no-progress"
+          - "--relative"
+          - "--gitignore"
+          - "--no-must-find-files"
+          - "--config"
+          - "cspell.json"
+        additional_dependencies:
+          - "@cspell/dict-bash@latest"
+          - "@cspell/dict-docker@latest"
+          - "@cspell/dict-golang@latest"
+          - "@cspell/dict-terraform@latest"
+          - "@cspell/dict-software-terms@latest"
+        # Limit to text-like files; binaries are skipped automatically
+        types_or: ["text"]
+        exclude: |
+          (?x)^(
+              docs/docs/assets/.* |
+              ^.gitignore |
+              ^.git/.* |
+              ^.github/.* |
+              .vscode/.* |
+              ^dist/.* |
+              ^release/.* |
+              .*\.sops\.yaml$|
+              .*\rc\.conf$|
+              .*\.(png|jpg|jpeg|gif|svg|ico|zip|gz|xz|7z|tar|nupkg)$
+          )$
+
+  # golangci-lint for Go files
+  - repo: https://github.com/golangci/golangci-lint
+    rev: v2.7.2
+    hooks:
+      - id: golangci-lint-config-verify
+      - id: golangci-lint
+      - id: golangci-lint-fmt
+
+  - repo: https://github.com/shellcheck-py/shellcheck-py
+    rev: v0.11.0.1
+    hooks:
+      - id: shellcheck
+        args: ["--exclude=SC3014,SC3043"] # Ignore source-related warnings
+        exclude: |
+          (?x)^(
+              rootfs/p10k.zsh
+          )$
+
+  - repo: https://github.com/antonbabenko/pre-commit-terraform
+    rev: v1.105.0
+    hooks:
+      - id: terraform_fmt
+      - id: terraform_docs
+        args:
+          - --args=--hide providers
+      # - id: terraform_trivy
+      # - id: terraform_validate
+      #   args:
+      #     - --args=-json
+      #     - --args=-no-color
+      - id: terraform_tflint
+      - id: terragrunt_validate_inputs
+        args:
+          - --hook-config=--parallelism-ci-cpu-cores=1
+          - --hook-config=--parallelism-limit=1
+        files: |
+          (?x)^(
+              support/iac/iknite/.*/terragrunt\.hcl
+          )$
+        exclude: \.terraform/.*$
+      - id: terragrunt_validate
+        args:
+          - --hook-config=--parallelism-ci-cpu-cores=1
+          - --hook-config=--parallelism-limit=1
+        files: |
+          (?x)^(
+              support/iac/iknite/.*/terragrunt\.hcl
+          )$
+        exclude: \.terraform/.*$
+
+# Global exclusions for all hooks
+exclude: |
+  ^docs/docs/assets/|
+  ^.git/|
+  .*\.(png|jpg|jpeg|gif|svg|ico|zip|gz|xz|7z|tar|nupkg)$
