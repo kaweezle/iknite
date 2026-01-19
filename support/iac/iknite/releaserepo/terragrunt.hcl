@@ -28,7 +28,7 @@ inputs = {
     "apkrepo" = {
       name                = "iknitestatic"
       static_content_path = "${get_repo_root()}/dist/repo"
-      destination_prefix  = "test/"
+      destination_prefix  = "release/"
     }
   }
 }

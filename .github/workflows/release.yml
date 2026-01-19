@@ -12,6 +12,7 @@ env:
   tg_version: "0.97.2"
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository_owner }}/iknite
+  IKNITE_REPO_NAME: ${{ (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) && 'release' || 'test' }}
 
 jobs:
   goreleaser-snapshot:
@@ -21,7 +22,6 @@ jobs:
     outputs:
       KUBERNETES_VERSION: ${{ steps.import-signing-key.outputs.KUBERNETES_VERSION }}
       IKNITE_VERSION: ${{ steps.get-iknite-version.outputs.IKNITE_VERSION }}
-      IKNITE_LAST_TAG: ${{ steps.get-iknite-version.outputs.IKNITE_LAST_TAG }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -37,7 +37,6 @@ jobs:
         run: |
           echo -e "$GPG_PRIVATE_KEY" > kaweezle-devel@kaweezle.com-c9d89864.rsa
           chmod 600 kaweezle-devel@kaweezle.com-c9d89864.rsa
-          openssl rsa -in kaweezle-devel@kaweezle.com-c9d89864.rsa -pubout -out kaweezle-devel@kaweezle.com-c9d89864.rsa.pub
           mkdir -p ~/.ssh && chmod 700 ~/.ssh
           cp kaweezle-devel@kaweezle.com-c9d89864.rsa ~/.ssh/id_rsa
           mkdir -p ~/.config/sops/age
@@ -52,20 +51,26 @@ jobs:
           AGE_PRIVATE_KEY: ${{ secrets.AGE_PRIVATE_KEY }}
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v5
+        if: github.event_name == 'pull_request'
         with:
           version: "~> v2"
           args: --snapshot --skip=publish --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Run GoReleaser
+        uses: goreleaser/goreleaser-action@v5
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+        with:
+          version: "~> v2"
+          args: release --skip=publish --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Get iknite version
         id: get-iknite-version
         run: |
           IKNITE_VERSION=$(jq -Mr ".version" dist/metadata.json)
-          IKNITE_LAST_TAG=$(jq -Mr ".tag" dist/metadata.json)
           echo "IKNITE_VERSION=$IKNITE_VERSION" >> $GITHUB_ENV
           echo "IKNITE_VERSION=$IKNITE_VERSION" >> $GITHUB_OUTPUT
-          echo "IKNITE_LAST_TAG=$IKNITE_LAST_TAG" >> $GITHUB_ENV
-          echo "IKNITE_LAST_TAG=$IKNITE_LAST_TAG" >> $GITHUB_OUTPUT
       - name: Build iknite images APK
         run: |
           echo "KUBERNETES_VERSION: ${KUBERNETES_VERSION}" > support/apk/.env
@@ -112,8 +117,6 @@ jobs:
           signature_key_name: kaweezle-devel@kaweezle.com-c9d89864.rsa
           destination: dist/repo
       - name: Upload APK repo
-        env:
-          IKNITE_APKREPO_DESTINATION_PREFIX: ${{ (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) && 'release/' || 'test/' }}
         run: |
           echo "::group::Instaling tenv"
           TENV_LATEST_VERSION=$(curl --silent https://api.github.com/repos/tofuutils/tenv/releases/latest | jq -r .tag_name)
@@ -129,7 +132,7 @@ jobs:
           echo "::group::Running terragrunt module"
           export TF_PLUGIN_CACHE_DIR="$HOME/.cache/terraform/plugin-cache"
           mkdir -p $TF_PLUGIN_CACHE_DIR
-          cd support/iac/iknite/testrepo
+          cd support/iac/iknite/${IKNITE_REPO_NAME}repo
           terragrunt init
           terragrunt apply -auto-approve
           echo "::endgroup::"
@@ -141,7 +144,6 @@ jobs:
     env:
       KUBERNETES_VERSION: ${{ needs.goreleaser-snapshot.outputs.KUBERNETES_VERSION }}
       IKNITE_VERSION: ${{ needs.goreleaser-snapshot.outputs.IKNITE_VERSION }}
-      IKNITE_LAST_TAG: ${{ needs.goreleaser-snapshot.outputs.IKNITE_LAST_TAG }}
     permissions:
       contents: read
       packages: write
@@ -188,9 +190,8 @@ jobs:
           mkdir -p /tmp/.buildx-cache-new
           echo "::group::Building iknite-rootfs-base:${IKNITE_VERSION}"
           docker buildx build \
-             --build-arg IKNITE_REPO_URL=https://static.iknite.app/test/ \
+             --build-arg IKNITE_REPO_URL=https://static.iknite.app/${IKNITE_REPO_NAME}/ \
              --build-arg IKNITE_VERSION=$IKNITE_VERSION \
-             --build-arg IKNITE_LAST_TAG=$IKNITE_LAST_TAG \
              --build-arg KUBERNETES_VERSION=${KUBERNETES_VERSION} \
              --cache-from type=local,src=/tmp/.buildx-cache \
              --cache-to type=local,dest=/tmp/.buildx-cache-new \
@@ -244,7 +245,6 @@ jobs:
     env:
       KUBERNETES_VERSION: ${{ needs.goreleaser-snapshot.outputs.KUBERNETES_VERSION }}
       IKNITE_VERSION: ${{ needs.goreleaser-snapshot.outputs.IKNITE_VERSION }}
-      IKNITE_LAST_TAG: ${{ needs.goreleaser-snapshot.outputs.IKNITE_LAST_TAG }}
     steps:
       - uses: actions/checkout@v4
 
@@ -332,7 +332,6 @@ jobs:
     env:
       KUBERNETES_VERSION: ${{ needs.goreleaser-snapshot.outputs.KUBERNETES_VERSION }}
       IKNITE_VERSION: ${{ needs.goreleaser-snapshot.outputs.IKNITE_VERSION }}
-      IKNITE_LAST_TAG: ${{ needs.goreleaser-snapshot.outputs.IKNITE_LAST_TAG }}
     permissions:
       contents: write
       packages: write
@@ -346,12 +345,11 @@ jobs:
       - name: Prepare release files
         run: |
           ls -Rl
-          mkdir -p dist
-          mv packages/* dist/
-          mv rootfs/* dist/
-          mv vm-images/* dist/
-          mv dist/iknite.rootfs.tar.gz dist/iknite-${IKNITE_VERSION}-${KUBERNETES_VERSION}.rootfs.tar.gz
-          (cd dist && sha256sum *.vhdx *.qcow2 *.tar.gz *.apk > SHA256SUMS)
+          mkdir -p release
+          mv packages/iknite-*.apk release/
+          mv rootfs/rootfs/iknite.rootfs.tar.gz release/iknite-${IKNITE_VERSION}-${KUBERNETES_VERSION}.rootfs.tar.gz
+          mv vm-images/* release/
+          (cd release && sha256sum *.vhdx *.qcow2 *.tar.gz *.apk > SHA256SUMS)
 
       - name: Create the GitHub Release (draft)
         uses: softprops/action-gh-release@v2
@@ -360,9 +358,6 @@ jobs:
           generate_release_notes: true
           body_path: RELEASE.md
           files: |
-            dist/*.apk
-            dist/*.rootfs.tar.gz
-            dist/*.vhdx
-            dist/*.qcow2
-            dist/SHA256SUMS
+            release/*
             Get-Iknite.ps1
+            rootfs/*.rsa.pub

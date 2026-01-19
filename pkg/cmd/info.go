@@ -76,6 +76,7 @@ func NewInfoCmd(ikniteConfig *v1alpha1.IkniteClusterSpec) *cobra.Command {
 	)
 
 	infoCmd.AddCommand(NewImagesCmd(ikniteConfig))
+	infoCmd.AddCommand(NewVersionsCmd())
 
 	return infoCmd
 }
@@ -90,6 +91,29 @@ func NewImagesCmd(ikniteConfig *v1alpha1.IkniteClusterSpec) *cobra.Command {
 		},
 	}
 	return imagesCmd
+}
+
+func NewVersionsCmd() *cobra.Command {
+	versionsCmd := &cobra.Command{
+		Use:   "versions",
+		Short: "Displays version information",
+		Long:  `Displays version information about iknite build.`,
+		Run: func(_ *cobra.Command, _ []string) {
+			fmt.Printf( //nolint:forbidigo // printing is expected here
+				"Iknite Version: %s\n"+
+					"Commit: %s\n"+
+					"Build Date: %s\n"+
+					"Built By: %s\n"+
+					"Default Kubernetes Version: %s\n",
+				IkniteVersion,
+				Commit,
+				BuildDate,
+				BuiltBy,
+				v1alpha1.KubernetesVersionDefault,
+			)
+		},
+	}
+	return versionsCmd
 }
 
 func performInfo(ikniteConfig *v1alpha1.IkniteClusterSpec) {

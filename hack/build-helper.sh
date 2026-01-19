@@ -3,7 +3,8 @@
 # cSpell: words nerdctl doas chainguard apks rootfull krmfn krmfnbuiltin apkrepo apkindex tenv testrepo qcow2 vhdx gsub
 
 set -e
-export IKNITE_REPO_URL=https://static.iknite.app/test/
+IKNITE_REPO_NAME="test"
+export IKNITE_REPO_NAME
 
 ROOT_DIR=$(cd "$(dirname "$0")/.." && pwd)
 
@@ -14,6 +15,7 @@ ROOTFULL=true
 SUDO_CMD=""
 BUILDKIT_NAMESPACE="k8s.io"
 CACHE_FLAG="--no-cache"
+SNAPSHOT="--snapshot"
 TF_VERSION="1.14.3"
 TG_VERSION="0.97.2"
 
@@ -63,6 +65,7 @@ OPTIONS:
     --skip-<step>       Skip a specific step
     --only-<step>       Run only the specified step (skip all others)
     --with-cache        Use cache for docker build (default: no cache)
+    --release           Build release version (default: snapshot)
 
 STEPS:
     goreleaser          Build Iknite package with goreleaser
@@ -73,12 +76,11 @@ STEPS:
     rootfs-image        Build final rootfs image
     fetch-krmfnbuiltin  Fetch krmfnbuiltin APKs
     make-apk-repo       Create APK repository in dist/repo
-    upload-repo         Upload APK repository to IKNITE_REPO_URL
+    upload-repo         Upload APK repository to https://static.iknite.app/<repo>/
     vm-image            Build VM images (qcow2, vhdx)
     clean               Cleanup temporary files
 
 ENVIRONMENT VARIABLES:
-    IKNITE_REPO_URL     APK repository URL (default: $IKNITE_REPO_URL)
     KUBERNETES_VERSION  Kubernetes version (default: $KUBERNETES_VERSION)
     KEY_NAME            Signing key file name (default: $KEY_NAME)
 
@@ -159,6 +161,12 @@ while [ $# -gt 0 ]; do
             CACHE_FLAG=""
             shift
             ;;
+        --release)
+            SNAPSHOT=""
+            IKNITE_REPO_NAME="release"
+            export IKNITE_REPO_NAME
+            shift
+            ;;
         *)
             error "Unknown option: $1"
             usage
@@ -197,7 +205,7 @@ fi
 
 if should_run_step "goreleaser"; then
     step "Building Iknite package..."
-    goreleaser --skip=publish --snapshot --clean
+    goreleaser release --skip=publish $SNAPSHOT --clean
 else
     skip "Building Iknite package"
 fi
@@ -270,31 +278,8 @@ else
     fi
 fi
 
-IKNITE_LAST_TAG=$(jq -Mr ".tag" dist/metadata.json)
 IKNITE_VERSION=$(jq -Mr ".version" dist/metadata.json)
-export IKNITE_LAST_TAG
 export IKNITE_VERSION
-
-IKNITE_ROOTFS_BASE="iknite-rootfs-base:${IKNITE_VERSION}"
-if should_run_step "build"; then
-    step "Building Iknite rootfs base image..."
-
-    rm -f rootfs/iknite.rootfs.tar.gz rootfs/*.apk || /bin/true
-    cp "dist/iknite-${IKNITE_VERSION}.$(uname -m).apk" rootfs/
-    cp "dist/krmfnbuiltin-${KRMFN_LATEST_VERSION#v}.$(uname -m).apk" rootfs/
-
-    $SUDO_CMD buildctl build \
-                 --frontend dockerfile.v0 \
-                 --local context=rootfs \
-                 --local dockerfile=rootfs \
-                 --opt "build-arg:IKNITE_REPO_URL=$IKNITE_REPO_URL" \
-                 --opt "build-arg:IKNITE_VERSION=$IKNITE_VERSION" \
-                 --opt "build-arg:IKNITE_LAST_TAG=$IKNITE_LAST_TAG" \
-                 $CACHE_FLAG \
-                 --output "type=image,name=${IKNITE_ROOTFS_BASE},push=false"
-else
-    skip "Building Iknite rootfs base image"
-fi
 
 if should_run_step "images"; then
     step "Building Iknite images package..."
@@ -322,6 +307,57 @@ if should_run_step "images"; then
     for f in *.apk; do mv "$f" "../$(echo "$f" | sed 's/\-r0.apk$//').$(uname -m).apk"; done)
 else
     skip "Building Iknite images package"
+fi
+
+if should_run_step make-apk-repo; then
+    step "Creating APK repository in dist/repo..."
+    rm -rf dist/repo || /bin/true
+    mkdir -p dist/repo
+
+    INPUT_APK_FILES="dist/*.apk" \
+    INPUT_DESTINATION="dist/repo" \
+    INPUT_SIGNATURE_KEY_NAME="$KEY_NAME" \
+    INPUT_SIGNATURE_KEY="$(cat "$KEY_NAME")" \
+    GITHUB_WORKSPACE=$(pwd) \
+    .github/actions/make-apkindex/entrypoint.sh
+else
+    skip "Creating APK repository in dist/repo"
+fi
+
+if should_run_step upload-repo; then
+    step "Uploading APK repository to Iknite repo URL..."
+
+    tenv tf install $TF_VERSION
+    tenv tg install $TG_VERSION
+
+    export TF_PLUGIN_CACHE_DIR="$HOME/.cache/terraform/plugin-cache"
+    mkdir -p "$TF_PLUGIN_CACHE_DIR"
+    (cd "support/iac/iknite/${IKNITE_REPO_NAME}repo" && \
+          terragrunt init && \
+          terragrunt apply -auto-approve )
+else
+    skip "Uploading APK repository to Iknite repo URL"
+fi
+
+
+IKNITE_ROOTFS_BASE="iknite-rootfs-base:${IKNITE_VERSION}"
+if should_run_step "build"; then
+    step "Building Iknite rootfs base image..."
+
+    rm -f rootfs/iknite.rootfs.tar.gz rootfs/*.apk || /bin/true
+    cp "dist/iknite-${IKNITE_VERSION}.$(uname -m).apk" rootfs/
+    cp "dist/krmfnbuiltin-${KRMFN_LATEST_VERSION#v}.$(uname -m).apk" rootfs/
+
+    $SUDO_CMD buildctl build \
+                 --frontend dockerfile.v0 \
+                 --local context=rootfs \
+                 --local dockerfile=rootfs \
+                 --opt "build-arg:IKNITE_REPO_URL=https://static.iknite.app/${IKNITE_REPO_NAME}/" \
+                 --opt "build-arg:IKNITE_VERSION=$IKNITE_VERSION" \
+                 $CACHE_FLAG \
+                 --output "type=image,name=${IKNITE_ROOTFS_BASE},push=false"
+else
+    skip "Building Iknite rootfs base image"
 fi
 
 IKNITE_IMAGES_APK="iknite-images-${KUBERNETES_VERSION}.$(uname -m).apk"
@@ -365,36 +401,6 @@ if should_run_step "rootfs-image"; then
                  --output "type=image,name=${IKNITE_ROOTFS_IMAGE},push=false"
 else
     skip "Building Iknite rootfs image"
-fi
-
-if should_run_step make-apk-repo; then
-    step "Creating APK repository in dist/repo..."
-    rm -rf dist/repo || /bin/true
-    mkdir -p dist/repo
-
-    INPUT_APK_FILES="dist/*.apk" \
-    INPUT_DESTINATION="dist/repo" \
-    INPUT_SIGNATURE_KEY_NAME="$KEY_NAME" \
-    INPUT_SIGNATURE_KEY="$(cat "$KEY_NAME")" \
-    GITHUB_WORKSPACE=$(pwd) \
-    .github/actions/make-apkindex/entrypoint.sh
-else
-    skip "Creating APK repository in dist/repo"
-fi
-
-if should_run_step upload-repo; then
-    step "Uploading APK repository to Iknite repo URL..."
-
-    tenv tf install $TF_VERSION
-    tenv tg install $TG_VERSION
-
-    export TF_PLUGIN_CACHE_DIR="$HOME/.cache/terraform/plugin-cache"
-    mkdir -p "$TF_PLUGIN_CACHE_DIR"
-    (cd support/iac/iknite/testrepo && \
-          terragrunt init && \
-          terragrunt apply -auto-approve )
-else
-    skip "Uploading APK repository to Iknite repo URL"
 fi
 
 if should_run_step vm-image; then

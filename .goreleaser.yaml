@@ -20,9 +20,11 @@ builds:
     flags:
       - -trimpath
     ldflags:
-      - -s -w -X main.version={{.Version}} -X main.commit={{.Commit}} -X
-        main.date={{ .CommitDate }} -X main.builtBy=pterm -X
-        github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1.KubernetesVersionDefault={{ .Env.KUBERNETES_VERSION }}
+      - -s -w -X github.com/kaweezle/iknite/pkg/cmd.IkniteVersion={{ .Version }}
+        -X github.com/kaweezle/iknite/pkg/cmd.Commit={{ .Commit }} -X
+        github.com/kaweezle/iknite/pkg/cmd.BuildDate={{ .CommitDate }}
+        -X github.com/kaweezle/iknite/pkg/cmd.BuiltBy=goreleaser
+        -X github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1.KubernetesVersionDefault={{ .Env.KUBERNETES_VERSION }}
     binary: iknite
     id: iknite
 archives:
@@ -108,4 +110,4 @@ nfpms:
         key_name: kaweezle-devel@kaweezle.com-c9d89864.rsa.pub
 release:
   extra_files:
-    - glob: ./kaweezle-devel@kaweezle.com-c9d89864.rsa.pub
+    - glob: ./rootfs/kaweezle-devel@kaweezle.com-c9d89864.rsa.pub

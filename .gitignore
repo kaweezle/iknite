@@ -18,7 +18,6 @@ build/
 dist/
 *.rsa
 gpg_key.asc
-kaweezle-devel@kaweezle.com-c9d89864.rsa.pub
 
 *-tls.yaml
 

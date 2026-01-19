@@ -2,10 +2,8 @@
 FROM alpine:3.23
 
 ARG IKNITE_VERSION=0.5.3-devel
-ARG IKNITE_LAST_TAG=v0.2.4
-ARG IKNITE_REPO_URL=https://static.iknite.app/test/
+ARG IKNITE_REPO_URL=https://static.iknite.app/release/
 ARG IKNITE_KEY_NAME=kaweezle-devel@kaweezle.com-c9d89864.rsa.pub
-ARG IKNITE_BASE_URL=https://github.com/kaweezle/iknite/releases/download
 ARG KUBERNETES_VERSION=1.34.3
 
 # Add the dependencies
@@ -13,7 +11,7 @@ RUN --mount=type=bind,target=/apks  \
     echo "https://dl-cdn.alpinelinux.org/alpine/edge/community/" >> /etc/apk/repositories && \
     echo "https://dl-cdn.alpinelinux.org/alpine/edge/testing/" >> /etc/apk/repositories && \
     echo "${IKNITE_REPO_URL}" >> /etc/apk/repositories && \
-    wget -O /etc/apk/keys/${IKNITE_KEY_NAME} "${IKNITE_BASE_URL}/${IKNITE_LAST_TAG}/${IKNITE_KEY_NAME}" && \
+    install -m 644 -o root -g root /apks/${IKNITE_KEY_NAME} /etc/apk/keys/${IKNITE_KEY_NAME} && \
     apk update --quiet && \
     apk add --no-progress --no-cache openrc zsh nerdctl openssh && \
     apk add --no-progress --no-cache /apks/iknite-${IKNITE_VERSION}.$(uname -m).apk /apks/krmfnbuiltin-*.$(uname -m).apk && \

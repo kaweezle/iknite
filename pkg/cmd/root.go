@@ -33,9 +33,13 @@ import (
 // cSpell: enable
 
 var (
-	cfgFile  string
-	v        string
-	jsonLogs bool
+	cfgFile       string
+	v             string
+	jsonLogs      bool
+	IkniteVersion = "v0.5.2"
+	Commit        = "unknown"
+	BuildDate     = "unknown"
+	BuiltBy       = "unknown"
 )
 
 // NewRootCmd creates a new root command.
@@ -51,15 +55,8 @@ func NewRootCmd() *cobra.Command {
 Makes the appropriate initialization of a WSL 2 Alpine distribution for running
 kubernetes.`,
 		Example: `> iknite start`,
-		Version: "v0.5.2", // <---VERSION--->
-		// Uncomment the following line if your bare application
-		// has an action associated with it:
-		// Run: func(cmd *cobra.Command, args []string) { },
+		Version: IkniteVersion,
 	}
-
-	// Here you will define your flags and configuration settings.
-	// Cobra supports persistent flags, which, if defined here,
-	// will be global for your application.
 
 	rootCmd.PersistentPreRunE = func(_ *cobra.Command, _ []string) error {
 		if err := SetUpLogs(os.Stderr, v, jsonLogs); err != nil {
