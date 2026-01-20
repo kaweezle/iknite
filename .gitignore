@@ -1,42 +1,54 @@
-# Binaries for programs and plugins
+# Go build artifacts
 *.exe
 *.exe~
 *.dll
 *.so
 *.dylib
 build/
+/iknite
 
-# Test binary, built with `go test -c`
+# Go test artifacts
 *.test
-
-# Output of the go coverage tool, specifically when used with LiteIDE
 *.out
 
-# Dependency directories (remove the comment below to include it)
+# Dependency directories
 # vendor/
 
+# Build and release artifacts
 dist/
+packages/
+
+# Secrets and keys
 *.rsa
 gpg_key.asc
-
 *-tls.yaml
+*.dec.sops.yaml
 
+# Development environment
 .vscode/*.log
 .venv/
 .env
 
-/iknite
-packages/
+# Root filesystem build artifacts
 rootfs/*.apk
-
-.terraform/
-.terragrunt-cache/
-*.dec.sops.yaml
 *.rootfs.tar.gz
 *.rootfs.tar
 
+# Infrastructure as Code
+.terraform/
+.terragrunt-cache/
+
+# VM and container images
 *.qcow2
 *.vhdx
 *.iso
-*.log
+
+# Support artifacts
 support/apk/iknite-images/*
+
+# Logs
+*.log
+
+# OS specific
+.DS_Store
+Thumbs.db
