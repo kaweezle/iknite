@@ -314,6 +314,12 @@ create a pull request. You can also simply open an issue with the tag
 4. Push to the Branch (`git push origin feature/AmazingFeature`)
 5. Open a Pull Request
 
+For detailed information, see:
+
+- [CONTRIBUTING.md](CONTRIBUTING.md) - Contribution guidelines
+- [BUILD.md](BUILD.md) - Build and release process
+- [STRUCTURE.md](STRUCTURE.md) - Project directory structure
+
 <!-- markdownlint-disable-line --><p align="right">(<a href="#top">back to top</a>)</p>
 
 <!-- LICENSE -->
