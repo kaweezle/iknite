@@ -213,10 +213,17 @@ jobs:
           echo "::endgroup::"
 
           echo "::group::Building and pushing root fs image to registry"
+          if [ "$IKNITE_REPO_NAME" = "release" ]; then
+            ADDITIONAL_TAG="--tag ${REGISTRY}/${IMAGE_NAME}:latest"
+          else
+            ADDITIONAL_TAG=""
+          fi
+
           docker buildx build \
              --build-arg IKNITE_VERSION=$IKNITE_VERSION \
              --build-arg KUBERNETES_VERSION=${KUBERNETES_VERSION} \
              --tag ${REGISTRY}/${IMAGE_NAME}:${IKNITE_VERSION}-${KUBERNETES_VERSION} \
+             $ADDITIONAL_TAG \
              --push \
              --file rootfs/Dockerfile.rootfs \
              rootfs

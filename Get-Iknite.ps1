@@ -293,7 +293,7 @@ function Install-Iknite {
 
     # Parse the Docker image reference
     $registry = 'ghcr.io'
-    $repository = 'kaweezle/iknite/iknite'
+    $repository = 'kaweezle/iknite'
     $tag = $IMAGE_VERSION
 
     # Get authentication token
