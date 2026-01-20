@@ -88,13 +88,31 @@
       }
     },
     {
-      "label": "goreleaser",
+      "label": "goreleaser-build",
       "type": "shell",
       "command": "goreleaser",
-      "args": ["--snapshot", "--skip=publish", "--clean"],
+      "args": ["build", "--single-target", "--auto-snapshot", "--clean"],
       "group": {
         "kind": "build",
         "isDefault": true
+      },
+      "options": {
+        "env": {
+          "GOOS": "linux",
+          "GOARCH": "amd64"
+        }
+      },
+      "problemMatcher": ["$go"],
+      "detail": "Run goreleaser to build the project"
+    },
+    {
+      "label": "goreleaser",
+      "type": "shell",
+      "command": "goreleaser",
+      "args": ["--auto-snapshot", "--skip=publish", "--clean"],
+      "group": {
+        "kind": "build",
+        "isDefault": false
       },
       "problemMatcher": ["$go"],
       "detail": "Run goreleaser to build the project"
