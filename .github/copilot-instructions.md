@@ -35,12 +35,13 @@ The project provides five main deliverables:
      local-path-provisioner
    - Reduces first-boot time by 2-5 minutes
 
-4. **Root filesystem image** (built with [Dockerfile](../rootfs/Dockerfile))
+4. **Root filesystem image** (built with
+   [Dockerfile](../packaging/rootfs/base/Dockerfile))
    - Alpine Linux base with `iknite` and `iknite-images` pre-installed
    - Exported as tarball for WSL2 import
    - Single-layer Docker image
-     ([Dockerfile.rootfs](../rootfs/Dockerfile.rootfs)) for container registries
-
+     ([Dockerfile](../packaging/rootfs/with-images/Dockerfile)) for container
+     registries
 5. **VM images** (built with
    [hack/build-vm-image.sh](../hack/build-vm-image.sh))
    - QCOW2 format for QEMU/KVM/OpenStack
@@ -193,10 +194,10 @@ Regenerates deepcopy/client code. Verify with `./hack/verify-codegen.sh`.
 ### Architecture
 
 The iknite image is an Alpine linux image running with OpenRC as init system. On
-WSL2/Docker, a custom [/etc/rc.conf](../rootfs/rc.conf) is used to disable
-hardware and networking services not needed in container environments. A file
-`/run/openrc/softlevel` is also created to allow OpenRC to run as non init
-process.
+WSL2/Docker, a custom [/etc/rc.conf](../packaging/rootfs/base/rc.conf) is used
+to disable hardware and networking services not needed in container
+environments. A file `/run/openrc/softlevel` is also created to allow OpenRC to
+run as non init process.
 
 `iknite` is installed via the iknite APK package, along with its dependencies
 (see [.goreleaser.yaml](../.goreleaser.yaml#L67-L79)). On first run, the iknite
@@ -257,8 +258,10 @@ etc.) during installation. This package is built using `chainguard-dev/melange`
 to create a minimal APK package containing the images.
 
 The iknite root filesystem image (`iknite-rootfs-base`) is built using a
-Dockerfile ([rootfs/Dockerfile](../rootfs/Dockerfile)) that installs the iknite
-APK package along with its dependencies on top of a minimal Alpine base image
+Dockerfile
+([packaging/rootfs/base/Dockerfile](../packaging/rootfs/base/Dockerfile)) that
+installs the iknite APK package along with its dependencies on top of a minimal
+Alpine base image
 
 This image does not contain the controller plane images. In order to install
 them, a container is created and the `iknite-images` APK package is installed
@@ -266,16 +269,17 @@ inside it. This container is then exported as as tarball and is the base root
 filesystem image that is distributed.
 
 A single layer Docker images is built using
-[Dockerfile.rootfs](../rootfs/Dockerfile.rootfs) that adds metadata and
-configures the image for use as a root filesystem image in WSL2 and Docker.
+([packaging/rootfs/with-images/Dockerfile](../packaging/rootfs/with-images/Dockerfile))
+that adds metadata and configures the image for use as a root filesystem image
+in WSL2 and Docker.
 
 In addition to the root filesystem image, ready-to-use VM images in QCOW2 and
 VHDX formats are built using the root filesystem image as base. A script
 ([hack/build-vm-image.sh](../hack/build-vm-image.sh)) automates the process of
 creating a VM image, installing the iknite APK packages and configuring the VM
 for first use. The starting point of the script is the built root filesystem
-image (`rootfs/iknite.rootfs.tar.gz`). It produces a QCOW2 image for QEMU/KVM
-and converts it into a VHDX image.
+image (`dist/iknite-<iknite_version>-<kubernetes_version>.rootfs.tar.gz`). It
+produces a QCOW2 image for QEMU/KVM and converts it into a VHDX image.
 
 ### Development Workflows
 

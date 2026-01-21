@@ -1,4 +1,5 @@
 #!/bin/sh
+# cSpell: words lowerdir upperdir fusermount overlayfs
 # Script to pre-download container images into the image being built.
 # This allows air-gapped installations to have all required images
 # already present.
@@ -8,7 +9,7 @@
 # we use the fuse-overlayfs snapshotter for containerd to pull the images.
 # The pulled images are stored in the overlayfs storage, and when the
 # snapshotter process is killed, the images remain available for use with
-# the standard overlayfs snapshotter. This is usefull when exporting images
+# the standard overlayfs snapshotter. This is useful when exporting images
 # into a VM image or a WSL2 image.
 # Usage: install_images.sh <image-list-file>
 set -ex

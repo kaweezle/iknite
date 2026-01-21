@@ -35,7 +35,7 @@ inputs = {
   images = {
     "iknite-vm-image" = {
       name            = "iknite-test-vm-image-${local.iknite_version}-${local.kubernetes_version}"
-      local_file_path = "${get_repo_root()}/rootfs/iknite-vm.${local.iknite_version}-${local.kubernetes_version}.qcow2"
+      local_file_path = "${get_repo_root()}/dist/iknite-vm.${local.iknite_version}-${local.kubernetes_version}.qcow2"
     }
   }
   instances = {

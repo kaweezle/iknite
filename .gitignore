@@ -27,7 +27,6 @@ gpg_key.asc
 
 /iknite
 packages/
-rootfs/*.apk
 
 .terraform/
 .terragrunt-cache/

@@ -60,13 +60,13 @@ repos:
         types_or: ["text"]
         exclude: |
           (?x)^(
+              .*/p10k\.zsh |
               docs/docs/assets/.* |
-              ^.gitignore |
-              ^.git/.* |
-              ^.github/.* |
-              .vscode/.* |
-              ^dist/.* |
-              ^release/.* |
+              \.gitignore |
+              \.git/.* |
+              \.github/.* |
+              \.vscode/.* |
+              dist/.* |
               .*\.sops\.yaml$|
               .*\rc\.conf$|
               .*\.(png|jpg|jpeg|gif|svg|ico|zip|gz|xz|7z|tar|nupkg)$
@@ -87,7 +87,7 @@ repos:
         args: ["--exclude=SC3014,SC3043"] # Ignore source-related warnings
         exclude: |
           (?x)^(
-              rootfs/p10k.zsh
+              packaging/rootfs/base/p10k.zsh
           )$
 
   - repo: https://github.com/antonbabenko/pre-commit-terraform

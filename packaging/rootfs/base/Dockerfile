@@ -1,4 +1,5 @@
 # syntax=docker/dockerfile:1.3-labs
+# cSpell: words apks subuid subgid softlevel powerlevel
 FROM alpine:3.23
 
 ARG IKNITE_VERSION=0.5.3-devel

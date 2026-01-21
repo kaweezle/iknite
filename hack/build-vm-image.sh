@@ -13,7 +13,9 @@ ONLY_CALLED=false
 IMAGE_SIZE="3G"
 SERIAL_PORT="ttyS0"
 KUBERNETES_VERSION=${KUBERNETES_VERSION:-$(grep k8s.io/kubernetes "$ROOT_DIR/go.mod" | awk '{gsub(/^v/,"",$2);print $2;}')}
-IKNITE_VERSION=$(jq -Mr ".version" dist/metadata.json)
+if [ -z "$IKNITE_VERSION" ]; then
+    IKNITE_VERSION=$(jq -Mr ".version" dist/metadata.json)
+fi
 readonly PROGNAME='build-vm-image'
 HOST_ARCH="$(uname -m)"
 readonly HOST_ARCH
@@ -374,7 +376,7 @@ done
 # rm -rf build
 # mkdir -p build
 IMAGE_FORMAT="qcow2"
-IMAGE_FILE="rootfs/iknite-vm.${IKNITE_VERSION}-${KUBERNETES_VERSION}.${IMAGE_FORMAT}"
+IMAGE_FILE="dist/iknite-vm.${IKNITE_VERSION}-${KUBERNETES_VERSION}.${IMAGE_FORMAT}"
 
 CLOUD_CONFIG_FILE=${1:-cloud-config.yaml}
 info "Creating iknite VM image $IMAGE_FILE using cloud config file: $CLOUD_CONFIG_FILE"
@@ -436,11 +438,11 @@ if should_run_step "copy-rootfs"; then
         warning "Root filesystem already exists in $mount_dir. Skipping copy."
     else
         info "Extracting root filesystem to $mount_dir"
-        tar -C "$mount_dir" -xpf rootfs/iknite.rootfs.tar.gz || {
+        tar -C "$mount_dir" -xpf "dist/iknite-${IKNITE_VERSION}-${KUBERNETES_VERSION}.rootfs.tar.gz" || {
             error "Failed to extract root filesystem to $mount_dir"
             exit 1
         }
-        sha256sum rootfs/iknite.rootfs.tar.gz > "$mount_dir/root/.rootfs.sha256sum"
+        sha256sum "dist/iknite-${IKNITE_VERSION}-${KUBERNETES_VERSION}.rootfs.tar.gz" > "$mount_dir/root/.rootfs.sha256sum"
     fi
     eval "DONE_$(step_to_var "copy-rootfs")=true"
 else
@@ -529,7 +531,7 @@ cleanup
 if should_run_step "build-vhdx"; then
     step "Building VHDX image from $IMAGE_FILE..."
 
-    VHDX_IMAGE_FILE="rootfs/iknite-vm.${IKNITE_VERSION}-${KUBERNETES_VERSION}.vhdx"
+    VHDX_IMAGE_FILE="dist/iknite-vm.${IKNITE_VERSION}-${KUBERNETES_VERSION}.vhdx"
     qemu-img convert "$IMAGE_FILE" -O vhdx -o subformat=dynamic "$VHDX_IMAGE_FILE"
 
     eval "DONE_$(step_to_var "build-vhdx")=true"

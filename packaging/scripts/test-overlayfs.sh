@@ -1,5 +1,6 @@
 #!/bin/sh
 # shellcheck disable=SC2329,SC3037
+# cSpell: words lowerdir upperdir fusermount overlayfs mountpoint
 set -e
 
 # This script checks if fuse-overlayfs is needed by testing if the overlay filesystem can be mounted directly.

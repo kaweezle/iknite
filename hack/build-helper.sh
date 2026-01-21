@@ -21,6 +21,8 @@ CACHE_FLAG="--no-cache"
 SNAPSHOT="--snapshot"
 TF_VERSION="1.14.3"
 TG_VERSION="0.97.2"
+ARCH=$(uname -m)
+
 
 # Auto-detect if running as root
 if [ "$(id -u)" -eq 0 ]; then
@@ -288,7 +290,6 @@ if should_run_step "images"; then
 
     BUILD_DIR_SUFFIX="build/apk/iknite-images"
     BUILD_DIR="$ROOT_DIR/$BUILD_DIR_SUFFIX"
-    ARCH=$(uname -m)
     rm -rf "$BUILD_DIR" || /bin/true
     mkdir -p "$BUILD_DIR"
     echo "KUBERNETES_VERSION: ${KUBERNETES_VERSION}" > "$BUILD_DIR/.env"
@@ -351,14 +352,19 @@ IKNITE_ROOTFS_BASE="iknite-rootfs-base:${IKNITE_VERSION}"
 if should_run_step "build"; then
     step "Building Iknite rootfs base image..."
 
-    rm -f rootfs/iknite.rootfs.tar.gz rootfs/*.apk || /bin/true
-    cp "dist/iknite-${IKNITE_VERSION}.$(uname -m).apk" rootfs/
-    cp "dist/krmfnbuiltin-${KRMFN_LATEST_VERSION#v}.$(uname -m).apk" rootfs/
+    BUILD_DIR="build/rootfs/base"
+    rm -rf "$BUILD_DIR" || /bin/true
+    mkdir -p "$BUILD_DIR"
+
+    cp -r "packaging/rootfs/base/." "$BUILD_DIR/"
+
+    cp "dist/iknite-${IKNITE_VERSION}.${ARCH}.apk" "$BUILD_DIR/"
+    cp "dist/krmfnbuiltin-${KRMFN_LATEST_VERSION#v}.${ARCH}.apk" "$BUILD_DIR/"
 
     $SUDO_CMD buildctl build \
                  --frontend dockerfile.v0 \
-                 --local context=rootfs \
-                 --local dockerfile=rootfs \
+                 --local "context=$BUILD_DIR" \
+                 --local "dockerfile=$BUILD_DIR" \
                  --opt "build-arg:IKNITE_REPO_URL=https://static.iknite.app/${IKNITE_REPO_NAME}/" \
                  --opt "build-arg:IKNITE_VERSION=$IKNITE_VERSION" \
                  $CACHE_FLAG \
@@ -367,7 +373,7 @@ else
     skip "Building Iknite rootfs base image"
 fi
 
-IKNITE_IMAGES_APK="iknite-images-${KUBERNETES_VERSION}.$(uname -m).apk"
+IKNITE_IMAGES_APK="iknite-images-${KUBERNETES_VERSION}.${ARCH}.apk"
 
 if should_run_step "add-images"; then
     step "Adding images to Iknite rootfs..."
@@ -378,7 +384,7 @@ if should_run_step "add-images"; then
     $SUDO_CMD nerdctl -n $BUILDKIT_NAMESPACE run \
         --name iknite-rootfs \
         --device /dev/fuse --cap-add SYS_ADMIN \
-        -v "$(pwd)/dist:/apks" \
+        -v "${ROOT_DIR}/dist:/apks" \
         -e "IKNITE_IMAGES_APK=${IKNITE_IMAGES_APK}" \
         "${IKNITE_ROOTFS_BASE}" \
         /bin/sh -c 'apk --no-cache add /apks/$IKNITE_IMAGES_APK; apk del iknite-images'
@@ -386,11 +392,14 @@ else
     skip "Adding images to Iknite rootfs"
 fi
 
+ROOTFS_NAME="iknite-${IKNITE_VERSION}-${KUBERNETES_VERSION}.rootfs.tar.gz"
+ROOTFS_PATH="dist/$ROOTFS_NAME"
+
 if should_run_step "export"; then
     step "Exporting Iknite rootfs tarball..."
-    rm -f rootfs/iknite.rootfs.tar.gz || /bin/true
+    rm -f "$ROOTFS_PATH" || /bin/true
 
-    $SUDO_CMD nerdctl -n $BUILDKIT_NAMESPACE export iknite-rootfs | gzip > rootfs/iknite.rootfs.tar.gz
+    $SUDO_CMD nerdctl -n $BUILDKIT_NAMESPACE export iknite-rootfs | gzip > "$ROOTFS_PATH"
 else
     skip "Exporting Iknite rootfs tarball"
 fi
@@ -398,12 +407,18 @@ fi
 IKNITE_ROOTFS_IMAGE="ghcr.io/kaweezle/iknite/iknite:${IKNITE_VERSION}-${KUBERNETES_VERSION}"
 if should_run_step "rootfs-image"; then
     step "Building Iknite rootfs image..."
+    BUILD_DIR="build/rootfs/with-images"
+    rm -rf "$BUILD_DIR" || /bin/true
+    mkdir -p "$BUILD_DIR"
+    cp -r "packaging/rootfs/with-images/." "$BUILD_DIR/"
+    cp "dist/${ROOTFS_NAME}" "$BUILD_DIR/$ROOTFS_NAME"
 
     $SUDO_CMD buildctl build \
                  --frontend dockerfile.v0 \
-                 --local context=rootfs \
-                 --local dockerfile=rootfs \
-                 --opt filename=Dockerfile.rootfs \
+                 --local "context=$BUILD_DIR" \
+                 --local "dockerfile=$BUILD_DIR" \
+                 --opt "build-arg:IKNITE_VERSION=$IKNITE_VERSION" \
+                 --opt "build-arg:KUBERNETES_VERSION=$KUBERNETES_VERSION" \
                  $CACHE_FLAG \
                  --output "type=image,name=${IKNITE_ROOTFS_IMAGE},push=false"
 else
@@ -413,7 +428,7 @@ fi
 if should_run_step vm-image; then
     step "Building VM images (qcow2, vhdx)..."
 
-    rm -f "rootfs/*.{qcow2,vhdx}" || /bin/true
+    rm -f "dist/*.{qcow2,vhdx}" || /bin/true
 
     ./hack/build-vm-image.sh
 else
@@ -422,9 +437,7 @@ fi
 
 if should_run_step "clean"; then
     step "Cleaning up..."
-    rm -f rootfs/*.apk || /bin/true
-    rm -rf dis/repo
-    $SUDO_CMD rm -rf packages || /bin/true
+    rm -rf build || /bin/true
     $SUDO_CMD nerdctl -n $BUILDKIT_NAMESPACE rm -f iknite-rootfs >/dev/null 2>&1 || /bin/true
 else
     skip "Cleaning up"

@@ -2,9 +2,8 @@
   "version": "0.2",
   "language": "en",
   "ignorePaths": [
-    "apk",
     "dist",
-    "rootfs",
+    "packaging/rootfs/**/*.z?sh",
     "go.*",
     ".gitignore",
     "**/testdata/**",
