@@ -101,7 +101,7 @@ locals {
 
   cloudflare_account_id = "a54f6b2557d54a9bff5eef36482b7fe6"
 
-  kubernetes_version = get_env("KUBERNETES_VERSION", "1.34.3")
+  kubernetes_version = get_env("KUBERNETES_VERSION", "1.35.0")
   iknite_version     = jsondecode(file("${get_repo_root()}/dist/metadata.json")).version
 }
 
