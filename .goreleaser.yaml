@@ -14,7 +14,6 @@ builds:
     goos:
       - linux
     goarch:
-      - "386"
       - amd64
     mod_timestamp: "{{ .CommitTimestamp }}"
     flags:
@@ -82,27 +81,27 @@ nfpms:
       - nerdctl
     bindir: /sbin
     contents:
-      - src: apk/crictl.yaml
+      - src: packaging/apk/iknite/crictl.yaml
         dst: /etc/crictl.yaml
-      - src: apk/iknite.d/kustomization.yaml
+      - src: packaging/apk/iknite/iknite.d/kustomization.yaml
         dst: /etc/iknite.d/kustomization.yaml
-      - src: apk/iknite.d/base/kustomization.yaml
+      - src: packaging/apk/iknite/iknite.d/base/kustomization.yaml
         dst: /etc/iknite.d/base/kustomization.yaml
-      - src: apk/iknite.d/base/kube-vip-addresspool.yaml
+      - src: packaging/apk/iknite/iknite.d/base/kube-vip-addresspool.yaml
         dst: /etc/iknite.d/base/kube-vip-addresspool.yaml
-      - src: apk/iknite.d/base/kube-flannel.yaml
+      - src: packaging/apk/iknite/iknite.d/base/kube-flannel.yaml
         dst: /etc/iknite.d/base/kube-flannel.yaml
-      - src: apk/iknite.d/base/coredns.yaml
+      - src: packaging/apk/iknite/iknite.d/base/coredns.yaml
         dst: /etc/iknite.d/base/coredns.yaml
-      - src: apk/init.d/iknite
+      - src: packaging/apk/iknite/init.d/iknite
         dst: /etc/init.d/iknite
-      - src: apk/conf.d/iknite
+      - src: packaging/apk/iknite/conf.d/iknite
         dst: /etc/conf.d/iknite
-      - src: apk/flannel/10-flannel.conflist
+      - src: packaging/apk/iknite/flannel/10-flannel.conflist
         dst: /etc/cni/net.d/10-flannel.conflist
-      - src: apk/flannel/subnet.env
+      - src: packaging/apk/iknite/flannel/subnet.env
         dst: /lib/iknite/flannel/subnet.env
-      - src: apk/buildkit/buildkitd.toml
+      - src: packaging/apk/iknite/buildkit/buildkitd.toml
         dst: /etc/buildkit/buildkitd.toml
     apk:
       signature:

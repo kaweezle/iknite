@@ -29,7 +29,7 @@ The project provides five main deliverables:
    - Depends on: kubelet, kubeadm, kubectl, containerd, cni-plugins, buildkit
 
 3. **Iknite-images APK package** (built with
-   [melange](../support/apk/iknite-images.yaml))
+   [melange](../packaging/apk/iknite-images/iknite-images.yaml))
    - Pre-pulls container images for faster startup
    - Includes: kubeadm images, flannel, metrics-server, kube-vip,
      local-path-provisioner
@@ -145,14 +145,16 @@ Follow [pkg/cmd/status.go](../pkg/cmd/status.go) pattern:
 
 #### Modifying Kubernetes Components
 
-Edit manifests in [apk/iknite.d/base/](../apk/iknite.d/base/kustomization.yaml),
+Edit manifests in
+[packaging/apk/iknite/iknite.d/base/](../packaging/apk/iknite/iknite.d/base/kustomization.yaml),
 then regenerate images list:
 
 ```bash
-kubectl kustomize apk/iknite.d | grep image: | awk '{ print $2; }'
+kubectl kustomize packaging/apk/iknite/iknite.d | grep image: | awk '{ print $2; }'
 ```
 
-Update `support/apk/iknite-images.yaml` to ensure images are pre-pulled.
+Update `packaging/apk/iknite-images/iknite-images.yaml` to ensure images are
+pre-pulled.
 
 ### Project-Specific Conventions
 
@@ -249,10 +251,10 @@ Iknite makes the following kustomizations to the kubeadm initialization process
   the cluster.
 
 To allow a faster startup, a companion APK package
-([iknite-images](../support/apk/iknite-images.yaml)) pre-imports all required
-container images (kubeadm, kubelet, pause, flannel, metrics-server, etc.) during
-installation. This package is built using `chainguard-dev/melange` to create a
-minimal APK package containing the images.
+([iknite-images](../packaging/apk/iknite-images/iknite-images.yaml)) pre-imports
+all required container images (kubeadm, kubelet, pause, flannel, metrics-server,
+etc.) during installation. This package is built using `chainguard-dev/melange`
+to create a minimal APK package containing the images.
 
 The iknite root filesystem image (`iknite-rootfs-base`) is built using a
 Dockerfile ([rootfs/Dockerfile](../rootfs/Dockerfile)) that installs the iknite
@@ -271,9 +273,9 @@ In addition to the root filesystem image, ready-to-use VM images in QCOW2 and
 VHDX formats are built using the root filesystem image as base. A script
 ([hack/build-vm-image.sh](../hack/build-vm-image.sh)) automates the process of
 creating a VM image, installing the iknite APK packages and configuring the VM
-for first use. The starting point of the script is the built root filesystem image
-(`rootfs/iknite.rootfs.tar.gz`). It produces a QCOW2 image for QEMU/KVM and
-converts it into a VHDX image.
+for first use. The starting point of the script is the built root filesystem
+image (`rootfs/iknite.rootfs.tar.gz`). It produces a QCOW2 image for QEMU/KVM
+and converts it into a VHDX image.
 
 ### Development Workflows
 
@@ -459,11 +461,11 @@ Available steps: `goreleaser`, `build`, `images`, `add-images`, `export`,
 
 ### Cluster Management
 
-| Task                  | Command/Path                                                                    |
-| --------------------- | ------------------------------------------------------------------------------- |
-| View cluster state    | `cat /run/iknite/status.json`                                                   |
-| View kubeconfig       | `cat /root/.kube/config`                                                        |
-| Check service status  | `rc-status`                                                                     |
-| View service logs     | `cat /var/log/iknite.log`                                                       |
-| APK dependencies      | [.goreleaser.yaml](../.goreleaser.yaml#L67-L79)                                 |
-| Default kustomization | [apk/iknite.d/base/kustomization.yaml](../apk/iknite.d/base/kustomization.yaml) |
+| Task                  | Command/Path                                                                                                      |
+| --------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| View cluster state    | `cat /run/iknite/status.json`                                                                                     |
+| View kubeconfig       | `cat /root/.kube/config`                                                                                          |
+| Check service status  | `rc-status`                                                                                                       |
+| View service logs     | `cat /var/log/iknite.log`                                                                                         |
+| APK dependencies      | [.goreleaser.yaml](../.goreleaser.yaml#L67-L79)                                                                   |
+| Default kustomization | [packaging/apk/iknite/iknite.d/base/kustomization.yaml](../packaging/apk/iknite/iknite.d/base/kustomization.yaml) |

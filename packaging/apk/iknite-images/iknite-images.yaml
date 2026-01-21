@@ -1,12 +1,10 @@
 # This is a melange (see https://github.com/chainguard-dev/melange) recipe
 # for building an apk package that contains the kubernetes base container
 # images for the iknite project.
-# Build with this command:
-# doas nerdctl run --privileged --rm -v $(pwd):/work cgr.dev/chainguard/melange build support/apk/iknite-images.yaml --arch $(uname -m)
+# Look at hack/build-helper.sh too see how the image-list.txt file is generated.
 # The following entries will be replaced at build time from the file provided by the --vars-file option
 vars:
   KUBERNETES_VERSION: "${KUBERNETES_VERSION}"
-  CONTAINERD_PAUSE_IMAGE:
 package:
   name: iknite-images
   version: "${{vars.KUBERNETES_VERSION}}"
@@ -186,6 +184,9 @@ environment:
 pipeline:
   - name: Download images
     runs: |
+      # Local images are generated from the commands:
+      #  iknite kustomize  -d packaging/apk/iknite/iknite.d print | grep image: | awk '{ print $2; }'
+      #  iknite info images
       LOCAL_IMAGES=$(cat image-list.txt)
       DEST_DIR=${{targets.destdir}}/usr/share/iknite/images
       KUBERNETES_VERSION=${{vars.KUBERNETES_VERSION}}
@@ -195,8 +196,6 @@ pipeline:
       cd $DEST_DIR
 
       # Download and compress each image
-      #
-      # Last images come from the command: kubectl kustomize apk/iknite.d | grep image: | awk '{ print $2; }'
       while IFS= read -r IMAGE; do
         FILENAME=$(echo "$IMAGE" | sed 's|[/:]|_|g')
         echo "Downloading $IMAGE..."

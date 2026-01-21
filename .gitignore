@@ -39,4 +39,3 @@ rootfs/*.apk
 *.vhdx
 *.iso
 *.log
-support/apk/iknite-images/*

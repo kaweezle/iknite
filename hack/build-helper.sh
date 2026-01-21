@@ -8,6 +8,9 @@ export IKNITE_REPO_NAME
 
 ROOT_DIR=$(cd "$(dirname "$0")/.." && pwd)
 
+mkdir -p "$ROOT_DIR/build"
+mkdir -p "$ROOT_DIR/dist"
+
 KUBERNETES_VERSION=${KUBERNETES_VERSION:-$(grep k8s.io/kubernetes "$ROOT_DIR/go.mod" | awk '{gsub(/^v/,"",$2);print $2;}')}
 KEY_NAME=${KEY_NAME:-kaweezle-devel@kaweezle.com-c9d89864.rsa}
 ROOTLESS=false
@@ -121,6 +124,21 @@ should_run_step() {
     return 0
 }
 
+_step_counter=0
+step() {
+	_step_counter=$(( _step_counter + 1 ))
+	printf '\n\033[1;36m%d) %s\033[0m\n' $_step_counter "$@" >&2  # bold cyan
+}
+
+skip() {
+	_step_counter=$(( _step_counter + 1 ))
+	printf '\n\033[1;35m%d) %s (Skipped)\033[0m\n' $_step_counter "$@" >&2  # bold magenta
+}
+
+error() {
+    printf '\n\033[1;31mError: %s\033[0m\n' "$@" >&2  # bold red
+}
+
 # Parse command-line arguments
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -175,21 +193,6 @@ while [ $# -gt 0 ]; do
     esac
 done
 
-_step_counter=0
-step() {
-	_step_counter=$(( _step_counter + 1 ))
-	printf '\n\033[1;36m%d) %s\033[0m\n' $_step_counter "$@" >&2  # bold cyan
-}
-
-skip() {
-	_step_counter=$(( _step_counter + 1 ))
-	printf '\n\033[1;35m%d) %s (Skipped)\033[0m\n' $_step_counter "$@" >&2  # bold magenta
-}
-
-error() {
-    printf '\n\033[1;31mError: %s\033[0m\n' "$@" >&2  # bold red
-}
-
 # Check goreleaser is installed
 step "Checking prerequisites..."
 if ! command -v goreleaser >/dev/null 2>&1; then
@@ -218,7 +221,6 @@ if should_run_step "fetch-krmfnbuiltin"; then
     cd dist
     echo "Latest krmfnbuiltin version is ${KRMFN_LATEST_VERSION}"
     curl -O -L "https://github.com/kaweezle/krmfnbuiltin/releases/download/${KRMFN_LATEST_VERSION}/krmfnbuiltin-${KRMFN_LATEST_VERSION#v}.x86_64.apk"
-    curl -O -L "https://github.com/kaweezle/krmfnbuiltin/releases/download/${KRMFN_LATEST_VERSION}/krmfnbuiltin-${KRMFN_LATEST_VERSION#v}.i386.apk"
     cd ..
 else
     skip "Fetching krmfnbuiltin image"
@@ -283,28 +285,33 @@ export IKNITE_VERSION
 
 if should_run_step "images"; then
     step "Building Iknite images package..."
-    rm -rf packages
-    echo "KUBERNETES_VERSION: ${KUBERNETES_VERSION}" > support/apk/.env
 
-    mkdir -p support/apk/iknite-images
-    ./dist/iknite_linux_amd64_v1/iknite kustomize  -d apk/iknite.d print  | grep image: | awk '{ print $2; }' > support/apk/iknite-images/image-list.txt
-    ./dist/iknite_linux_amd64_v1/iknite info images >> support/apk/iknite-images/image-list.txt
-    sort -u support/apk/iknite-images/image-list.txt -o support/apk/iknite-images/image-list.txt
+    BUILD_DIR_SUFFIX="build/apk/iknite-images"
+    BUILD_DIR="$ROOT_DIR/$BUILD_DIR_SUFFIX"
+    ARCH=$(uname -m)
+    rm -rf "$BUILD_DIR" || /bin/true
+    mkdir -p "$BUILD_DIR"
+    echo "KUBERNETES_VERSION: ${KUBERNETES_VERSION}" > "$BUILD_DIR/.env"
+
+    ./dist/iknite_linux_amd64_v1/iknite kustomize  -d packaging/apk/iknite/iknite.d print  | grep image: | awk '{ print $2; }' > "$BUILD_DIR/image-list.txt"
+    ./dist/iknite_linux_amd64_v1/iknite info images >> "$BUILD_DIR/image-list.txt"
+    sort -u "$BUILD_DIR/image-list.txt" -o "$BUILD_DIR/image-list.txt"
 
     $SUDO_CMD nerdctl run --privileged --rm -v "$(pwd):/work" \
         cgr.dev/chainguard/melange \
-        build support/apk/iknite-images.yaml \
-        --arch "$(uname -m)" \
-        --vars-file support/apk/.env \
-        --source-dir support/apk/iknite-images \
-        --out-dir ./dist/ \
+        build packaging/apk/iknite-images/iknite-images.yaml \
+        --arch "$ARCH" \
+        --vars-file "$BUILD_DIR_SUFFIX/.env" \
+        --source-dir "$BUILD_DIR_SUFFIX" \
+        --out-dir "dist" \
         --signing-key kaweezle-devel@kaweezle.com-c9d89864.rsa \
         --generate-index=false
     if [ "$ROOTLESS" = false ]; then
-        $SUDO_CMD chown -R "$(id -u):$(id -g)" dist
+        $SUDO_CMD chown -R "$(id -u):$(id -g)" "$ROOT_DIR/dist"
     fi
-    (cd "dist/$(uname -m)/" && \
-    for f in *.apk; do mv "$f" "../$(echo "$f" | sed 's/\-r0.apk$//').$(uname -m).apk"; done)
+    (cd "$ROOT_DIR/dist/$ARCH/" && \
+    for f in *.apk; do mv "$f" "../$(echo "$f" | sed 's/\-r0.apk$//').$ARCH.apk"; done)
+    rmdir "$ROOT_DIR/dist/$ARCH/"
 else
     skip "Building Iknite images package"
 fi
