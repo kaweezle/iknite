@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1.3-labs
 FROM scratch
 ARG IKNITE_VERSION=0.5.3-devel
-ARG KUBERNETES_VERSION=1.34.3
+ARG KUBERNETES_VERSION=1.35.0
 ARG ALPINE_VERSION=3.23
 
 ADD ./iknite-${IKNITE_VERSION}-${KUBERNETES_VERSION}.rootfs.tar.gz /
