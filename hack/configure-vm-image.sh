@@ -52,8 +52,8 @@ cat > /etc/network/interfaces <<-EOF
 	post-down /etc/network/if-post-down.d/*
 EOF
 
-mkdir -p etc/network/if-post-up.d
-mkdir -p etc/network/if-post-down.d
+mkdir -p /etc/network/if-post-up.d
+mkdir -p /etc/network/if-post-down.d
 
 step "Setting resolv.conf"
 cat > /etc/resolv.conf <<-EOF
