@@ -21,7 +21,7 @@
 <div align="center">
 
   <a href="https://github.com/kaweezle/iknite">
-    <img src="docs/img/logo.svg" alt="Logo" width="128" height="128">
+    <img src="docs/docs/img/logo.svg" alt="Logo" width="128" height="128">
   </a>
   <h3 align="center">Iknite</h3>
 
@@ -360,6 +360,12 @@ and Alpine, kaweezle is closer to the clusters you may use on public clouds.
 This readme has has been created from the
 [Best-README-Template](https://github.com/othneildrew/Best-README-Template)
 project.
+
+For detailed information, see:
+
+- [CONTRIBUTING.md](CONTRIBUTING.md) - Contribution guidelines
+- [BUILD.md](BUILD.md) - Build and release process
+- [STRUCTURE.md](STRUCTURE.md) - Project directory structure
 
 <!-- markdownlint-disable-line --><p align="right">(<a href="#top">back to top</a>)</p>
 
