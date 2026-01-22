@@ -14,12 +14,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# IMPORTANT: You will need GNU grep for this script to work.
+
 set -o errexit
 set -o nounset
 set -o pipefail
 
 SCRIPT_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
-CODEGEN_PKG=${CODEGEN_PKG:-"$(go env GOPATH)/pkg/mod/k8s.io/code-generator@v0.30.1"}
+CODEGEN_PKG=${CODEGEN_PKG:-$(cd "${SCRIPT_ROOT}"; go list -f '{{ .Dir }}' -m k8s.io/code-generator 2>/dev/null || echo "${GOPATH}/pkg/mod/k8s.io/code-generator@v0.34.3")}
 
 # shellcheck disable=SC1091
 source "${CODEGEN_PKG}/kube_codegen.sh"
