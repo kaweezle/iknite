@@ -28,6 +28,10 @@ repos:
         #   )$
       - id: check-merge-conflict
       - id: detect-private-key
+        exclude: |
+          (?x)^(
+              hack/iknitedev/cmd/install_signing_key_test\.go
+          )$
       - id: check-added-large-files
         args: ["--maxkb=10240"] # 10 MB
 

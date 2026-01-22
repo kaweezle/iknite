@@ -18,7 +18,13 @@
     "**/**.sops.yaml"
   ],
   "dictionaryDefinitions": [],
-  "dictionaries": ["bash", "docker", "golang", "terraform", "softwareTerms"],
+  "dictionaries": [
+    "bash",
+    "docker",
+    "golang",
+    "terraform",
+    "softwareTerms"
+  ],
   "words": [
     "abuild",
     "afero",
@@ -40,6 +46,7 @@
     "DRYRUN",
     "fieldtype",
     "fontawesome",
+    "forbidigo",
     "forcetypeassert",
     "gitmoji",
     "gochecknoinits",
@@ -53,6 +60,7 @@
     "govet",
     "Healthz",
     "iknite",
+    "iknitedev",
     "Infof",
     "Infoln",
     "interfacebloat",
