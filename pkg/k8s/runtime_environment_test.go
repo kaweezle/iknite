@@ -32,6 +32,7 @@ func (s *RuntimeEnvironmentTestSuite) TeardownTest() {
 }
 
 func (s *RuntimeEnvironmentTestSuite) TestPreventKubeletServiceFromStarting() {
+	s.T().Parallel()
 	// cSpell: disable
 	rcConfFileContent := dedent.Dedent(`
     rc_sys="prefix"
@@ -65,6 +66,7 @@ func (s *RuntimeEnvironmentTestSuite) TestPreventKubeletServiceFromStarting() {
 }
 
 func (s *RuntimeEnvironmentTestSuite) TestPreventKubeletServiceFromStartingWhenLineIsPresent() {
+	s.T().Parallel()
 	// cSpell: disable
 	existingContent := dedent.Dedent(`
     rc_sys="prefix"

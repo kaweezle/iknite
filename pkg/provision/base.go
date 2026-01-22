@@ -42,7 +42,7 @@ func IsBaseKustomizationAvailable(dirname string) (bool, error) {
 	if err == nil {
 		exists = true
 	} else {
-		exists, err = utils.Exists(path.Join(dirname, "kustomization.yaml"))
+		exists, err = utils.FS.Exists(path.Join(dirname, "kustomization.yaml"))
 		if err != nil {
 			return false, fmt.Errorf("while testing for directory: %w", err)
 		}

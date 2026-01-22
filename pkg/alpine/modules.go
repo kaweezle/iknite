@@ -47,7 +47,7 @@ func EnsureMachineID() error {
 			"filename": machineIDFile,
 		}).Info("Generating machine ID...")
 
-		if err := utils.WriteFile(machineIDFile, []byte(id.String()), os.FileMode(int(0o644))); err != nil {
+		if err := utils.FS.WriteFile(machineIDFile, []byte(id.String()), os.FileMode(int(0o644))); err != nil {
 			return fmt.Errorf("error while creating machine id: %s: %w", machineIDFile, err)
 		}
 		return nil

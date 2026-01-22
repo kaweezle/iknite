@@ -17,25 +17,15 @@ package utils
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"net"
-	"os"
-	"path/filepath"
 	"time"
-
-	"github.com/spf13/afero"
-)
-
-var (
-	fs  = afero.NewOsFs()
-	afs = &afero.Afero{Fs: fs}
 )
 
 // ExecuteOnExistence executes the function fn if the file existence is the
 // one given by the parameter.
 func ExecuteOnExistence(file string, existence bool, fn func() error) error {
-	exists, err := afs.Exists(file)
+	exists, err := FS.Exists(file)
 	if err != nil {
 		return fmt.Errorf("error while checking if %s exists: %w", file, err)
 	}
@@ -58,35 +48,19 @@ func ExecuteIfExist(file string, fn func() error) error {
 	return ExecuteOnExistence(file, true, fn)
 }
 
-// Exists tells if file exists.
-func Exists(path string) (bool, error) {
-	exists, err := afs.Exists(path)
-	if err != nil {
-		return false, fmt.Errorf("failed to check if path exists: %w", err)
-	}
-	return exists, nil
-}
-
-func WriteFile(filename string, data []byte, perm os.FileMode) error {
-	if err := afs.WriteFile(filename, data, perm); err != nil {
-		return fmt.Errorf("failed to write file: %w", err)
-	}
-	return nil
-}
-
 // MoveFileIfExists moves the file src to the destination dst
 // if it exists.
 func MoveFileIfExists(src, dst string) error {
-	err := os.Link(src, dst)
+	exists, err := FS.Exists(src)
 	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			return nil
-		}
-		return fmt.Errorf("error while linking %s to %s: %w", src, dst, err)
+		return fmt.Errorf("error while checking existence of %s: %w", src, err)
+	}
+	if !exists {
+		return nil
 	}
 
-	if err := os.Remove(src); err != nil {
-		return fmt.Errorf("failed to remove source file: %w", err)
+	if err := FS.Rename(src, dst); err != nil {
+		return fmt.Errorf("failed to move file from %s to %s: %w", src, dst, err)
 	}
 	return nil
 }
@@ -113,31 +87,8 @@ func GetOutboundIP() (net.IP, error) {
 	return localAddr.IP, nil
 }
 
-func RemoveDirectoryContents(dir string, predicate func(string) bool) error {
-	d, err := os.Open(dir) //nolint:gosec // Controlled file path
-	if err != nil {
-		return fmt.Errorf("failed to open directory: %w", err)
-	}
-	defer func() {
-		err = d.Close()
-	}()
-	names, err := d.Readdirnames(-1)
-	if err != nil {
-		return fmt.Errorf("failed to read directory names: %w", err)
-	}
-	for _, name := range names {
-		if predicate == nil || predicate(name) {
-			err = os.RemoveAll(filepath.Join(dir, name))
-			if err != nil {
-				return fmt.Errorf("failed to remove %s: %w", name, err)
-			}
-		}
-	}
-	return nil
-}
-
 func IsOnWSL() bool {
-	wsl, err := afs.DirExists("/run/WSL")
+	wsl, err := FS.DirExists("/run/WSL")
 	if err != nil {
 		return false
 	}

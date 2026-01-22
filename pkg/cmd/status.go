@@ -245,7 +245,7 @@ func performStatus(ikniteConfig *v1alpha1.IkniteClusterSpec) {
 				Name:        "openrc",
 				Description: "Check that OpenRC is started",
 				CheckFn: func(_ context.Context, _ k8s.CheckData) (bool, string, error) {
-					exists, err := utils.Exists(constants.SoftLevelPath)
+					exists, err := utils.FS.Exists(constants.SoftLevelPath)
 					if err != nil {
 						return false, "", fmt.Errorf(
 							"failed to check if OpenRC is started: %w",
