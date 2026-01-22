@@ -137,7 +137,7 @@ jobs:
           echo "::group::Running terragrunt module"
           export TF_PLUGIN_CACHE_DIR="$HOME/.cache/terraform/plugin-cache"
           mkdir -p $TF_PLUGIN_CACHE_DIR
-          cd support/iac/iknite/${IKNITE_REPO_NAME}repo
+          cd deploy/iac/iknite/${IKNITE_REPO_NAME}repo
           terragrunt init
           terragrunt apply -auto-approve
           echo "::endgroup::"
@@ -287,7 +287,7 @@ jobs:
 
       - name: Build VM images
         run: |
-          sudo KUBERNETES_VERSION=${KUBERNETES_VERSION} IKNITE_VERSION=${IKNITE_VERSION} ./hack/build-vm-image.sh
+          sudo KUBERNETES_VERSION=${KUBERNETES_VERSION} IKNITE_VERSION=${IKNITE_VERSION} ./packaging/scripts/build-vm-image.sh
 
       - name: Create OpenStack image and test VM deployment
         id: create-and-test-openstack-image
@@ -317,7 +317,7 @@ jobs:
           echo "::group::Running terragrunt module with instance creation"
           export TF_PLUGIN_CACHE_DIR="$HOME/.cache/terraform/plugin-cache"
           mkdir -p $TF_PLUGIN_CACHE_DIR
-          cd support/iac/iknite/iknite-vm
+          cd deploy/iac/iknite/iknite-vm
           export IKNITE_CREATE_INSTANCE=true
           terragrunt init
           terragrunt apply -auto-approve

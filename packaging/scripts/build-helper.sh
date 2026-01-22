@@ -1,12 +1,13 @@
 #!/bin/sh
 
-# cSpell: words nerdctl doas chainguard apks rootfull krmfn krmfnbuiltin apkrepo apkindex tenv testrepo qcow2 vhdx gsub
+# cSpell: words nerdctl doas chainguard apks rootfull krmfn krmfnbuiltin apkrepo apkindex tenv testrepo qcow2 vhdx gsub toplevel
 
 set -e
 IKNITE_REPO_NAME="test"
 export IKNITE_REPO_NAME
 
-ROOT_DIR=$(cd "$(dirname "$0")/.." && pwd)
+# TODO:try git rev-parse --show-toplevel
+ROOT_DIR=$(cd "$(dirname "$0")/../../" && pwd)
 
 mkdir -p "$ROOT_DIR/build"
 mkdir -p "$ROOT_DIR/dist"
@@ -220,10 +221,10 @@ KRMFN_LATEST_VERSION=$(curl --silent  https://api.github.com/repos/kaweezle/krmf
 if should_run_step "fetch-krmfnbuiltin"; then
     step "Fetching krmfnbuiltin image..."
 
-    cd dist
+    cd "$ROOT_DIR/dist"
     echo "Latest krmfnbuiltin version is ${KRMFN_LATEST_VERSION}"
     curl -O -L "https://github.com/kaweezle/krmfnbuiltin/releases/download/${KRMFN_LATEST_VERSION}/krmfnbuiltin-${KRMFN_LATEST_VERSION#v}.x86_64.apk"
-    cd ..
+    cd -
 else
     skip "Fetching krmfnbuiltin image"
 fi
@@ -282,7 +283,7 @@ else
     fi
 fi
 
-IKNITE_VERSION=$(jq -Mr ".version" dist/metadata.json)
+IKNITE_VERSION=$(jq -Mr ".version" "$ROOT_DIR/dist/metadata.json")
 export IKNITE_VERSION
 
 if should_run_step "images"; then
@@ -294,11 +295,11 @@ if should_run_step "images"; then
     mkdir -p "$BUILD_DIR"
     echo "KUBERNETES_VERSION: ${KUBERNETES_VERSION}" > "$BUILD_DIR/.env"
 
-    ./dist/iknite_linux_amd64_v1/iknite kustomize  -d packaging/apk/iknite/iknite.d print  | grep image: | awk '{ print $2; }' > "$BUILD_DIR/image-list.txt"
-    ./dist/iknite_linux_amd64_v1/iknite info images >> "$BUILD_DIR/image-list.txt"
+    "$ROOT_DIR/dist/iknite_linux_amd64_v1/iknite" kustomize -d "$ROOT_DIR/packaging/apk/iknite/iknite.d" print  | grep image: | awk '{ print $2; }' > "$BUILD_DIR/image-list.txt"
+    "$ROOT_DIR/dist/iknite_linux_amd64_v1/iknite" info images >> "$BUILD_DIR/image-list.txt"
     sort -u "$BUILD_DIR/image-list.txt" -o "$BUILD_DIR/image-list.txt"
 
-    $SUDO_CMD nerdctl run --privileged --rm -v "$(pwd):/work" \
+    $SUDO_CMD nerdctl run --privileged --rm -v "$ROOT_DIR:/work" \
         cgr.dev/chainguard/melange \
         build packaging/apk/iknite-images/iknite-images.yaml \
         --arch "$ARCH" \
@@ -319,14 +320,14 @@ fi
 
 if should_run_step make-apk-repo; then
     step "Creating APK repository in dist/repo..."
-    rm -rf dist/repo || /bin/true
-    mkdir -p dist/repo
+    rm -rf "$ROOT_DIR/dist/repo" || /bin/true
+    mkdir -p "$ROOT_DIR/dist/repo"
 
-    INPUT_APK_FILES="dist/*.apk" \
-    INPUT_DESTINATION="dist/repo" \
+    INPUT_APK_FILES="$ROOT_DIR/dist/*.apk" \
+    INPUT_DESTINATION="$ROOT_DIR/dist/repo" \
     INPUT_SIGNATURE_KEY_NAME="$KEY_NAME" \
-    INPUT_SIGNATURE_KEY="$(cat "$KEY_NAME")" \
-    GITHUB_WORKSPACE=$(pwd) \
+    INPUT_SIGNATURE_KEY="$(cat "$ROOT_DIR/$KEY_NAME")" \
+    GITHUB_WORKSPACE="$ROOT_DIR" \
     .github/actions/make-apkindex/entrypoint.sh
 else
     skip "Creating APK repository in dist/repo"
@@ -340,7 +341,7 @@ if should_run_step upload-repo; then
 
     export TF_PLUGIN_CACHE_DIR="$HOME/.cache/terraform/plugin-cache"
     mkdir -p "$TF_PLUGIN_CACHE_DIR"
-    (cd "support/iac/iknite/${IKNITE_REPO_NAME}repo" && \
+    (cd "$ROOT_DIR/deploy/iac/iknite/${IKNITE_REPO_NAME}repo" && \
           terragrunt init && \
           terragrunt apply -auto-approve )
 else
@@ -352,14 +353,14 @@ IKNITE_ROOTFS_BASE="iknite-rootfs-base:${IKNITE_VERSION}"
 if should_run_step "build"; then
     step "Building Iknite rootfs base image..."
 
-    BUILD_DIR="build/rootfs/base"
+    BUILD_DIR="$ROOT_DIR/build/rootfs/base"
     rm -rf "$BUILD_DIR" || /bin/true
     mkdir -p "$BUILD_DIR"
 
-    cp -r "packaging/rootfs/base/." "$BUILD_DIR/"
+    cp -r "$ROOT_DIR/packaging/rootfs/base/." "$BUILD_DIR/"
 
-    cp "dist/iknite-${IKNITE_VERSION}.${ARCH}.apk" "$BUILD_DIR/"
-    cp "dist/krmfnbuiltin-${KRMFN_LATEST_VERSION#v}.${ARCH}.apk" "$BUILD_DIR/"
+    cp "$ROOT_DIR/dist/iknite-${IKNITE_VERSION}.${ARCH}.apk" "$BUILD_DIR/"
+    cp "$ROOT_DIR/dist/krmfnbuiltin-${KRMFN_LATEST_VERSION#v}.${ARCH}.apk" "$BUILD_DIR/"
 
     $SUDO_CMD buildctl build \
                  --frontend dockerfile.v0 \
@@ -393,7 +394,7 @@ else
 fi
 
 ROOTFS_NAME="iknite-${IKNITE_VERSION}-${KUBERNETES_VERSION}.rootfs.tar.gz"
-ROOTFS_PATH="dist/$ROOTFS_NAME"
+ROOTFS_PATH="$ROOT_DIR/dist/$ROOTFS_NAME"
 
 if should_run_step "export"; then
     step "Exporting Iknite rootfs tarball..."
@@ -407,12 +408,11 @@ fi
 IKNITE_ROOTFS_IMAGE="ghcr.io/kaweezle/iknite/iknite:${IKNITE_VERSION}-${KUBERNETES_VERSION}"
 if should_run_step "rootfs-image"; then
     step "Building Iknite rootfs image..."
-    BUILD_DIR="build/rootfs/with-images"
+    BUILD_DIR="$ROOT_DIR/build/rootfs/with-images"
     rm -rf "$BUILD_DIR" || /bin/true
     mkdir -p "$BUILD_DIR"
-    cp -r "packaging/rootfs/with-images/." "$BUILD_DIR/"
-    cp "dist/${ROOTFS_NAME}" "$BUILD_DIR/$ROOTFS_NAME"
-
+    cp -r "$ROOT_DIR/packaging/rootfs/with-images/." "$BUILD_DIR/"
+    cp "$ROOT_DIR/dist/${ROOTFS_NAME}" "$BUILD_DIR/$ROOTFS_NAME"
     $SUDO_CMD buildctl build \
                  --frontend dockerfile.v0 \
                  --local "context=$BUILD_DIR" \
@@ -428,16 +428,17 @@ fi
 if should_run_step vm-image; then
     step "Building VM images (qcow2, vhdx)..."
 
-    rm -f "dist/*.{qcow2,vhdx}" || /bin/true
+    rm -f "$ROOT_DIR/dist/*.{qcow2,vhdx}" || /bin/true
 
-    ./hack/build-vm-image.sh
+    script_dir=$(cd "$(dirname "$0")" && pwd)
+    "$script_dir/build-vm-image.sh"
 else
     skip "Building VM images (qcow2, vhdx)"
 fi
 
 if should_run_step "clean"; then
     step "Cleaning up..."
-    rm -rf build || /bin/true
+    rm -rf "$ROOT_DIR/build" || /bin/true
     $SUDO_CMD nerdctl -n $BUILDKIT_NAMESPACE rm -f iknite-rootfs >/dev/null 2>&1 || /bin/true
 else
     skip "Cleaning up"

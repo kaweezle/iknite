@@ -1,12 +1,14 @@
 #!/usr/bin/env sh
 # cSpell: words nocloud genisoimage volid cidata subformat qcow2 cdrkit nodiscard blockdev getsize writeback blkid fsprogs progname wgets
 # cSpell: words mountpoint resolv resolvconf runlevel runlevels hotplug udevadm mdev extlinux virt mkinitfs virtio syslinux relatime vhdx
-# cSpell: words inittab securetty gsub
+# cSpell: words inittab securetty gsub toplevel
 set -e
 
 # Step names for dynamic --skip-* and --only-* handling
 STEP_NAMES="create-image mount-image copy-rootfs install-kernel install-bootloader configure-vm cleanup build-vhdx build-iso"
-ROOT_DIR=$(cd "$(dirname "$0")/.." && pwd)
+# TODO:try git rev-parse --show-toplevel
+ROOT_DIR=$(cd "$(dirname "$0")/../../" && pwd)
+
 
 # Only run this specific step (empty means run all non-skipped steps)
 ONLY_CALLED=false

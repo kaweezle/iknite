@@ -43,7 +43,7 @@ The project provides five main deliverables:
      ([Dockerfile](../packaging/rootfs/with-images/Dockerfile)) for container
      registries
 5. **VM images** (built with
-   [hack/build-vm-image.sh](../hack/build-vm-image.sh))
+   [packaging/scripts/build-vm-image.sh](../packaging/scripts/build-vm-image.sh))
    - QCOW2 format for QEMU/KVM/OpenStack
    - VHDX format for Hyper-V
    - Pre-configured with iknite ready to start on first boot
@@ -55,11 +55,11 @@ The project provides five main deliverables:
   releases
 - **[Pre-commit](../.pre-commit-config.yaml)**: Code quality (gofmt,
   golangci-lint, shellcheck, cspell)
-- **[hack/build-helper.sh](../hack/build-helper.sh)**: Developer-friendly build
-  script (full pipeline locally)
+- **[packaging/scripts/build-helper.sh](../packaging/scripts/build-helper.sh)**:
+  Developer-friendly build script (full pipeline locally)
 - **[Devcontainer](../.devcontainer/devcontainer.json)**: Alpine-based
   development environment with all dependencies
-- **[Terraform/Terragrunt](../support/iac/)**: APK repository hosting
+- **[Terraform/Terragrunt](../deploy/iac/)**: APK repository hosting
   (Cloudflare) and VM testing (OpenStack)
 
 ## Golang CLI (iknite)
@@ -147,15 +147,19 @@ Follow [pkg/cmd/status.go](../pkg/cmd/status.go) pattern:
 #### Modifying Kubernetes Components
 
 Edit manifests in
-[packaging/apk/iknite/iknite.d/base/](../packaging/apk/iknite/iknite.d/base/kustomization.yaml),
-then regenerate images list:
+[packaging/apk/iknite/iknite.d/base/](../packaging/apk/iknite/iknite.d/base/kustomization.yaml).
+
+Verify with the following command:
 
 ```bash
-kubectl kustomize packaging/apk/iknite/iknite.d | grep image: | awk '{ print $2; }'
+kubectl kustomize packaging/apk/iknite/iknite.d
 ```
 
-Update `packaging/apk/iknite-images/iknite-images.yaml` to ensure images are
-pre-pulled.
+This can be done also with iknite:
+
+```bash
+ ./dist/iknite_linux_amd64_v1/iknite kustomize -d packaging/apk/iknite/iknite.d print
+```
 
 ### Project-Specific Conventions
 
@@ -275,18 +279,19 @@ in WSL2 and Docker.
 
 In addition to the root filesystem image, ready-to-use VM images in QCOW2 and
 VHDX formats are built using the root filesystem image as base. A script
-([hack/build-vm-image.sh](../hack/build-vm-image.sh)) automates the process of
-creating a VM image, installing the iknite APK packages and configuring the VM
-for first use. The starting point of the script is the built root filesystem
-image (`dist/iknite-<iknite_version>-<kubernetes_version>.rootfs.tar.gz`). It
-produces a QCOW2 image for QEMU/KVM and converts it into a VHDX image.
+([packaging/scripts/build-vm-image.sh](../packaging/scripts/build-vm-image.sh))
+automates the process of creating a VM image, installing the iknite APK packages
+and configuring the VM for first use. The starting point of the script is the
+built root filesystem image
+(`dist/iknite-<iknite_version>-<kubernetes_version>.rootfs.tar.gz`). It produces
+a QCOW2 image for QEMU/KVM and converts it into a VHDX image.
 
 ### Development Workflows
 
 The main script to build the iknite images is
-[hack/build-helper.sh](../hack/build-helper.sh). It is a developer friendly
-version of the [release workflow](../.github/workflows/release.yml) that can be
-run locally.
+[packaging/scripts/build-helper.sh](../packaging/scripts/build-helper.sh). It is
+a developer friendly version of the
+[release workflow](../.github/workflows/release.yml) that can be run locally.
 
 It performs the following steps:
 
@@ -308,13 +313,13 @@ STEPS:
 A single step can be run:
 
 ```bash
-./hack/build-helper.sh --only-goreleaser # Several other --only-<step> can be added
+./packaging/scripts/build-helper.sh --only-goreleaser # Several other --only-<step> can be added
 ```
 
 Or one or more steps can be skipped:
 
 ```bash
-./hack/build-helper.sh --skip-images
+./packaging/scripts/build-helper.sh --skip-images
 ```
 
 The `--with-cache` flag can be used to speed up docker builds by reusing
@@ -323,13 +328,13 @@ previous layers.
 In general, the full build can be run with:
 
 ```bash
-./hack/build-helper.sh --with-cache --skip-clean
+./packaging/scripts/build-helper.sh --with-cache --skip-clean
 ```
 
 And the the focus on one specific step by skipping all the others:
 
 ```bash
-./hack/build-helper.sh --only-build --skip-clean --with-cache
+./packaging/scripts/build-helper.sh --only-build --skip-clean --with-cache
 ```
 
 The script assumes a Linux host with Docker or Containerd (preferred) installed.
@@ -440,16 +445,16 @@ configuration.
 
 ### Image Building
 
-| Task                     | Command                                             |
-| ------------------------ | --------------------------------------------------- |
-| Full image build (local) | `./hack/build-helper.sh --with-cache --skip-clean`  |
-| Build only APK packages  | `./hack/build-helper.sh --only-goreleaser`          |
-| Build rootfs base image  | `./hack/build-helper.sh --only-build --with-cache`  |
-| Build iknite-images APK  | `./hack/build-helper.sh --only-images`              |
-| Build rootfs tarball     | `./hack/build-helper.sh --only-export`              |
-| Build VM images          | `./hack/build-vm-image.sh`                          |
-| Skip specific step       | `./hack/build-helper.sh --skip-<step> --with-cache` |
-| Build APK repository     | `./hack/build-helper.sh --only-make-apk-repo`       |
+| Task                     | Command                                                          |
+| ------------------------ | ---------------------------------------------------------------- |
+| Full image build (local) | `./packaging/scripts/build-helper.sh --with-cache --skip-clean`  |
+| Build only APK packages  | `./packaging/scripts/build-helper.sh --only-goreleaser`          |
+| Build rootfs base image  | `./packaging/scripts/build-helper.sh --only-build --with-cache`  |
+| Build iknite-images APK  | `./packaging/scripts/build-helper.sh --only-images`              |
+| Build rootfs tarball     | `./packaging/scripts/build-helper.sh --only-export`              |
+| Build VM images          | `./packaging/scripts/build-vm-image.sh`                          |
+| Skip specific step       | `./packaging/scripts/build-helper.sh --skip-<step> --with-cache` |
+| Build APK repository     | `./packaging/scripts/build-helper.sh --only-make-apk-repo`       |
 
 Available steps: `goreleaser`, `build`, `images`, `add-images`, `export`,
 `rootfs-image`, `fetch-krmfnbuiltin`, `make-apk-repo`, `upload-repo`,

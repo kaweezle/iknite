@@ -5,7 +5,7 @@ include "root" {
 }
 
 terraform {
-  source = "${get_repo_root()}/support/iac/modules/openstack-vm"
+  source = "${get_repo_root()}/deploy/iac/modules/openstack-vm"
 }
 
 locals {

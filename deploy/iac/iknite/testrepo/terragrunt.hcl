@@ -5,7 +5,7 @@ include "root" {
 }
 
 terraform {
-  source = "${get_repo_root()}/support/iac/modules/object-store-sync"
+  source = "${get_repo_root()}/deploy/iac/modules/object-store-sync"
 }
 
 locals {
@@ -28,7 +28,7 @@ inputs = {
     "apkrepo" = {
       name                = "iknitestatic"
       static_content_path = "${get_repo_root()}/dist/repo"
-      destination_prefix  = "release/"
+      destination_prefix  = "test/"
     }
   }
 }

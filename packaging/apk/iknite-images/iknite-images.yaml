@@ -1,7 +1,8 @@
+# cSpell: words overlayfs lowerdir upperdir skopeo destdir mountpoint fusermount
 # This is a melange (see https://github.com/chainguard-dev/melange) recipe
 # for building an apk package that contains the kubernetes base container
 # images for the iknite project.
-# Look at hack/build-helper.sh too see how the image-list.txt file is generated.
+# Look at packaging/scripts/build-helper.sh too see how the image-list.txt file is generated.
 # The following entries will be replaced at build time from the file provided by the --vars-file option
 vars:
   KUBERNETES_VERSION: "${KUBERNETES_VERSION}"
