@@ -2,9 +2,11 @@ name: Build Dev Container
 
 on:
   pull_request:
+    branches:
+      - main
     paths:
-      - "hack/devcontainer/Dockerfile"
-      - ".github/workflows/devcontainer.yaml"
+      - hack/devcontainer/*
+      - .github/workflows/devcontainer.yaml
   push:
     branches:
       - deploy/devcontainer

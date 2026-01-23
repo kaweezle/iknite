@@ -63,7 +63,7 @@ func StartOpenRC() error {
 
 func IsServiceStarted(serviceName string) (bool, error) {
 	serviceLink := path.Join(startedServicesDir, serviceName)
-	exists, err := utils.Exists(serviceLink)
+	exists, err := utils.FS.Exists(serviceLink)
 	if err != nil {
 		return false, fmt.Errorf("failed to check if service %s is started: %w", serviceName, err)
 	}

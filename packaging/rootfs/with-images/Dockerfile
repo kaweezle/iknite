@@ -1,0 +1,15 @@
+# syntax=docker/dockerfile:1.3-labs
+FROM scratch
+ARG IKNITE_VERSION=0.5.3-devel
+ARG KUBERNETES_VERSION=1.34.3
+ARG ALPINE_VERSION=3.23
+
+ADD ./iknite-${IKNITE_VERSION}-${KUBERNETES_VERSION}.rootfs.tar.gz /
+LABEL org.opencontainers.image.source="https://github.com/kaweezle/iknite.git"
+LABEL org.opencontainers.image.description="Iknite ${IKNITE_VERSION} on Alpine ${ALPINE_VERSION} with Kubernetes ${KUBERNETES_VERSION} support"
+LABEL org.opencontainers.image.flavor="Alpine"
+LABEL org.opencontainers.image.version="${ALPINE_VERSION}.2"
+LABEL com.kaweezle.wsl.rootfs.uid=0
+LABEL com.kaweezle.wsl.rootfs.username=root
+LABEL com.kaweezle.wsl.rootfs.configured="false"
+USER root

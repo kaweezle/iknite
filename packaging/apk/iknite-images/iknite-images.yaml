@@ -1,0 +1,215 @@
+# cSpell: words overlayfs lowerdir upperdir skopeo destdir mountpoint fusermount
+# This is a melange (see https://github.com/chainguard-dev/melange) recipe
+# for building an apk package that contains the kubernetes base container
+# images for the iknite project.
+# Look at packaging/scripts/build-helper.sh too see how the image-list.txt file is generated.
+# The following entries will be replaced at build time from the file provided by the --vars-file option
+vars:
+  KUBERNETES_VERSION: "${KUBERNETES_VERSION}"
+package:
+  name: iknite-images
+  version: "${{vars.KUBERNETES_VERSION}}"
+  description: A collection of containerd images for the iknite project.
+  copyright:
+    - license: Apache-2.0
+  dependencies:
+    runtime:
+      - containerd
+      - containerd-ctr
+      - fuse-overlayfs
+  scriptlets:
+    post-install: |
+      #!/bin/sh
+
+      # This script checks if fuse-overlayfs is needed by testing if the overlay filesystem can be mounted directly.
+      is_fuse_overlayfs_needed() {
+          local tmpdir=$(mktemp -d)
+          mkdir -p "$tmpdir/lower" "$tmpdir/upper" "$tmpdir/work" "$tmpdir/merged"
+          echo -n "test" > "$tmpdir/lower/hello.txt"
+
+          if mount -t overlay overlay -o lowerdir="${tmpdir}/lower",upperdir="${tmpdir}/upper",workdir="${tmpdir}/work" "${tmpdir}/merged" 2>/dev/null; then
+              if mountpoint -q "${tmpdir}/merged"; then
+                  umount "${tmpdir}/merged"
+                  rm -rf "$tmpdir"
+                  return 1  # echo "no"
+              fi
+          fi
+          rm -rf "$tmpdir"
+          return 0  # echo "yes"
+      }
+
+      # This function installs fuse-overlayfs and checks if it works by creating a simple overlay filesystem.
+      add_and_check_fuse_overlayfs() {
+          # apk add --update --no-progress --no-cache fuse-overlayfs
+          local tmpdir=$(mktemp -d)
+          local result=1
+          mkdir -p "$tmpdir/lower" "$tmpdir/upper" "$tmpdir/work" "$tmpdir/merged"
+          echo -n "test" > "$tmpdir/lower/hello.txt"
+
+          if fuse-overlayfs -o lowerdir="${tmpdir}/lower",upperdir="${tmpdir}/upper",workdir="${tmpdir}/work" "${tmpdir}/merged" 2>/dev/null; then
+              if [ -f "${tmpdir}/merged/hello.txt" ] && [ $(cat "${tmpdir}/merged/hello.txt") == "test" ]; then
+                  result=0
+              fi
+              fusermount3 -u "${tmpdir}/merged"
+          fi
+          rm -rf "$tmpdir"
+          return $result
+      }
+
+      # This function removes fuse-overlayfs after testing.
+      remove_fuse_overlayfs() {
+          echo apk del fuse-overlayfs
+      }
+
+      install_fuse_overlayfs_snapshotter() {
+
+          echo "Installing fuse-overlayfs snapshotter"
+          (cd /usr/local/bin && \
+              wget -q -O - https://github.com/containerd/fuse-overlayfs-snapshotter/releases/download/v2.1.2/containerd-fuse-overlayfs-2.1.2-linux-amd64.tar.gz | tar zx)
+
+          echo "Starting fuse-overlayfs snapshotter"
+          /usr/local/bin/containerd-fuse-overlayfs-grpc /var/run/fuse-overlayfs.sock /var/lib/containerd/io.containerd.snapshotter.v1.overlayfs >/var/log/fuse-overlayfs.log 2>&1 &
+
+          echo "Configuring containerd to use fuse-overlayfs"
+          # Backup the original config file
+          if [ -f /etc/containerd/config.toml.bak ]; then
+              echo "Backup already exists, skipping backup"
+          else
+              cp /etc/containerd/config.toml /etc/containerd/config.toml.bak
+          fi
+          # Remove any existing proxy_plugins section
+          if grep -q "\[proxy_plugins\]" /etc/containerd/config.toml; then
+              sed -i -e '/\[proxy_plugins\]/d' /etc/containerd/config.toml
+          fi
+          # Add the new proxy_plugins section
+          cat - >> /etc/containerd/config.toml <<EOF
+
+      [proxy_plugins]
+        [proxy_plugins."fuse-overlayfs"]
+          type = "snapshot"
+          address = "/var/run/fuse-overlayfs.sock"
+      EOF
+          echo "Containerd snapshotter set to fuse-overlayfs"
+      }
+
+      remove_fuse_overlayfs_snapshotter() {
+          echo "Removing fuse-overlayfs snapshotter"
+          kill %1
+          rm -f /var/log/fuse-overlayfs.log
+          mv /etc/containerd/config.toml.bak /etc/containerd/config.toml
+          rm -f /usr/local/bin/containerd-fuse-overlayfs-grpc
+          unset CONTAINERD_SNAPSHOTTER
+          echo "Containerd snapshotter removed"
+      }
+
+      start_containerd() {
+          echo "Starting containerd..."
+          containerd --config /etc/containerd/config.toml >/dev/null 2>&1 &
+          # Wait for containerd to start
+          while [ ! -S /run/containerd/containerd.sock ]; do
+              sleep 1
+          done
+      }
+
+      stop_containerd() {
+          echo "Stopping containerd..."
+          kill %
+          rm -f /run/containerd/containerd.sock
+      }
+
+      used_fuse=no
+
+      # Check if containerd is running. If not, start it and memorize we have started it
+      if [ -S /run/containerd/containerd.sock ]; then
+        started_containerd=no
+      else
+        if is_fuse_overlayfs_needed; then
+            echo "fuse-overlayfs is needed"
+            if add_and_check_fuse_overlayfs; then
+                echo "fuse-overlayfs is working"
+                used_fuse=yes
+                install_fuse_overlayfs_snapshotter
+            else
+                echo "fuse-overlayfs is not working"
+                exit 1
+            fi
+        else
+            echo "fuse-overlayfs is not needed"
+        fi
+
+        if [ "$used_fuse" = "yes" ]; then
+            export CONTAINERD_SNAPSHOTTER=fuse-overlayfs
+        fi
+        start_containerd
+        started_containerd=yes
+      fi
+
+      # Register images
+      cd /usr/share/iknite/images
+      for i in *.tar.gz; do
+          name=$(basename $i .tar.gz | tr '_' ':')
+          # Check if the image is already imported
+          if ! ctr -n k8s.io images ls | grep -q "$name"; then
+              # Import the image
+              echo "Importing container image $name..."
+              gzip -dc $i | ctr -n k8s.io images import --local -
+          else
+              echo "Container image $name already imported, skipping."
+          fi
+      done
+
+      # If we started containerd, stop it
+      if [ "$started_containerd" = "yes" ]; then
+        stop_containerd
+        unset CONTAINERD_SNAPSHOTTER
+
+        if [ "$used_fuse" = "yes" ]; then
+            remove_fuse_overlayfs_snapshotter
+            remove_fuse_overlayfs
+        fi
+      fi
+
+environment:
+  contents:
+    repositories:
+      - https://packages.wolfi.dev/os
+      - https://dl-cdn.alpinelinux.org/alpine/edge/community
+      - https://dl-cdn.alpinelinux.org/alpine/edge/testing
+    keyring:
+      - https://packages.wolfi.dev/os/wolfi-signing.rsa.pub
+    packages:
+      - busybox
+      - containers-common
+      - skopeo
+
+pipeline:
+  - name: Download images
+    runs: |
+      # Local images are generated from the commands:
+      #  iknite kustomize  -d packaging/apk/iknite/iknite.d print | grep image: | awk '{ print $2; }'
+      #  iknite info images
+      LOCAL_IMAGES=$(cat image-list.txt)
+      DEST_DIR=${{targets.destdir}}/usr/share/iknite/images
+      KUBERNETES_VERSION=${{vars.KUBERNETES_VERSION}}
+
+      mkdir -p $DEST_DIR
+      mkdir -p /var/tmp
+      cd $DEST_DIR
+
+      # Download and compress each image
+      while IFS= read -r IMAGE; do
+        FILENAME=$(echo "$IMAGE" | sed 's|[/:]|_|g')
+        echo "Downloading $IMAGE..."
+        skopeo copy docker://$IMAGE oci-archive:${FILENAME}.tar:$IMAGE
+        gzip ${FILENAME}.tar
+      done << END
+      $LOCAL_IMAGES
+      END
+
+test:
+  environment:
+    contents:
+      packages: []
+  pipeline:
+    - runs: |
+        ls -l ${{targets.destdir}}/usr/share/iknite/images

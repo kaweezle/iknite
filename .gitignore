@@ -27,7 +27,6 @@ gpg_key.asc
 
 /iknite
 packages/
-rootfs/*.apk
 
 .terraform/
 .terragrunt-cache/
@@ -39,4 +38,4 @@ rootfs/*.apk
 *.vhdx
 *.iso
 *.log
-support/apk/iknite-images/*
+docs/site/

@@ -35,4 +35,6 @@ func RegisterDefaults(scheme *runtime.Scheme) error {
 
 func SetObjectDefaults_IkniteCluster(in *IkniteCluster) {
 	SetDefaults_IkniteCluster(in)
+	SetDefaults_IkniteClusterSpec(&in.Spec)
+	SetDefaults_IkniteClusterStatus(&in.Status)
 }

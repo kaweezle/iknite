@@ -2,9 +2,8 @@
   "version": "0.2",
   "language": "en",
   "ignorePaths": [
-    "apk",
     "dist",
-    "rootfs",
+    "packaging/rootfs/**/*.z?sh",
     "go.*",
     ".gitignore",
     "**/testdata/**",
@@ -19,7 +18,13 @@
     "**/**.sops.yaml"
   ],
   "dictionaryDefinitions": [],
-  "dictionaries": ["bash", "docker", "golang", "terraform", "softwareTerms"],
+  "dictionaries": [
+    "bash",
+    "docker",
+    "golang",
+    "terraform",
+    "softwareTerms"
+  ],
   "words": [
     "abuild",
     "afero",
@@ -41,6 +46,7 @@
     "DRYRUN",
     "fieldtype",
     "fontawesome",
+    "forbidigo",
     "forcetypeassert",
     "gitmoji",
     "gochecknoinits",
@@ -54,6 +60,7 @@
     "govet",
     "Healthz",
     "iknite",
+    "iknitedev",
     "Infof",
     "Infoln",
     "interfacebloat",

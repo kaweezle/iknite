@@ -10,7 +10,7 @@ import (
 	"testing"
 
 	"github.com/spf13/afero"
-	"github.com/stretchr/testify/suite"
+	"github.com/stretchr/testify/require"
 	"github.com/txn2/txeh"
 
 	"github.com/kaweezle/iknite/pkg/alpine"
@@ -20,72 +20,69 @@ import (
 
 // cSpell: enable
 
-type IPTestSuite struct {
-	suite.Suite
-	Executor    *tu.MockExecutor
-	OldExecutor *utils.Executor
+func setupExecutor(t *testing.T) (*tu.MockExecutor, func()) {
+	t.Helper()
+	executor := &tu.MockExecutor{}
+	old := utils.Exec
+	utils.Exec = executor
+	return executor, func() {
+		utils.Exec = old
+	}
 }
 
-func (s *IPTestSuite) SetupTest() {
-	s.Executor = &tu.MockExecutor{}
-	s.OldExecutor = &utils.Exec
-	utils.Exec = s.Executor
-}
-
-func (s *IPTestSuite) TeardownTest() {
-	utils.Exec = *s.OldExecutor
-}
-
-func (s *IPTestSuite) TestIPExists() {
-	require := s.Require()
+func TestIPExists(t *testing.T) {
+	req := require.New(t)
 	localhost := net.ParseIP("127.0.0.1")
-	require.NotNil(localhost)
+	req.NotNil(localhost)
 
 	result, err := alpine.CheckIpExists(localhost)
-	require.NoError(err)
-	require.True(result, "Localhost should exist")
+	req.NoError(err)
+	req.True(result, "Localhost should exist")
 
 	nonexistent := net.ParseIP("10.0.0.16")
-	require.NotNil(nonexistent)
+	req.NotNil(nonexistent)
 
 	result, err = alpine.CheckIpExists(nonexistent)
-	require.NoError(err)
-	require.False(result, "10.0.0.16 shouldn't exist")
+	req.NoError(err)
+	req.False(result, "10.0.0.16 shouldn't exist")
 }
 
-func (s *IPTestSuite) TestAddIpAddress() {
-	require := s.Require()
+func TestAddIpAddress(t *testing.T) {
+	executor, teardown := setupExecutor(t)
+	defer teardown()
+
+	req := require.New(t)
 
 	ipaddr := net.ParseIP("192.168.99.2")
-	require.NotNil(ipaddr)
+	req.NotNil(ipaddr)
 
-	call := s.Executor.On("Run", true, "/sbin/ip", "addr", "add", "192.168.99.2/24", "broadcast", "+", "dev", "eth0").
+	call := executor.On("Run", true, "/sbin/ip", "addr", "add", "192.168.99.2/24", "broadcast", "+", "dev", "eth0").
 		Return("ok", nil)
 
 	err := alpine.AddIpAddress("eth0", ipaddr)
 
-	require.NoError(err)
-	s.Executor.AssertExpectations(s.T())
+	req.NoError(err)
+	executor.AssertExpectations(t)
 
 	call.Unset()
-	s.Executor.On("Run", true, "/sbin/ip", "addr", "add", "192.168.99.2/24", "broadcast", "+", "dev", "eth0").
+	executor.On("Run", true, "/sbin/ip", "addr", "add", "192.168.99.2/24", "broadcast", "+", "dev", "eth0").
 		Return("RTNETLINK answers: File exists", new(exec.ExitError))
 
 	err = alpine.AddIpAddress("eth0", ipaddr)
-	s.Executor.AssertExpectations(s.T())
+	executor.AssertExpectations(t)
 
-	require.EqualError(err, "RTNETLINK answers: File exists: <nil>")
+	req.EqualError(err, "RTNETLINK answers: File exists: <nil>")
 }
 
-func (s *IPTestSuite) TestAddIpMapping() {
-	require := s.Require()
+func TestAddIpMapping(t *testing.T) {
+	req := require.New(t)
 
 	fs := afero.NewOsFs()
 	afs := &afero.Afero{Fs: fs}
 
 	f, err := os.CreateTemp("", "hosts")
-	require.NoError(err)
-	require.NoError(f.Close())
+	req.NoError(err)
+	req.NoError(f.Close())
 
 	config := txeh.HostsConfig{
 		ReadFilePath:  "testdata/hosts1",
@@ -96,15 +93,15 @@ func (s *IPTestSuite) TestAddIpMapping() {
 	domainName := "kaweezle.local"
 
 	err = alpine.AddIpMapping(&config, ip, domainName, []net.IP{})
-	require.NoError(err)
+	req.NoError(err)
 
 	changed, err := afs.ReadFile(f.Name())
-	require.NoError(err)
+	req.NoError(err)
 
 	re := regexp.MustCompile(`(?m)^192\.168\.99\.2\s+kaweezle.local$`)
 
 	found := re.Find(changed)
-	require.NotNilf(found, "File doesn't contain ip mapping:\n[%s]", string(changed))
+	req.NotNilf(found, "File doesn't contain ip mapping:\n[%s]", string(changed))
 
 	// Same test with the removal of an existing address
 	config = txeh.HostsConfig{
@@ -113,21 +110,16 @@ func (s *IPTestSuite) TestAddIpMapping() {
 	}
 
 	err = alpine.AddIpMapping(&config, ip, domainName, []net.IP{net.ParseIP("192.168.99.4")})
-	require.NoError(err)
-	require.NoError(err)
+	req.NoError(err)
+	req.NoError(err)
 
 	changed, err = afs.ReadFile(f.Name())
-	require.NoError(err)
+	req.NoError(err)
 
 	found = re.Find(changed)
-	require.NotNil(found, "File doesn't contain ip mapping")
+	req.NotNil(found, "File doesn't contain ip mapping")
 
 	re2 := regexp.MustCompile(`192\.168\.99\.4`)
 	found = re2.Find(changed)
-	require.Nil(found, "Shouldn't contain old IP")
-}
-
-func TestIP(t *testing.T) {
-	t.Parallel()
-	suite.Run(t, new(IPTestSuite))
+	req.Nil(found, "Shouldn't contain old IP")
 }

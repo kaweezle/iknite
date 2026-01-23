@@ -18,6 +18,7 @@ import (
 
 	"github.com/kaweezle/iknite/pkg/alpine"
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
+	"github.com/kaweezle/iknite/pkg/utils"
 )
 
 // cSpell: enable
@@ -229,7 +230,7 @@ func processMounts(path string, remove bool, message string, isDryRun bool) erro
 		return fmt.Errorf("failed to evaluate symlinks for path %s: %w", path, err)
 	}
 
-	p := s.File("/proc/self/mounts").Column(2).Match(path).FilterLine(func(s string) string {
+	p := utils.FS.Pipe("/proc/self/mounts").Column(2).Match(path).FilterLine(func(s string) string {
 		logger.WithField("mount", s).Debug(message)
 		if !isDryRun {
 			err = syscall.Unmount(s, 0)
@@ -238,7 +239,7 @@ func processMounts(path string, remove bool, message string, isDryRun bool) erro
 				return s
 			}
 			if remove {
-				err = os.RemoveAll(s)
+				err = utils.FS.RemoveAll(s)
 				if err != nil {
 					logger.WithField("path", s).WithError(err).Warn("Error removing path")
 					return s

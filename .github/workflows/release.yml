@@ -4,6 +4,7 @@ name: Buid iknite package, rootfs, and VM images
 on:
   pull_request:
     branches: ["main"]
+    types: [labeled, synchronize, opened]
   push:
     tags: ["v*"]
 
@@ -18,7 +19,7 @@ jobs:
   goreleaser-snapshot:
     name: Test GoReleaser packaging
     runs-on: ubuntu-latest
-    if: ${{ github.actor != 'dependabot[bot]' }}
+    if: ${{ github.event_name == 'push' || contains(github.event.pull_request.labels.*.name, 'e2e') && github.actor != 'dependabot[bot]' }}
     outputs:
       KUBERNETES_VERSION: ${{ steps.import-signing-key.outputs.KUBERNETES_VERSION }}
       IKNITE_VERSION: ${{ steps.get-iknite-version.outputs.IKNITE_VERSION }}
@@ -73,26 +74,31 @@ jobs:
           echo "IKNITE_VERSION=$IKNITE_VERSION" >> $GITHUB_OUTPUT
       - name: Build iknite images APK
         run: |
-          echo "KUBERNETES_VERSION: ${KUBERNETES_VERSION}" > support/apk/.env
-          mkdir -p support/apk/iknite-images
-          ./dist/iknite_linux_amd64_v1/iknite kustomize  -d apk/iknite.d print  | grep image: | awk '{ print $2; }' > support/apk/iknite-images/image-list.txt
-          ./dist/iknite_linux_amd64_v1/iknite info images >> support/apk/iknite-images/image-list.txt
-          sort -u support/apk/iknite-images/image-list.txt -o support/apk/iknite-images/image-list.txt
+          BUILD_DIR="build/apk/iknite-images"
+          ARCH=$(uname -m)
+          rm -rf "$BUILD_DIR" || /bin/true
+          mkdir -p "$BUILD_DIR"
+
+          echo "KUBERNETES_VERSION: ${KUBERNETES_VERSION}" > "$BUILD_DIR/.env"
+          ./dist/iknite_linux_amd64_v1/iknite kustomize  -d packaging/apk/iknite/iknite.d print | grep image: | awk '{ print $2; }' > "$BUILD_DIR/image-list.txt"
+          ./dist/iknite_linux_amd64_v1/iknite info images >> "$BUILD_DIR/image-list.txt"
+          sort -u "$BUILD_DIR/image-list.txt" -o "$BUILD_DIR/image-list.txt"
 
           docker run --rm --privileged \
             -v /var/run/docker.sock:/var/run/docker.sock \
             -v $(pwd):/work \
-            cgr.dev/chainguard/melange build support/apk/iknite-images.yaml \
-            --arch $(uname -m) \
+            cgr.dev/chainguard/melange build packaging/apk/iknite-images/iknite-images.yaml \
+            --arch "$ARCH" \
             --signing-key kaweezle-devel@kaweezle.com-c9d89864.rsa \
-            --vars-file support/apk/.env \
-            --source-dir support/apk/iknite-images \
+            --vars-file "$BUILD_DIR/.env" \
+            --source-dir "$BUILD_DIR" \
             --out-dir ./dist/ \
             --generate-index=false
           sudo chown -R $(id -u):$(id -g) dist
-          (cd dist/$(uname -m)/ && \
+          (cd "dist/$ARCH"/ && \
            sha256sum *.apk >>../SHA256SUMS && \
-           for f in *.apk; do mv $f ../$(echo $f | sed 's/\-r0.apk$//').$(uname -m).apk; done)
+           for f in *.apk; do mv $f ../$(echo $f | sed 's/\-r0.apk$//').$ARCH.apk; done)
+          rmdir "dist/$ARCH/"
       - name: Download krmfnbuiltin apk
         run: |
           cd dist
@@ -132,7 +138,7 @@ jobs:
           echo "::group::Running terragrunt module"
           export TF_PLUGIN_CACHE_DIR="$HOME/.cache/terraform/plugin-cache"
           mkdir -p $TF_PLUGIN_CACHE_DIR
-          cd support/iac/iknite/${IKNITE_REPO_NAME}repo
+          cd deploy/iac/iknite/${IKNITE_REPO_NAME}repo
           terragrunt init
           terragrunt apply -auto-approve
           echo "::endgroup::"
@@ -183,9 +189,15 @@ jobs:
           sudo apt-get update -y
           sudo apt-get install -y --no-install-recommends libarchive-tools
 
+          mkdir -p dist
+          BUILD_DIR="build/rootfs/base"
+          rm -rf "$BUILD_DIR" || /bin/true
+          mkdir -p "$BUILD_DIR"
+          cp -r "packaging/rootfs/base/." "$BUILD_DIR/"
+
           echo "Version is $IKNITE_VERSION"
-          cp packages/iknite-${IKNITE_VERSION}.$(uname -m).apk rootfs
-          cp packages/krmfnbuiltin-*.$(uname -m).apk rootfs/
+          cp packages/iknite-${IKNITE_VERSION}.$(uname -m).apk "$BUILD_DIR"
+          cp packages/krmfnbuiltin-*.$(uname -m).apk "$BUILD_DIR"
           mkdir -p /tmp/.buildx-cache
           mkdir -p /tmp/.buildx-cache-new
           echo "::group::Building iknite-rootfs-base:${IKNITE_VERSION}"
@@ -197,7 +209,7 @@ jobs:
              --cache-to type=local,dest=/tmp/.buildx-cache-new \
              --tag iknite-rootfs-base:${IKNITE_VERSION} \
              --load \
-             rootfs
+             "$BUILD_DIR"
           echo "::endgroup::"
 
           echo "::group::Adding base iknite images to root fs and exporting"
@@ -208,8 +220,10 @@ jobs:
             iknite-rootfs-base:${IKNITE_VERSION} \
             /bin/sh -c 'apk --no-cache add /apks/iknite-images-*.apk; apk del iknite-images'
 
-          docker export iknite-rootfs | bsdtar -zcf rootfs/iknite.rootfs.tar.gz --exclude=.dockerenv --exclude=dev/console @-
-          sha256sum rootfs/iknite.rootfs.tar.gz >> packages/SHA256SUMS
+          ROOTFS_NAME="iknite-${IKNITE_VERSION}-${KUBERNETES_VERSION}.rootfs.tar.gz"
+          ROOTFS_PATH="dist/$ROOTFS_NAME"
+          docker export iknite-rootfs | bsdtar -zcf "$ROOTFS_PATH" --exclude=.dockerenv --exclude=dev/console @-
+          sha256sum "$ROOTFS_PATH" >> dist/SHA256SUMS
           echo "::endgroup::"
 
           echo "::group::Building and pushing root fs image to registry"
@@ -219,14 +233,19 @@ jobs:
             ADDITIONAL_TAG=""
           fi
 
+          BUILD_DIR="build/rootfs/with-images"
+          rm -rf "$BUILD_DIR" || /bin/true
+          mkdir -p "$BUILD_DIR"
+          cp -r "packaging/rootfs/with-images/." "$BUILD_DIR/"
+          cp "dist/${ROOTFS_NAME}" "$BUILD_DIR/$ROOTFS_NAME"
+
           docker buildx build \
              --build-arg IKNITE_VERSION=$IKNITE_VERSION \
              --build-arg KUBERNETES_VERSION=${KUBERNETES_VERSION} \
              --tag ${REGISTRY}/${IMAGE_NAME}:${IKNITE_VERSION}-${KUBERNETES_VERSION} \
              $ADDITIONAL_TAG \
              --push \
-             --file rootfs/Dockerfile.rootfs \
-             rootfs
+             "$BUILD_DIR"
           echo "::endgroup::"
 
       - name: Upload root fs artifact
@@ -234,8 +253,7 @@ jobs:
         with:
           name: rootfs
           path: |
-            rootfs/iknite.rootfs.tar.gz
-            packages/SHA256SUMS
+            dist/*
 
       - name: Move cache
         run: |
@@ -255,28 +273,22 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Get packages artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: packages
-          path: dist
-
       - name: Get root fs artifact
         uses: actions/download-artifact@v4
         with:
           name: rootfs
+          path: dist
 
       # What is needed: qemu-img qemu-nbd genisoimage
       - name: Install dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y qemu-utils qemu-guest-agent genisoimage
-          ls -Rl rootfs/
           ls -Rl dist/
 
       - name: Build VM images
         run: |
-          sudo ./hack/build-vm-image.sh
+          sudo KUBERNETES_VERSION=${KUBERNETES_VERSION} IKNITE_VERSION=${IKNITE_VERSION} ./packaging/scripts/build-vm-image.sh
 
       - name: Create OpenStack image and test VM deployment
         id: create-and-test-openstack-image
@@ -306,7 +318,7 @@ jobs:
           echo "::group::Running terragrunt module with instance creation"
           export TF_PLUGIN_CACHE_DIR="$HOME/.cache/terraform/plugin-cache"
           mkdir -p $TF_PLUGIN_CACHE_DIR
-          cd support/iac/iknite/iknite-vm
+          cd deploy/iac/iknite/iknite-vm
           export IKNITE_CREATE_INSTANCE=true
           terragrunt init
           terragrunt apply -auto-approve
@@ -327,9 +339,8 @@ jobs:
         with:
           name: vm-images
           path: |
-            rootfs/iknite-*.vhdx
-            rootfs/iknite-*.qcow2
-            rootfs/*.iso
+            dist/iknite-*.vhdx
+            dist/iknite-*.qcow2
 
   make-release:
     name: Release iknite package
@@ -354,9 +365,11 @@ jobs:
           ls -Rl
           mkdir -p release
           mv packages/iknite-*.apk release/
-          mv rootfs/rootfs/iknite.rootfs.tar.gz release/iknite-${IKNITE_VERSION}-${KUBERNETES_VERSION}.rootfs.tar.gz
+          mv rootfs/* release/
           mv vm-images/* release/
-          (cd release && sha256sum *.vhdx *.qcow2 *.tar.gz *.apk > SHA256SUMS)
+          cp Get-Iknite.ps1 release/
+          cp packaging/rootfs/base/*.rsa.pub release/
+          (cd release && sha256sum * > SHA256SUMS)
 
       - name: Create the GitHub Release (draft)
         uses: softprops/action-gh-release@v2
@@ -366,5 +379,3 @@ jobs:
           body_path: RELEASE.md
           files: |
             release/*
-            Get-Iknite.ps1
-            rootfs/*.rsa.pub

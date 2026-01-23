@@ -5,8 +5,7 @@ import (
 	"testing"
 
 	"github.com/lithammer/dedent"
-	"github.com/spf13/afero"
-	"github.com/stretchr/testify/suite"
+	"github.com/stretchr/testify/require"
 
 	"github.com/kaweezle/iknite/pkg/k8s"
 	tu "github.com/kaweezle/iknite/pkg/testutils"
@@ -15,23 +14,25 @@ import (
 
 // cSpell: enable
 
-type RuntimeEnvironmentTestSuite struct {
-	suite.Suite
-	Executor    *tu.MockExecutor
-	OldExecutor *utils.Executor
+func setupExecutor(t *testing.T) func() {
+	t.Helper()
+	executor := &tu.MockExecutor{}
+	old := utils.Exec
+	utils.Exec = executor
+	oldFS := utils.FS
+	utils.FS = utils.NewMemMapFS()
+	return func() {
+		utils.Exec = old
+		utils.FS = oldFS
+	}
 }
 
-func (s *RuntimeEnvironmentTestSuite) SetupTest() {
-	s.Executor = &tu.MockExecutor{}
-	s.OldExecutor = &utils.Exec
-	utils.Exec = s.Executor
-}
+const confFilePath = "/etc/rc.conf"
 
-func (s *RuntimeEnvironmentTestSuite) TeardownTest() {
-	utils.Exec = *s.OldExecutor
-}
+func TestPreventKubeletServiceFromStarting(t *testing.T) {
+	teardown := setupExecutor(t)
+	defer teardown()
 
-func (s *RuntimeEnvironmentTestSuite) TestPreventKubeletServiceFromStarting() {
 	// cSpell: disable
 	rcConfFileContent := dedent.Dedent(`
     rc_sys="prefix"
@@ -41,30 +42,23 @@ func (s *RuntimeEnvironmentTestSuite) TestPreventKubeletServiceFromStarting() {
     `)
 	// cSpell: enable
 
-	require := s.Require()
-	fs := afero.NewOsFs()
-	afs := &afero.Afero{Fs: fs}
+	req := require.New(t)
 
-	tempFile, err := afero.TempFile(fs, "", "rc.conf")
-	require.NoError(err)
-	defer func() {
-		err = tempFile.Close()
-	}()
-
-	_, err = tempFile.WriteString(rcConfFileContent)
-	require.NoError(err)
-
-	confFilePath := tempFile.Name()
+	err := utils.FS.WriteFile(confFilePath, []byte(rcConfFileContent), 0o644)
+	req.NoError(err)
 
 	err = k8s.PreventKubeletServiceFromStarting(confFilePath)
-	require.NoError(err)
+	req.NoError(err)
 
-	content, err := afs.ReadFile(confFilePath)
-	require.NoError(err)
-	require.Equal(rcConfFileContent+k8s.RcConfPreventKubeletRunning+"\n", string(content))
+	content, err := utils.FS.ReadFile(confFilePath)
+	req.NoError(err)
+	req.Equal(rcConfFileContent+k8s.RcConfPreventKubeletRunning+"\n", string(content))
 }
 
-func (s *RuntimeEnvironmentTestSuite) TestPreventKubeletServiceFromStartingWhenLineIsPresent() {
+func TestPreventKubeletServiceFromStarting_WhenLineIsPresent(t *testing.T) {
+	teardown := setupExecutor(t)
+	defer teardown()
+
 	// cSpell: disable
 	existingContent := dedent.Dedent(`
     rc_sys="prefix"
@@ -75,30 +69,15 @@ func (s *RuntimeEnvironmentTestSuite) TestPreventKubeletServiceFromStartingWhenL
     `)
 	// cSpell: enable
 
-	require := s.Require()
-	fs := afero.NewOsFs()
-	afs := &afero.Afero{Fs: fs}
+	req := require.New(t)
 
-	tempFile, err := afero.TempFile(fs, "", "rc.conf")
-	require.NoError(err)
-	defer func() {
-		err = tempFile.Close()
-	}()
-
-	_, err = tempFile.WriteString(existingContent)
-	require.NoError(err)
-
-	confFilePath := tempFile.Name()
+	err := utils.FS.WriteFile(confFilePath, []byte(existingContent), 0o644)
+	req.NoError(err)
 
 	err = k8s.PreventKubeletServiceFromStarting(confFilePath)
-	require.NoError(err)
+	req.NoError(err)
 
-	content, err := afs.ReadFile(confFilePath)
-	require.NoError(err)
-	require.Equal(existingContent, string(content))
-}
-
-func TestRuntimeEnvironment(t *testing.T) {
-	t.Parallel()
-	suite.Run(t, new(RuntimeEnvironmentTestSuite))
+	content, err := utils.FS.ReadFile(confFilePath)
+	req.NoError(err)
+	req.Equal(existingContent, string(content))
 }

@@ -41,7 +41,7 @@ const (
 func IsKubeletServiceRunnable(confFilePath string) (bool, error) {
 	var lines int
 	var err error
-	if lines, err = script.File(confFilePath).Match(RcConfPreventKubeletRunning).CountLines(); err != nil {
+	if lines, err = utils.FS.Pipe(confFilePath).Match(RcConfPreventKubeletRunning).CountLines(); err != nil {
 		return false, fmt.Errorf("failed to count lines in config file: %w", err)
 	}
 	return lines == 0, nil
@@ -50,7 +50,7 @@ func IsKubeletServiceRunnable(confFilePath string) (bool, error) {
 // PreventKubeletServiceFromStarting ensures that the kubelet service is not started
 // by the OpenRC init system. It does so by adding a line to the confFilePath file.
 func PreventKubeletServiceFromStarting(confFilePath string) error {
-	present, err := script.File(confFilePath).Match(RcConfPreventKubeletRunning).CountLines()
+	present, err := utils.FS.Pipe(confFilePath).Match(RcConfPreventKubeletRunning).CountLines()
 	if err != nil {
 		return fmt.Errorf("while checking %s: %w", confFilePath, err)
 	}
@@ -60,9 +60,9 @@ func PreventKubeletServiceFromStarting(confFilePath string) error {
 	}
 	log.Info("Preventing kubelet from running")
 	var lines []string
-	if lines, err = script.File(confFilePath).Slice(); err == nil {
+	if lines, err = utils.FS.Pipe(confFilePath).Slice(); err == nil {
 		lines = append(lines, RcConfPreventKubeletRunning)
-		if _, err = script.Slice(lines).WriteFile(confFilePath); err != nil {
+		if _, err = utils.FS.WritePipe(confFilePath, script.Slice(lines), os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o644); err != nil {
 			return fmt.Errorf("while writing %s: %w", confFilePath, err)
 		}
 	} else {
@@ -85,7 +85,11 @@ func PrepareKubernetesEnvironment(ikniteConfig *v1alpha1.IkniteClusterSpec) erro
 
 	// Allow forwarding (kubeadm requirement)
 	log.Info("Ensuring basic settings...")
-	err := utils.WriteFile("/proc/sys/net/ipv4/ip_forward", []byte("1\n"), os.FileMode(int(0o644)))
+	err := utils.FS.WriteFile(
+		"/proc/sys/net/ipv4/ip_forward",
+		[]byte("1\n"),
+		os.FileMode(int(0o644)),
+	)
 	if err != nil {
 		log.WithError(err).Info("Could not write to /proc/sys/net/ipv4/ip_forward")
 	}
@@ -95,7 +99,7 @@ func PrepareKubernetesEnvironment(ikniteConfig *v1alpha1.IkniteClusterSpec) erro
 	}
 
 	// Make bridge use ip-tables
-	err = utils.WriteFile(
+	err = utils.FS.WriteFile(
 		"/proc/sys/net/bridge/bridge-nf-call-iptables",
 		[]byte("1\n"),
 		os.FileMode(int(0o644)),
@@ -166,7 +170,7 @@ func PrepareKubernetesEnvironment(ikniteConfig *v1alpha1.IkniteClusterSpec) erro
 
 	log.Infof("Ensuring %s existence...", constants.CrictlYaml)
 	if err := utils.ExecuteIfNotExist(constants.CrictlYaml, func() error {
-		return utils.WriteFile(
+		return utils.FS.WriteFile(
 			constants.CrictlYaml,
 			[]byte("runtime-endpoint: unix://"+constants.ContainerServiceSock+"\n"),
 			os.FileMode(int(0o644)))
