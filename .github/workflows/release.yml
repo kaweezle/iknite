@@ -4,6 +4,7 @@ name: Buid iknite package, rootfs, and VM images
 on:
   pull_request:
     branches: ["main"]
+    types: [labeled, synchronize, opened]
   push:
     tags: ["v*"]
 
@@ -18,7 +19,7 @@ jobs:
   goreleaser-snapshot:
     name: Test GoReleaser packaging
     runs-on: ubuntu-latest
-    if: ${{ github.actor != 'dependabot[bot]' }}
+    if: ${{ github.event_name == 'push' || contains(github.event.pull_request.labels.*.name, 'e2e') && github.actor != 'dependabot[bot]' }}
     outputs:
       KUBERNETES_VERSION: ${{ steps.import-signing-key.outputs.KUBERNETES_VERSION }}
       IKNITE_VERSION: ${{ steps.get-iknite-version.outputs.IKNITE_VERSION }}
