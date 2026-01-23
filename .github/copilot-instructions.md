@@ -6,8 +6,8 @@
 
 Iknite is a Go-based cluster orchestrator that manages initialization and
 startup of a single-node Kubernetes cluster on Alpine Linux (WSL2/VM). It wraps
-`kubeadm` with Alpine-specific integration (OpenRC services) and pre-provisions
-essential cluster components.
+`kubeadm` and `kubelet` with Alpine-specific integration (OpenRC services) and
+pre-provisions essential cluster components.
 
 ### Core Workflow
 
@@ -57,10 +57,10 @@ The project provides five main deliverables:
   golangci-lint, shellcheck, cspell)
 - **[packaging/scripts/build-helper.sh](../packaging/scripts/build-helper.sh)**:
   Developer-friendly build script (full pipeline locally)
-- **[Devcontainer](../.devcontainer/devcontainer.json)**: Alpine-based
-  development environment with all dependencies
-- **[Terraform/Terragrunt](../deploy/iac/)**: APK repository hosting
-  (Cloudflare) and VM testing (OpenStack)
+- **[Devcontainer](../hack/devcontainer/Dockerfile)**: Alpine-based development
+  environment with all dependencies
+- **[Terraform/Terragrunt](../deploy/iac/iknite/root.hcl)**: APK repository
+  hosting (Cloudflare) and VM testing (OpenStack)
 
 ## Golang CLI (iknite)
 
@@ -105,8 +105,7 @@ The project provides five main deliverables:
    `//go:linkname` to access unexported kubeadm functions, allowing deep
    customization of init phases
 2. **OpenRC coordination**: Kubelet prevented from auto-starting via rc.conf
-   patches (see
-   [pkg/k8s/runtime_environment.go](../pkg/k8s/runtime_environment.go))
+   patches (see ` pkg/k8s/runtime_environment.go`)
 3. **State tracking**: Custom `IkniteCluster` CR persisted as JSON to track
    initialization phases and workload readiness
 
@@ -133,7 +132,8 @@ pre-commit run --all-files
 - Use `testify/suite` for stateful test fixtures (see
   [pkg/k8s/runtime_environment_test.go](../pkg/k8s/runtime_environment_test.go))
 - Mock executors via `pkg/testutils.MockExecutor` to avoid shell dependencies
-- Afero filesystem mocking for file I/O tests
+- Afero filesystem mocking for file I/O tests (see
+  [pkg/utils/filesystem_test.go](../pkg/utils/filesystem_test.go))
 
 #### Adding Commands
 
@@ -149,7 +149,7 @@ Follow [pkg/cmd/status.go](../pkg/cmd/status.go) pattern:
 Edit manifests in
 [packaging/apk/iknite/iknite.d/base/](../packaging/apk/iknite/iknite.d/base/kustomization.yaml).
 
-Verify with the following command:
+Verify with the following command after making changes:
 
 ```bash
 kubectl kustomize packaging/apk/iknite/iknite.d
@@ -205,22 +205,23 @@ run as non init process.
 
 `iknite` is installed via the iknite APK package, along with its dependencies
 (see [.goreleaser.yaml](../.goreleaser.yaml#L67-L79)). On first run, the iknite
-OpenRC service (`/etc/init.d/iknite`) is started which in turn runs
-`iknite start` to initialize the cluster. The service depends on `containerd`
-service to ensure container runtime is running before starting the cluster. It
-_wants_ the `buildkitd` service in order to provide container image building
-capabilities inside the cluster. `iknite` will launch and manage the `kubelet`
-service as part of its workflow. In consequence the `kubelet` service is
-disabled in `/etc/rc.conf` to prevent the kubeadm included auto-start logic from
-interfering with iknite.
+OpenRC service ([/etc/init.d/iknite](../packaging/apk/iknite/init.d/iknite)) is
+started which in turn runs `iknite init` to initialize the cluster. The service
+depends on `containerd` service to ensure container runtime is running before
+starting the cluster. It _wants_ the `buildkitd` service in order to provide
+container image building capabilities inside the cluster. `iknite` will launch
+and manage the `kubelet` command as part of its workflow. In consequence the
+`kubelet` service is disabled in `/etc/rc.conf` to prevent the kubeadm included
+auto-start logic from interfering with iknite.
 
 As part of the startup process, iknite will apply the default kustomization
-present in `/etc/iknite.d/kustomization.yaml` unless overridden by user
-configuration (in `/etc/conf.d/iknite`). The APK package installs a base set of
-kustomizations including networking (flannel), metrics-server,
-local-path-provisioner and Kube-VIP. Iknite then creates a configmap
-`iknite-config` in the `kube-system` namespace to avoid re-applying the base
-kustomization on subsequent restarts.
+present in
+[/etc/iknite.d/kustomization.yaml](../packaging/apk/iknite/iknite.d/base/kustomization.yaml)
+unless overridden by user configuration (in `/etc/conf.d/iknite`). The APK
+package installs a base set of kustomizations including networking (flannel),
+metrics-server, local-path-provisioner and Kube-VIP. Iknite then creates a
+configmap `iknite-config` in the `kube-system` namespace to avoid re-applying
+the base kustomization on subsequent restarts.
 
 On WSL2, the IP address of the WSL VM changes on each start. Kubernetes expects
 the node IP to be stable. To solve this, iknite detects the WSL environment and
@@ -231,8 +232,9 @@ Iknite also launches a small MDNS responder to allow `iknite.local` to resolve
 to this IP from the Windows host.
 
 Iknite persists cluster state in `/run/iknite/status.json` using the
-`IkniteCluster` custom resource format. This allows tracking initialization
-phases and workload readiness across restarts.
+[`IkniteCluster`](../pkg/apis/iknite/v1alpha1/types.go) custom resource format.
+This allows tracking initialization phases and workload readiness across
+restarts.
 
 Iknite makes the following kustomizations to the kubeadm initialization process
 (in [pkg/cmd/init.go](../pkg/cmd/init.go)):
@@ -387,12 +389,23 @@ The documentation source is in `docs/docs/` and is managed with
 [awesome-nav](https://github.com/lukasgeiter/mkdocs-awesome-nav) for automatic
 navigation generation.
 
+The project also includes the following markdown pages outside the `docs/`
+folder:
+
+- [README.md](../README.md): Project overview and quickstart
+- [CONTRIBUTING.md](../CONTRIBUTING.md): Contribution guidelines
+- [RELEASE.md](../RELEASE.md): Important information to include in releases.
+- [STRUCTURE.md](../STRUCTURE.md): Project architecture
+- [BUILD.md](../BUILD.md): Build instructions
+- [pkg/README.md](../pkg/README.md): Golang package overview
+
 ### Documentation Structure
 
 - **Configuration**: [docs/mkdocs.yaml](../docs/mkdocs.yaml) - MkDocs
   configuration
 - **Content**: `docs/docs/` - Markdown documentation files
-- **Navigation**: `docs/docs/.nav.yml` - Manual navigation overrides
+- **Navigation**: [`docs/docs/.nav.yml`](../docs/docs/.nav.yml) - Manual
+  navigation overrides
 - **Dependencies**: [docs/pyproject.toml](../docs/pyproject.toml) - Python
   dependencies managed with `uv`
 

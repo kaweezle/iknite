@@ -96,14 +96,13 @@ Deployment configurations and infrastructure as code:
     - `root.hcl` - Terragrunt root configuration
     - `secrets.sops.yaml` - Encrypted secrets
     - `apkrepo/` - Static APK repository website creation
-    - `releaserepo/`, `testrepo/` - APK repository modules
-    - `dns_iknite_app/` - DNS configuration
-    - `iknite-lb/` - Load balancer configuration
+    - `releaserepo/`, `testrepo/` - APK repository creation and upload
+    - `dns_iknite_app/` - DNS configuration of the iknite.app domain
     - `iknite-vm/` - VM deployment configuration
   - `modules/` - Reusable Terraform modules
     - `object-store-sync/` - Object storage synchronization
     - `openstack-vm/` - OpenStack VM provisioning
-    - `public-object-store/` - Public object storage setup
+    - `public-object-store/` - Public object storage on OVH setup
 
 ## Development
 
