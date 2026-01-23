@@ -4,8 +4,8 @@
 
 The iknite project has significant testability challenges due to tight coupling
 with system resources (Alpine OpenRC, Kubernetes APIs, process execution). The
-existing [testutils.MockExecutor](pkg/testutils/executor.go) pattern provides a
-foundation, but ~95% of the codebase bypasses abstraction layers and calls
+existing `testutils.MockExecutor` (`pkg/testutils/executor.go`) pattern provides
+a foundation, but ~95% of the codebase bypasses abstraction layers and calls
 system APIs directly. This plan systematically introduces dependency injection
 through interfaces to enable comprehensive unit testing.
 

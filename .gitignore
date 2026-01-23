@@ -38,3 +38,4 @@ packages/
 *.vhdx
 *.iso
 *.log
+docs/site/
