@@ -98,6 +98,7 @@ linters:
     - testpackage
     - thelper
     - tparallel
+    - testifylint
     - unconvert
     - unparam
     - unused

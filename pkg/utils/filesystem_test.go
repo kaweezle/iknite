@@ -583,7 +583,7 @@ func TestFileSystem_WritePipe(t *testing.T) {
 			testPath := "output.txt"
 			n, err := fs.WritePipe(testPath, pipe, os.O_CREATE|os.O_WRONLY, 0o644)
 			require.NoError(t, err)
-			assert.Greater(t, n, int64(0))
+			assert.Equal(t, n, int64(len(testData)))
 
 			content, err := fs.ReadFile(testPath)
 			require.NoError(t, err)

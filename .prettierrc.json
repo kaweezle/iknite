@@ -8,6 +8,12 @@
       }
     },
     {
+      "files": ".github/instructions/*.md",
+      "options": {
+        "embeddedLanguageFormatting": "off"
+      }
+    },
+    {
       "files": "*.md",
       "options": {
         "proseWrap": "always"

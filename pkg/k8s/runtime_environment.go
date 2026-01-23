@@ -41,7 +41,7 @@ const (
 func IsKubeletServiceRunnable(confFilePath string) (bool, error) {
 	var lines int
 	var err error
-	if lines, err = script.File(confFilePath).Match(RcConfPreventKubeletRunning).CountLines(); err != nil {
+	if lines, err = utils.FS.Pipe(confFilePath).Match(RcConfPreventKubeletRunning).CountLines(); err != nil {
 		return false, fmt.Errorf("failed to count lines in config file: %w", err)
 	}
 	return lines == 0, nil
@@ -60,9 +60,9 @@ func PreventKubeletServiceFromStarting(confFilePath string) error {
 	}
 	log.Info("Preventing kubelet from running")
 	var lines []string
-	if lines, err = script.File(confFilePath).Slice(); err == nil {
+	if lines, err = utils.FS.Pipe(confFilePath).Slice(); err == nil {
 		lines = append(lines, RcConfPreventKubeletRunning)
-		if _, err = script.Slice(lines).WriteFile(confFilePath); err != nil {
+		if _, err = utils.FS.WritePipe(confFilePath, script.Slice(lines), os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o644); err != nil {
 			return fmt.Errorf("while writing %s: %w", confFilePath, err)
 		}
 	} else {
