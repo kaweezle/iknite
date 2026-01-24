@@ -1,0 +1,82 @@
+name: Feature request
+description: Propose an improvement or new capability
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for suggesting an improvement. Please provide enough detail to understand the value and scope.
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: One sentence describing the feature.
+      placeholder: Add support for ...
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Target area
+      description: Which part of iknite would this affect?
+      options:
+        - iknite CLI command
+        - Kubernetes bootstrapping (kubeadm/kubelet phases)
+        - Initial kustomization
+        - Runtime environment (services, checks, workloads)
+        - Image / VM generation
+        - Host integration (WSL/Hyper-V/Incus/QEMU)
+        - Documentation
+        - Developer experience (SDKs, APIs)
+        - CI / CD pipelines
+        - Other / not sure
+    validations:
+      required: true
+  - type: dropdown
+    id: runtime_env
+    attributes:
+      label: Runtime environment
+      description: Primary environment you care about.
+      options:
+        - WSL
+        - Hyper-V
+        - Incus
+        - QEMU
+        - Cloud (OpenStack/other)
+        - Docker / Containerd / Podman
+        - Other / not sure
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem / motivation
+      description: What problem does this solve? Who benefits?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: Outline the approach, CLI/API changes, config flags, or UX impacts.
+      placeholder: |
+        - New flag ...
+        - Update kustomization ...
+        - Additional validation ...
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Other ways you considered solving this.
+  - type: textarea
+    id: impact
+    attributes:
+      label: Impact / scope
+      description: Expected risks, testing needs, compatibility considerations (WSL/Hyper-V/Incus/QEMU/Cloud).
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional context
+      description: Links, references, mockups, related issues.

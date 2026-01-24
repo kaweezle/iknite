@@ -1,0 +1,89 @@
+name: Bug report
+description: Report a problem with iknite
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug. Please answer the questions below so we can reproduce and fix the issue quickly.
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: Clear and concise description of the problem.
+      placeholder: What happened? What did you expect?
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Affected area
+      description: Which part of iknite is impacted?
+      options:
+        - iknite CLI command
+        - Kubernetes bootstrapping (kubeadm/kubelet phases)
+        - Initial kustomization
+        - Runtime environment (services, checks, workloads)
+        - Image / VM generation
+        - Host integration (WSL/Hyper-V/Incus/QEMU)
+        - Documentation
+        - Developer experience (SDKs, APIs)
+        - CI / CD pipelines
+        - Other / not sure
+    validations:
+      required: true
+  - type: dropdown
+    id: runtime_env
+    attributes:
+      label: Runtime environment
+      description: Where are you running iknite?
+      options:
+        - WSL
+        - Hyper-V
+        - Incus
+        - QEMU
+        - Cloud (OpenStack/other)
+        - Docker / Containerd / Podman
+        - Other / not sure
+    validations:
+      required: true
+  - type: textarea
+    id: version
+    attributes:
+      label: Versions
+      description: Include iknite version (`iknite --version`), Kubernetes version, OS/arch, and whether you used the packaged image or built from source.
+      placeholder: |
+        iknite: v0.x.x
+        Kubernetes: v1.xx.x
+        Host OS: Windows 11 / Ubuntu 22.04
+        Install type: release APK / rootfs image / local build
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Steps or commands that reliably reproduce the issue.
+      placeholder: |
+        1. ...
+        2. ...
+        3. ...
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs / outputs
+      description: Add key excerpts from logs (iknite, kubelet, containerd) or command outputs. Mask secrets.
+      render: shell
+  - type: textarea
+    id: config
+    attributes:
+      label: Configuration
+      description: Paste relevant config snippets (CLI flags, /etc/iknite.d overrides, custom kustomization).
+      render: yaml
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional context
+      description: Anything else we should know (network setup, security tools, repro frequency).
