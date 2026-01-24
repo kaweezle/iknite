@@ -1,6 +1,6 @@
 ---
 description: 'Terraform Conventions and Guidelines'
-applyTo: 'deploy/iac/**/*.tf, deploy/iac/**/*.hcl'
+applyTo: 'deploy/iac/**/*'
 ---
 
 <!-- cSpell: words kwzltfstate earlyvalue2 tftest -->

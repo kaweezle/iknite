@@ -318,10 +318,10 @@ jobs:
           echo "::group::Running terragrunt module with instance creation"
           export TF_PLUGIN_CACHE_DIR="$HOME/.cache/terraform/plugin-cache"
           mkdir -p $TF_PLUGIN_CACHE_DIR
-          cd deploy/iac/iknite/iknite-vm
+          cd deploy/iac/iknite/iknite-image
           export IKNITE_CREATE_INSTANCE=true
-          terragrunt init
-          terragrunt apply -auto-approve
+          terragrunt --graph --non-interactive init
+          terragrunt --graph --non-interactive apply -auto-approve
           echo "::endgroup::"
 
           echo "::group::Testing VM instance"
@@ -331,7 +331,7 @@ jobs:
 
           echo "::group::Teardown VM instance"
           export IKNITE_CREATE_INSTANCE=false
-          terragrunt apply -auto-approve
+          terragrunt --graph --non-interactive apply -auto-approve
           echo "::endgroup::"
 
       - name: Upload VM images

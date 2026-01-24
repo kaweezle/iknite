@@ -8,6 +8,10 @@ terraform {
   source = "${get_repo_root()}/deploy/iac/modules/openstack-vm"
 }
 
+dependency "image" {
+  config_path = "${get_parent_terragrunt_dir("root")}/iknite-image"
+}
+
 locals {
   secret             = include.root.locals.secret
   ovh                = include.root.locals.ovh
@@ -32,18 +36,12 @@ inputs = {
   private_keys = {
     "iknite" = local.secret.iknite_vm.ssh_private_key
   }
-  images = {
-    "iknite-vm-image" = {
-      name            = "iknite-test-vm-image-${local.iknite_version}-${local.kubernetes_version}"
-      local_file_path = "${get_repo_root()}/dist/iknite-vm.${local.iknite_version}-${local.kubernetes_version}.qcow2"
-    }
-  }
   instances = {
     "iknite-vm-instance" = {
       name    = "iknite-vm-instance"
       enabled = tobool(get_env("IKNITE_CREATE_INSTANCE", "false"))
 
-      image_name  = "iknite-vm-image"
+      image_id    = dependency.image.outputs.images["iknite-vm-image"].id
       flavor_name = "b3-16"
       key_name    = "iknite"
       user_data   = tobool(get_env("IKNITE_DEBUG_INSTANCE", "false")) ? file("cloud-config.yaml") : null
