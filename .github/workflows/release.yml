@@ -320,8 +320,8 @@ jobs:
           mkdir -p $TF_PLUGIN_CACHE_DIR
           cd deploy/iac/iknite/iknite-image
           export IKNITE_CREATE_INSTANCE=true
-          terragrunt --graph --non-interactive init
-          terragrunt --graph --non-interactive apply -auto-approve
+          terragrunt run --graph --non-interactive init
+          terragrunt run --graph --non-interactive apply
           echo "::endgroup::"
 
           echo "::group::Testing VM instance"
@@ -331,7 +331,7 @@ jobs:
 
           echo "::group::Teardown VM instance"
           export IKNITE_CREATE_INSTANCE=false
-          terragrunt --graph --non-interactive apply -auto-approve
+          terragrunt run --graph --non-interactive apply
           echo "::endgroup::"
 
       - name: Upload VM images
