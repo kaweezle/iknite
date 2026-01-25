@@ -59,8 +59,10 @@ The project provides five main deliverables:
   Developer-friendly build script (full pipeline locally)
 - **[Devcontainer](../hack/devcontainer/Dockerfile)**: Alpine-based development
   environment with all dependencies
-- **[Terraform/Terragrunt](../deploy/iac/iknite/root.hcl)**: APK repository
-  hosting (Cloudflare) and VM testing (OpenStack)
+- **[Terraform/Terragrunt](../deploy/iac/)**: APK repository hosting
+  (Cloudflare) and VM testing (OpenStack) - see
+  [IaC README](../deploy/iac/README.md) for detailed conventions and getting
+  started guide
 
 ## Golang CLI (iknite)
 

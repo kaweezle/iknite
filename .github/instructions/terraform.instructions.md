@@ -22,6 +22,9 @@ these guidelines to ensure consistency, maintainability, and security.
   ```bash
   export TF_PLUGIN_CACHE_DIR="$HOME/.cache/terraform/plugin-cache"
   ```
+- All credentials information (S3 state backend, OVH, Openstack, etc.) is stored
+  in the SOPS-encrypted file
+  [deploy/iac/iknite/secrets.sops.yaml](../../deploy/iac/iknite/secrets.sops.yaml)
 
 ## Project Structure
 
