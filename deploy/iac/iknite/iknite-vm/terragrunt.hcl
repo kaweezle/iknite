@@ -13,28 +13,24 @@ dependency "image" {
 }
 
 locals {
-  secret             = include.root.locals.secret
-  ovh                = include.root.locals.ovh
+  openstack          = include.root.locals.secret.openstack
+  ovh                = include.root.locals.secret.ovh
+  iknite_vm          = include.root.locals.secret.iknite_vm
   iknite_version     = include.root.locals.iknite_version
   kubernetes_version = include.root.locals.kubernetes_version
 }
 
 inputs = {
-  ovh = merge(
-    local.ovh,
-    {
-      application_secret = local.secret.ovh_application_secret
-    }
-  )
-  openstack = local.secret.openstack
+  ovh       = local.ovh
+  openstack = local.openstack
   keys = {
     "iknite" = {
       name       = "iknite"
-      public_key = local.secret.iknite_vm.ssh_public_key
+      public_key = local.iknite_vm.ssh_public_key
     }
   }
   private_keys = {
-    "iknite" = local.secret.iknite_vm.ssh_private_key
+    "iknite" = local.iknite_vm.ssh_private_key
   }
   instances = {
     "iknite-vm-instance" = {

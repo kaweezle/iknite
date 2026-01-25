@@ -10,11 +10,11 @@ terraform {
 locals {
   iknite_version     = include.root.locals.iknite_version
   kubernetes_version = include.root.locals.kubernetes_version
-  secret             = include.root.locals.secret
+  openstack          = include.root.locals.secret.openstack
 }
 
 inputs = {
-  openstack = local.secret.openstack
+  openstack = local.openstack
 
   images = {
     "iknite-vm-image" = {
