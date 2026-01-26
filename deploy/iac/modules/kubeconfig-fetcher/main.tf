@@ -16,7 +16,7 @@ resource "null_resource" "fetch_kubeconfig" {
   # This provisional step ensures we only try to fetch once the host is reachable
   provisioner "local-exec" {
     command     = local.ssh_command
-    interpreter = ["/bin/sh", "-c"]
+    interpreter = ["/bin/bash", "-c"]
     on_failure  = continue
   }
 
@@ -24,13 +24,14 @@ resource "null_resource" "fetch_kubeconfig" {
     host            = var.host
     username        = var.username
     kubeconfig_path = var.kubeconfig_path
+    # timestamp       = timestamp()
   }
 }
 
 # Retrieve the kubeconfig file content using a data source that runs a script
 data "external" "kubeconfig" {
   count   = var.host == "" ? 0 : 1
-  program = ["/bin/sh", "-c", "${local.ssh_command} | jq -Rs '{kubeconfig: .}'"]
+  program = ["/bin/bash", "-c", "${local.ssh_command} | jq -Rs '{kubeconfig: .}'"]
 
   depends_on = [null_resource.fetch_kubeconfig]
 }
