@@ -1,0 +1,6 @@
+apiVersion: autocloud.config.kaweezle.com/v1alpha1
+kind: PlatformValues
+metadata:
+  name: iknite-values
+data:
+  domain: iknite.app
