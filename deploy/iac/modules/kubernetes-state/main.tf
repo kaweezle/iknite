@@ -1,6 +1,13 @@
 locals {
-  kubeconfig_path    = "/tmp/kubeconfig-${random_id.config.hex}"
-  kubeconfig_content = var.kubeconfig_present ? yamldecode(var.kubeconfig_content) : {}
+  kubeconfig_path = "/tmp/kubeconfig-${random_id.config.hex}"
+  kubeconfig_content = var.kubeconfig_present ? yamldecode(var.kubeconfig_content) : {
+    apiVersion        = "v1"
+    kind              = "Config"
+    clusters          = []
+    contexts          = []
+    "current-context" = ""
+    users             = []
+  }
 }
 
 # Generate a unique temporary path for kubeconfig
