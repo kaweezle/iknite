@@ -93,17 +93,21 @@ RUN set -eux ;\
 # Switch back to non-root user
 USER argocd
 
-RUN set -eux ;\
+RUN --mount=type=bind,target=/conf set -eux ;\
     helm plugin install https://github.com/databus23/helm-diff --version v${HELM_DIFF_VERSION} && \
     helm plugin install https://github.com/jkroepke/helm-secrets --version v${HELM_SECRETS_VERSION} && \
     helm plugin install https://github.com/mumoshu/helm-x  && \
     helm plugin install https://github.com/aslafy-z/helm-git && \
-    helm plugin install https://github.com/hypnoglow/helm-s3
+    helm plugin install https://github.com/hypnoglow/helm-s3 && \
+    mkdir -p /home/argocd/cmp-server/config/ && \
+    install -m 0644 -o argocd -g argocd /conf/plugin.yaml /home/argocd/cmp-server/config/plugin.yaml
 
 USER root
 
-RUN mv /usr/local/bin/helm /usr/local/bin/helm.orig && \
-    ln -sf "/home/argocd/.local/share/helm/plugins/helm-secrets/scripts/wrapper/helm.sh" /usr/local/bin/helm
+RUN --mount=type=bind,target=/conf set -eux ;\
+    mv /usr/local/bin/helm /usr/local/bin/helm.orig && \
+    ln -sf "/home/argocd/.local/share/helm/plugins/helm-secrets/scripts/wrapper/helm.sh" /usr/local/bin/helm && \
+    install -m 755 -o root -g root /conf/argocd-helmfile.sh /usr/local/bin/argocd-helmfile.sh
 
 USER argocd
 
