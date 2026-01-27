@@ -3,4 +3,15 @@ kind: PlatformValues
 metadata:
   name: iknite-values
 data:
-  domain: iknite.app
+  domain_suffix: iknite.app
+  argocd:
+    domain: argocd-e2e.iknite.app
+    repo_server_image_name: ghcr.io/kaweezle/argocd-helmfile
+    repo_server_image_tag: v3.2.6-1.2.3-1
+    github:
+      base_url: git@github.com:kaweezle
+      organization: kaweezle
+  bootstrap:
+    repo_url: git@github.com:kaweezle/iknite.git
+    repo_target_revision: feature/end-to-end-test
+    application_path: deploy/k8s/environments/e2e/apps/appstage-00-bootstrap.yaml

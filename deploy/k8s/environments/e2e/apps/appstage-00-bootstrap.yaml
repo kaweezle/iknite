@@ -1,0 +1,24 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: appstage-00-bootstrap
+  namespace: argocd
+  annotations:
+    autocloud/local-application: "true"
+    # finalizers:
+    #   - resources-finalizer.argocd.argoproj.io
+spec:
+  destination:
+    namespace: argocd
+    server: https://kubernetes.default.svc
+  project: default
+  source:
+    path: deploy/k8s/environments/e2e/apps/appstage-00-bootstrap
+    repoURL: git@github.com:kaweezle/iknite.git
+    targetRevision: feature/end-to-end-test
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

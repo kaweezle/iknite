@@ -25,7 +25,7 @@ inputs = {
   deploy_key_public_key = local.ssh_public_key
   deploy_key_title      = "ArgoCD E2E Deploy Key"
   deploy_key_read_only  = true
-  webhook_events        = ["push", "pull_request"]
+  webhook_events        = ["push"]
   webhook_active        = true
   webhook_content_type  = "json"
 }

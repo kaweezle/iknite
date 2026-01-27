@@ -1,0 +1,356 @@
+# cSpell: words adminapi gpgkeys statusbadge restrictor
+## Globally shared configuration
+global:
+  # -- Default domain used by all components
+  ## Used for ingresses, certificates, SSO, notifications, etc.
+  domain: {{ .Environment.Values.data.argocd.domain }}
+
+  # -- Toggle and define pod-level security context.
+  # @default -- `{}` (See [values.yaml])
+  securityContext:
+    runAsUser: 999
+
+## Argo Configs
+configs:
+  # General Argo CD configuration
+  ## Ref: https://github.com/argoproj/argo-cd/blob/master/docs/operator-manual/argocd-cm.yaml
+  cm:
+    # -- Timeout to discover if a new manifests version got published to the repository
+    timeout.reconciliation: 15s
+
+    accounts.adminapi: login
+    # new service account for image-updater
+    accounts.image-updater: apiKey
+    kustomize.enabled: "true"
+    statusbadge.enabled: "true"
+    kustomize.buildOptions: "--enable-alpha-plugins --enable-exec --enable-helm --load-restrictor LoadRestrictionsNone"
+    helm.valuesFileSchemes: "secrets+gpg-import, secrets+gpg-import-kubernetes, secrets+age-import, secrets+age-import-kubernetes, secrets, secrets+literal, https,http"
+    dex.config: |
+      logger:
+        level: debug
+        format: json
+      connectors:
+      - type: github
+        id: github
+        name: GitHub
+        config:
+          clientID: {{ .Environment.Values.data.argocd.github_oauth_client_id | quote }}
+          clientSecret: {{ .Environment.Values.data.argocd.github_oauth_client_secret | quote }}
+          orgs:
+          - name: {{ .Environment.Values.data.argocd.github.organization | quote }}
+          teamNameField: slug
+          useLoginAsId: true
+
+      {{ if .Environment.Values.data | dig "argo_workflows" "domain" "" }}
+      staticClients:
+      - id: argo-workflows-sso
+        name: Argo Workflows
+        redirectURIs:
+        - https://{{ .Environment.Values.data.argo_workflows.domain }}/oauth2/callback
+        secretEnv: ARGO_WORKFLOWS_SSO_CLIENT_SECRET
+      {{ end }}
+
+  params:
+    server.insecure: true
+
+  rbac:
+    policy.default: role:readonly
+    # Put the users in the admin team in order to give them admin rights
+    policy.csv: |
+      g, {{ .Environment.Values.data.argocd.github.organization }}:admin,role:admin
+      p, role:org-admin, applications, *, */*, allow
+      p, role:org-admin, clusters, *, *, allow
+      p, role:org-admin, repositories, *, *, allow
+      p, role:org-admin, projects, *, *, allow
+      p, role:org-admin, certificates, *, *, allow
+      p, role:org-admin, accounts, *, *, allow
+      p, role:org-admin, gpgkeys, *, *, allow
+      p, role:org-admin, extensions, *, *, allow
+      g, adminapi, role:api
+      p, role:image-updater, applications, get, */*, allow
+      p, role:image-updater, applications, update, */*, allow
+      g, image-updater, role:image-updater
+
+  credentialTemplates:
+    ssh-creds:
+      url: {{ .Environment.Values.data.argocd.github.base_url }}
+      sshPrivateKey: {{ .Environment.Values.data.argocd.ssh_private_key | quote }}
+
+  secret:
+    githubSecret: {{ .Environment.Values.data.github.webhook_secret | quote }}
+
+    extra:
+      accounts.adminapi.tokens: "null"
+      accounts.adminapi.password: {{ .Environment.Values.data.argocd.admin_password_bcrypt | quote }}
+      accounts.adminapi.passwordMtime: 2023-09-28T12:06:32Z
+
+    argocdServerAdminPassword: {{ .Environment.Values.data.argocd.admin_password_bcrypt | quote }}
+    argocdServerAdminPasswordMtime: 2022-10-11T11:21:11Z
+
+## Dex
+{{ if .Environment.Values.data | dig "argo_workflows" "client_secret" "" }}
+dex:
+  # -- Environment variables to pass to the Dex server
+  env:
+    - name: ARGO_WORKFLOWS_SSO_CLIENT_SECRET
+      valueFrom:
+        secretKeyRef:
+          name: argo-workflows-sso
+          key: client-secret
+{{ end }}
+
+## Server
+server:
+  certificateSecret:
+    enabled: true # Created by the ingress package with external-secrets
+    key: {{ .Environment.Values.data.dns.wildcard.key | quote }}
+    crt: {{ .Environment.Values.data.dns.wildcard.crt | quote }}
+
+  ingress:
+    enabled: true # Created by the ingress package
+    hostname: {{ .Environment.Values.data.argocd.domain }}
+    controller: generic
+    ingressClassName: traefik
+    tls: true
+
+## Repo Server
+repoServer:
+  ## Repo server image
+  image:
+    # -- Repository to use for the repo server
+    # @default -- `""` (defaults to global.image.repository)
+    repository: {{ .Environment.Values.data.argocd.repo_server_image_name }}
+    # -- Tag to use for the repo server
+    # @default -- `""` (defaults to global.image.tag)
+    tag: {{ .Environment.Values.data.argocd.repo_server_image_tag }}
+    # -- Image pull policy for the repo server
+    # @default -- `""` (defaults to global.image.imagePullPolicy)
+    imagePullPolicy: ""
+
+  # -- Environment variables to pass to repo server
+  env:
+    - name: SOPS_AGE_KEY_FILE
+      value: /sops-private-keys/age_key.txt
+    - name: HELM_PLUGINS
+      value: /home/argocd/.local/share/helm/plugins/
+    - name: HOST_IP
+      valueFrom:
+        fieldRef:
+          fieldPath: status.hostIP
+    - name: AZURE_CONFIG_DIR
+      value: /tmp/.azure
+    - name: HELM_SECRETS_VALUES_ALLOW_SYMLINKS
+      value: "false"
+    - name: HELM_SECRETS_VALUES_ALLOW_ABSOLUTE_PATH
+      value: "true"
+    - name: HELM_SECRETS_VALUES_ALLOW_PATH_TRAVERSAL
+      value: "false"
+    - name: HELM_SECRETS_WRAPPER_ENABLED
+      value: "true"
+    - name: HELM_SECRETS_DECRYPT_SECRETS_IN_TMP_DIR
+      value: "true"
+
+  # -- Additional volumeMounts to the repo server main container
+  volumeMounts:
+    - name: argocd-sops-private-keys
+      mountPath: /sops-private-keys
+
+  # -- Additional volumes to the repo server pod
+  volumes:
+    - name: argocd-sops-private-keys
+      secret:
+        secretName: argocd-sops-private-keys
+        optional: true
+        defaultMode: 420
+    - name: helmfile-cmp-tmp
+      emptyDir: {}
+
+  useEphemeralHelmWorkingDir: false
+
+  extraContainers:
+  - name: helmfile-plugin
+    image: {{ .Environment.Values.data.argocd.repo_server_image_name }}:{{ .Environment.Values.data.argocd.repo_server_image_tag }}
+    command: [/var/run/argocd/argocd-cmp-server]
+    env:
+    - name: SOPS_AGE_KEY_FILE
+      value: /sops-private-keys/age_key.txt
+    - name: HELM_PLUGINS
+      value: /home/argocd/.local/share/helm/plugins/
+    - name: HOST_IP
+      valueFrom:
+        fieldRef:
+          fieldPath: status.hostIP
+    - name: AZURE_CONFIG_DIR
+      value: /tmp/.azure
+    - name: HELM_SECRETS_VALUES_ALLOW_SYMLINKS
+      value: "false"
+    - name: HELM_SECRETS_VALUES_ALLOW_ABSOLUTE_PATH
+      value: "true"
+    - name: HELM_SECRETS_VALUES_ALLOW_PATH_TRAVERSAL
+      value: "false"
+    - name: HELM_SECRETS_WRAPPER_ENABLED
+      value: "true"
+    - name: HELM_SECRETS_DECRYPT_SECRETS_IN_TMP_DIR
+      value: "true"
+    - name: HELM_SECRETS_BACKEND
+      value: "sops"
+    securityContext:
+      runAsNonRoot: true
+      runAsUser: 999
+    volumeMounts:
+      - name: argocd-sops-private-keys
+        mountPath: /sops-private-keys
+      - mountPath: /var/run/argocd
+        name: var-files
+      - mountPath: /tmp
+        name: helmfile-cmp-tmp
+      - mountPath: /home/argocd/cmp-server/plugins
+        name: plugins
+
+extraObjects:
+  # This secret is mounted on the argocd-repo-server in order to decrypt secrets
+  # upon installation.
+  -
+    apiVersion: v1
+    kind: Secret
+    metadata:
+      name: argocd-sops-private-keys
+    type: Opaque
+    data:
+      # The non transformed value is the content of sample_age_key.txt
+      age_key.txt: {{ .Environment.Values.data.secrets.age_key_b64 | quote }}
+  {{ if .Environment.Values.data | dig "argo_workflows" "client_secret" "" }}
+  -
+    apiVersion: v1
+    kind: Secret
+    type: Opaque
+    metadata:
+      name: argo-workflows-sso
+      labels:
+        app.kubernetes.io/name: argo-workflows-sso
+        app.kubernetes.io/part-of: argo-workflows
+    stringData:
+      client-id: argo-workflows-sso
+      client-secret: {{ .Environment.Values.data.argo_workflows.client_secret | quote }}
+  {{ end }}
+  -
+    apiVersion: v1
+    kind: Secret
+    metadata:
+      name: github-api-pat
+    type: Opaque
+    stringData:
+      token: {{ .Environment.Values.data.github.api_token | quote }}
+  ####
+  # Bootstrap application
+  ####
+  -
+    apiVersion: v1
+    kind: Secret
+    metadata:
+      name: argocd-private-repo-ssh-key
+      annotations:
+        argocd.argoproj.io/hook: Skip
+    type: Opaque
+    data:
+      sshPrivateKey: {{ .Environment.Values.data.argocd.ssh_private_key | b64enc | quote }}
+  -
+    apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: bootstrap
+      annotations:
+        argocd.argoproj.io/hook: Skip
+    # The dot (.) character cannot be used as separator here as names are going to be
+    # used as environment variables.
+    data:
+      autocloud_target_revision: {{ .Environment.Values.data.bootstrap.repo_target_revision | quote }}
+      autocloud_repo_url: {{ .Environment.Values.data.bootstrap.repo_url | quote }}
+      autocloud_bootstrap_application_path: {{ .Environment.Values.data.bootstrap.application_path | quote }}
+  -
+    apiVersion: v1
+    kind: ServiceAccount
+    metadata:
+      labels:
+        app: argocd
+      name: argocd-application-admin
+      annotations:
+        argocd.argoproj.io/hook: Skip
+  -
+    apiVersion: rbac.authorization.k8s.io/v1
+    kind: ClusterRoleBinding
+    metadata:
+      labels:
+        app: argocd
+      name: argocd-application-admin
+      annotations:
+        argocd.argoproj.io/hook: Skip
+    roleRef:
+      apiGroup: rbac.authorization.k8s.io
+      kind: ClusterRole
+      name: cluster-admin
+    subjects:
+      - kind: ServiceAccount
+        namespace: argocd
+        name: argocd-application-admin
+  -
+    apiVersion: batch/v1
+    kind: Job
+    metadata:
+      labels:
+        app: argocd
+      name: create-bootstrap-application
+      annotations:
+        argocd.argoproj.io/hook: Skip
+    spec:
+      ttlSecondsAfterFinished: 100
+      backoffLimit: 3
+      template:
+        spec:
+          serviceAccountName: argocd-application-admin
+          automountServiceAccountToken: true
+          restartPolicy: OnFailure
+          volumes:
+            - name: ssh-key-volume
+              secret:
+                secretName: argocd-private-repo-ssh-key
+                items:
+                  - key: sshPrivateKey
+                    path: id_rsa
+          containers:
+            - name: create-bootstrap-application
+              image: {{ .Environment.Values.data.argocd.repo_server_image_name }}:{{ .Environment.Values.data.argocd.repo_server_image_tag }}
+              imagePullPolicy: IfNotPresent
+              envFrom:
+                - configMapRef:
+                    name: bootstrap
+              env:
+                - name: ROLLOUT_INITIAL_DELAY
+                  value: "5"
+                - name: ROLLOUT_TIMEOUT
+                  value: "90s"
+              command:
+                - /bin/bash
+                - -c
+                - |
+                  set -xe
+
+                  whoami
+                  mkdir ~/.ssh
+                  chmod -R 777 ~/.ssh
+                  cp /etc/ssh-key/* ~/.ssh
+                  eval $(ssh-agent) && ssh-add /etc/ssh-key/id_rsa
+                  ssh-keyscan -t rsa github.com >> ~/.ssh/known_hosts
+
+                  sleep $ROLLOUT_INITIAL_DELAY
+                  ns=$(cat /var/run/secrets/kubernetes.io/serviceaccount/namespace)
+                  # Wait for ArgoCD deployment to settle. If the application is created too early,
+                  # It won't be deployed.
+                  kubectl -n "$ns" rollout status deployments,statefulsets,daemonsets --timeout=$ROLLOUT_TIMEOUT
+
+                  git clone "${autocloud_repo_url}" repo
+                  cd repo; git checkout "${autocloud_target_revision}"
+                  kubectl apply -f "${autocloud_bootstrap_application_path}"
+              volumeMounts:
+                - mountPath: /etc/ssh-key
+                  name: ssh-key-volume
