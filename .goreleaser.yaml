@@ -3,7 +3,7 @@
 # Make sure to check the documentation at https://goreleaser.com
 version: 2
 env:
-  - KUBERNETES_VERSION={{ if index .Env "KUBERNETES_VERSION"  }}{{ .Env.KUBERNETES_VERSION }}{{ else }}1.34.3{{ end }}
+  - KUBERNETES_VERSION={{ if index .Env "KUBERNETES_VERSION"  }}{{ .Env.KUBERNETES_VERSION }}{{ else }}1.35.0{{ end }}
 before:
   hooks:
     - go mod tidy

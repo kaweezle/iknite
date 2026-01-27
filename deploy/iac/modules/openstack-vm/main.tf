@@ -1,33 +1,7 @@
-// Maybe these should be separate modules?
 resource "openstack_compute_keypair_v2" "this" {
   for_each   = var.keys
   name       = each.value.name
   public_key = each.value.public_key
-}
-
-resource "null_resource" "image_hash" {
-  for_each = var.images
-
-  triggers = {
-    file_hash = filesha256(each.value.local_file_path)
-  }
-}
-
-// Create new image from current
-resource "openstack_images_image_v2" "this" {
-  for_each = var.images
-
-  name             = each.value.name
-  local_file_path  = each.value.local_file_path
-  container_format = each.value.container_format
-  disk_format      = each.value.disk_format
-  visibility       = each.value.visibility
-
-  lifecycle {
-    replace_triggered_by = [
-      null_resource.image_hash[each.key].id
-    ]
-  }
 }
 
 locals {
@@ -41,7 +15,7 @@ locals {
 resource "openstack_compute_instance_v2" "this" {
   for_each    = local.enabled_instances
   name        = each.value.name
-  image_id    = openstack_images_image_v2.this[each.value.image_name].id
+  image_id    = each.value.image_id
   flavor_name = each.value.flavor_name
   key_pair    = each.value.key_name
   user_data   = each.value.user_data

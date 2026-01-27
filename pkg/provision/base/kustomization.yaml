@@ -24,7 +24,7 @@ patches:
   - patch: |-
       - op: replace
         path: /data
-        value: |
+        value:
           config.json: |-
             {
                     "nodePathMap":[

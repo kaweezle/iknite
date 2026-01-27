@@ -1,0 +1,31 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ConfigManagementPlugin
+metadata:
+  name: helmfile
+spec:
+  # To use the name instead of discovery, update the name in your application
+  # manifest to <metadata.name>-<spec.version> if version was mentioned in the
+  # ConfigManagementPlugin spec or else just use <metadata.name>
+  #version: v1.0
+  init:
+    command: ["/usr/local/bin/argocd-helmfile.sh"]
+    args: ["init"]
+  generate:
+    command: ["/usr/local/bin/argocd-helmfile.sh"]
+    args: ["generate"]
+
+  # discover is implied with sidecar-style plugins
+  # executed in the sidecar and with standard env vars like init and generate
+  discover:
+    find:
+      command: ["/usr/local/bin/argocd-helmfile.sh", "discover"]
+  parameters:
+    #static:
+    #- name: values-files
+    #  title: Values Files
+    #  collectionType: array
+    dynamic:
+      command: ["/usr/local/bin/argocd-helmfile.sh", "parameters"]
+  # https://github.com/argoproj/argo-cd/pull/12940
+  # https://github.com/travisghansen/argo-cd-helmfile/issues/37
+  preserveFileMode: true

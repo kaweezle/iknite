@@ -5,7 +5,7 @@ FROM alpine:3.23
 ARG IKNITE_VERSION=0.5.3-devel
 ARG IKNITE_REPO_URL=https://static.iknite.app/release/
 ARG IKNITE_KEY_NAME=kaweezle-devel@kaweezle.com-c9d89864.rsa.pub
-ARG KUBERNETES_VERSION=1.34.3
+ARG KUBERNETES_VERSION=1.35.0
 
 # Add the dependencies
 RUN --mount=type=bind,target=/apks  \

@@ -1,30 +1,20 @@
 
-variable "images" {
-  type = map(object({
-    name             = string
-    local_file_path  = string
-    container_format = optional(string, "bare")
-    disk_format      = optional(string, "qcow2")
-    visibility       = optional(string, "private")
-  }))
-  description = "Map of images to create"
-}
 
 variable "instances" {
+  description = "Map of instances to create. image_name references a key in var.images."
   type = map(object({
-    name         = string
-    enabled      = optional(bool, true)
-    image_name   = string
-    flavor_name  = string
-    key_name     = string
     dns_zone     = optional(string)
-    ttl          = optional(number, 60)
-    network_name = optional(string, "Ext-Net")
+    enabled      = optional(bool, true)
+    flavor_name  = string
+    image_id     = string
+    key_name     = string
     metadata     = optional(map(string), {})
-    user_data    = optional(string, null)
+    name         = string
+    network_name = optional(string, "Ext-Net")
     tags         = optional(list(string), [])
+    ttl          = optional(number, 60)
+    user_data    = optional(string, null)
   }))
-  description = "Map of instances to create"
 }
 
 variable "keys" {

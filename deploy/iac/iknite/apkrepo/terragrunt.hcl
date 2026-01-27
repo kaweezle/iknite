@@ -9,27 +9,19 @@ terraform {
 }
 
 locals {
-  secret        = include.root.locals.secret
-  ovh           = include.root.locals.ovh
-  project_id    = include.root.locals.os_project_id
-  ovh_region    = include.root.locals.os_storage_region_name
-  s3_access_key = include.root.locals.s3_access_key_id
-
+  s3        = include.root.locals.secret.s3
+  openstack = include.root.locals.secret.openstack
+  ovh       = include.root.locals.secret.ovh
 }
 
 inputs = {
-  ovh = merge(
-    local.ovh,
-    {
-      application_secret = local.secret.ovh_application_secret
-    }
-  )
+  ovh = local.ovh
   s3 = {
-    access_key = local.s3_access_key
-    secret_key = local.secret.s3_secret_access_key
+    access_key = local.s3.access_key_id
+    secret_key = local.s3.secret_access_key
   }
-  project_id = local.project_id
-  region     = local.ovh_region
+  project_id = local.openstack.tenant_id
+  region     = local.openstack.storage_region
 
   object_stores = {
     "apkrepo" = {

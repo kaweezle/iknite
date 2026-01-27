@@ -1,0 +1,61 @@
+# cSpell: words dockerimage
+name: Build and publish container image from tag
+on:
+  push:
+    tags: ["dockerimage/*/*"]
+
+env:
+  REGISTRY: ghcr.io
+
+jobs:
+  publish:
+    name: Build and publish container image
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set parameters from tag name
+        id: split
+        env:
+          TAG: ${{ github.ref_name }}
+        shell: bash
+        run: |
+          COMPONENTS=(${TAG//\// })
+          DOCKER_IMAGE_NAME="${COMPONENTS[1]}"
+          VERSION="${COMPONENTS[2]}"
+          echo "docker_image_name=$DOCKER_IMAGE_NAME" >> $GITHUB_OUTPUT
+          echo "docker_image_version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ steps.split.outputs.docker_image_name }}
+          tags: |
+            type=raw,value=latest,enable=true
+            type=raw,value=${{ steps.split.outputs.docker_image_version }},enable=true
+            type=ref,event=pr,prefix=pr
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: ./deploy/k8s/container-images/${{ steps.split.outputs.docker_image_name }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
