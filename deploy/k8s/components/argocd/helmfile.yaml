@@ -1,0 +1,40 @@
+# cSpell: words
+environments:
+  default:
+    secrets:
+      - ../../secrets/secrets.sops.yaml
+    values:
+      - ../../values/values.yaml
+---
+repositories:
+  - name: traefik
+    url: https://traefik.github.io/charts
+  - name: argo
+    url: https://argoproj.github.io/argo-helm
+
+apiVersions:
+  - monitoring.coreos.com/v1
+
+releases:
+  - name: traefik
+    namespace: traefik
+    createNamespace: true
+    chart: traefik/traefik
+    values:
+      - values-traefik.yaml.gotmpl
+  - name: argocd
+    namespace: argocd
+    chart: argo/argo-cd
+    version: ~9.3.6
+    createNamespace: true
+    values:
+      - values-argocd.yaml.gotmpl
+
+helmDefaults:
+  wait: true
+  timeout: 600
+  recreatePods: false
+  force: false
+  atomic: true
+  cleanupOnFail: true
+  historyMax: 10
