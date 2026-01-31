@@ -1,4 +1,4 @@
-output "cluster_exists" {
+output "kubeconfig_present" {
   value       = var.kubeconfig_present
   description = "Indicates whether the Kubernetes cluster is accessible"
 }

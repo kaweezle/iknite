@@ -15,16 +15,11 @@
     "docs/pyproject.toml",
     "*-requirements.txt",
     "**/rc.conf",
-    "**/**.sops.yaml"
+    "**/**.sops.yaml",
+    "**/*.lock.hcl"
   ],
   "dictionaryDefinitions": [],
-  "dictionaries": [
-    "bash",
-    "docker",
-    "golang",
-    "terraform",
-    "softwareTerms"
-  ],
+  "dictionaries": ["bash", "docker", "golang", "terraform", "softwareTerms"],
   "words": [
     "abuild",
     "afero",

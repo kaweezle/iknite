@@ -10,6 +10,10 @@ terraform {
       source  = "hashicorp/null"
       version = "~> 3.0"
     }
+    helmfile = {
+      source  = "kaweezle/helmfile"
+      version = "~> 0.1.0"
+    }
     local = {
       source  = "hashicorp/local"
       version = "~> 2.6.2"
@@ -18,6 +22,5 @@ terraform {
       source  = "hashicorp/random"
       version = "~> 3.8.1"
     }
-
   }
 }
