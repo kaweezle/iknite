@@ -30,16 +30,16 @@ inputs = {
       enabled = can(dependency.vm.outputs.instances["iknite-vm-instance"].access_ip_v4)
       type    = "A"
       content = try(dependency.vm.outputs.instances["iknite-vm-instance"].access_ip_v4, "")
-      ttl     = 1
-      proxied = true
+      ttl     = 60
+      proxied = false
     }
     "argocd-e2e" = {
       name    = "argocd-e2e"
       enabled = can(dependency.vm.outputs.instances["iknite-vm-instance"].access_ip_v4)
       type    = "A"
       content = try(dependency.vm.outputs.instances["iknite-vm-instance"].access_ip_v4, "")
-      ttl     = 1
-      proxied = true
+      ttl     = 60
+      proxied = false
     }
   }
 }

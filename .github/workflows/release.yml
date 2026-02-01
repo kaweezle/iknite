@@ -325,8 +325,7 @@ jobs:
           echo "::endgroup::"
 
           echo "::group::Testing VM instance"
-          # Add commands to test the VM instance here
-          echo "Should test Kubernetes presence..."
+          ../../../../test/e2e/argocd-checker.sh
           echo "::endgroup::"
 
           echo "::group::Teardown VM instance"

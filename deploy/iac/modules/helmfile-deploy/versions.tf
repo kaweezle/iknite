@@ -12,7 +12,7 @@ terraform {
     }
     helmfile = {
       source  = "kaweezle/helmfile"
-      version = "~> 0.1.0"
+      version = "~> 0.1.1"
     }
     local = {
       source  = "hashicorp/local"
