@@ -28,6 +28,9 @@ releases:
     chart: argo/argo-cd
     version: ~9.3.6
     createNamespace: true
+    disableValidationOnInstall: true
+    needs:
+      - traefik/traefik
     values:
       - values-argocd.yaml.gotmpl
 

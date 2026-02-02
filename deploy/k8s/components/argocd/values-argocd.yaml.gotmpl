@@ -1,4 +1,4 @@
-# cSpell: words adminapi gpgkeys statusbadge restrictor
+# cSpell: words adminapi gpgkeys statusbadge restrictor websecure
 ## Globally shared configuration
 global:
   # -- Default domain used by all components
@@ -107,7 +107,7 @@ server:
     crt: {{ .Environment.Values.data.dns.wildcard.crt | quote }}
 
   ingress:
-    enabled: true # Created by the ingress package
+    enabled: false # Created by the ingress package
     hostname: {{ .Environment.Values.data.argocd.domain }}
     controller: generic
     ingressClassName: traefik
@@ -241,6 +241,68 @@ extraObjects:
     type: Opaque
     stringData:
       token: {{ .Environment.Values.data.github.api_token | quote }}
+  -
+    apiVersion: traefik.io/v1alpha1
+    kind: IngressRoute
+    metadata:
+      name: argocd-server
+      namespace: argocd
+    spec:
+      entryPoints:
+        - websecure
+      routes:
+        - kind: Rule
+          match: Host(`{{ .Environment.Values.data.argocd.domain }}`)
+          priority: 10
+          services:
+            - kind: Service
+              name: argocd-server
+              namespace: argocd
+              port: http
+              passHostHeader: true
+        - kind: Rule
+          match: Host(`{{ .Environment.Values.data.argocd.domain }}`) && Header(`Content-Type`, `application/grpc`)
+          priority: 11
+          services:
+            - kind: Service
+              name: argocd-server
+              namespace: argocd
+              port: http
+              passHostHeader: true
+              scheme: h2c
+      tls:
+        secretName: argocd-server-tls
+        domains:
+          - main: {{ .Environment.Values.data.argocd.domain }}
+  -
+    apiVersion: traefik.io/v1alpha1
+    kind: IngressRoute
+    metadata:
+      name: argocd-server-web
+      namespace: argocd
+    spec:
+      entryPoints:
+        - web
+      routes:
+        - kind: Rule
+          match: Host(`{{ .Environment.Values.data.argocd.domain }}`)
+          priority: 10
+          services:
+            - kind: Service
+              name: argocd-server
+              namespace: argocd
+              port: http
+              passHostHeader: true
+        - kind: Rule
+          match: Host(`{{ .Environment.Values.data.argocd.domain }}`) && Header(`Content-Type`, `application/grpc`)
+          priority: 11
+          services:
+            - kind: Service
+              name: argocd-server
+              namespace: argocd
+              port: http
+              passHostHeader: true
+              scheme: h2c
   ####
   # Bootstrap application
   ####
