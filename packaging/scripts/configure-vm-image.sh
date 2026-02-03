@@ -62,6 +62,10 @@ nameserver 1.1.1.1
 nameserver 2606:4700:4700::1111
 EOF
 
+step 'Configuring dhcpcd'
+echo "allowinterfaces eth*" >> /etc/dhcpcd.conf
+echo "ipv4only" >> /etc/dhcpcd.conf
+
 # FIXME: remove root and alpine password
 step "Set cloud configuration"
 sed -e '/disable_root:/ s/true/false/' \
