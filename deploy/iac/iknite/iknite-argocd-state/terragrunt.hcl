@@ -11,7 +11,8 @@ dependency "argocd" {
   config_path = "${get_parent_terragrunt_dir("root")}/iknite-argocd"
 
   mock_outputs = {
-    kubeconfig = "apiVersion: v1\nkind: Config\nclusters: []\ncontexts: []\ncurrent-context: ''\nusers: []"
+    kubeconfig_content = "apiVersion: v1\nkind: Config\nclusters: []\ncontexts: []\ncurrent-context: ''\nusers: []"
+    kubeconfig_present = true
   }
 }
 

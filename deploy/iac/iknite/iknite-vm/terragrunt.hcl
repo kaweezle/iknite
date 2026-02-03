@@ -10,6 +10,14 @@ terraform {
 
 dependency "image" {
   config_path = "${get_parent_terragrunt_dir("root")}/iknite-image"
+
+  mock_outputs = {
+    images = {
+      "iknite-vm-image" = {
+        id = "mock-image-id"
+      }
+    }
+  }
 }
 
 locals {
@@ -37,7 +45,7 @@ inputs = {
       name    = "iknite-vm-instance"
       enabled = tobool(get_env("IKNITE_CREATE_INSTANCE", "false"))
 
-      image_id    = dependency.image.outputs.images["iknite-vm-image"].id
+      image_id    = try(dependency.image.outputs.images["iknite-vm-image"].id, "mock-image-id")
       flavor_name = "b3-16"
       key_name    = "iknite"
       user_data   = tobool(get_env("IKNITE_DEBUG_INSTANCE", "false")) ? file("cloud-config.yaml") : null
