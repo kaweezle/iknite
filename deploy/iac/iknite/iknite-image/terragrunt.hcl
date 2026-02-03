@@ -10,7 +10,7 @@ terraform {
 locals {
   iknite_version     = include.root.locals.iknite_version
   kubernetes_version = include.root.locals.kubernetes_version
-  openstack          = include.root.locals.secret.openstack
+  openstack          = include.root.locals.secret.ovh.openstack
 }
 
 inputs = {

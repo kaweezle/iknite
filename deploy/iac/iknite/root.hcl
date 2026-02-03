@@ -8,10 +8,10 @@ terraform {
     backend "s3" {
       bucket = "${local.state_bucket}"
       key    = "iknite/${path_relative_to_include()}/terraform.tfstate"
-      region = "${local.secret.s3.region}"
+      region = "${local.secret.ovh.s3.region}"
       # sbg or any activated high performance storage region
       endpoints = {
-        s3 = "https://${local.secret.s3.endpoint}/"
+        s3 = "https://${local.secret.ovh.s3.endpoint}/"
       }
       skip_credentials_validation = true
       skip_region_validation      = true
@@ -30,8 +30,8 @@ terraform {
       # aws_access_key_id = "s3 user access key"
       # aws_secret_access_key = "s3 user secret key"
       #
-      access_key                  = "${local.secret.s3.access_key_id}"
-      secret_key                  = "${local.secret.s3.secret_access_key}"
+      access_key                  = "${local.secret.ovh.s3.access_key_id}"
+      secret_key                  = "${local.secret.ovh.s3.secret_access_key}"
     }
 }
 EOF
@@ -70,10 +70,10 @@ provider "openstack" {
 }
 
 provider "ovh" {
-  endpoint           = "${local.secret.ovh.endpoint}"
-  application_key    = "${local.secret.ovh.application_key}"
-  application_secret = "${local.secret.ovh.application_secret}"
-  consumer_key       = "${local.secret.ovh.consumer_key}"
+  endpoint           = "${local.secret.ovh.ovh.endpoint}"
+  application_key    = "${local.secret.ovh.ovh.application_key}"
+  application_secret = "${local.secret.ovh.ovh.application_secret}"
+  consumer_key       = "${local.secret.ovh.ovh.consumer_key}"
 }
 EOF
 }
@@ -89,7 +89,7 @@ locals {
   email               = "info@kaweezle.com"
 
   # Infrastructure information
-  secret = yamldecode(sops_decrypt_file(find_in_parent_folders("secrets.sops.yaml")))
+  secret = yamldecode(sops_decrypt_file("${get_repo_root()}/deploy/k8s/secrets/secrets.sops.yaml")).data
 
   cloudflare_account_id = "a54f6b2557d54a9bff5eef36482b7fe6"
 

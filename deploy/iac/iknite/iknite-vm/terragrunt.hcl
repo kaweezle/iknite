@@ -21,8 +21,8 @@ dependency "image" {
 }
 
 locals {
-  openstack          = include.root.locals.secret.openstack
-  ovh                = include.root.locals.secret.ovh
+  openstack          = include.root.locals.secret.ovh.openstack
+  ovh                = include.root.locals.secret.ovh.ovh
   iknite_vm          = include.root.locals.secret.iknite_vm
   iknite_version     = include.root.locals.iknite_version
   kubernetes_version = include.root.locals.kubernetes_version
