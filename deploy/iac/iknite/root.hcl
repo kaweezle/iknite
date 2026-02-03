@@ -85,7 +85,7 @@ locals {
   slug                = "kaweezle"
   domain_suffix       = "iknite.app"
   github_organization = "kaweezle"
-  state_bucket        = "knttfstate"
+  state_bucket        = "kwzltfstate"
   email               = "info@kaweezle.com"
 
   # Infrastructure information
