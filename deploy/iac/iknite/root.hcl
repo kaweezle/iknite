@@ -8,30 +8,20 @@ terraform {
     backend "s3" {
       bucket = "${local.state_bucket}"
       key    = "iknite/${path_relative_to_include()}/terraform.tfstate"
-      region = "${local.secret.ovh.s3.region}"
+      region = "${local.secret.cloudflare.storage.region}"
       # sbg or any activated high performance storage region
       endpoints = {
-        s3 = "https://${local.secret.ovh.s3.endpoint}/"
+        s3 = "${local.secret.cloudflare.storage.endpoint}/"
       }
       skip_credentials_validation = true
+      skip_metadata_api_check     = true
       skip_region_validation      = true
       skip_requesting_account_id  = true
-      skip_s3_checksum            = false
-      skip_metadata_api_check     = true
+      skip_s3_checksum            = true
       use_path_style              = true
 
-      # Credentials. Please configure your credentials in ~/.aws/credentials
-      # or in environment variables.
-      # Environment variables Example:
-      # export AWS_ACCESS_KEY_ID="s3 user access key"
-      # export AWS_SECRET_ACCESS_KEY="s3 user secret key"
-      # ~/.aws/credentials Example:
-      # [default]
-      # aws_access_key_id = "s3 user access key"
-      # aws_secret_access_key = "s3 user secret key"
-      #
-      access_key                  = "${local.secret.ovh.s3.access_key_id}"
-      secret_key                  = "${local.secret.ovh.s3.secret_access_key}"
+      access_key                  = "${local.secret.cloudflare.storage.access_key_id}"
+      secret_key                  = "${local.secret.cloudflare.storage.secret_access_key}"
     }
 }
 EOF
