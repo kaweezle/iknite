@@ -3,7 +3,7 @@
 global:
   # -- Default domain used by all components
   ## Used for ingresses, certificates, SSO, notifications, etc.
-  domain: {{ .Environment.Values.data.argocd.domain }}
+  domain: {{ .Values.data.argocd.domain }}
 
   # -- Toggle and define pod-level security context.
   # @default -- `{}` (See [values.yaml])
@@ -34,10 +34,10 @@ configs:
         id: github
         name: GitHub
         config:
-          clientID: {{ .Environment.Values.data.argocd.github_oauth_client_id | quote }}
-          clientSecret: {{ .Environment.Values.data.argocd.github_oauth_client_secret | quote }}
+          clientID: {{ .Values.data.argocd.github_oauth_client_id | quote }}
+          clientSecret: {{ .Values.data.argocd.github_oauth_client_secret | quote }}
           orgs:
-          - name: {{ .Environment.Values.data.argocd.github.organization | quote }}
+          - name: {{ .Values.data.argocd.github.organization | quote }}
           teamNameField: slug
           useLoginAsId: true
 
@@ -46,7 +46,7 @@ configs:
       - id: argo-workflows-sso
         name: Argo Workflows
         redirectURIs:
-        - https://{{ .Environment.Values.data.argo_workflows.domain }}/oauth2/callback
+        - https://{{ .Values.data.argo_workflows.domain }}/oauth2/callback
         secretEnv: ARGO_WORKFLOWS_SSO_CLIENT_SECRET
       {{ end }}
 
@@ -57,7 +57,7 @@ configs:
     policy.default: role:readonly
     # Put the users in the admin team in order to give them admin rights
     policy.csv: |
-      g, {{ .Environment.Values.data.argocd.github.organization }}:admin,role:admin
+      g, {{ .Values.data.argocd.github.organization }}:admin,role:admin
       p, role:org-admin, applications, *, */*, allow
       p, role:org-admin, clusters, *, *, allow
       p, role:org-admin, repositories, *, *, allow
@@ -73,18 +73,18 @@ configs:
 
   credentialTemplates:
     ssh-creds:
-      url: {{ .Environment.Values.data.argocd.github.base_url }}
-      sshPrivateKey: {{ .Environment.Values.data.argocd.ssh_private_key | quote }}
+      url: {{ .Values.data.argocd.github.base_url }}
+      sshPrivateKey: {{ .Values.data.argocd.ssh_private_key | quote }}
 
   secret:
-    githubSecret: {{ .Environment.Values.data.github.webhook_secret | quote }}
+    githubSecret: {{ .Values.data.github.webhook_secret | quote }}
 
     extra:
       accounts.adminapi.tokens: "null"
-      accounts.adminapi.password: {{ .Environment.Values.data.argocd.admin_password_bcrypt | quote }}
+      accounts.adminapi.password: {{ .Values.data.argocd.admin_password_bcrypt | quote }}
       accounts.adminapi.passwordMtime: 2023-09-28T12:06:32Z
 
-    argocdServerAdminPassword: {{ .Environment.Values.data.argocd.admin_password_bcrypt | quote }}
+    argocdServerAdminPassword: {{ .Values.data.argocd.admin_password_bcrypt | quote }}
     argocdServerAdminPasswordMtime: 2022-10-11T11:21:11Z
 
 ## Dex
@@ -103,12 +103,12 @@ dex:
 server:
   certificateSecret:
     enabled: true # Created by the ingress package with external-secrets
-    key: {{ .Environment.Values.data.dns.wildcard.key | quote }}
-    crt: {{ .Environment.Values.data.dns.wildcard.crt | quote }}
+    key: {{ .Values.data.dns.wildcard.key | quote }}
+    crt: {{ .Values.data.dns.wildcard.crt | quote }}
 
   ingress:
     enabled: false # Created by the ingress package
-    hostname: {{ .Environment.Values.data.argocd.domain }}
+    hostname: {{ .Values.data.argocd.domain }}
     controller: generic
     ingressClassName: traefik
     tls: true
@@ -119,10 +119,10 @@ repoServer:
   image:
     # -- Repository to use for the repo server
     # @default -- `""` (defaults to global.image.repository)
-    repository: {{ .Environment.Values.data.argocd.repo_server_image_name }}
+    repository: {{ .Values.data.argocd.repo_server_image_name }}
     # -- Tag to use for the repo server
     # @default -- `""` (defaults to global.image.tag)
-    tag: {{ .Environment.Values.data.argocd.repo_server_image_tag }}
+    tag: {{ .Values.data.argocd.repo_server_image_tag }}
     # -- Image pull policy for the repo server
     # @default -- `""` (defaults to global.image.imagePullPolicy)
     imagePullPolicy: ""
@@ -169,7 +169,7 @@ repoServer:
 
   extraContainers:
   - name: helmfile-plugin
-    image: {{ .Environment.Values.data.argocd.repo_server_image_name }}:{{ .Environment.Values.data.argocd.repo_server_image_tag }}
+    image: {{ .Values.data.argocd.repo_server_image_name }}:{{ .Values.data.argocd.repo_server_image_tag }}
     command: [/var/run/argocd/argocd-cmp-server]
     env:
     - name: SOPS_AGE_KEY_FILE
@@ -218,7 +218,7 @@ extraObjects:
     type: Opaque
     data:
       # The non transformed value is the content of sample_age_key.txt
-      age_key.txt: {{ .Environment.Values.data.secrets.age_key_b64 | quote }}
+      age_key.txt: {{ .Values.data.secrets.age_key_b64 | quote }}
   {{ if .Environment.Values.data | dig "argo_workflows" "client_secret" "" }}
   -
     apiVersion: v1
@@ -231,7 +231,7 @@ extraObjects:
         app.kubernetes.io/part-of: argo-workflows
     stringData:
       client-id: argo-workflows-sso
-      client-secret: {{ .Environment.Values.data.argo_workflows.client_secret | quote }}
+      client-secret: {{ .Values.data.argo_workflows.client_secret | quote }}
   {{ end }}
   -
     apiVersion: v1
@@ -240,7 +240,7 @@ extraObjects:
       name: github-api-pat
     type: Opaque
     stringData:
-      token: {{ .Environment.Values.data.github.api_token | quote }}
+      token: {{ .Values.data.github.api_token | quote }}
   -
     apiVersion: traefik.io/v1alpha1
     kind: IngressRoute
@@ -252,7 +252,7 @@ extraObjects:
         - websecure
       routes:
         - kind: Rule
-          match: Host(`{{ .Environment.Values.data.argocd.domain }}`)
+          match: Host(`{{ .Values.data.argocd.domain }}`)
           priority: 10
           services:
             - kind: Service
@@ -261,7 +261,7 @@ extraObjects:
               port: http
               passHostHeader: true
         - kind: Rule
-          match: Host(`{{ .Environment.Values.data.argocd.domain }}`) && Header(`Content-Type`, `application/grpc`)
+          match: Host(`{{ .Values.data.argocd.domain }}`) && Header(`Content-Type`, `application/grpc`)
           priority: 11
           services:
             - kind: Service
@@ -273,7 +273,7 @@ extraObjects:
       tls:
         secretName: argocd-server-tls
         domains:
-          - main: {{ .Environment.Values.data.argocd.domain }}
+          - main: {{ .Values.data.argocd.domain }}
   -
     apiVersion: traefik.io/v1alpha1
     kind: IngressRoute
@@ -285,7 +285,7 @@ extraObjects:
         - web
       routes:
         - kind: Rule
-          match: Host(`{{ .Environment.Values.data.argocd.domain }}`)
+          match: Host(`{{ .Values.data.argocd.domain }}`)
           priority: 10
           services:
             - kind: Service
@@ -294,7 +294,7 @@ extraObjects:
               port: http
               passHostHeader: true
         - kind: Rule
-          match: Host(`{{ .Environment.Values.data.argocd.domain }}`) && Header(`Content-Type`, `application/grpc`)
+          match: Host(`{{ .Values.data.argocd.domain }}`) && Header(`Content-Type`, `application/grpc`)
           priority: 11
           services:
             - kind: Service
@@ -315,7 +315,7 @@ extraObjects:
         argocd.argoproj.io/hook: Skip
     type: Opaque
     data:
-      sshPrivateKey: {{ .Environment.Values.data.argocd.ssh_private_key | b64enc | quote }}
+      sshPrivateKey: {{ .Values.data.argocd.ssh_private_key | b64enc | quote }}
   -
     apiVersion: v1
     kind: ConfigMap
@@ -326,9 +326,9 @@ extraObjects:
     # The dot (.) character cannot be used as separator here as names are going to be
     # used as environment variables.
     data:
-      autocloud_target_revision: {{ .Environment.Values.data.bootstrap.repo_target_revision | quote }}
-      autocloud_repo_url: {{ .Environment.Values.data.bootstrap.repo_url | quote }}
-      autocloud_bootstrap_application_path: {{ .Environment.Values.data.bootstrap.application_path | quote }}
+      autocloud_target_revision: {{ .Values.data.bootstrap.repo_target_revision | quote }}
+      autocloud_repo_url: {{ .Values.data.bootstrap.repo_url | quote }}
+      autocloud_bootstrap_application_path: {{ .Values.data.bootstrap.application_path | quote }}
   -
     apiVersion: v1
     kind: ServiceAccount
@@ -381,7 +381,7 @@ extraObjects:
                     path: id_rsa
           containers:
             - name: create-bootstrap-application
-              image: {{ .Environment.Values.data.argocd.repo_server_image_name }}:{{ .Environment.Values.data.argocd.repo_server_image_tag }}
+              image: {{ .Values.data.argocd.repo_server_image_name }}:{{ .Values.data.argocd.repo_server_image_tag }}
               imagePullPolicy: IfNotPresent
               envFrom:
                 - configMapRef:
