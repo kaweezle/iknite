@@ -1,5 +1,7 @@
 # GitHub Configuration Module
 
+<!-- cSpell: words myorg -->
+
 This module configures GitHub resources required for ArgoCD integration:
 
 - Deploy keys for git repository access (automated)
@@ -104,19 +106,12 @@ See [variables.tf](variables.tf) for detailed input descriptions.
 
 <!-- markdownlint-disable -->
 <!-- BEGIN_TF_DOCS -->
-
 ## Requirements
 
-| Name                                                                     | Version   |
-| ------------------------------------------------------------------------ | --------- |
-| <a name="requirement_terraform"></a> [terraform](#requirement_terraform) | >= 1.11.0 |
-| <a name="requirement_github"></a> [github](#requirement_github)          | ~> 6.0    |
-
-## Providers
-
-| Name                                                      | Version |
-| --------------------------------------------------------- | ------- |
-| <a name="provider_github"></a> [github](#provider_github) | ~> 6.0  |
+| Name | Version |
+|------|---------|
+| <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | >= 1.11.0 |
+| <a name="requirement_github"></a> [github](#requirement\_github) | ~> 6.0 |
 
 ## Modules
 
@@ -124,36 +119,35 @@ No modules.
 
 ## Resources
 
-| Name                                                                                                                                         | Type     |
-| -------------------------------------------------------------------------------------------------------------------------------------------- | -------- |
-| [github_organization_webhook.this](https://registry.terraform.io/providers/integrations/github/latest/docs/resources/organization_webhook)   | resource |
+| Name | Type |
+|------|------|
+| [github_organization_webhook.this](https://registry.terraform.io/providers/integrations/github/latest/docs/resources/organization_webhook) | resource |
 | [github_repository_deploy_key.this](https://registry.terraform.io/providers/integrations/github/latest/docs/resources/repository_deploy_key) | resource |
-| [github_repository_webhook.this](https://registry.terraform.io/providers/integrations/github/latest/docs/resources/repository_webhook)       | resource |
+| [github_repository_webhook.this](https://registry.terraform.io/providers/integrations/github/latest/docs/resources/repository_webhook) | resource |
 
 ## Inputs
 
-| Name                                                                                             | Description                                                                               | Type           | Default                                             | Required |
-| ------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------- | -------------- | --------------------------------------------------- | :------: |
-| <a name="input_deploy_key_public_key"></a> [deploy_key_public_key](#input_deploy_key_public_key) | SSH public key to be used as deploy key for git repositories                              | `string`       | n/a                                                 |   yes    |
-| <a name="input_deploy_key_read_only"></a> [deploy_key_read_only](#input_deploy_key_read_only)    | Whether the deploy key should be read-only                                                | `bool`         | `true`                                              |    no    |
-| <a name="input_deploy_key_title"></a> [deploy_key_title](#input_deploy_key_title)                | Title for the deploy key                                                                  | `string`       | `"ArgoCD Deploy Key"`                               |    no    |
-| <a name="input_github_owner"></a> [github_owner](#input_github_owner)                            | GitHub organization or user name that owns the resources                                  | `string`       | `null`                                              |    no    |
-| <a name="input_github_token"></a> [github_token](#input_github_token)                            | GitHub personal access token with appropriate permissions                                 | `string`       | n/a                                                 |   yes    |
-| <a name="input_organizations"></a> [organizations](#input_organizations)                         | List of organization names to configure webhooks for                                      | `list(string)` | `[]`                                                |    no    |
-| <a name="input_repositories"></a> [repositories](#input_repositories)                            | List of repository names (without owner prefix) to configure deploy keys and webhooks for | `list(string)` | `[]`                                                |    no    |
-| <a name="input_webhook_active"></a> [webhook_active](#input_webhook_active)                      | Whether the webhook is active                                                             | `bool`         | `true`                                              |    no    |
-| <a name="input_webhook_content_type"></a> [webhook_content_type](#input_webhook_content_type)    | Content type for webhook payloads                                                         | `string`       | `"json"`                                            |    no    |
-| <a name="input_webhook_events"></a> [webhook_events](#input_webhook_events)                      | List of events that should trigger the webhook                                            | `list(string)` | <pre>[<br/> "push",<br/> "pull_request"<br/>]</pre> |    no    |
-| <a name="input_webhook_secret"></a> [webhook_secret](#input_webhook_secret)                      | Secret for securing webhook requests                                                      | `string`       | n/a                                                 |   yes    |
-| <a name="input_webhook_url"></a> [webhook_url](#input_webhook_url)                               | Webhook URL for ArgoCD to receive webhook events                                          | `string`       | n/a                                                 |   yes    |
+| Name | Description | Type | Default | Required |
+|------|-------------|------|---------|:--------:|
+| <a name="input_deploy_key_public_key"></a> [deploy\_key\_public\_key](#input\_deploy\_key\_public\_key) | SSH public key to be used as deploy key for git repositories | `string` | n/a | yes |
+| <a name="input_deploy_key_read_only"></a> [deploy\_key\_read\_only](#input\_deploy\_key\_read\_only) | Whether the deploy key should be read-only | `bool` | `true` | no |
+| <a name="input_deploy_key_title"></a> [deploy\_key\_title](#input\_deploy\_key\_title) | Title for the deploy key | `string` | `"ArgoCD Deploy Key"` | no |
+| <a name="input_github_owner"></a> [github\_owner](#input\_github\_owner) | GitHub organization or user name that owns the resources | `string` | `null` | no |
+| <a name="input_github_token"></a> [github\_token](#input\_github\_token) | GitHub personal access token with appropriate permissions | `string` | n/a | yes |
+| <a name="input_organizations"></a> [organizations](#input\_organizations) | List of organization names to configure webhooks for | `list(string)` | `[]` | no |
+| <a name="input_repositories"></a> [repositories](#input\_repositories) | List of repository names (without owner prefix) to configure deploy keys and webhooks for | `list(string)` | `[]` | no |
+| <a name="input_webhook_active"></a> [webhook\_active](#input\_webhook\_active) | Whether the webhook is active | `bool` | `true` | no |
+| <a name="input_webhook_content_type"></a> [webhook\_content\_type](#input\_webhook\_content\_type) | Content type for webhook payloads | `string` | `"json"` | no |
+| <a name="input_webhook_events"></a> [webhook\_events](#input\_webhook\_events) | List of events that should trigger the webhook | `list(string)` | <pre>[<br/>  "push",<br/>  "pull_request"<br/>]</pre> | no |
+| <a name="input_webhook_secret"></a> [webhook\_secret](#input\_webhook\_secret) | Secret for securing webhook requests | `string` | n/a | yes |
+| <a name="input_webhook_url"></a> [webhook\_url](#input\_webhook\_url) | Webhook URL for ArgoCD to receive webhook events | `string` | n/a | yes |
 
 ## Outputs
 
-| Name                                                                                               | Description                            |
-| -------------------------------------------------------------------------------------------------- | -------------------------------------- |
-| <a name="output_deploy_keys"></a> [deploy_keys](#output_deploy_keys)                               | Deploy key details for each repository |
-| <a name="output_organization_webhooks"></a> [organization_webhooks](#output_organization_webhooks) | Organization webhook details           |
-| <a name="output_repository_webhooks"></a> [repository_webhooks](#output_repository_webhooks)       | Repository webhook details             |
-
+| Name | Description |
+|------|-------------|
+| <a name="output_deploy_keys"></a> [deploy\_keys](#output\_deploy\_keys) | Deploy key details for each repository |
+| <a name="output_organization_webhooks"></a> [organization\_webhooks](#output\_organization\_webhooks) | Organization webhook details |
+| <a name="output_repository_webhooks"></a> [repository\_webhooks](#output\_repository\_webhooks) | Repository webhook details |
 <!-- END_TF_DOCS -->
 <!-- markdownlint-enable -->

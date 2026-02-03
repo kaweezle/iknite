@@ -73,7 +73,7 @@ repos:
               dist/.* |
               .*\.sops\.yaml$|
               .*\rc\.conf$|
-              .*\.(png|jpg|jpeg|gif|svg|ico|zip|gz|xz|7z|tar|nupkg)$
+              .*\.(png|jpg|jpeg|gif|svg|ico|zip|gz|xz|7z|tar|nupkg)
           )$
 
   # golangci-lint for Go files
@@ -91,7 +91,7 @@ repos:
         args: ["--exclude=SC3014,SC3043"] # Ignore source-related warnings
         exclude: |
           (?x)^(
-              packaging/rootfs/base/p10k.zsh
+              .*/p10k\.zsh
           )$
 
   - repo: https://github.com/antonbabenko/pre-commit-terraform
@@ -113,7 +113,7 @@ repos:
           - --hook-config=--parallelism-limit=1
         files: |
           (?x)^(
-              support/iac/iknite/.*/terragrunt\.hcl
+              deploy/iac/iknite/.*/terragrunt\.hcl
           )$
         exclude: \.terraform/.*$
       - id: terragrunt_validate
@@ -122,7 +122,7 @@ repos:
           - --hook-config=--parallelism-limit=1
         files: |
           (?x)^(
-              support/iac/iknite/.*/terragrunt\.hcl
+              deploy/iac/iknite/.*/terragrunt\.hcl
           )$
         exclude: \.terraform/.*$
 

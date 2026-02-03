@@ -31,6 +31,7 @@ func setupExecutor(t *testing.T) (*tu.MockExecutor, func()) {
 }
 
 func TestIPExists(t *testing.T) {
+	t.Parallel()
 	req := require.New(t)
 	localhost := net.ParseIP("127.0.0.1")
 	req.NotNil(localhost)
@@ -48,6 +49,7 @@ func TestIPExists(t *testing.T) {
 }
 
 func TestAddIpAddress(t *testing.T) {
+	t.Parallel()
 	executor, teardown := setupExecutor(t)
 	defer teardown()
 
@@ -75,6 +77,7 @@ func TestAddIpAddress(t *testing.T) {
 }
 
 func TestAddIpMapping(t *testing.T) {
+	t.Parallel()
 	req := require.New(t)
 
 	fs := afero.NewOsFs()

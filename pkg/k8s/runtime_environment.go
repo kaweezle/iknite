@@ -21,8 +21,8 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 
-	"github.com/bitfield/script"
 	log "github.com/sirupsen/logrus"
 	"github.com/txn2/txeh"
 
@@ -62,7 +62,8 @@ func PreventKubeletServiceFromStarting(confFilePath string) error {
 	var lines []string
 	if lines, err = utils.FS.Pipe(confFilePath).Slice(); err == nil {
 		lines = append(lines, RcConfPreventKubeletRunning)
-		if _, err = utils.FS.WritePipe(confFilePath, script.Slice(lines), os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o644); err != nil {
+		content := strings.Join(lines, "\n") + "\n"
+		if err = utils.FS.WriteFile(confFilePath, []byte(content), 0o644); err != nil {
 			return fmt.Errorf("while writing %s: %w", confFilePath, err)
 		}
 	} else {

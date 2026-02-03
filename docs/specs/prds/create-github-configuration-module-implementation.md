@@ -1,5 +1,7 @@
 # GitHub Configuration Module Implementation Summary
 
+<!-- cSpell: words AAAAB -->
+
 ## Overview
 
 A comprehensive Terraform module for automating GitHub configuration required by
