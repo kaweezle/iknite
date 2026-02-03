@@ -47,6 +47,7 @@ The project provides five main deliverables:
    - QCOW2 format for QEMU/KVM/OpenStack
    - VHDX format for Hyper-V
    - Pre-configured with iknite ready to start on first boot
+   - Includes cloud-init for easy customization
 
 ### Build & Infrastructure Tools
 
@@ -206,7 +207,7 @@ environments. A file `/run/openrc/softlevel` is also created to allow OpenRC to
 run as non init process.
 
 `iknite` is installed via the iknite APK package, along with its dependencies
-(see [.goreleaser.yaml](../.goreleaser.yaml#L67-L79)). On first run, the iknite
+(see `.goreleaser.yaml`). On first run, the iknite
 OpenRC service ([/etc/init.d/iknite](../packaging/apk/iknite/init.d/iknite)) is
 started which in turn runs `iknite init` to initialize the cluster. The service
 depends on `containerd` service to ensure container runtime is running before
@@ -238,7 +239,7 @@ Iknite persists cluster state in `/run/iknite/status.json` using the
 This allows tracking initialization phases and workload readiness across
 restarts.
 
-Iknite makes the following kustomizations to the kubeadm initialization process
+Iknite makes the following modifications to the kubeadm initialization process
 (in [pkg/cmd/init.go](../pkg/cmd/init.go)):
 
 - Ensure that the containerd environment is clean.
@@ -288,7 +289,7 @@ automates the process of creating a VM image, installing the iknite APK packages
 and configuring the VM for first use. The starting point of the script is the
 built root filesystem image
 (`dist/iknite-<iknite_version>-<kubernetes_version>.rootfs.tar.gz`). It produces
-a QCOW2 image for QEMU/KVM and converts it into a VHDX image.
+a QCOW2 image for QEMU/KVM and converts it into a VHDX image for Hyper-V.
 
 ### Development Workflows
 
@@ -342,8 +343,7 @@ And the the focus on one specific step by skipping all the others:
 ```
 
 The script assumes a Linux host with Docker or Containerd (preferred) installed.
-The main development environment is an Alpine based devcontainer
-([.devcontainer/devcontainer.json](../.devcontainer/devcontainer.json)) or WSL2
+The main development environment is an Alpine based devcontainer or WSL2
 distribution with Alpine installed via the rootfs image. The
 [hack/make-rootfs-devenv.sh](../hack/make-rootfs-devenv.sh) script adds the
 appropriate packages to the rootfs image to make it suitable as a development
@@ -353,7 +353,7 @@ environment.
 
 ### Commit Style
 
-Use [gitmoji](https://gitmoji.dev/) conventions:
+Use gitmoji conventions:
 
 - ✨ New features
 - 🐛 Bug fixes
@@ -361,8 +361,7 @@ Use [gitmoji](https://gitmoji.dev/) conventions:
 - ♻️ Refactoring
 - ✅ Tests
 
-Keep commits atomic and descriptive (see
-[CONTRIBUTING.md](../CONTRIBUTING.md#L146-L174)).
+Keep commits atomic and descriptive (see [CONTRIBUTING.md](../CONTRIBUTING.md)).
 
 ## Common Pitfalls
 
@@ -387,8 +386,7 @@ Keep commits atomic and descriptive (see
 ## Documentation
 
 Iknite documentation is built with **MkDocs** using Material for MkDocs theme.
-The documentation source is in `docs/docs/` and is managed with
-[awesome-nav](https://github.com/lukasgeiter/mkdocs-awesome-nav) for automatic
+The documentation source is in `docs/docs/` and is managed with automatic
 navigation generation.
 
 The project also includes the following markdown pages outside the `docs/`
@@ -403,13 +401,10 @@ folder:
 
 ### Documentation Structure
 
-- **Configuration**: [docs/mkdocs.yaml](../docs/mkdocs.yaml) - MkDocs
-  configuration
+- **Configuration**: `docs/mkdocs.yaml` - MkDocs configuration
 - **Content**: `docs/docs/` - Markdown documentation files
-- **Navigation**: [`docs/docs/.nav.yml`](../docs/docs/.nav.yml) - Manual
-  navigation overrides
-- **Dependencies**: [docs/pyproject.toml](../docs/pyproject.toml) - Python
-  dependencies managed with `uv`
+- **Navigation**: `docs/docs/.nav.yml` - Manual navigation overrides
+- **Dependencies**: `docs/pyproject.toml` - Python dependencies managed with `uv`
 
 ### Documentation Commands
 
@@ -462,7 +457,7 @@ configuration.
 
 | Task                     | Command                                                          |
 | ------------------------ | ---------------------------------------------------------------- |
-| Full image build (local) | `./packaging/scripts/build-helper.sh --with-cache --skip-clean`  |
+| Full image build (local) | `./packaging/scripts/build-helper.sh --with-cache`               |
 | Build only APK packages  | `./packaging/scripts/build-helper.sh --only-goreleaser`          |
 | Build rootfs base image  | `./packaging/scripts/build-helper.sh --only-build --with-cache`  |
 | Build iknite-images APK  | `./packaging/scripts/build-helper.sh --only-images`              |
@@ -491,5 +486,5 @@ Available steps: `goreleaser`, `build`, `images`, `add-images`, `export`,
 | View kubeconfig       | `cat /root/.kube/config`                                                                                          |
 | Check service status  | `rc-status`                                                                                                       |
 | View service logs     | `cat /var/log/iknite.log`                                                                                         |
-| APK dependencies      | [.goreleaser.yaml](../.goreleaser.yaml#L67-L79)                                                                   |
-| Default kustomization | [packaging/apk/iknite/iknite.d/base/kustomization.yaml](../packaging/apk/iknite/iknite.d/base/kustomization.yaml) |
+| APK dependencies      | `.goreleaser.yaml`                                                                                                |
+| Default kustomization | `packaging/apk/iknite/iknite.d/base/kustomization.yaml`                                                           |
