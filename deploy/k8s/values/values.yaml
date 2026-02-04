@@ -13,5 +13,5 @@ data:
       organization: kaweezle
   bootstrap:
     repo_url: git@github.com:kaweezle/iknite.git
-    repo_target_revision: feature/end-to-end-test
+    repo_target_revision: main
     application_path: deploy/k8s/environments/e2e/apps/appstage-00-bootstrap.yaml

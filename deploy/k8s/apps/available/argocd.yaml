@@ -21,7 +21,7 @@ spec:
   source:
     path: deploy/k8s/components/argocd
     repoURL: git@github.com:kaweezle/iknite.git
-    targetRevision: feature/end-to-end-test
+    targetRevision: main
     plugin:
       # Helmfile environment variables
       env:

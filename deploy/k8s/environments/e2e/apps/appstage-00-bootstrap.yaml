@@ -15,7 +15,7 @@ spec:
   source:
     path: deploy/k8s/environments/e2e/apps/appstage-00-bootstrap
     repoURL: git@github.com:kaweezle/iknite.git
-    targetRevision: feature/end-to-end-test
+    targetRevision: main
   syncPolicy:
     automated:
       prune: true
