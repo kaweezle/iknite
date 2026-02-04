@@ -1,0 +1,125 @@
+# cSpell: disable
+name: End to end tests
+
+on:
+  pull_request:
+    branches: ["main"]
+    types: [labeled, synchronize, opened]
+
+env:
+  tf_version: "1.14.3"
+  tg_version: "0.97.2"
+
+jobs:
+  test-vm-image:
+    name: Test Iknite VM image on OpenStack
+    if: ${{ contains(github.event.pull_request.labels.*.name, 'test-e2e') && github.actor != 'dependabot[bot]' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          fetch-tags: "true"
+      - name: Import Signature key
+        id: import-signing-key
+        shell: bash
+        run: |
+          echo -e "$GPG_PRIVATE_KEY" > kaweezle-devel@kaweezle.com-c9d89864.rsa
+          chmod 600 kaweezle-devel@kaweezle.com-c9d89864.rsa
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          cp kaweezle-devel@kaweezle.com-c9d89864.rsa ~/.ssh/id_rsa
+          mkdir -p ~/.config/sops/age
+          echo -e "$AGE_PRIVATE_KEY" > ~/.config/sops/age/keys.txt
+          chmod 600 ~/.config/sops/age/keys.txt
+          KUBERNETES_VERSION=$(grep k8s.io/kubernetes go.mod | awk '{gsub(/^v/,"",$2);print $2;}')
+          IKNITE_VERSION=$(git describe --abbrev=0 --tags --match="v[0-9]*" | awk -F'.' '{ printf "%s.%s.%s-devel",$1,$2,$3+1;}')
+          echo "Using Kubernetes version $KUBERNETES_VERSION, iknite version $IKNITE_VERSION"
+          echo "KUBERNETES_VERSION=$KUBERNETES_VERSION" >> $GITHUB_ENV
+          echo "KUBERNETES_VERSION=$KUBERNETES_VERSION" >> $GITHUB_OUTPUT
+          echo "IKNITE_VERSION=$IKNITE_VERSION" >> $GITHUB_ENV
+          echo "IKNITE_VERSION=$IKNITE_VERSION" >> $GITHUB_OUTPUT
+        env:
+          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+          AGE_PRIVATE_KEY: ${{ secrets.AGE_PRIVATE_KEY }}
+      - name: Preparing environment
+        run: |
+          set -euo pipefail
+          echo "::group::Installing tenv"
+          TENV_LATEST_VERSION=$(curl --silent https://api.github.com/repos/tofuutils/tenv/releases/latest | jq -r .tag_name)
+          curl -O -L "https://github.com/tofuutils/tenv/releases/latest/download/tenv_${TENV_LATEST_VERSION}_amd64.deb"
+          sudo dpkg -i "tenv_${TENV_LATEST_VERSION}_amd64.deb"
+          echo "::endgroup::"
+
+          echo "::group::Installing terraform ($tf_version) and terragrunt ($tg_version)"
+          tenv tf install $tf_version
+          tenv tg install $tg_version
+          echo "::endgroup::"
+
+          echo "::group::Installing helmfile"
+          HELMFILE_LATEST_VERSION=$(curl --silent https://api.github.com/repos/helmfile/helmfile/releases/latest | jq -r .tag_name | tr -d v)
+          curl -L "https://github.com/helmfile/helmfile/releases/download/v${HELMFILE_LATEST_VERSION}/helmfile_${HELMFILE_LATEST_VERSION}_linux_amd64.tar.gz" -o helmfile.tar.gz
+          tar -xzvf helmfile.tar.gz helmfile
+          chmod +x helmfile
+          sudo mv helmfile /usr/local/bin/helmfile
+          rm helmfile.tar.gz
+          /usr/local/bin/helmfile init --force
+          helm plugin install https://github.com/mumoshu/helm-x
+          echo "::endgroup::"
+
+          echo "::group::Installing sops"
+          SOPS_LATEST_VERSION=$(curl --silent https://api.github.com/repos/getsops/sops/releases/latest | jq -r .tag_name)
+          curl -sLo sops -L https://github.com/getsops/sops/releases/download/${SOPS_LATEST_VERSION}/sops-${SOPS_LATEST_VERSION}.linux.amd64
+          chmod +x sops
+          sudo mv sops /usr/local/bin/sops
+          echo "::endgroup::"
+
+          echo "::group::Checking argocd deployment"
+          cd deploy/k8s/components/argocd
+          echo "############################################################"
+          echo "Release list..."
+          helmfile list --output json | jq .
+          echo "############################################################"
+          echo "Build checksum..."
+          helmfile build --embed-values | grep -v '^#' | grep -v '^filepath: ' | sha256sum
+          echo "::endgroup::"
+
+      - name: Create OpenStack image and test VM deployment
+        id: create-and-test-openstack-image
+        run: |
+          set -euo pipefail
+          echo "::group::Running terragrunt module with instance creation"
+          export TF_PLUGIN_CACHE_DIR="$HOME/.cache/terraform/plugin-cache"
+          mkdir -p $TF_PLUGIN_CACHE_DIR
+          cd deploy/iac/iknite/iknite-image
+          export IKNITE_CREATE_INSTANCE=true
+          echo "############################################################"
+          echo "Initializing terragrunt units chain..."
+          terragrunt run --graph --non-interactive init
+
+          echo "############################################################"
+          echo "Refreshing terragrunt state for image..."
+          terragrunt apply -auto-approve -refresh-only
+
+          echo "############################################################"
+          echo "Now performing chain starting with vm creation..."
+          cd ../iknite-vm
+          terragrunt run --graph --non-interactive apply
+          echo "::endgroup::"
+
+          echo "::group::Testing VM instance"
+          ../../../../test/e2e/argocd-checker.sh
+          echo "::endgroup::"
+
+      - name: Clean OpenStack image
+        id: clean-openstack-image
+        if: ${{ contains(github.event.pull_request.labels.*.name, 'clean-e2e') }}
+        run: |
+          set -euo pipefail
+          echo "::group::Teardown VM instance"
+          export IKNITE_CREATE_INSTANCE=false
+          cd deploy/iac/iknite/iknite-vm
+          terragrunt run --graph --non-interactive apply
+          echo "::endgroup::"

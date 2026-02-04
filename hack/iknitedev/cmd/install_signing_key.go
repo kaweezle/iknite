@@ -13,7 +13,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-// cSpell: ignore getsops
+// cSpell: ignore getsops kyaml
 package cmd
 
 import (
@@ -24,7 +24,8 @@ import (
 	"github.com/getsops/sops/v3/decrypt"
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
-	"gopkg.in/yaml.v3"
+	"sigs.k8s.io/kustomize/kyaml/kio"
+	"sigs.k8s.io/kustomize/kyaml/yaml"
 )
 
 // SigningKeyOptions contains configuration for the signing-key command.
@@ -39,7 +40,7 @@ type SigningKeyOptions struct {
 func CreateSigningKeyCmd(fs afero.Fs, opts *SigningKeyOptions) *cobra.Command {
 	if opts == nil {
 		opts = &SigningKeyOptions{
-			KeyName: "apk_signing_key",
+			KeyName: "data.apk_signing_key",
 		}
 	}
 	if opts.Fs == nil {
@@ -59,8 +60,8 @@ signing key, and writes it to the specified destination directory with appropria
 permissions (0400).
 
 Example:
-  iknitedev install signing-key deploy/iac/iknite/secrets.sops.yaml .
-  iknitedev install signing-key --key apk_signing_key deploy/iac/iknite/secrets.sops.yaml /path/to/dest`,
+  iknitedev install signing-key deploy/k8s/secrets/secrets.sops.yaml .
+  iknitedev install signing-key --key data.apk_signing_key deploy/k8s/secrets/secrets.sops.yaml /path/to/dest`,
 		Args: cobra.ExactArgs(2),
 		RunE: func(_ *cobra.Command, args []string) error {
 			opts.SecretsFile = args[0]
@@ -105,11 +106,20 @@ func InstallSigningKey(opts *SigningKeyOptions) error {
 	if parseErr := yaml.Unmarshal(cleartext, &secrets); parseErr != nil {
 		return fmt.Errorf("failed to parse decrypted secrets: %w", parseErr)
 	}
+	var nodes []*yaml.RNode
+	nodes, err = kio.FromBytes(cleartext)
+	if err != nil {
+		return fmt.Errorf("failed to parse decrypted secrets into RNodes: %w", err)
+	}
 
-	// Extract the signing key
-	signingKeyData, ok := secrets[opts.KeyName]
-	if !ok {
-		return fmt.Errorf("%s not found in secrets file", opts.KeyName)
+	if len(nodes) == 0 {
+		return fmt.Errorf("no YAML documents found in decrypted secrets")
+	}
+	secretsNode := nodes[0]
+
+	signingKeyData, retrievalErr := secretsNode.GetFieldValue(opts.KeyName)
+	if retrievalErr != nil {
+		return fmt.Errorf("%s not found in secrets file: %w", opts.KeyName, retrievalErr)
 	}
 
 	signingKeyMap, ok := signingKeyData.(map[string]any)

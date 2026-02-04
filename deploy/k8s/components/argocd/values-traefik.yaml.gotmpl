@@ -1,0 +1,59 @@
+# cSpell: words websecure
+global:
+  checkNewVersion: false
+  sendAnonymousUsage: false
+
+logs:
+  general:
+    level: "DEBUG"
+
+ingressRoute:
+  dashboard:
+    enabled: true
+
+updateStrategy:
+  type: Recreate
+
+providers:
+  kubernetesCRD:
+    enabled: true
+    allowCrossNamespace: true
+    allowExternalNameServices: true
+  kubernetesIngress:
+    enabled: true
+    allowExternalNameServices: true
+  kubernetesGateway:
+    enabled: false
+
+service:
+  enabled: true
+  single: true
+  type: LoadBalancer
+
+ports:
+  traefik:
+    port: 8080
+    expose:
+      default: true
+    exposedPort: 8080
+    protocol: TCP
+  websecure:
+    port: 443
+    hostPort: 443
+    containerPort: 443
+    expose:
+      default: true
+    exposedPort: 443
+    protocol: TCP
+    http:
+      tls:
+        enabled: true
+        options: ""
+        certResolver: ""
+        domains: []
+  metrics:
+    port: 9100
+    expose:
+      default: false
+    exposedPort: 9100
+    protocol: TCP

@@ -15,7 +15,7 @@ write_files:
           cluster:
             ip: 192.168.99.2
             create_ip: true
-            kubernetes_version: "1.34.3"
+            kubernetes_version: "1.35.0"
             domain_name: iknite.local
             network_interface: eth0
             enable_mdns: true

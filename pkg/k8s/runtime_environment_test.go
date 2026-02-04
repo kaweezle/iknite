@@ -14,6 +14,8 @@ import (
 
 // cSpell: enable
 
+// cSpell: words paralleltest
+
 func setupExecutor(t *testing.T) func() {
 	t.Helper()
 	executor := &tu.MockExecutor{}
@@ -29,6 +31,7 @@ func setupExecutor(t *testing.T) func() {
 
 const confFilePath = "/etc/rc.conf"
 
+//nolint:paralleltest // Using a global variable util.Exec
 func TestPreventKubeletServiceFromStarting(t *testing.T) {
 	teardown := setupExecutor(t)
 	defer teardown()
@@ -55,6 +58,7 @@ func TestPreventKubeletServiceFromStarting(t *testing.T) {
 	req.Equal(rcConfFileContent+k8s.RcConfPreventKubeletRunning+"\n", string(content))
 }
 
+//nolint:paralleltest // Using a global variable util.Exec
 func TestPreventKubeletServiceFromStarting_WhenLineIsPresent(t *testing.T) {
 	teardown := setupExecutor(t)
 	defer teardown()

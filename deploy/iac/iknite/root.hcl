@@ -1,4 +1,4 @@
-# cSpell: words hwzkgzs kwzltfstate
+# cSpell: words hwzkgzs kwzltfstate knttfstate
 generate "backend" {
   path      = "backend.tf"
   if_exists = "overwrite_terragrunt"
@@ -6,31 +6,22 @@ generate "backend" {
 
 terraform {
     backend "s3" {
-      bucket = "kwzltfstate"
+      bucket = "${local.state_bucket}"
       key    = "iknite/${path_relative_to_include()}/terraform.tfstate"
-      region = "gra"
+      region = "${local.secret.cloudflare.storage.region}"
       # sbg or any activated high performance storage region
       endpoints = {
-        s3 = "https://s3.gra.io.cloud.ovh.net/"
+        s3 = "${local.secret.cloudflare.storage.endpoint}/"
       }
       skip_credentials_validation = true
+      skip_metadata_api_check     = true
       skip_region_validation      = true
       skip_requesting_account_id  = true
       skip_s3_checksum            = true
-      skip_metadata_api_check     = true
+      use_path_style              = true
 
-      # Credentials. Please configure your credentials in ~/.aws/credentials
-      # or in environment variables.
-      # Environment variables Example:
-      # export AWS_ACCESS_KEY_ID="s3 user access key"
-      # export AWS_SECRET_ACCESS_KEY="s3 user secret key"
-      # ~/.aws/credentials Example:
-      # [default]
-      # aws_access_key_id = "s3 user access key"
-      # aws_secret_access_key = "s3 user secret key"
-      #
-      access_key                  = "${local.s3_access_key_id}"
-      secret_key                  = "${local.secret.s3_secret_access_key}"
+      access_key                  = "${local.secret.cloudflare.storage.access_key_id}"
+      secret_key                  = "${local.secret.cloudflare.storage.secret_access_key}"
     }
 }
 EOF
@@ -69,10 +60,10 @@ provider "openstack" {
 }
 
 provider "ovh" {
-  endpoint           = "${local.ovh.endpoint}"
-  application_key    = "${local.ovh.application_key}"
-  application_secret = "${local.secret.ovh_application_secret}"
-  consumer_key       = "${local.ovh.consumer_key}"
+  endpoint           = "${local.secret.ovh.ovh.endpoint}"
+  application_key    = "${local.secret.ovh.ovh.application_key}"
+  application_secret = "${local.secret.ovh.ovh.application_secret}"
+  consumer_key       = "${local.secret.ovh.ovh.consumer_key}"
 }
 EOF
 }
@@ -84,24 +75,15 @@ locals {
   slug                = "kaweezle"
   domain_suffix       = "iknite.app"
   github_organization = "kaweezle"
+  state_bucket        = "kwzltfstate"
   email               = "info@kaweezle.com"
 
   # Infrastructure information
-  secret = yamldecode(sops_decrypt_file(find_in_parent_folders("secrets.sops.yaml")))
-  ovh = {
-    endpoint        = "ovh-eu"
-    application_key = "4KyIjUiRpDo4lpqY"
-    consumer_key    = "l6t3g737V7WrZbV09urGaRzlRCLZmTqp"
-  }
-  ovh_region             = "ovh-eu"
-  os_project_id          = "40d343bb6eb54b57af7a367a31cd3898"
-  os_storage_region_name = "GRA"
-  s3_access_key_id       = "a56154691503423d82fe101b6cbd956e"
-  s3_user_id             = "a99acb7ecb2f4120b44eddc0b9fd580b"
+  secret = yamldecode(sops_decrypt_file("${get_repo_root()}/deploy/k8s/secrets/secrets.sops.yaml")).data
 
   cloudflare_account_id = "a54f6b2557d54a9bff5eef36482b7fe6"
 
-  kubernetes_version = get_env("KUBERNETES_VERSION", "1.34.3")
+  kubernetes_version = get_env("KUBERNETES_VERSION", "1.35.0")
   iknite_version     = get_env("IKNITE_VERSION", try(jsondecode(file("${get_repo_root()}/dist/metadata.json")).version, "0.6.1-devel"))
 }
 

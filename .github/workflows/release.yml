@@ -304,7 +304,7 @@ jobs:
           chmod 600 ~/.config/sops/age/keys.txt
           echo "::endgroup::"
 
-          echo "::group::Instaling tenv"
+          echo "::group::Installing tenv"
           TENV_LATEST_VERSION=$(curl --silent https://api.github.com/repos/tofuutils/tenv/releases/latest | jq -r .tag_name)
           curl -O -L "https://github.com/tofuutils/tenv/releases/latest/download/tenv_${TENV_LATEST_VERSION}_amd64.deb"
           sudo dpkg -i "tenv_${TENV_LATEST_VERSION}_amd64.deb"
@@ -315,23 +315,29 @@ jobs:
           tenv tg install $tg_version
           echo "::endgroup::"
 
+          echo "::group::Installing sops"
+          SOPS_LATEST_VERSION=$(curl --silent https://api.github.com/repos/getsops/sops/releases/latest | jq -r .tag_name)
+          curl -sLo sops -L https://github.com/getsops/sops/releases/download/${SOPS_LATEST_VERSION}/sops-${SOPS_LATEST_VERSION}.linux.amd64
+          chmod +x sops
+          sudo mv sops /usr/local/bin/sops
+          echo "::endgroup::"
+
           echo "::group::Running terragrunt module with instance creation"
           export TF_PLUGIN_CACHE_DIR="$HOME/.cache/terraform/plugin-cache"
           mkdir -p $TF_PLUGIN_CACHE_DIR
-          cd deploy/iac/iknite/iknite-vm
+          cd deploy/iac/iknite/iknite-image
           export IKNITE_CREATE_INSTANCE=true
-          terragrunt init
-          terragrunt apply -auto-approve
+          terragrunt run --graph --non-interactive init
+          terragrunt run --graph --non-interactive apply
           echo "::endgroup::"
 
           echo "::group::Testing VM instance"
-          # Add commands to test the VM instance here
-          echo "Should test Kubernetes presence..."
+          ../../../../test/e2e/argocd-checker.sh
           echo "::endgroup::"
 
           echo "::group::Teardown VM instance"
           export IKNITE_CREATE_INSTANCE=false
-          terragrunt apply -auto-approve
+          terragrunt run --graph --non-interactive apply
           echo "::endgroup::"
 
       - name: Upload VM images

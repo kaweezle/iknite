@@ -9,11 +9,7 @@ terraform {
 }
 
 locals {
-  secret        = include.root.locals.secret
-  s3_region     = lower(include.root.locals.os_storage_region_name)
-  s3_access_key = include.root.locals.s3_access_key_id
-  r2            = include.root.locals.secret.cloudflare.storage
-
+  r2 = include.root.locals.secret.cloudflare.storage
 }
 
 inputs = {

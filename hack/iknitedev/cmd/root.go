@@ -54,6 +54,7 @@ development tasks that are not part of the main iknite binary.`,
 
 	// Add subcommands
 	rootCmd.AddCommand(CreateInstallCmd(opts.Fs))
+	rootCmd.AddCommand(CreateKustomizeCmd(opts.Fs))
 
 	return rootCmd
 }

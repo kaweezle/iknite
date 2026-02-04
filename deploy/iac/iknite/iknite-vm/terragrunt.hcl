@@ -8,45 +8,47 @@ terraform {
   source = "${get_repo_root()}/deploy/iac/modules/openstack-vm"
 }
 
+dependency "image" {
+  config_path = "${get_parent_terragrunt_dir("root")}/iknite-image"
+
+  mock_outputs = {
+    images = {
+      "iknite-vm-image" = {
+        id = "mock-image-id"
+      }
+    }
+  }
+}
+
 locals {
-  secret             = include.root.locals.secret
-  ovh                = include.root.locals.ovh
+  openstack          = include.root.locals.secret.ovh.openstack
+  ovh                = include.root.locals.secret.ovh.ovh
+  iknite_vm          = include.root.locals.secret.iknite_vm
   iknite_version     = include.root.locals.iknite_version
   kubernetes_version = include.root.locals.kubernetes_version
 }
 
 inputs = {
-  ovh = merge(
-    local.ovh,
-    {
-      application_secret = local.secret.ovh_application_secret
-    }
-  )
-  openstack = local.secret.openstack
+  ovh       = local.ovh
+  openstack = local.openstack
   keys = {
     "iknite" = {
       name       = "iknite"
-      public_key = local.secret.iknite_vm.ssh_public_key
+      public_key = local.iknite_vm.ssh_public_key
     }
   }
   private_keys = {
-    "iknite" = local.secret.iknite_vm.ssh_private_key
-  }
-  images = {
-    "iknite-vm-image" = {
-      name            = "iknite-test-vm-image-${local.iknite_version}-${local.kubernetes_version}"
-      local_file_path = "${get_repo_root()}/dist/iknite-vm.${local.iknite_version}-${local.kubernetes_version}.qcow2"
-    }
+    "iknite" = local.iknite_vm.ssh_private_key
   }
   instances = {
     "iknite-vm-instance" = {
       name    = "iknite-vm-instance"
       enabled = tobool(get_env("IKNITE_CREATE_INSTANCE", "false"))
 
-      image_name  = "iknite-vm-image"
+      image_id    = try(dependency.image.outputs.images["iknite-vm-image"].id, "mock-image-id")
       flavor_name = "b3-16"
       key_name    = "iknite"
-      user_data   = tobool(get_env("IKNITE_DEBUG_INSTANCE", "false")) ? file("cloud-config.yaml") : null
+      user_data   = tobool(get_env("IKNITE_DEBUG_INSTANCE", "false")) ? file("cloud-config-debug.yaml") : null
     }
   }
 }

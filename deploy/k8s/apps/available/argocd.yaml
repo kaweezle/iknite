@@ -1,0 +1,36 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: argocd-server
+  namespace: argocd
+  annotations:
+    autocloud/local-application: "true"
+    autocloud/custom-path: "true"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  destination:
+    namespace: argocd
+    server: https://kubernetes.default.svc
+  ignoreDifferences:
+    - group: argoproj.io
+      jsonPointers:
+        - /status
+      kind: Application
+  project: default
+  source:
+    path: deploy/k8s/components/argocd
+    repoURL: git@github.com:kaweezle/iknite.git
+    targetRevision: main
+    plugin:
+      # Helmfile environment variables
+      env:
+        # We have resources in multiple namespaces
+        - name: HELMFILE_USE_CONTEXT_NAMESPACE
+          value: "true"
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

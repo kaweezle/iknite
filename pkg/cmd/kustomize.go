@@ -134,11 +134,15 @@ func initializeKustomization(flagSet *flag.FlagSet) {
 
 func performKustomize(_ *cobra.Command, _ []string) {
 	ip, err := utils.GetOutboundIP()
-	cobra.CheckErr(fmt.Errorf("while getting IP address: %w", err))
+	if err != nil {
+		cobra.CheckErr(fmt.Errorf("while getting IP address: %w", err))
+	}
 
 	// We need to get it from root as we will apply configuration
 	kubeConfig, err := k8s.LoadFromFile(constants.KubernetesRootConfig)
-	cobra.CheckErr(fmt.Errorf("while loading local cluster configuration: %w", err))
+	if err != nil {
+		cobra.CheckErr(fmt.Errorf("while loading local cluster configuration: %w", err))
+	}
 	err = kubeConfig.CheckClusterRunning(
 		clusterCheckRetries,
 		clusterCheckOkResponses,
