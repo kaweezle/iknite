@@ -3,7 +3,7 @@ module github.com/kaweezle/iknite
 go 1.25.0
 
 require (
-	github.com/bitfield/script v0.22.1
+	github.com/bitfield/script v0.24.1
 	github.com/charmbracelet/bubbles v0.20.0
 	github.com/charmbracelet/bubbletea v1.1.0
 	github.com/charmbracelet/lipgloss v1.1.0
