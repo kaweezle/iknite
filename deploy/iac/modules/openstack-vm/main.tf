@@ -30,7 +30,7 @@ resource "openstack_compute_instance_v2" "this" {
 locals {
   dns_zones_to_create = {
     for k, v in var.instances : k => v
-    if v.dns_zone != null
+    if v.dns_zone != null && v.enabled
   }
 }
 
