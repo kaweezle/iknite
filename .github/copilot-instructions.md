@@ -308,7 +308,7 @@ STEPS:
     add-images          Add images to rootfs container
     export              Export rootfs tarball
     rootfs-image        Build final rootfs image
-    fetch-krmfnbuiltin  Fetch krmfnbuiltin APKs
+    fetch-karmafun  Fetch karmafun APKs
     make-apk-repo       Create APK repository in dist/repo
     upload-repo         Upload APK repository to https://static.iknite.app/<repo>/
     vm-image            Build VM images (qcow2, vhdx)
@@ -467,7 +467,7 @@ configuration.
 | Build APK repository     | `./packaging/scripts/build-helper.sh --only-make-apk-repo`       |
 
 Available steps: `goreleaser`, `build`, `images`, `add-images`, `export`,
-`rootfs-image`, `fetch-krmfnbuiltin`, `make-apk-repo`, `upload-repo`,
+`rootfs-image`, `fetch-karmafun`, `make-apk-repo`, `upload-repo`,
 `vm-image`, `clean`
 
 ### Documentation

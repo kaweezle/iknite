@@ -99,13 +99,12 @@ jobs:
            sha256sum *.apk >>../SHA256SUMS && \
            for f in *.apk; do mv $f ../$(echo $f | sed 's/\-r0.apk$//').$ARCH.apk; done)
           rmdir "dist/$ARCH/"
-      - name: Download krmfnbuiltin apk
+      - name: Download karmafun apk
         run: |
           cd dist
-          LATEST_VERSION=$(curl --silent  https://api.github.com/repos/kaweezle/krmfnbuiltin/releases/latest | jq -r .tag_name)
-          echo "Latest krmfnbuiltin version is ${LATEST_VERSION}"
-          curl -O -L "https://github.com/kaweezle/krmfnbuiltin/releases/download/${LATEST_VERSION}/krmfnbuiltin-${LATEST_VERSION#v}.x86_64.apk"
-          curl -O -L "https://github.com/kaweezle/krmfnbuiltin/releases/download/${LATEST_VERSION}/krmfnbuiltin-${LATEST_VERSION#v}.i386.apk"
+          LATEST_VERSION=$(curl --silent  https://api.github.com/repos/karmafun/karmafun/releases/latest | jq -r .tag_name)
+          echo "Latest karmafun version is ${LATEST_VERSION}"
+          curl -O -L "https://github.com/karmafun/karmafun/releases/download/${LATEST_VERSION}/karmafun-${LATEST_VERSION#v}.x86_64.apk"
           cd ..
       - name: Upload assets
         uses: actions/upload-artifact@v6
@@ -197,7 +196,7 @@ jobs:
 
           echo "Version is $IKNITE_VERSION"
           cp packages/iknite-${IKNITE_VERSION}.$(uname -m).apk "$BUILD_DIR"
-          cp packages/krmfnbuiltin-*.$(uname -m).apk "$BUILD_DIR"
+          cp packages/karmafun-*.$(uname -m).apk "$BUILD_DIR"
           mkdir -p /tmp/.buildx-cache
           mkdir -p /tmp/.buildx-cache-new
           echo "::group::Building iknite-rootfs-base:${IKNITE_VERSION}"

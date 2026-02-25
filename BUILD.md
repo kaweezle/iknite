@@ -237,7 +237,7 @@ images, and VM images.
 4. **add-images** - Add images to rootfs container
 5. **export** - Export rootfs tarball
 6. **rootfs-image** - Build final rootfs Docker image
-7. **fetch-krmfnbuiltin** - Fetch krmfnbuiltin APKs
+7. **fetch-karmafun** - Fetch karmafun APKs
 8. **make-apk-repo** - Create APK repository in dist/repo
 9. **upload-repo** - Upload APK repository to https://static.iknite.app/
 10. **vm-image** - Build VM images (qcow2, vhdx)
@@ -321,7 +321,7 @@ echo https://static.iknite.app/test/ >> /etc/apk/repositories
 echo https://static.iknite.app/release/ >> /etc/apk/repositories
 
 # Install dependencies
-apk --update add krmfnbuiltin k9s openssl nerdctl
+apk --update add karmafun k9s openssl nerdctl
 
 # Install iknite
 apk add iknite iknite-images

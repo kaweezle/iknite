@@ -103,8 +103,8 @@ dex:
 server:
   certificateSecret:
     enabled: true # Created by the ingress package with external-secrets
-    key: {{ .Values.data.dns.wildcard.key | quote }}
-    crt: {{ .Values.data.dns.wildcard.crt | quote }}
+    key: {{ .Values.data.dns.wildcard | dig .Values.data.domain_suffix "key" "" | quote }}
+    crt: {{ .Values.data.dns.wildcard | dig .Values.data.domain_suffix "crt" "" | quote }}
 
   ingress:
     enabled: false # Created by the ingress package

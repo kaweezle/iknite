@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# cSpell: words nerdctl doas chainguard apks rootfull krmfn krmfnbuiltin apkrepo apkindex tenv testrepo qcow2 vhdx gsub toplevel
+# cSpell: words nerdctl doas chainguard apks rootfull krmfn karmafun apkrepo apkindex tenv testrepo qcow2 vhdx gsub toplevel
 
 set -e
 IKNITE_REPO_NAME="test"
@@ -44,7 +44,7 @@ if [ "$ROOTLESS" = false ]; then
 fi
 
 # Step names for dynamic --skip-* and --only-* handling
-STEP_NAMES="goreleaser build images add-images export rootfs-image fetch-krmfnbuiltin make-apk-repo upload-repo vm-image clean"
+STEP_NAMES="goreleaser build images add-images export rootfs-image fetch-karmafun make-apk-repo upload-repo vm-image clean"
 
 # Only run this specific step (empty means run all non-skipped steps)
 ONLY_CALLED=false
@@ -80,7 +80,7 @@ STEPS:
     add-images          Add images to rootfs container
     export              Export rootfs tarball
     rootfs-image        Build final rootfs image
-    fetch-krmfnbuiltin  Fetch krmfnbuiltin APKs
+    fetch-karmafun      Fetch karmafun APKs
     make-apk-repo       Create APK repository in dist/repo
     upload-repo         Upload APK repository to https://static.iknite.app/<repo>/
     vm-image            Build VM images (qcow2, vhdx)
@@ -217,16 +217,16 @@ else
 fi
 
 
-KRMFN_LATEST_VERSION=$(curl --silent  https://api.github.com/repos/kaweezle/krmfnbuiltin/releases/latest | jq -r .tag_name)
-if should_run_step "fetch-krmfnbuiltin"; then
-    step "Fetching krmfnbuiltin image..."
+KRMFN_LATEST_VERSION=$(curl --silent  https://api.github.com/repos/karmafun/karmafun/releases/latest | jq -r .tag_name)
+if should_run_step "fetch-karmafun"; then
+    step "Fetching karmafun image..."
 
     cd "$ROOT_DIR/dist"
-    echo "Latest krmfnbuiltin version is ${KRMFN_LATEST_VERSION}"
-    curl -O -L "https://github.com/kaweezle/krmfnbuiltin/releases/download/${KRMFN_LATEST_VERSION}/krmfnbuiltin-${KRMFN_LATEST_VERSION#v}.x86_64.apk"
+    echo "Latest karmafun version is ${KRMFN_LATEST_VERSION}"
+    curl -O -L "https://github.com/karmafun/karmafun/releases/download/${KRMFN_LATEST_VERSION}/karmafun-${KRMFN_LATEST_VERSION#v}.x86_64.apk"
     cd -
 else
-    skip "Fetching krmfnbuiltin image"
+    skip "Fetching karmafun image"
 fi
 
 # Check nerdctl is installed
@@ -334,13 +334,8 @@ else
 fi
 
 if should_run_step upload-repo; then
-    step "Uploading APK repository to Iknite repo URL..."
+    step "Uploading APK repository ${IKNITE_REPO_NAME} to Iknite repo URL..."
 
-    tenv tf install $TF_VERSION
-    tenv tg install $TG_VERSION
-
-    export TF_PLUGIN_CACHE_DIR="$HOME/.cache/terraform/plugin-cache"
-    mkdir -p "$TF_PLUGIN_CACHE_DIR"
     (cd "$ROOT_DIR/deploy/iac/iknite/${IKNITE_REPO_NAME}repo" && \
           terragrunt init && \
           terragrunt apply -auto-approve )
@@ -360,7 +355,7 @@ if should_run_step "build"; then
     cp -r "$ROOT_DIR/packaging/rootfs/base/." "$BUILD_DIR/"
 
     cp "$ROOT_DIR/dist/iknite-${IKNITE_VERSION}.${ARCH}.apk" "$BUILD_DIR/"
-    cp "$ROOT_DIR/dist/krmfnbuiltin-${KRMFN_LATEST_VERSION#v}.${ARCH}.apk" "$BUILD_DIR/"
+    cp "$ROOT_DIR/dist/karmafun-${KRMFN_LATEST_VERSION#v}.${ARCH}.apk" "$BUILD_DIR/"
 
     $SUDO_CMD buildctl build \
                  --frontend dockerfile.v0 \

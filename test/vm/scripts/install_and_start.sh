@@ -8,7 +8,7 @@ wget -q -P /etc/apk/keys "${KEY_URL}"
 grep -q iknite /etc/apk/repositories || echo https://static.iknite.app/release/ >> /etc/apk/repositories
 
 # Add some minimal dependencies
-apk --update add krmfnbuiltin k9s openssl nerdctl
+apk --update add karmafun k9s openssl nerdctl
 
 apk add --allow-untrusted --no-cache /mnt/wsl/iknite-*.x86_64.apk
 
