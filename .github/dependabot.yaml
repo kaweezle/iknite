@@ -1,6 +1,24 @@
+# cSpell: words gomod
 version: 2
 updates:
   - package-ecosystem: "gomod"
     directory: "/"
+    schedule:
+      interval: "daily"
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "daily"
+    groups:
+      "github-actions":
+        patterns:
+          - "*" # Group all GitHub Actions dependencies together
+  - package-ecosystem: "docker"
+    directories:
+      - /packaging/rootfs/base
+    schedule:
+      interval: "daily"
+  - package-ecosystem: "opentofu"
+    directory: "/deploy/iac"
     schedule:
       interval: "daily"
