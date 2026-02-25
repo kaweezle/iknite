@@ -25,11 +25,11 @@ jobs:
       IKNITE_VERSION: ${{ steps.get-iknite-version.outputs.IKNITE_VERSION }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
           go-version: ^1
       - name: Import Signature key
@@ -51,7 +51,7 @@ jobs:
           GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
           AGE_PRIVATE_KEY: ${{ secrets.AGE_PRIVATE_KEY }}
       - name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@v5
+        uses: goreleaser/goreleaser-action@v7
         if: github.event_name == 'pull_request'
         with:
           version: "~> v2"
@@ -59,7 +59,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@v5
+        uses: goreleaser/goreleaser-action@v7
         if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
         with:
           version: "~> v2"
@@ -108,7 +108,7 @@ jobs:
           curl -O -L "https://github.com/kaweezle/krmfnbuiltin/releases/download/${LATEST_VERSION}/krmfnbuiltin-${LATEST_VERSION#v}.i386.apk"
           cd ..
       - name: Upload assets
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: packages
           path: |
@@ -154,7 +154,7 @@ jobs:
       contents: read
       packages: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -171,7 +171,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Cache Docker layers
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: /tmp/.buildx-cache
           key: ${{ runner.os }}-single-buildx-${{ github.sha }}
@@ -179,7 +179,7 @@ jobs:
             ${{ runner.os }}-single-buildx
 
       - name: Get built apks
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: packages
           path: packages
@@ -249,7 +249,7 @@ jobs:
           echo "::endgroup::"
 
       - name: Upload root fs artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: rootfs
           path: |
@@ -271,10 +271,10 @@ jobs:
       KUBERNETES_VERSION: ${{ needs.goreleaser-snapshot.outputs.KUBERNETES_VERSION }}
       IKNITE_VERSION: ${{ needs.goreleaser-snapshot.outputs.IKNITE_VERSION }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Get root fs artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: rootfs
           path: dist
@@ -341,7 +341,7 @@ jobs:
           echo "::endgroup::"
 
       - name: Upload VM images
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: vm-images
           path: |
@@ -360,7 +360,7 @@ jobs:
       contents: write
       packages: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       # Import all the artifacts from previous jobs
       - name: Get All artifacts
