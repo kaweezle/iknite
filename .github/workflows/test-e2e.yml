@@ -119,7 +119,7 @@ jobs:
         run: |
           set -euo pipefail
           echo "::group::Teardown VM instance"
-          export IKNITE_CREATE_INSTANCE=false
+          export IKNITE_CREATE_INSTANCE=true
           cd deploy/iac/iknite/iknite-vm
-          terragrunt run --graph --non-interactive apply
+          terragrunt run --graph --non-interactive destroy -- -auto-approve
           echo "::endgroup::"

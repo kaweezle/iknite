@@ -97,7 +97,7 @@ retrieve_kubeconfig() {
     terragrunt apply -refresh-only -auto-approve &> /dev/null
 
     local kubeconfig_content
-    kubeconfig_content=$(terragrunt output -raw kubeconfig 2>&1)
+    kubeconfig_content=$(terragrunt output -raw kubeconfig 2>/dev/null)
 
     # shellcheck disable=SC2181
     if [[ $? -ne 0 ]]; then
@@ -302,9 +302,9 @@ login_argocd() {
     local host=$1
     local password=$2
 
-    log_info "Logging in to ArgoCD server..."
+    log_info "Logging in to ArgoCD server ${host}..."
 
-    if "${ARGOCD_CLI}" login "${host}" --username admin --password "${password}"; then
+    if "${ARGOCD_CLI}" login "${host}" --username admin --password "${password}" --insecure; then
         log_info "Successfully logged in to ArgoCD"
     else
         log_error "Failed to log in to ArgoCD"
