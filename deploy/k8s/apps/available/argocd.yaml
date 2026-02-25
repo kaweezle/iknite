@@ -34,3 +34,5 @@ spec:
       selfHeal: true
     syncOptions:
       - CreateNamespace=true
+      # Needed in ArgoCD v3.3 https://argo-cd.readthedocs.io/en/stable/operator-manual/upgrading/3.2-3.3/#breaking-changes
+      - ServerSideApply=true

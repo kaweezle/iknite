@@ -1,5 +1,5 @@
 terraform {
-  required_version = ">= 1.14"
+  required_version = ">= 1.11"
 
   required_providers {
     kubernetes = {
@@ -12,7 +12,7 @@ terraform {
     }
     helmfile = {
       source  = "kaweezle/helmfile"
-      version = "~> 0.1.1"
+      version = "~> 0.1.2"
     }
     local = {
       source  = "hashicorp/local"
