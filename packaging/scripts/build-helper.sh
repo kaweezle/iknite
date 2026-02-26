@@ -20,8 +20,6 @@ SUDO_CMD=""
 BUILDKIT_NAMESPACE="k8s.io"
 CACHE_FLAG="--no-cache"
 SNAPSHOT="--snapshot"
-TF_VERSION="1.14.3"
-TG_VERSION="0.97.2"
 ARCH=$(uname -m)
 
 
