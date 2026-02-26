@@ -14,20 +14,11 @@ resource "local_file" "kubeconfig" {
   filename             = local.kubeconfig_path
   file_permission      = "0600"
   directory_permission = "0700"
-}
 
-# Clean up the temporary kubeconfig file
-resource "null_resource" "cleanup_kubeconfig" {
   provisioner "local-exec" {
     when    = destroy
-    command = "rm -f ${self.triggers.kubeconfig_file}"
+    command = "rm -f ${self.filename}"
   }
-
-  triggers = {
-    kubeconfig_file = local_file.kubeconfig.filename
-  }
-
-  depends_on = [local_file.kubeconfig]
 }
 
 resource "helmfile_release" "this" {

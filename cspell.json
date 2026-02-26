@@ -17,7 +17,8 @@
     "**/rc.conf",
     "**/**.sops.yaml",
     "**/*.lock.hcl",
-    "packaging/apk/iknite/**"
+    "packaging/apk/iknite/**",
+    ".gitattributes"
   ],
   "dictionaryDefinitions": [],
   "dictionaries": ["bash", "docker", "golang", "terraform", "softwareTerms"],

@@ -17,6 +17,13 @@ locals {
 
 dependency "vm" {
   config_path = "${get_parent_terragrunt_dir("root")}/iknite-vm"
+  mock_outputs = {
+    instances = {
+      "iknite-vm-instance" = {
+        access_ip_v4 = ""
+      }
+    }
+  }
 }
 
 inputs = {
@@ -27,7 +34,7 @@ inputs = {
   records = {
     "e2e" = {
       name    = "e2e"
-      enabled = can(dependency.vm.outputs.instances["iknite-vm-instance"].access_ip_v4)
+      enabled = try(dependency.vm.outputs.instances["iknite-vm-instance"].access_ip_v4, "") != ""
       type    = "A"
       content = try(dependency.vm.outputs.instances["iknite-vm-instance"].access_ip_v4, "")
       ttl     = 60
@@ -35,7 +42,7 @@ inputs = {
     }
     "argocd-e2e" = {
       name    = "argocd-e2e"
-      enabled = can(dependency.vm.outputs.instances["iknite-vm-instance"].access_ip_v4)
+      enabled = try(dependency.vm.outputs.instances["iknite-vm-instance"].access_ip_v4, "") != ""
       type    = "A"
       content = try(dependency.vm.outputs.instances["iknite-vm-instance"].access_ip_v4, "")
       ttl     = 60
