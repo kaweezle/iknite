@@ -185,7 +185,9 @@ func (config *Config) RestartProxy() error {
 	ctx := context.Background()
 
 	var ds *appsV1.DaemonSet
-	if ds, err = client.AppsV1().DaemonSets("kube-system").Get(ctx, "kube-proxy", metaV1.GetOptions{}); err != nil {
+	if ds, err = client.AppsV1().
+		DaemonSets("kube-system").
+		Get(ctx, "kube-proxy", metaV1.GetOptions{}); err != nil {
 		return fmt.Errorf("failed to get kube-proxy daemonset: %w", err)
 	}
 
@@ -305,7 +307,9 @@ func WriteIkniteConfigMap(
 			ConfigMaps("kube-system").
 			Update(context.TODO(), cm, metaV1.UpdateOptions{})
 	} else {
-		res, err = client.CoreV1().ConfigMaps("kube-system").Create(context.TODO(), cm, metaV1.CreateOptions{})
+		res, err = client.CoreV1().
+			ConfigMaps("kube-system").
+			Create(context.TODO(), cm, metaV1.CreateOptions{})
 	}
 	if err != nil {
 		return res, fmt.Errorf("failed to write iknite config map: %w", err)

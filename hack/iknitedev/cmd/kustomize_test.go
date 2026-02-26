@@ -94,7 +94,11 @@ data:
 `
 
 	// Write files
-	if err := os.WriteFile(filepath.Join(tmpDir, "kustomization.yaml"), []byte(kustomizationContent), 0o644); err != nil {
+	if err := os.WriteFile(
+		filepath.Join(tmpDir, "kustomization.yaml"),
+		[]byte(kustomizationContent),
+		0o644,
+	); err != nil {
 		t.Fatalf("failed to write kustomization.yaml: %v", err)
 	}
 
@@ -157,7 +161,11 @@ spec:
 `
 
 	// Write files
-	if err := os.WriteFile(filepath.Join(tmpDir, "kustomization.yaml"), []byte(kustomizationContent), 0o644); err != nil {
+	if err := os.WriteFile(
+		filepath.Join(tmpDir, "kustomization.yaml"),
+		[]byte(kustomizationContent),
+		0o644,
+	); err != nil {
 		t.Fatalf("failed to write kustomization.yaml: %v", err)
 	}
 
@@ -286,7 +294,11 @@ data:
 `
 
 	// Write files
-	if err := os.WriteFile(filepath.Join(tmpDir, "kustomization.yaml"), []byte(kustomizationContent), 0o644); err != nil {
+	if err := os.WriteFile(
+		filepath.Join(tmpDir, "kustomization.yaml"),
+		[]byte(kustomizationContent),
+		0o644,
+	); err != nil {
 		t.Fatalf("failed to write kustomization.yaml: %v", err)
 	}
 

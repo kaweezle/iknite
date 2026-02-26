@@ -11,4 +11,5 @@ const (
 	EnableMDNS         = "cluster.enable_mdns"
 	ClusterName        = "cluster.cluster_name"
 	Kustomization      = "cluster.kustomization"
+	UseEtcd            = "cluster.use_etcd"
 )

@@ -21,7 +21,13 @@
     ".gitattributes"
   ],
   "dictionaryDefinitions": [],
-  "dictionaries": ["bash", "docker", "golang", "terraform", "softwareTerms"],
+  "dictionaries": [
+    "bash",
+    "docker",
+    "golang",
+    "terraform",
+    "softwareTerms"
+  ],
   "words": [
     "abuild",
     "afero",
@@ -43,6 +49,7 @@
     "deepcopy",
     "Distros",
     "DRYRUN",
+    "dupl",
     "fieldtype",
     "finalizer",
     "fontawesome",
@@ -65,12 +72,12 @@
     "Infof",
     "Infoln",
     "interfacebloat",
+    "karmafun",
     "kaweezle",
     "keypair",
     "keypairs",
     "killall",
     "koptions",
-    "karmafun",
     "krusty",
     "kubeadm",
     "kubeconfig",

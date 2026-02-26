@@ -31,7 +31,7 @@ type cleanOptions struct {
 	unmountPaths       bool
 	cleanCni           bool
 	cleanIptables      bool
-	cleanEtcd          bool
+	cleanAPIBackend    bool
 	cleanClusterConfig bool
 	cleanIpAddress     bool
 }
@@ -45,7 +45,7 @@ func newCleanOptions() *cleanOptions {
 		unmountPaths:       true,
 		cleanCni:           true,
 		cleanIptables:      true,
-		cleanEtcd:          false,
+		cleanAPIBackend:    false,
 		cleanClusterConfig: false,
 		cleanIpAddress:     false,
 	}
@@ -53,7 +53,7 @@ func newCleanOptions() *cleanOptions {
 
 func (o *cleanOptions) hasActualWorkToDo() bool {
 	return o.stopContainers || o.stopContainerd || o.unmountPaths || o.cleanCni ||
-		o.cleanIptables || o.cleanEtcd || o.cleanIpAddress || o.cleanClusterConfig ||
+		o.cleanIptables || o.cleanAPIBackend || o.cleanIpAddress || o.cleanClusterConfig ||
 		o.cleanAll
 }
 
@@ -65,7 +65,7 @@ func (o *cleanOptions) validate() error {
 		o.unmountPaths = true
 		o.cleanCni = true
 		o.cleanIptables = true
-		o.cleanEtcd = true
+		o.cleanAPIBackend = true
 		o.cleanIpAddress = true
 		o.cleanClusterConfig = true
 	}
@@ -128,10 +128,10 @@ func initializeClean(flags *flag.FlagSet, cleanOptions *cleanOptions) {
 		"Reset iptables",
 	)
 	flags.BoolVar(
-		&cleanOptions.cleanEtcd,
-		options.CleanEtcd,
-		cleanOptions.cleanEtcd,
-		"Reset etcd data",
+		&cleanOptions.cleanAPIBackend,
+		options.CleanAPIBackend,
+		cleanOptions.cleanAPIBackend,
+		"Reset API backend data",
 	)
 	flags.BoolVar(
 		&cleanOptions.cleanIpAddress,
@@ -206,9 +206,9 @@ func performClean(ikniteConfig *v1alpha1.IkniteClusterSpec, cleanOptions *cleanO
 		}
 	}
 
-	if cleanOptions.cleanEtcd {
-		logger.Info("Cleaning up etcd data...")
-		cobra.CheckErr(k8s.DeleteEtcdData(dryRun))
+	if cleanOptions.cleanAPIBackend {
+		logger.Info("Cleaning up API backend data...")
+		cobra.CheckErr(k8s.DeleteAPIBackendData(dryRun, ikniteConfig.UseEtcd))
 	}
 
 	if cleanOptions.cleanClusterConfig {

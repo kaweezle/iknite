@@ -57,6 +57,7 @@ data:
            pods insecure
            fallthrough in-addr.arpa ip6.arpa
            ttl 30
+           startup_timeout 10s
         }
         prometheus :9153
         forward . /etc/resolv.conf {
@@ -109,6 +110,10 @@ spec:
           effect: NoSchedule
       nodeSelector:
         kubernetes.io/os: linux
+      initContainers:
+        - name: wait
+          image: public.ecr.aws/docker/library/busybox:1.37.0
+          command: ["sh", "-c", "sleep 10"]
       containers:
         - name: coredns
           image: registry.k8s.io/coredns/coredns:v1.13.1
@@ -141,7 +146,7 @@ spec:
               port: 8080
               scheme: HTTP
             initialDelaySeconds: 5
-            periodSeconds: 10
+            periodSeconds: 5
             timeoutSeconds: 5
             successThreshold: 1
             failureThreshold: 5

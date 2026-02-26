@@ -6,6 +6,10 @@ on:
     branches: ["main"]
     types: [labeled, synchronize, opened]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test-vm-image:
     name: Test Iknite VM image on OpenStack

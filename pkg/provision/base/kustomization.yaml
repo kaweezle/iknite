@@ -47,7 +47,7 @@ patches:
                   effect: NoSchedule
               containers:
               - name: helper-pod
-                image: busybox:1.37.0
+                image: public.ecr.aws/docker/library/busybox:1.37.0
                 imagePullPolicy: IfNotPresent
           setup: |-
             #!/bin/sh
@@ -70,6 +70,12 @@ patches:
       - op: replace
         path: /spec/template/spec/containers/0/readinessProbe/initialDelaySeconds
         value: 10
+      - op: replace
+        path: /spec/template/spec/initContainers
+        value:
+          - name: wait
+            image: public.ecr.aws/docker/library/busybox:1.37.0
+            command: ['sh', '-c', 'sleep 10']
     target:
       kind: Deployment
       name: metrics-server

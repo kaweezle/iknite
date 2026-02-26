@@ -24,6 +24,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/bitfield/script"
 	"github.com/mitchellh/mapstructure"
 	"github.com/spf13/cobra"
 	flag "github.com/spf13/pflag"
@@ -85,6 +86,12 @@ func ConfigureClusterCommand(flagSet *flag.FlagSet, ikniteConfig *v1alpha1.Iknit
 		ikniteConfig.Kustomization,
 		"Kustomization location (URL or directory)",
 	)
+	flagSet.BoolVar(
+		&ikniteConfig.UseEtcd,
+		options.UseEtcd,
+		ikniteConfig.UseEtcd,
+		"Use etcd instead of kine as the backing store",
+	)
 }
 
 func StartPersistentPreRun(cmd *cobra.Command, _ []string) {
@@ -128,6 +135,11 @@ func StartPersistentPreRun(cmd *cobra.Command, _ []string) {
 	_ = viper.BindPFlag(
 		Kustomization,
 		flags.Lookup(options.Kustomization),
+	)
+	//nolint:errcheck // flag exists
+	_ = viper.BindPFlag(
+		UseEtcd,
+		flags.Lookup(options.UseEtcd),
 	)
 }
 
@@ -248,6 +260,10 @@ func GetKubeVipImage() string {
 	return "ghcr.io/kube-vip/kube-vip:v0.8.9"
 }
 
+func GetKineImage() string {
+	return "ghcr.io/k3s-io/kine:v0.14.12"
+}
+
 // GetIkniteImages returns the list of container images used by iknite.
 func GetIkniteImages(ikniteConfig *v1alpha1.IkniteClusterSpec) ([]string, error) {
 	// Load default kubeadm configuration to get the list of control plane images
@@ -278,5 +294,14 @@ func GetIkniteImages(ikniteConfig *v1alpha1.IkniteClusterSpec) ([]string, error)
 	containerImages := images.GetControlPlaneImages(&cfg.ClusterConfiguration)
 	// Add kube vip image
 	containerImages = append(containerImages, GetKubeVipImage())
+	if !ikniteConfig.UseEtcd {
+		// Add kine image if not using etcd
+		containerImages = append(containerImages, GetKineImage())
+		//nolint:errcheck // this doesn't return error
+		containerImages, _ = script.Slice(containerImages).
+			Reject("etcd:").
+			Slice()
+	}
+	containerImages = append(containerImages, "public.ecr.aws/docker/library/busybox:1.37.0")
 	return containerImages, nil
 }

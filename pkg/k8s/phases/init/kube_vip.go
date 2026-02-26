@@ -1,11 +1,10 @@
-package init
+package init //nolint:dupl // kube-vip and kine intentionally share the same static-pod-manifest phase structure
 
 import (
 	"errors"
 	"fmt"
 	"html/template"
 	"io"
-	"path/filepath"
 
 	"github.com/spf13/afero"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
@@ -44,28 +43,13 @@ func CreateKubeVipConfiguration(wr io.Writer, config *v1alpha1.IkniteClusterSpec
 	return nil
 }
 
+// WriteKubeVipConfiguration creates the kube-vip manifest file in manifestDir.
 func WriteKubeVipConfiguration(
 	fs afero.Fs, manifestDir string, config *v1alpha1.IkniteClusterSpec,
 ) (afero.File, error) {
-	afs := &afero.Afero{Fs: fs}
-	f, err := afs.Create(filepath.Join(manifestDir, "kube-vip.yaml"))
-	if err != nil {
-		return f, fmt.Errorf("failed to create kube-vip.yaml file: %w", err)
-	}
-	defer func() {
-		closeErr := f.Close()
-		if err == nil {
-			err = closeErr
-		} else if closeErr == nil {
-			closeErr = afs.Remove(f.Name())
-			if closeErr != nil {
-				err = errors.Join(err, fmt.Errorf("while removing file %s: %w", f.Name(), closeErr))
-			}
-		}
-	}()
-
-	err = CreateKubeVipConfiguration(f, config)
-	return f, err
+	return writeStaticPodManifest(
+		fs, manifestDir, "kube-vip.yaml", config, CreateKubeVipConfiguration,
+	)
 }
 
 func runKubeVipControlPlane(c workflow.RunData) error {

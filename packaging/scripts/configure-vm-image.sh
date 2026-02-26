@@ -30,6 +30,8 @@ apk add --quiet --no-cache --no-progress less logrotate openssh chrony cloud-ini
 
 step 'Set up timezone'
 setup-timezone -z Europe/Paris
+echo "" >> /etc/chrony/chrony.conf
+echo "makestep 1 3" >> /etc/chrony/chrony.conf
 
 step 'Set up keymap'
 setup-keymap fr fr-azerty
