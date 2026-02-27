@@ -20,10 +20,10 @@ require (
 	github.com/stretchr/testify v1.11.1
 	github.com/txn2/txeh v1.8.0
 	golang.org/x/net v0.50.0
-	k8s.io/api v0.35.1
-	k8s.io/apimachinery v0.35.1
+	k8s.io/api v0.35.2
+	k8s.io/apimachinery v0.35.2
 	k8s.io/cli-runtime v0.35.1
-	k8s.io/client-go v0.35.1
+	k8s.io/client-go v0.35.2
 	k8s.io/code-generator v0.35.1
 	k8s.io/klog/v2 v2.130.1
 	k8s.io/kube-proxy v0.35.1
