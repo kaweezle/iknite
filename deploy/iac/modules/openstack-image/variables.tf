@@ -6,6 +6,7 @@ variable "images" {
     local_file_path  = string
     name             = string
     visibility       = optional(string, "private")
+    properties       = optional(map(string), {})
   }))
 }
 

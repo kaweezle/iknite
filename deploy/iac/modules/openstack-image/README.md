@@ -57,7 +57,7 @@ No modules.
 
 | Name | Description | Type | Default | Required |
 |------|-------------|------|---------|:--------:|
-| <a name="input_images"></a> [images](#input\_images) | Map of images to create | <pre>map(object({<br/>    container_format = optional(string, "bare")<br/>    disk_format      = optional(string, "qcow2")<br/>    local_file_path  = string<br/>    name             = string<br/>    visibility       = optional(string, "private")<br/>  }))</pre> | n/a | yes |
+| <a name="input_images"></a> [images](#input\_images) | Map of images to create | <pre>map(object({<br/>    container_format = optional(string, "bare")<br/>    disk_format      = optional(string, "qcow2")<br/>    local_file_path  = string<br/>    name             = string<br/>    visibility       = optional(string, "private")<br/>    properties       = optional(map(string), {})<br/>  }))</pre> | n/a | yes |
 | <a name="input_openstack"></a> [openstack](#input\_openstack) | OpenStack credentials | <pre>object({<br/>    auth_url            = string<br/>    password            = string<br/>    project_domain_name = string<br/>    region              = string<br/>    tenant_id           = string<br/>    user_domain_name    = string<br/>    user_name           = string<br/>  })</pre> | n/a | yes |
 
 ## Outputs

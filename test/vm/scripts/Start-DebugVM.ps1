@@ -39,7 +39,7 @@
     - Network neighbor discovery relies on ARP table entries with MAC prefix 00-15-5d (Hyper-V default).
 #>
 
-# cSpell: words openstack vhdx dvddrive Synchronisation Heure
+# cSpell: words openstack vhdx dvddrive synchronisation heure
 [CmdletBinding(SupportsShouldProcess=$true)]
 param(
     [string]$VMName = "debug",
@@ -54,22 +54,23 @@ if (-not $CheckOnly) {
     Write-Host "Resizing VHD to 20GB..."
     Resize-VHD -Path $VHDXPath -SizeBytes 20GB
     Write-Host "Creating the VM '$VMName'..."
-    $null = New-VM -Name $VMName -MemoryStartupBytes 2GB -Path . -BootDevice VHD -VHDPath $VHDXPath -SwitchName "Default Switch" -Generation 1
-    # Increase the number of processors to 2 for better performance
+    $null = New-VM -Name $VMName -MemoryStartupBytes 2GB -Path . -BootDevice VHD -VHDPath $VHDXPath -SwitchName "Default Switch" -Generation 2
+    Write-Host "Increase the number of processors to 2 for better performance"
     Set-VMProcessor -VMName $VMName -Count 2
-    # Redirect COM1 to a named pipe for debugging purposes
+    Write-Host "Redirect COM1 to a named pipe for debugging purposes"
     Set-VMComPort -VMName $VMName -Number 1 -Path "\\.\pipe\$VMName"
-    Set-VMDvdDrive -VMName $VMName -Path $ISOPath
-    # Set the Maximum RAM to 16GB to allow for dynamic memory allocation if needed
-    Set-VMMemory -VMName $VMName -DynamicMemoryEnabled $true -MinimumBytes 2GB -MaximumBytes 16GB
-    # Disable automatic checkpoints to avoid performance issues during debugging
+    Write-Host "Add a DVD drive and attach the specified ISO for cloud-init configuration"
+    Add-VMDvdDrive -VMName $VMName -Path $ISOPath
+    Write-Host "Set the RAM of the VM to the fixed amount of 8GB"
+    Set-VMMemory -VMName $VMName -StartupBytes 8GB -DynamicMemoryEnabled $false
+    Write-Host "Disable automatic checkpoints to avoid performance issues during debugging"
     Set-VM -Name $VMName -CheckpointType "Disabled"
-    # Set the automatic stop action to turn off the VM to ensure it shuts down cleanly when stopped from Hyper-V Manager
+    Write-Host "Set the automatic stop action to turn off the VM to ensure it shuts down cleanly when stopped from Hyper-V Manager"
     Set-VM -VMName $VMName -AutomaticStopAction TurnOff
-    # Set the memory settings to allow for dynamic memory allocation between 2GB and 16GB, which can help with performance during debugging
-    Set-VM -VMName $VMName -MemoryMinimumBytes 2GB -MemoryMaximumBytes 16GB
-    # Disable time synchronization to prevent clock drift issues during debugging
+    Write-Host "Disable time synchronization to prevent clock drift issues during debugging"
     Disable-VMIntegrationService -VMName $VMName -Name "Synchronisation date/heure"
+    Write-Host "Remove secure boot to allow booting from the provided VHDX and ISO without signing requirements"
+    Set-VMFirmware -VMName $VMName -EnableSecureBoot Off
 
     if (-not $DoNotStart) {
         Write-Host "Starting the VM '$VMName'..."
