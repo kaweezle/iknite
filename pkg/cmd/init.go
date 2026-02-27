@@ -301,6 +301,7 @@ func newCmdInit(out io.Writer, initOptions *initOptions) *cobra.Command {
 			// Skip either kine or etcd based on UseEtcd setting.
 			if data.IkniteCluster().Spec.UseEtcd {
 				initRunner.Options.SkipPhases = append(initRunner.Options.SkipPhases, "kine")
+				data.ikniteCluster.Spec.APIBackendDatabaseDirectory = data.cfg.Etcd.Local.DataDir
 			} else {
 				initRunner.Options.SkipPhases = append(initRunner.Options.SkipPhases, "etcd")
 			}

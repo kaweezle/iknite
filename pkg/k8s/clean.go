@@ -309,12 +309,7 @@ func DeleteNetworkInterfaces(isDryRun bool) error {
 }
 
 // DeleteAPIBackendData deletes the API backend data directory.
-func DeleteAPIBackendData(isDryRun, isEtcd bool) error {
-	apiBackendName := "kine"
-	if isEtcd {
-		apiBackendName = "etcd"
-	}
-	apiBackendDataDir := "/var/lib/" + apiBackendName
+func DeleteAPIBackendData(isDryRun bool, apiBackendName, apiBackendDatabaseDirectory string) error {
 	apiBackendManifestPath := filepath.Join(
 		kubeadmConstants.KubernetesDir,
 		kubeadmConstants.ManifestsSubDirName,
@@ -329,16 +324,16 @@ func DeleteAPIBackendData(isDryRun, isEtcd bool) error {
 	} else {
 		for i := range pod.Spec.Volumes {
 			if pod.Spec.Volumes[i].Name == apiBackendName+"-data" {
-				apiBackendDataDir = pod.Spec.Volumes[i].HostPath.Path
+				apiBackendDatabaseDirectory = pod.Spec.Volumes[i].HostPath.Path
 				break
 			}
 		}
 	}
 	if isDryRun {
-		log.WithField("path", apiBackendDataDir).Info("Dry run: would delete API backend data...")
+		log.WithField("path", apiBackendDatabaseDirectory).Info("Dry run: would delete API backend data...")
 	} else {
-		log.WithField("path", apiBackendDataDir).Info("Deleting API backend data...")
-		err = resetPhases.CleanDir(apiBackendDataDir)
+		log.WithField("path", apiBackendDatabaseDirectory).Info("Deleting API backend data...")
+		err = resetPhases.CleanDir(apiBackendDatabaseDirectory)
 		if err != nil {
 			return fmt.Errorf("failed to delete API backend data: %w", err)
 		}

@@ -1,3 +1,4 @@
+//nolint:lll // this is a template, so long lines are expected
 package init
 
 // cSpell: disable
@@ -17,7 +18,7 @@ spec:
   containers:
     - command:
         - kine
-        - --endpoint=sqlite:///var/lib/kine/kine.db?_journal=WAL&cache=shared&_busy_timeout=30000&_txlock=immediate
+        - --endpoint=sqlite://{{ .APIBackendDatabaseDirectory }}/kine.db?_journal=WAL&cache=shared&_busy_timeout=30000&_txlock=immediate
         - --trusted-ca-file=/etc/kubernetes/pki/etcd/ca.crt
         - --server-cert-file=/etc/kubernetes/pki/etcd/server.crt
         - --server-key-file=/etc/kubernetes/pki/etcd/server.key
@@ -38,7 +39,7 @@ spec:
           cpu: 100m
           memory: 100Mi
       volumeMounts:
-        - mountPath: /var/lib/kine
+        - mountPath: {{ .APIBackendDatabaseDirectory }}
           name: kine-data
         - mountPath: /etc/kubernetes/pki/etcd
           name: kine-certs
@@ -59,7 +60,7 @@ spec:
         type: DirectoryOrCreate
       name: kine-certs
     - hostPath:
-        path: /var/lib/kine
+        path: {{ .APIBackendDatabaseDirectory }}
         type: DirectoryOrCreate
       name: kine-data
 status: {}

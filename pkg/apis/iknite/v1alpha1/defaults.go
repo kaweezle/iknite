@@ -47,6 +47,9 @@ func SetDefaults_IkniteClusterSpec(obj *IkniteClusterSpec) {
 	if obj.Kustomization == "" {
 		obj.Kustomization = constants.DefaultKustomization
 	}
+	if obj.APIBackendDatabaseDirectory == "" {
+		obj.APIBackendDatabaseDirectory = constants.KineDirectory
+	}
 }
 
 func SetDefaults_IkniteClusterStatus(obj *IkniteClusterStatus) {

@@ -208,7 +208,11 @@ func performClean(ikniteConfig *v1alpha1.IkniteClusterSpec, cleanOptions *cleanO
 
 	if cleanOptions.cleanAPIBackend {
 		logger.Info("Cleaning up API backend data...")
-		cobra.CheckErr(k8s.DeleteAPIBackendData(dryRun, ikniteConfig.UseEtcd))
+		apiBackendName := "kine"
+		if ikniteConfig.UseEtcd {
+			apiBackendName = "etcd"
+		}
+		cobra.CheckErr(k8s.DeleteAPIBackendData(dryRun, apiBackendName, ikniteConfig.APIBackendDatabaseDirectory))
 	}
 
 	if cleanOptions.cleanClusterConfig {

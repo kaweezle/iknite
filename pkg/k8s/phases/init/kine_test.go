@@ -77,6 +77,7 @@ func TestCreateKineConfiguration_ContainsKineFlags(t *testing.T) {
 	cfg := &v1alpha1.IkniteClusterSpec{
 		Ip: net.ParseIP("10.0.0.1"),
 	}
+	v1alpha1.SetDefaults_IkniteClusterSpec(cfg)
 
 	if err := initPhases.CreateKineConfiguration(buf, cfg); err != nil {
 		t.Fatalf("CreateKineConfiguration() failed: %v", err)
@@ -95,7 +96,7 @@ func TestCreateKineConfiguration_ContainsKineFlags(t *testing.T) {
 	}
 	for _, check := range checks {
 		if !strings.Contains(output, check) {
-			t.Errorf("output missing expected string %q", check)
+			t.Errorf("output missing expected string %q\n%s", check, output)
 		}
 	}
 }

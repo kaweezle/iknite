@@ -46,6 +46,8 @@ type IkniteClusterSpec struct {
 	EnableMDNS bool `json:"enableMDNS,omitempty" protobuf:"bytes,6,opt,name=enableMDNS" mapstructure:"enable_mdns"` //nolint:lll // for readability
 	// +optional
 	UseEtcd bool `json:"useEtcd,omitempty" protobuf:"bytes,9,opt,name=useEtcd" mapstructure:"use_etcd"` //nolint:lll // for readability
+	// +optional
+	APIBackendDatabaseDirectory string `json:"apiBackendDatabaseDirectory,omitempty" protobuf:"bytes,10,opt,name=apiBackendDatabaseDirectory" mapstructure:"api_backend_database_directory"` //nolint:lll // for readability
 }
 
 func (c *IkniteClusterSpec) GetApiEndPoint() string {
