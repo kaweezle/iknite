@@ -2,7 +2,7 @@
 # cSpell: words nocloud genisoimage volid cidata subformat qcow2 cdrkit nodiscard blockdev getsize writeback blkid
 # cSpell: words mountpoint resolv resolvconf runlevel runlevels hotplug udevadm mdev extlinux virt mkinitfs virtio
 # cSpell: words inittab securetty gsub toplevel uefi efi sfdisk dosfstools efistub secureboot ukifile vfat mkdosfs mkfat
-# cSpell: words fsprogs progname wgets syslinux relatime vhdx bootable noatime fmask iocharset bootx
+# cSpell: words fsprogs progname wgets syslinux relatime vhdx bootable noatime fmask iocharset bootx tarcmd bsdtar
 set -e
 
 # Step names for dynamic --skip-* and --only-* handling
@@ -36,6 +36,13 @@ esac
 if ! command -v realpath >/dev/null; then
 	alias realpath='readlink -f'
 fi
+
+TARCMD="tar"
+if command -v bsdtar >/dev/null; then
+    echo "Using bsdtar for better compatibility with tar archives"
+	TARCMD="bsdtar"
+fi
+
 
 _apk() {
     # shellcheck disable=SC2086
@@ -404,7 +411,9 @@ MKFS_FAT=$(command -v mkfs.fat 2>/dev/null || command -v mkdosfs)
 # rm -rf build
 # mkdir -p build
 IMAGE_FORMAT="qcow2"
-IMAGE_FILE="dist/iknite-vm.${IKNITE_VERSION}-${KUBERNETES_VERSION}.${IMAGE_FORMAT}"
+IMAGE_DIR="dist/images"
+mkdir -p "$IMAGE_DIR"
+IMAGE_FILE="$IMAGE_DIR/iknite-vm.${IKNITE_VERSION}-${KUBERNETES_VERSION}.${IMAGE_FORMAT}"
 
 CLOUD_CONFIG_FILE=${1:-cloud-config.yaml}
 info "Creating iknite VM image $IMAGE_FILE using cloud config file: $CLOUD_CONFIG_FILE"
@@ -456,7 +465,7 @@ if should_run_step "create-image"; then
     fi
 
     # Format root partition as ext4
-    if blkid "$root_dev" 2>/dev/null | grep -q UUID; then
+    if blkid "$root_dev" 2>/dev/null | grep -q 'TYPE="ext4"'; then
         warning "Root partition $root_dev already has a filesystem. Skipping."
     else
         info "Creating ext4 filesystem on root partition $root_dev"
@@ -502,7 +511,7 @@ if should_run_step "copy-rootfs"; then
         warning "Root filesystem already exists in $mount_dir. Skipping copy."
     else
         info "Extracting root filesystem to $mount_dir"
-        tar -C "$mount_dir" -xpf "dist/iknite-${IKNITE_VERSION}-${KUBERNETES_VERSION}.rootfs.tar.gz" || {
+        $TARCMD -C "$mount_dir" -xpf "dist/iknite-${IKNITE_VERSION}-${KUBERNETES_VERSION}.rootfs.tar.gz" || {
             error "Failed to extract root filesystem to $mount_dir"
             exit 1
         }
@@ -599,7 +608,7 @@ cleanup
 if should_run_step "build-vhdx"; then
     step "Building VHDX image from $IMAGE_FILE..."
 
-    VHDX_IMAGE_FILE="dist/iknite-vm.${IKNITE_VERSION}-${KUBERNETES_VERSION}.vhdx"
+    VHDX_IMAGE_FILE="$IMAGE_DIR/iknite-vm.${IKNITE_VERSION}-${KUBERNETES_VERSION}.vhdx"
     qemu-img convert "$IMAGE_FILE" -O vhdx -o subformat=dynamic "$VHDX_IMAGE_FILE"
 
     eval "DONE_$(step_to_var "build-vhdx")=true"
