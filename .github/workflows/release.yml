@@ -310,6 +310,10 @@ jobs:
             --annotation org.opencontainers.image.version="${IKNITE_VERSION}" \
             --annotation org.opencontainers.image.description="VM image for iknite ${IKNITE_VERSION} with Kubernetes ${KUBERNETES_VERSION}" \
             iknite-vm.${IKNITE_VERSION}-${KUBERNETES_VERSION}.vhdx:application/x-hyperv-disk
+          if [ "$IKNITE_REPO_NAME" = "release" ]; then
+            IMAGE_TAG="${REGISTRY}/${IMAGE_NAME}-vm-vhdx:latest"
+            oras tag ${REGISTRY}/${IMAGE_NAME}-vm-vhdx:${IKNITE_VERSION}-${KUBERNETES_VERSION} $IMAGE_TAG
+          fi
 
           IMAGE_TAG="${REGISTRY}/${IMAGE_NAME}-vm-qcow2:${IKNITE_VERSION}-${KUBERNETES_VERSION}"
           oras push $IMAGE_TAG \
@@ -318,7 +322,10 @@ jobs:
             --annotation org.opencontainers.image.version="${IKNITE_VERSION}" \
             --annotation org.opencontainers.image.description="VM image for iknite ${IKNITE_VERSION} with Kubernetes ${KUBERNETES_VERSION}" \
             iknite-vm.${IKNITE_VERSION}-${KUBERNETES_VERSION}.qcow2:application/x-qemu-disk
-
+          if [ "$IKNITE_REPO_NAME" = "release" ]; then
+            IMAGE_TAG="${REGISTRY}/${IMAGE_NAME}-vm-qcow2:latest"
+            oras tag ${REGISTRY}/${IMAGE_NAME}-vm-qcow2:${IKNITE_VERSION}-${KUBERNETES_VERSION} $IMAGE_TAG
+          fi
       - name: Retrieve aqua cache
         uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
         with:
@@ -406,6 +413,7 @@ jobs:
           mv packages/iknite-*.apk release/
           mv rootfs/* release/
           cp Get-Iknite.ps1 release/
+          cp Get-IkniteVM.ps1 release/
           cp packaging/rootfs/base/*.rsa.pub release/
           (cd release && sha256sum * > SHA256SUMS)
 
