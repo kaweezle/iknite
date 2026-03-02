@@ -72,7 +72,9 @@ install -d -m 700 /etc/uefi-keys
 efi-mkkeys -s "Iknite VM" -o /etc/uefi-keys
 apk del --quiet efi-mkkeys
 # The binary mount command is installed by efi-mkkeys. When removed, we need to restore the /bin/mount symlink.
-ln -s /bin/busybox /bin/mount
+if [ ! -f /bin/mount ]; then
+    ln -s /bin/busybox /bin/mount
+fi
 
 # Configure secureboot-hook to generate the UKI with the correct kernel
 # command line and place it at the default UEFI bootloader path so that
