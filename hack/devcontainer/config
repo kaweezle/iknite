@@ -1,0 +1,6 @@
+Host *
+    # The following options disable strict host key checking and prevent the known_hosts file from being updated,
+    # which is useful when connecting to ephemeral VMs during testing or in CI environments where the host keys may change frequently.
+    # However this lets you vulnerable to man-in-the-middle attacks, so use with caution and only in controlled environments.
+    StrictHostKeyChecking no
+    UserKnownHostsFile /dev/null
