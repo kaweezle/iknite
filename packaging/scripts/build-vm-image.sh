@@ -17,7 +17,7 @@ IMAGE_SIZE="3G"
 SERIAL_PORT="ttyS0"
 KUBERNETES_VERSION=${KUBERNETES_VERSION:-$(grep k8s.io/kubernetes "$ROOT_DIR/go.mod" | awk '{gsub(/^v/,"",$2);print $2;}')}
 if [ -z "$IKNITE_VERSION" ]; then
-    IKNITE_VERSION=$(jq -Mr ".version" dist/metadata.json)
+    IKNITE_VERSION=$(jq -Mr ".version" "$ROOT_DIR/dist/metadata.json")
 fi
 readonly PROGNAME='build-vm-image'
 HOST_ARCH="$(uname -m)"
@@ -408,10 +408,8 @@ if ! command -v mkfs.fat >/dev/null 2>&1 && ! command -v mkdosfs >/dev/null 2>&1
 fi
 MKFS_FAT=$(command -v mkfs.fat 2>/dev/null || command -v mkdosfs)
 
-# rm -rf build
-# mkdir -p build
 IMAGE_FORMAT="qcow2"
-IMAGE_DIR="dist/images"
+IMAGE_DIR="$ROOT_DIR/dist/images"
 mkdir -p "$IMAGE_DIR"
 IMAGE_FILE="$IMAGE_DIR/iknite-vm.${IKNITE_VERSION}-${KUBERNETES_VERSION}.${IMAGE_FORMAT}"
 
@@ -511,11 +509,11 @@ if should_run_step "copy-rootfs"; then
         warning "Root filesystem already exists in $mount_dir. Skipping copy."
     else
         info "Extracting root filesystem to $mount_dir"
-        $TARCMD -C "$mount_dir" -xpf "dist/iknite-${IKNITE_VERSION}-${KUBERNETES_VERSION}.rootfs.tar.gz" || {
+        $TARCMD -C "$mount_dir" -xpf "$ROOT_DIR/dist/iknite-${IKNITE_VERSION}-${KUBERNETES_VERSION}.rootfs.tar.gz" || {
             error "Failed to extract root filesystem to $mount_dir"
             exit 1
         }
-        sha256sum "dist/iknite-${IKNITE_VERSION}-${KUBERNETES_VERSION}.rootfs.tar.gz" > "$mount_dir/root/.rootfs.sha256sum"
+        sha256sum "$ROOT_DIR/dist/iknite-${IKNITE_VERSION}-${KUBERNETES_VERSION}.rootfs.tar.gz" > "$mount_dir/root/.rootfs.sha256sum"
     fi
     eval "DONE_$(step_to_var "copy-rootfs")=true"
 else

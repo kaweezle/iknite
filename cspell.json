@@ -18,16 +18,11 @@
     "**/**.sops.yaml",
     "**/*.lock.hcl",
     "packaging/apk/iknite/**",
-    ".gitattributes"
+    ".gitattributes",
+    "checkmake.ini"
   ],
   "dictionaryDefinitions": [],
-  "dictionaries": [
-    "bash",
-    "docker",
-    "golang",
-    "terraform",
-    "softwareTerms"
-  ],
+  "dictionaries": ["bash", "docker", "golang", "terraform", "softwareTerms"],
   "words": [
     "abuild",
     "afero",
@@ -37,6 +32,7 @@
     "buildctl",
     "buildkit",
     "buildkitd",
+    "checkmake",
     "clientset",
     "codegen",
     "configmap",
