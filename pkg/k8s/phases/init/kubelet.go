@@ -72,7 +72,11 @@ func runKubeletStart(c workflow.RunData) error {
 	// TODO: Maybe we want to do that some time in the future, in order to remove some logic from the
 	// mark-control-plane phase?
 	if err := kubeletPhase.WriteKubeletDynamicEnvFile(
-		&data.Cfg().ClusterConfiguration, &data.Cfg().NodeRegistration, false, data.KubeletDir()); err != nil {
+		&data.Cfg().ClusterConfiguration,
+		&data.Cfg().NodeRegistration,
+		false,
+		data.KubeletDir(),
+	); err != nil {
 		return fmt.Errorf("error writing a dynamic environment file for the kubelet: %w", err)
 	}
 
@@ -81,7 +85,10 @@ func runKubeletStart(c workflow.RunData) error {
 		kubeletConf := &kubeletConfig.KubeletConfiguration{
 			ContainerRuntimeEndpoint: data.Cfg().NodeRegistration.CRISocket,
 		}
-		if err := kubeletPhase.WriteInstanceConfigToDisk(kubeletConf, data.KubeletDir()); err != nil {
+		if err := kubeletPhase.WriteInstanceConfigToDisk(
+			kubeletConf,
+			data.KubeletDir(),
+		); err != nil {
 			return fmt.Errorf("error writing instance kubelet configuration to disk: %w", err)
 		}
 	} else {
@@ -91,7 +98,11 @@ func runKubeletStart(c workflow.RunData) error {
 
 	// Write the kubelet configuration file to disk.
 	if err := kubeletPhase.WriteConfigToDisk(
-		&data.Cfg().ClusterConfiguration, data.KubeletDir(), data.PatchesDir(), data.OutputWriter()); err != nil {
+		&data.Cfg().ClusterConfiguration,
+		data.KubeletDir(),
+		data.PatchesDir(),
+		data.OutputWriter(),
+	); err != nil {
 		return fmt.Errorf("error writing kubelet configuration to disk: %w", err)
 	}
 	// Try to start the kubelet service in case it's inactive

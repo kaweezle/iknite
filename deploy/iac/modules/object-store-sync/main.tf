@@ -19,7 +19,7 @@ locals {
         bucket      = bucket
         file_key    = file_key
         file        = file
-      }
+      } if can(regex(bucket.file_regex, file.source_path))
     ]
   ]) : "${item.bucket_name}-${item.file_key}" => item }
 }

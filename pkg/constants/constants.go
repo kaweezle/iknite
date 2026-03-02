@@ -33,4 +33,5 @@ const (
 	CrictlYaml           = "/etc/crictl.yaml"
 	RcConfFile           = "/etc/rc.conf"
 	SoftLevelPath        = "/run/openrc/softlevel" // cSpell: disable-line
+	KineDirectory        = "/var/lib/kine"
 )

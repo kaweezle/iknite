@@ -171,7 +171,10 @@ func CleanDir(filePath string) error {
 		return fmt.Errorf("failed to read directory names: %w", err)
 	}
 	for _, name := range names {
-		if err = os.RemoveAll(filepath.Join(filePath, name)); err != nil {
+		//nolint:gosec // Controlled file path
+		if err = os.RemoveAll(
+			filepath.Join(filePath, name),
+		); err != nil {
 			return fmt.Errorf("failed to remove %s: %w", name, err)
 		}
 	}

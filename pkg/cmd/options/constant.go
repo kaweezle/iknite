@@ -23,12 +23,15 @@ const (
 	EnableMDNS         = "enable-mdns"
 	ClusterName        = "cluster-name"
 
+	// Etcd/Kine.
+	UseEtcd = "use-etcd"
+
 	// Clean.
 	StopContainers     = "stop-containers"
 	UnmountPaths       = "unmount-paths"
 	CleanCNI           = "clean-cni"
 	CleanIPTables      = "clean-iptables"
-	CleanEtcd          = "clean-etcd"
+	CleanAPIBackend    = "clean-api-backend"
 	CleanIPAddress     = "clean-ip-address"
 	CleanAll           = "clean-all"
 	CleanClusterConfig = "clean-cluster-config"

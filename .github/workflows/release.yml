@@ -286,13 +286,46 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y qemu-utils qemu-guest-agent genisoimage
+          sudo apt-get install -y --no-install-recommends qemu-utils qemu-guest-agent genisoimage libarchive-tools
           ls -Rl dist/
 
       - name: Build VM images
         run: |
           sudo KUBERNETES_VERSION=${KUBERNETES_VERSION} IKNITE_VERSION=${IKNITE_VERSION} ./packaging/scripts/build-vm-image.sh
 
+      - name: Install oras
+        uses: oras-project/setup-oras@v1
+
+      - name: Log in with ORAS CLI
+        run: |
+          echo ${{ secrets.GITHUB_TOKEN }} | oras login ghcr.io -u ${{ github.actor }} --password-stdin
+
+      - name: Push VM images to registry
+        run: |
+          cd dist/images
+          IMAGE_TAG="${REGISTRY}/${IMAGE_NAME}-vm-vhdx:${IKNITE_VERSION}-${KUBERNETES_VERSION}"
+          oras push $IMAGE_TAG \
+            --artifact-type application/vnd.oci.image.layer.vhdx \
+            --annotation org.opencontainers.image.title="iknite-vm-${IKNITE_VERSION}-${KUBERNETES_VERSION}.vhdx" \
+            --annotation org.opencontainers.image.version="${IKNITE_VERSION}" \
+            --annotation org.opencontainers.image.description="VM image for iknite ${IKNITE_VERSION} with Kubernetes ${KUBERNETES_VERSION}" \
+            iknite-vm.${IKNITE_VERSION}-${KUBERNETES_VERSION}.vhdx:application/x-hyperv-disk
+          if [ "$IKNITE_REPO_NAME" = "release" ]; then
+            IMAGE_TAG="${REGISTRY}/${IMAGE_NAME}-vm-vhdx:latest"
+            oras tag ${REGISTRY}/${IMAGE_NAME}-vm-vhdx:${IKNITE_VERSION}-${KUBERNETES_VERSION} $IMAGE_TAG
+          fi
+
+          IMAGE_TAG="${REGISTRY}/${IMAGE_NAME}-vm-qcow2:${IKNITE_VERSION}-${KUBERNETES_VERSION}"
+          oras push $IMAGE_TAG \
+            --artifact-type application/vnd.oci.image.layer.qcow2 \
+            --annotation org.opencontainers.image.title="iknite-vm-${IKNITE_VERSION}-${KUBERNETES_VERSION}.qcow2" \
+            --annotation org.opencontainers.image.version="${IKNITE_VERSION}" \
+            --annotation org.opencontainers.image.description="VM image for iknite ${IKNITE_VERSION} with Kubernetes ${KUBERNETES_VERSION}" \
+            iknite-vm.${IKNITE_VERSION}-${KUBERNETES_VERSION}.qcow2:application/x-qemu-disk
+          if [ "$IKNITE_REPO_NAME" = "release" ]; then
+            IMAGE_TAG="${REGISTRY}/${IMAGE_NAME}-vm-qcow2:latest"
+            oras tag ${REGISTRY}/${IMAGE_NAME}-vm-qcow2:${IKNITE_VERSION}-${KUBERNETES_VERSION} $IMAGE_TAG
+          fi
       - name: Retrieve aqua cache
         uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
         with:
@@ -309,20 +342,25 @@ jobs:
           AQUA_DISABLE_COSIGN: "true"
           AQUA_DISABLE_SLSA: "true"
 
-      - name: Create OpenStack image and test VM deployment
-        id: create-and-test-openstack-image
-        # if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
-        if: github.event_name == 'pull_request'
-        env:
-          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
-          AGE_PRIVATE_KEY: ${{ secrets.AGE_PRIVATE_KEY }}
+      - name: Import Age key
         run: |
           echo "::group::Import Age key"
           mkdir -p ~/.config/sops/age
           echo -e "$AGE_PRIVATE_KEY" > ~/.config/sops/age/keys.txt
           chmod 600 ~/.config/sops/age/keys.txt
           echo "::endgroup::"
+          echo "::group::Force helmfile initialization"
+          helmfile init --force
+          helm plugin install https://github.com/mumoshu/helm-x
+          echo "::endgroup::"
+        env:
+          AGE_PRIVATE_KEY: ${{ secrets.AGE_PRIVATE_KEY }}
 
+      - name: Create OpenStack image and test VM deployment
+        id: create-and-test-openstack-image
+        # if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+        if: github.event_name == 'pull_request'
+        run: |
           cd deploy/iac/iknite/iknite-image
           export IKNITE_CREATE_INSTANCE=true
           echo "::group::Running terragrunt module init"
@@ -338,17 +376,17 @@ jobs:
           echo "::endgroup::"
 
           echo "::group::Teardown VM instance"
-          export IKNITE_CREATE_INSTANCE=false
-          terragrunt run --graph --non-interactive apply
+          cd ../iknite-vm
+          terragrunt run --graph --non-interactive destroy -- -auto-approve
           echo "::endgroup::"
 
-      - name: Upload VM images
-        uses: actions/upload-artifact@v6
-        with:
-          name: vm-images
-          path: |
-            dist/iknite-*.vhdx
-            dist/iknite-*.qcow2
+      - name: push Images to object storage
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+        run: |
+          echo "::group::Running terragrunt module to push images to object storage"
+          cd deploy/iac/iknite/iknite-public-images
+          terragrunt run --graph --non-interactive apply
+          echo "::endgroup::"
 
   make-release:
     name: Release iknite package
@@ -374,8 +412,8 @@ jobs:
           mkdir -p release
           mv packages/iknite-*.apk release/
           mv rootfs/* release/
-          mv vm-images/* release/
           cp Get-Iknite.ps1 release/
+          cp Get-IkniteVM.ps1 release/
           cp packaging/rootfs/base/*.rsa.pub release/
           (cd release && sha256sum * > SHA256SUMS)
 

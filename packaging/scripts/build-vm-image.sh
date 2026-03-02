@@ -1,7 +1,8 @@
 #!/usr/bin/env sh
-# cSpell: words nocloud genisoimage volid cidata subformat qcow2 cdrkit nodiscard blockdev getsize writeback blkid fsprogs progname wgets
-# cSpell: words mountpoint resolv resolvconf runlevel runlevels hotplug udevadm mdev extlinux virt mkinitfs virtio syslinux relatime vhdx
-# cSpell: words inittab securetty gsub toplevel
+# cSpell: words nocloud genisoimage volid cidata subformat qcow2 cdrkit nodiscard blockdev getsize writeback blkid
+# cSpell: words mountpoint resolv resolvconf runlevel runlevels hotplug udevadm mdev extlinux virt mkinitfs virtio
+# cSpell: words inittab securetty gsub toplevel uefi efi sfdisk dosfstools efistub secureboot ukifile vfat mkdosfs mkfat
+# cSpell: words fsprogs progname wgets syslinux relatime vhdx bootable noatime fmask iocharset bootx tarcmd bsdtar
 set -e
 
 # Step names for dynamic --skip-* and --only-* handling
@@ -35,6 +36,13 @@ esac
 if ! command -v realpath >/dev/null; then
 	alias realpath='readlink -f'
 fi
+
+TARCMD="tar"
+if command -v bsdtar >/dev/null; then
+    echo "Using bsdtar for better compatibility with tar archives"
+	TARCMD="bsdtar"
+fi
+
 
 _apk() {
     # shellcheck disable=SC2086
@@ -180,6 +188,11 @@ rc_add() {
 	done
 }
 
+# Tests if the specified command exists on the system.
+has_cmd() {
+	command -v "$1" >/dev/null
+}
+
 # Ensures that the specified device node exists.
 settle_dev_node() {
 	local dev="$1"
@@ -197,6 +210,19 @@ settle_dev_node() {
 	[ -e "$dev" ] && return 0
 
 	return 1
+}
+
+# Creates a GPT partition table for UEFI boot on the given device.
+# Partition layout:
+#   p1 - EFI System Partition (400M, FAT32, bootable)
+#   p2 - root partition (remaining space, ext4)
+create_gpt() {
+	local dev="$1"
+	printf '%s\n' \
+		'label: gpt' \
+		'name=efi,type=U,size=400M,bootable' \
+		'name=system,type=L' \
+		| sfdisk "$dev"
 }
 
 # Installs and configures extlinux.
@@ -365,9 +391,9 @@ trap cleanup EXIT HUP INT TERM
 
 
 # Alpine packages required for building VM image
-# qemu-img cdrkit e2fsprogs
+# qemu-img cdrkit e2fsprogs sfdisk dosfstools
 
-NEEDED_COMMANDS="qemu-img qemu-nbd genisoimage"
+NEEDED_COMMANDS="qemu-img qemu-nbd genisoimage sfdisk"
 for cmd in $NEEDED_COMMANDS; do
     if ! command -v "$cmd" >/dev/null 2>&1; then
         error "Required command not found: $cmd"
@@ -375,10 +401,19 @@ for cmd in $NEEDED_COMMANDS; do
     fi
 done
 
+# dosfstools provides mkfs.fat (mkdosfs)
+if ! command -v mkfs.fat >/dev/null 2>&1 && ! command -v mkdosfs >/dev/null 2>&1; then
+    error "Required command not found: mkfs.fat (install dosfstools)"
+    exit 1
+fi
+MKFS_FAT=$(command -v mkfs.fat 2>/dev/null || command -v mkdosfs)
+
 # rm -rf build
 # mkdir -p build
 IMAGE_FORMAT="qcow2"
-IMAGE_FILE="dist/iknite-vm.${IKNITE_VERSION}-${KUBERNETES_VERSION}.${IMAGE_FORMAT}"
+IMAGE_DIR="dist/images"
+mkdir -p "$IMAGE_DIR"
+IMAGE_FILE="$IMAGE_DIR/iknite-vm.${IKNITE_VERSION}-${KUBERNETES_VERSION}.${IMAGE_FORMAT}"
 
 CLOUD_CONFIG_FILE=${1:-cloud-config.yaml}
 info "Creating iknite VM image $IMAGE_FILE using cloud config file: $CLOUD_CONFIG_FILE"
@@ -402,13 +437,40 @@ if should_run_step "create-image"; then
     fi
     info "Image attached as $disk_dev"
 
-    # Check that the filesystem does not already exist
-    if blkid "$disk_dev" | grep -q UUID >/dev/null 2>&1; then
-        warning "Block device $disk_dev already has a filesystem. Skipping creation."
+    # Create GPT partition table with EFI (400M) and root partitions
+    if sfdisk --dump "$disk_dev" 2>/dev/null | grep -q 'type=U'; then
+        warning "GPT partition table already exists on $disk_dev. Skipping creation."
     else
-        info "Creating ext4 filesystem on $disk_dev"
-        mkfs.ext4 -O ^64bit -E nodiscard "$disk_dev" >/dev/null || {
-            error "Failed to create ext4 filesystem on $disk_dev"
+        info "Creating GPT partition table on $disk_dev"
+        create_gpt "$disk_dev"
+        sleep 1
+    fi
+
+    esp_dev="${disk_dev}p1"
+    root_dev="${disk_dev}p2"
+
+    # Wait for partition device nodes to appear
+    settle_dev_node "$esp_dev" || { error "EFI partition $esp_dev did not appear"; exit 1; }
+    settle_dev_node "$root_dev" || { error "Root partition $root_dev did not appear"; exit 1; }
+
+    # Format EFI partition as FAT32
+    if blkid "$esp_dev" 2>/dev/null | grep -q 'TYPE="vfat"'; then
+        warning "EFI partition $esp_dev already formatted as FAT32. Skipping."
+    else
+        info "Formatting EFI partition $esp_dev as FAT32 (400M)"
+        "$MKFS_FAT" -F32 -n EFI "$esp_dev" || {
+            error "Failed to format EFI partition $esp_dev as FAT32"
+            exit 1
+        }
+    fi
+
+    # Format root partition as ext4
+    if blkid "$root_dev" 2>/dev/null | grep -q 'TYPE="ext4"'; then
+        warning "Root partition $root_dev already has a filesystem. Skipping."
+    else
+        info "Creating ext4 filesystem on root partition $root_dev"
+        mkfs.ext4 -O ^64bit -E nodiscard "$root_dev" >/dev/null || {
+            error "Failed to create ext4 filesystem on $root_dev"
             exit 1
         }
     fi
@@ -420,12 +482,21 @@ fi
 
 if should_run_step "mount-image"; then
     step "Mounting VM image..."
-    root_uuid=$(blk_uuid "$disk_dev")
+    esp_dev="${disk_dev}p1"
+    root_dev="${disk_dev}p2"
+    root_uuid=$(blk_uuid "$root_dev")
     mount_dir=$(mktemp -d /tmp/$PROGNAME.XXXXXX)
 
     info "Mounting root filesystem (UUID: $root_uuid) at $mount_dir"
     mount -o rw,defaults UUID="$root_uuid" "$mount_dir" || {
         error "Failed to mount root filesystem UUID=$root_uuid at $mount_dir"
+        exit 1
+    }
+
+    info "Mounting EFI partition at $mount_dir/efi"
+    mkdir -p "$mount_dir/efi"
+    mount -t vfat "$esp_dev" "$mount_dir/efi" || {
+        error "Failed to mount EFI partition $esp_dev at $mount_dir/efi"
         exit 1
     }
     eval "DONE_$(step_to_var "mount-image")=true"
@@ -440,7 +511,7 @@ if should_run_step "copy-rootfs"; then
         warning "Root filesystem already exists in $mount_dir. Skipping copy."
     else
         info "Extracting root filesystem to $mount_dir"
-        tar -C "$mount_dir" -xpf "dist/iknite-${IKNITE_VERSION}-${KUBERNETES_VERSION}.rootfs.tar.gz" || {
+        $TARCMD -C "$mount_dir" -xpf "dist/iknite-${IKNITE_VERSION}-${KUBERNETES_VERSION}.rootfs.tar.gz" || {
             error "Failed to extract root filesystem to $mount_dir"
             exit 1
         }
@@ -467,12 +538,21 @@ prepare_chroot "$mount_dir"
 if should_run_step "install-kernel"; then
     step "Installing kernel to VM image..."
 
-    if [ -f "$mount_dir/boot/vmlinuz-linux" ]; then
+    info "Installing UEFI boot packages (mkinitfs, systemd-efistub, secureboot-hook)"
+    _apk add --root "$mount_dir" mkinitfs systemd-efistub secureboot-hook || {
+        error "Failed to install UEFI boot packages to $mount_dir"
+        exit 1
+    }
+
+    info "Setting up mkinitfs"
+    setup_mkinitfs "$mount_dir" "base ext4 kms scsi virtio"
+
+    if [ -f "$mount_dir/boot/vmlinuz-virt" ]; then
         warning "Kernel already exists in $mount_dir/boot. Skipping installation."
     else
-        info "Installing kernel to $mount_dir/boot"
+        info "Installing kernel linux-virt to $mount_dir"
         _apk add --root "$mount_dir" linux-virt || {
-            error "Failed install kernel to $mount_dir"
+            error "Failed to install kernel to $mount_dir"
             exit 1
         }
     fi
@@ -482,23 +562,17 @@ else
 fi
 
 if should_run_step "install-bootloader"; then
-    step "Installing bootloader to VM image..."
+    step "Setting up UEFI boot directory structure..."
 
-    _apk add --root "$mount_dir" mkinitfs || {
-        error "Failed install mkinitfs to $mount_dir"
-        exit 1
-    }
-
-    info "Setting up mkinitfs"
-    setup_mkinitfs "$mount_dir" "base ext4 kms scsi virtio"
-
-    info "Setting up extlinux bootloader"
-    _apk add --root "$mount_dir" --no-scripts syslinux
-    setup_extlinux "$mount_dir" "UUID=$root_uuid" "ext4" "virt" "$SERIAL_PORT"
+    # For UEFI boot, we use a Unified Kernel Image (UKI) placed at the default
+    # UEFI bootloader path /efi/EFI/Boot/bootx64.efi. The UKI is generated by
+    # secureboot-hook via 'apk fix kernel-hooks' which runs in configure-vm.
+    info "Creating EFI boot directory structure"
+    mkdir -p "$mount_dir/efi/EFI/Boot"
 
     eval "DONE_$(step_to_var "install-bootloader")=true"
 else
-    skip "Installing bootloader to VM image"
+    skip "Setting up UEFI boot directory structure"
 fi
 
 
@@ -507,8 +581,9 @@ if should_run_step "configure-vm"; then
 
     info "Setting up fstab"
     cat > "$mount_dir/etc/fstab" <<-EOF
-# <fs>		<mountpoint>	<type>	<opts>		<dump/pass>
-UUID=$root_uuid	/		ext4	relatime	0 1
+# <fs>           <mountpoint>  <type>  <opts>                                                                                     <dump/pass>
+UUID=$root_uuid  /             ext4    relatime                                                                                    0 1
+LABEL=EFI        /efi          vfat    rw,noatime,fmask=0133,codepage=437,iocharset=ascii,shortname=mixed,utf8,errors=remount-ro  0 2
 EOF
 
     info "Setting up serial console"
@@ -519,7 +594,7 @@ EOF
     script_dir=$(dirname "$(realpath "$0")")
     info "Executing script in chroot: $script_dir/configure-vm-image.sh"
     mount_bind "${script_dir}" "$mount_dir/mnt"
-    chroot "$mount_dir" /bin/sh -c "cd /mnt && ./configure-vm-image.sh" || {
+    chroot "$mount_dir" /bin/sh -c "cd /mnt && ./configure-vm-image.sh '$root_uuid'" || {
         error "Script $script_dir/configure-vm-image.sh failed in chroot"
         exit 1
     }
@@ -533,7 +608,7 @@ cleanup
 if should_run_step "build-vhdx"; then
     step "Building VHDX image from $IMAGE_FILE..."
 
-    VHDX_IMAGE_FILE="dist/iknite-vm.${IKNITE_VERSION}-${KUBERNETES_VERSION}.vhdx"
+    VHDX_IMAGE_FILE="$IMAGE_DIR/iknite-vm.${IKNITE_VERSION}-${KUBERNETES_VERSION}.vhdx"
     qemu-img convert "$IMAGE_FILE" -O vhdx -o subformat=dynamic "$VHDX_IMAGE_FILE"
 
     eval "DONE_$(step_to_var "build-vhdx")=true"

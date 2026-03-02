@@ -41,7 +41,9 @@ const (
 func IsKubeletServiceRunnable(confFilePath string) (bool, error) {
 	var lines int
 	var err error
-	if lines, err = utils.FS.Pipe(confFilePath).Match(RcConfPreventKubeletRunning).CountLines(); err != nil {
+	if lines, err = utils.FS.Pipe(confFilePath).
+		Match(RcConfPreventKubeletRunning).
+		CountLines(); err != nil {
 		return false, fmt.Errorf("failed to count lines in config file: %w", err)
 	}
 	return lines == 0, nil
@@ -120,7 +122,10 @@ func PrepareKubernetesEnvironment(ikniteConfig *v1alpha1.IkniteClusterSpec) erro
 	}
 	if !ipExists {
 		if ikniteConfig.CreateIp {
-			if err := alpine.AddIpAddress(ikniteConfig.NetworkInterface, ikniteConfig.Ip); err != nil {
+			if err := alpine.AddIpAddress(
+				ikniteConfig.NetworkInterface,
+				ikniteConfig.Ip,
+			); err != nil {
 				return fmt.Errorf("while adding ip address %v to interface %v: %w",
 					ikniteConfig.Ip, ikniteConfig.NetworkInterface, err)
 			}
@@ -136,7 +141,11 @@ func PrepareKubernetesEnvironment(ikniteConfig *v1alpha1.IkniteClusterSpec) erro
 			"domainName": ikniteConfig.DomainName,
 		}).Info("Check domain name to IP mapping...")
 
-		if contains, ips := alpine.IsHostMapped(context.Background(), ikniteConfig.Ip, ikniteConfig.DomainName); !contains {
+		if contains, ips := alpine.IsHostMapped(
+			context.Background(),
+			ikniteConfig.Ip,
+			ikniteConfig.DomainName,
+		); !contains {
 			log.WithFields(log.Fields{
 				"ip":         ikniteConfig.Ip,
 				"domainName": ikniteConfig.DomainName,

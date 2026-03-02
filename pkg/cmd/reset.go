@@ -184,7 +184,8 @@ func newResetData(
 			)
 		}
 	} else {
-		klog.V(1).Infof("[reset] Could not obtain a client set from the kubeconfig file: %s", opts.kubeconfigPath)
+		klog.V(1).
+			Infof("[reset] Could not obtain a client set from the kubeconfig file: %s", opts.kubeconfigPath)
 	}
 
 	ignorePreflightErrorsSet, err := validation.ValidateIgnorePreflightErrors(

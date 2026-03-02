@@ -14,6 +14,7 @@ resource "openstack_images_image_v2" "this" {
   local_file_path  = each.value.local_file_path
   name             = each.value.name
   visibility       = each.value.visibility
+  properties       = each.value.properties
 
   lifecycle {
     replace_triggered_by = [

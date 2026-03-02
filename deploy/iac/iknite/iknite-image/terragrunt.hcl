@@ -1,3 +1,4 @@
+// cSpell: words virtio
 include "root" {
   path   = find_in_parent_folders("root.hcl")
   expose = true
@@ -19,7 +20,13 @@ inputs = {
   images = {
     "iknite-vm-image" = {
       name            = "iknite-test-vm-image-${local.iknite_version}-${local.kubernetes_version}"
-      local_file_path = "${get_repo_root()}/dist/iknite-vm.${local.iknite_version}-${local.kubernetes_version}.qcow2"
+      local_file_path = "${get_repo_root()}/dist/images/iknite-vm.${local.iknite_version}-${local.kubernetes_version}.qcow2"
+      properties = {
+        hw_firmware_type    = "uefi"
+        hw_disk_bus         = "scsi"
+        hw_scsi_model       = "virtio-scsi"
+        hw_qemu_guest_agent = "yes"
+      }
     }
   }
 }

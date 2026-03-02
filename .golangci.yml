@@ -32,6 +32,8 @@ formatters:
         - standard
         - default
         - prefix(github.com/kaweezle/iknite)
+    golines:
+      max-len: 120
 
 linters:
   enable:

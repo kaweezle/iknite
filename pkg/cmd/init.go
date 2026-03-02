@@ -248,6 +248,9 @@ func newCmdInit(out io.Writer, initOptions *initOptions) *cobra.Command {
 	initRunner.AppendPhase(WrapPhase(phases.NewCertsPhase(), ikniteApi.Initializing, nil))
 	initRunner.AppendPhase(WrapPhase(phases.NewKubeConfigPhase(), ikniteApi.Initializing, nil))
 	initRunner.AppendPhase(WrapPhase(phases.NewEtcdPhase(), ikniteApi.Initializing, nil))
+	initRunner.AppendPhase(
+		WrapPhase(iknitePhase.NewKineControlPlanePhase(), ikniteApi.Initializing, nil),
+	)
 	controlPlanePhase := phases.NewControlPlanePhase()
 	controlPlanePhase.Phases = append(
 		controlPlanePhase.Phases,
@@ -293,6 +296,14 @@ func newCmdInit(out io.Writer, initOptions *initOptions) *cobra.Command {
 			// If the flag for skipping phases was empty, use the values from config
 			if len(initRunner.Options.SkipPhases) == 0 {
 				initRunner.Options.SkipPhases = data.cfg.SkipPhases
+			}
+
+			// Skip either kine or etcd based on UseEtcd setting.
+			if data.IkniteCluster().Spec.UseEtcd {
+				initRunner.Options.SkipPhases = append(initRunner.Options.SkipPhases, "kine")
+				data.ikniteCluster.Spec.APIBackendDatabaseDirectory = data.cfg.Etcd.Local.DataDir
+			} else {
+				initRunner.Options.SkipPhases = append(initRunner.Options.SkipPhases, "etcd")
 			}
 
 			initRunner.Options.SkipPhases = manageSkippedAddons(
@@ -430,10 +441,16 @@ func newInitData(
 		cfg.NodeRegistration.Name = initOptions.externalInitCfg.NodeRegistration.Name
 	}
 
-	if err = configUtil.VerifyAPIServerBindAddress(cfg.LocalAPIEndpoint.AdvertiseAddress); err != nil {
+	if err = configUtil.VerifyAPIServerBindAddress(
+		cfg.LocalAPIEndpoint.AdvertiseAddress,
+	); err != nil {
 		return nil, fmt.Errorf("failed to verify API server bind address: %w", err)
 	}
-	if err = features.ValidateVersion(features.InitFeatureGates, cfg.FeatureGates, cfg.KubernetesVersion); err != nil {
+	if err = features.ValidateVersion(
+		features.InitFeatureGates,
+		cfg.FeatureGates,
+		cfg.KubernetesVersion,
+	); err != nil {
 		return nil, fmt.Errorf("failed to validate version: %w", err)
 	}
 
@@ -709,7 +726,7 @@ func (d *initData) ClientWithoutBootstrap() (clientset.Interface, error) {
 
 // Tokens returns an array of token strings.
 func (d *initData) Tokens() []string {
-	tokens := []string{}
+	tokens := make([]string, 0, len(d.cfg.BootstrapTokens))
 	for _, bt := range d.cfg.BootstrapTokens {
 		tokens = append(tokens, bt.Token.String())
 	}
@@ -835,7 +852,7 @@ func WrapPhase(
 		}
 	}
 	if p.Phases != nil {
-		newChildPhases = []workflow.Phase{}
+		newChildPhases = make([]workflow.Phase, 0, len(p.Phases))
 		newParentPhases := append(*parentPhases, p)
 		for _, childPhase := range p.Phases {
 			newChildPhases = append(newChildPhases, WrapPhase(childPhase, state, &newParentPhases))

@@ -16,5 +16,6 @@ variable "object_stores" {
     name                = string
     static_content_path = string
     destination_prefix  = string
+    file_regex          = optional(string, ".*")
   }))
 }

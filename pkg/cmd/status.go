@@ -95,6 +95,17 @@ func performStatus(ikniteConfig *v1alpha1.IkniteClusterSpec) {
 		return checkData
 	}
 
+	var apiBackendName string
+	if ikniteConfig.UseEtcd {
+		apiBackendName = "etcd"
+	} else {
+		apiBackendName = "kine"
+	}
+	dBManifestCheck := k8s.KubernetesFileCheck(
+		fmt.Sprintf("manifest_%s", apiBackendName),
+		fmt.Sprintf("/etc/kubernetes/manifests/%s.yaml", apiBackendName),
+	)
+
 	// Create all checks
 	checks := []*k8s.Check{
 		// Phase 1: Environment
@@ -170,7 +181,11 @@ func performStatus(ikniteConfig *v1alpha1.IkniteClusterSpec) {
 						return true, "Domain name is not set", nil
 					}
 					ipString := ikniteConfig.Ip.String()
-					if contains, ips := alpine.IsHostMapped(ctx, ikniteConfig.Ip, ikniteConfig.DomainName); contains {
+					if contains, ips := alpine.IsHostMapped(
+						ctx,
+						ikniteConfig.Ip,
+						ikniteConfig.DomainName,
+					); contains {
 						mapped := func() bool {
 							for _, ip := range ips {
 								if ip.String() == ipString {
@@ -200,7 +215,7 @@ func performStatus(ikniteConfig *v1alpha1.IkniteClusterSpec) {
 		k8s.NewPhase("configuration", "Kubernetes configuration", []*k8s.Check{
 			k8s.FileTreeCheck("pki", "Check PKI files", "/etc/kubernetes/pki", pkiFiles),
 			k8s.NewPhase("manifests", "Kubernetes manifests", []*k8s.Check{
-				k8s.KubernetesFileCheck("manifest_etcd", "/etc/kubernetes/manifests/etcd.yaml"),
+				dBManifestCheck,
 				k8s.KubernetesFileCheck(
 					"manifest_apiserver",
 					"/etc/kubernetes/manifests/kube-apiserver.yaml",
@@ -220,20 +235,37 @@ func performStatus(ikniteConfig *v1alpha1.IkniteClusterSpec) {
 			k8s.KubernetesFileCheck("kubeadm_flags", "/var/lib/kubelet/kubeadm-flags.env"),
 			// Check that the etcd data directory is present and contains data
 			{
-				Name:        "etcd_data",
-				Description: "Check that the etcd data directory (/var/lib/etcd) is present and contains data",
+				Name: fmt.Sprintf("api_backend_%s_data", apiBackendName),
+				Description: fmt.Sprintf(
+					"Check that the %s data directory (/var/lib/%s) is present and contains data",
+					apiBackendName,
+					apiBackendName,
+				),
 				CheckFn: func(_ context.Context, _ k8s.CheckData) (bool, string, error) {
+					var expectedFiles []string
+					if apiBackendName == "etcd" {
+						expectedFiles = []string{"member/snap/db"}
+					} else {
+						expectedFiles = []string{"kine.db"}
+					}
 					missingFiles, _, err := k8s.FileTreeDifference(
-						"/var/lib/etcd",
-						[]string{"member/snap/db"},
+						fmt.Sprintf("/var/lib/%s", apiBackendName),
+						expectedFiles,
 					)
 					if err != nil {
-						return false, "", fmt.Errorf("failed to check etcd file tree: %w", err)
+						return false, "", fmt.Errorf(
+							"failed to check %s file tree: %w",
+							apiBackendName,
+							err,
+						)
 					}
 					if len(missingFiles) > 0 {
-						return false, "/var/lib/etcd has no data file", nil
+						return false, fmt.Sprintf(
+							"/var/lib/%s has no data file",
+							apiBackendName,
+						), nil
 					}
-					return true, "/var/lib/etcd has data files", nil
+					return true, fmt.Sprintf("/var/lib/%s has data files", apiBackendName), nil
 				},
 			},
 		}),

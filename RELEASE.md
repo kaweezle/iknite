@@ -1,4 +1,4 @@
-<!-- cSpell: words authinfo USERPROFILE -->
+<!-- cSpell: words authinfo USERPROFILE VHDX -->
 
 ## Quick Start
 
@@ -77,3 +77,23 @@ To uninstall the distribution, run:
 ```powershell
 wsl --unregister iknite
 ```
+
+### Running inside a Hyper-V VM
+
+Iknite can also be run inside a Hyper-V VM. Similar to the WSL installation,
+there is a PowerShell script that can be used to set up the VM image:
+
+```powershell
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+Invoke-RestMethod -Uri https://github.com/kaweezle/iknite/releases/latest/download/Get-IkniteVM.ps1 | Invoke-Expression
+```
+
+The script will automatically:
+
+- Download the Hyper-V VHDX image from GitHub Container Registry
+- Create a new Hyper-V VM named `iknite` with the downloaded image
+- Create a pair of ssh keys for VM access.
+- Create a cloud-init ISO with default user configuration and attach it to the
+  VM
+- Start the VM
+- Wait for cloud-init to finish and print the VM's IP address for SSH access

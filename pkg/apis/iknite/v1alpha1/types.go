@@ -22,7 +22,7 @@ import (
 type IkniteCluster struct {
 	metaV1.TypeMeta `json:",inline"`
 
-	Spec IkniteClusterSpec `json:"spec"             protobuf:"bytes,2,opt,name=spec"`
+	Spec IkniteClusterSpec `json:"spec" protobuf:"bytes,2,opt,name=spec"`
 	// +optional
 	Status IkniteClusterStatus `json:"status,omitempty" protobuf:"bytes,3,opt,name=status"`
 }
@@ -31,19 +31,23 @@ type IkniteClusterSpec struct {
 	// +optional
 	KubernetesVersion string `json:"kubernetesVersion,omitempty" protobuf:"bytes,2,opt,name=kubernetesVersion" mapstructure:"kubernetes_version"` //nolint:lll // for readability
 	// +optional
-	DomainName string `json:"domainName,omitempty"        protobuf:"bytes,3,opt,name=domainName"        mapstructure:"domain_name"` //nolint:lll // for readability
+	DomainName string `json:"domainName,omitempty" protobuf:"bytes,3,opt,name=domainName" mapstructure:"domain_name"` //nolint:lll // for readability
 	// +optional
-	NetworkInterface string `json:"networkInterface,omitempty"  protobuf:"bytes,5,opt,name=networkInterface"  mapstructure:"network_interface"` //nolint:lll // for readability
+	NetworkInterface string `json:"networkInterface,omitempty" protobuf:"bytes,5,opt,name=networkInterface" mapstructure:"network_interface"` //nolint:lll // for readability
 	// +optional
-	ClusterName string `json:"clusterName,omitempty"       protobuf:"bytes,7,opt,name=clusterName"       mapstructure:"cluster_name"` //nolint:lll // for readability
+	ClusterName string `json:"clusterName,omitempty" protobuf:"bytes,7,opt,name=clusterName" mapstructure:"cluster_name"` //nolint:lll // for readability
 	// +optional
-	Kustomization string `json:"kustomization,omitempty"     protobuf:"bytes,8,opt,name=kustomization"`
+	Kustomization string `json:"kustomization,omitempty" protobuf:"bytes,8,opt,name=kustomization"`
 	// +optional
-	Ip net.IP `json:"ip,omitempty"                protobuf:"bytes,1,opt,name=ip"                mapstructure:"ip"`
+	Ip net.IP `json:"ip,omitempty" protobuf:"bytes,1,opt,name=ip" mapstructure:"ip"`
 	// +optional
-	CreateIp bool `json:"createIp,omitempty"          protobuf:"bytes,4,opt,name=createIp"          mapstructure:"create_ip"` //nolint:lll // for readability
+	CreateIp bool `json:"createIp,omitempty" protobuf:"bytes,4,opt,name=createIp" mapstructure:"create_ip"` //nolint:lll // for readability
 	// +optional
-	EnableMDNS bool `json:"enableMDNS,omitempty"        protobuf:"bytes,6,opt,name=enableMDNS"        mapstructure:"enable_mdns"` //nolint:lll // for readability
+	EnableMDNS bool `json:"enableMDNS,omitempty" protobuf:"bytes,6,opt,name=enableMDNS" mapstructure:"enable_mdns"` //nolint:lll // for readability
+	// +optional
+	UseEtcd bool `json:"useEtcd,omitempty" protobuf:"bytes,9,opt,name=useEtcd" mapstructure:"use_etcd"` //nolint:lll // for readability
+	// +optional
+	APIBackendDatabaseDirectory string `json:"apiBackendDatabaseDirectory,omitempty" protobuf:"bytes,10,opt,name=apiBackendDatabaseDirectory" mapstructure:"api_backend_database_directory"` //nolint:lll // for readability
 }
 
 func (c *IkniteClusterSpec) GetApiEndPoint() string {

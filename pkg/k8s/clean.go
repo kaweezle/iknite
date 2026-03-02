@@ -35,7 +35,9 @@ func ResetIPAddress(ikniteConfig *v1alpha1.IkniteClusterSpec, isDryRun bool) err
 	}
 	ip, err := alpine.IpMappingForHost(hosts, ikniteConfig.DomainName)
 	if err != nil {
-		return fmt.Errorf("failed to get IP mapping for host: %w", err)
+		log.WithField("hostname", ikniteConfig.DomainName).
+			Warn("failed to get IP mapping for host:", err)
+		return nil
 	}
 	ones, _ := ip.DefaultMask().Size()
 	ipWithMask := fmt.Sprintf("%v/%d", ip, ones)
@@ -49,7 +51,7 @@ func ResetIPAddress(ikniteConfig *v1alpha1.IkniteClusterSpec, isDryRun bool) err
 		log.WithField("interface", s).WithField("ip", ipWithMask).Debug("Deleting IP address...")
 		return s
 	}).ExecForEach(fmt.Sprintf("%sip addr del %s dev {{.}}", prefix, ipWithMask))
-	p.Wait()
+	_ = p.Wait() //nolint:errcheck // we check p.Error() instead
 	if p.Error() != nil {
 		return fmt.Errorf("failed to delete IP address: %w", p.Error())
 	}
@@ -96,9 +98,12 @@ func RemoveKubeletFiles(isDryRun bool) error {
 			"Would remove cpu_manager_state, memory_manager_state, pod/* files in /var/lib/kubelet...",
 		)
 	} else {
-		log.Info("Removing cpu_manager_state, memory_manager_state, pod/* files in /var/lib/kubelet...")
+		log.Info(
+			"Removing cpu_manager_state, memory_manager_state, pod/* files in /var/lib/kubelet...",
+		)
 		out, err := s.Exec(
-			"sh -c 'rm -rf /var/lib/kubelet/{cpu_manager_state,memory_manager_state} /var/lib/kubelet/pods/*'").String()
+			"sh -c 'rm -rf /var/lib/kubelet/{cpu_manager_state,memory_manager_state} /var/lib/kubelet/pods/*'",
+		).String()
 		if err != nil {
 			return fmt.Errorf("failed to remove kubelet files: %s: %w", out, err)
 		}
@@ -112,7 +117,9 @@ func StopAllContainers(isDryRun bool) error {
 			"Would stop all containers with command /bin/sh -c 'crictl rmp -f $(crictl pods -q)'...",
 		)
 	} else {
-		log.Info("Stopping all containers with command /bin/sh -c 'crictl rmp -f $(crictl pods -q)'...")
+		log.Info(
+			"Stopping all containers with command /bin/sh -c 'crictl rmp -f $(crictl pods -q)'...",
+		)
 		_, err := s.Exec("/bin/sh -c 'crictl rmp -f $(crictl pods -q)'").String()
 		if err != nil {
 			return fmt.Errorf("failed to stop all containers: %w", err)
@@ -248,7 +255,7 @@ func processMounts(path string, remove bool, message string, isDryRun bool) erro
 		}
 		return s
 	})
-	p.Wait()
+	_ = p.Wait() //nolint:errcheck // we check p.Error() instead
 	if err = p.Error(); err != nil {
 		return fmt.Errorf("failed to process mounts for path %s: %w", path, err)
 	}
@@ -266,7 +273,7 @@ func DeleteCniNamespaces(isDryRun bool) error {
 		logger.WithField("namespace", s).Debug("Deleting namespace...")
 		return s
 	}).ExecForEach(command)
-	p.Wait()
+	_ = p.Wait() //nolint:errcheck // we check p.Error() instead
 	if err := p.Error(); err != nil {
 		return fmt.Errorf("failed to delete CNI namespaces: %w", err)
 	}
@@ -289,7 +296,7 @@ func DeleteNetworkInterfaces(isDryRun bool) error {
 			logger.WithField("interface", ifname).Debugf("Deleting interface with: %s...", command)
 			return command
 		}).ExecForEach("{{ . }}")
-	p.Wait()
+	_ = p.Wait() //nolint:errcheck // we check p.Error() instead
 	err := p.Error()
 	if err != nil {
 		log.WithError(err).Error("Error deleting pods network interfaces")
@@ -301,35 +308,34 @@ func DeleteNetworkInterfaces(isDryRun bool) error {
 	return nil
 }
 
-// DeleteEtcdData deletes the etcd data directory.
-func DeleteEtcdData(isDryRun bool) error {
-	etcdDataDir := "/var/lib/etcd"
-	etcdManifestPath := filepath.Join(
+// DeleteAPIBackendData deletes the API backend data directory.
+func DeleteAPIBackendData(isDryRun bool, apiBackendName, apiBackendDatabaseDirectory string) error {
+	apiBackendManifestPath := filepath.Join(
 		kubeadmConstants.KubernetesDir,
 		kubeadmConstants.ManifestsSubDirName,
-		"etcd.yaml",
+		apiBackendName+".yaml",
 	)
-	etcdPod, err := utilStaticPod.ReadStaticPodFromDisk(etcdManifestPath)
+	pod, err := utilStaticPod.ReadStaticPodFromDisk(apiBackendManifestPath)
 	if err != nil {
 		if !os.IsNotExist(err) {
-			return fmt.Errorf("failed to read etcd pod from disk: %w", err)
+			return fmt.Errorf("failed to read API backend pod from disk: %w", err)
 		}
-		// If the etcd manifest does not exist, we assume the default data directory.
+		// If the API backend manifest does not exist, we assume the default data directory.
 	} else {
-		for i := range etcdPod.Spec.Volumes {
-			if etcdPod.Spec.Volumes[i].Name == "etcd-data" {
-				etcdDataDir = etcdPod.Spec.Volumes[i].HostPath.Path
+		for i := range pod.Spec.Volumes {
+			if pod.Spec.Volumes[i].Name == apiBackendName+"-data" {
+				apiBackendDatabaseDirectory = pod.Spec.Volumes[i].HostPath.Path
 				break
 			}
 		}
 	}
 	if isDryRun {
-		log.WithField("path", etcdDataDir).Info("Dry run: would delete etcd data...")
+		log.WithField("path", apiBackendDatabaseDirectory).Info("Dry run: would delete API backend data...")
 	} else {
-		log.WithField("path", etcdDataDir).Info("Deleting etcd data...")
-		err = resetPhases.CleanDir(etcdDataDir)
+		log.WithField("path", apiBackendDatabaseDirectory).Info("Deleting API backend data...")
+		err = resetPhases.CleanDir(apiBackendDatabaseDirectory)
 		if err != nil {
-			return fmt.Errorf("failed to delete etcd data: %w", err)
+			return fmt.Errorf("failed to delete API backend data: %w", err)
 		}
 	}
 	return nil

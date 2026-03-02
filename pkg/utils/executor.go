@@ -19,7 +19,11 @@ type Executor interface {
 type CommandExecutor struct{}
 
 func (c *CommandExecutor) Run(combined bool, cmd string, arguments ...string) ([]byte, error) {
-	command := exec.CommandContext(context.Background(), cmd, arguments...)
+	//nolint:gosec // We want to run a command on the host
+	command := exec.CommandContext(
+		context.Background(),
+		cmd,
+		arguments...)
 	var output []byte
 	var err error
 	if combined {
@@ -39,6 +43,7 @@ func (c *CommandExecutor) Pipe(
 	cmd string,
 	arguments ...string,
 ) ([]byte, error) {
+	//nolint:gosec // We want to run a command on the host
 	command := exec.CommandContext(context.Background(), cmd, arguments...)
 	command.Stdin = stdin
 	var output []byte
