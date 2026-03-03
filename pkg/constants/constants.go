@@ -34,4 +34,8 @@ const (
 	RcConfFile           = "/etc/rc.conf"
 	SoftLevelPath        = "/run/openrc/softlevel" // cSpell: disable-line
 	KineDirectory        = "/var/lib/kine"
+	KubernetesPKIDir     = "/etc/kubernetes/pki"
+	IkniteServerCertName = "iknite-server"
+	IkniteClientCertName = "iknite-client"
+	IkniteServerPort     = 11443
 )

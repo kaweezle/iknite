@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -65,6 +66,7 @@ import (
 	"github.com/kaweezle/iknite/pkg/constants"
 	"github.com/kaweezle/iknite/pkg/k8s"
 	iknitePhase "github.com/kaweezle/iknite/pkg/k8s/phases/init"
+	ikniteServer "github.com/kaweezle/iknite/pkg/server"
 )
 
 // cSpell: enable
@@ -130,6 +132,7 @@ type initData struct {
 	ikniteCluster               *v1alpha1.IkniteCluster
 	kubeletCmd                  *exec.Cmd
 	mdnsConn                    *mdns.Conn
+	statusServer                *http.Server
 	ctx                         context.Context //nolint:containedctx // passed around but not stored
 	ctxCancel                   context.CancelFunc
 }
@@ -181,6 +184,10 @@ func newCmdInit(out io.Writer, initOptions *initOptions) *cobra.Command {
 			data, ok := c.(*initData)
 			if !ok {
 				return errors.New("invalid data struct")
+			}
+			// Stop the status server if it was started
+			if shutdownErr := ikniteServer.ShutdownServer(data.statusServer); shutdownErr != nil {
+				log.WithError(shutdownErr).Warn("Failed to stop iknite status server")
 			}
 			// Stop the kubelet process if it was started
 			kubeletCmd := data.KubeletCmd()
@@ -275,6 +282,7 @@ func newCmdInit(out io.Writer, initOptions *initOptions) *cobra.Command {
 	initRunner.AppendPhase(
 		WrapPhase(iknitePhase.NewKustomizeClusterPhase(), ikniteApi.Stabilizing, nil),
 	)
+	initRunner.AppendPhase(WrapPhase(iknitePhase.NewServePhase(), ikniteApi.Stabilizing, nil))
 	initRunner.AppendPhase(WrapPhase(iknitePhase.NewWorkloadsPhase(), ikniteApi.Stabilizing, nil))
 	initRunner.AppendPhase(WrapPhase(iknitePhase.NewDaemonizePhase(), ikniteApi.Stabilizing, nil))
 	//nolint:gocritic // standalone node
@@ -803,6 +811,14 @@ func (d *initData) SetMDnsConn(conn *mdns.Conn) {
 
 func (d *initData) MDnsConn() *mdns.Conn {
 	return d.mdnsConn
+}
+
+func (d *initData) SetStatusServer(srv *http.Server) {
+	d.statusServer = srv
+}
+
+func (d *initData) StatusServer() *http.Server {
+	return d.statusServer
 }
 
 func (d *initData) ContextWithCancel() (context.Context, context.CancelFunc) {

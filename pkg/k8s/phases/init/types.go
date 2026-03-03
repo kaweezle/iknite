@@ -2,6 +2,7 @@ package init
 
 import (
 	"context"
+	"net/http"
 	"os/exec"
 
 	"github.com/pion/mdns"
@@ -19,4 +20,6 @@ type IkniteInitData interface {
 	SetMDnsConn(conn *mdns.Conn)
 	MDnsConn() *mdns.Conn
 	ContextWithCancel() (context.Context, context.CancelFunc)
+	SetStatusServer(srv *http.Server)
+	StatusServer() *http.Server
 }

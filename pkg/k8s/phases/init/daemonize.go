@@ -97,6 +97,9 @@ func runDaemonize(c workflow.RunData) error {
 		// Prevent double stop
 		data.SetKubeletCmd(nil)
 	}
+
+	ensureServerStopped(data)
+
 	data.IkniteCluster().Update(iknite.Cleaning, "clean", nil, nil)
 	err = k8s.CleanAll(&data.IkniteCluster().Spec, true, false, false, false)
 	if err != nil {
