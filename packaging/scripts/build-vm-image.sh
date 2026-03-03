@@ -121,7 +121,8 @@ should_run_step() {
 # Attaches the specified raw image as a loop device and prints its path.
 attach_loop() {
 	local img="$1"
-	losetup --find --show "$img"
+	losetup -f "$img"
+    losetup -a 2>/dev/null | grep "$img" | awk -F: '{print $1}'
 }
 
 # Prints UUID of filesystem on the specified block device.
@@ -398,16 +399,16 @@ if should_run_step "create-image"; then
     fi
 
     # Attach partition images as loop devices
-    if losetup -j "$EFI_IMG" 2>/dev/null | grep -q "$EFI_IMG"; then
-        efi_loop=$(losetup -j "$EFI_IMG" | awk -F: '{print $1}')
+    if losetup -a 2>/dev/null | grep -q "$EFI_IMG"; then
+        efi_loop=$(losetup -a 2>/dev/null | grep "$EFI_IMG" | awk -F: '{print $1}')
         warning "EFI image $EFI_IMG is already attached as $efi_loop"
     else
         efi_loop=$(attach_loop "$EFI_IMG") || { error "Failed to attach $EFI_IMG as a loop device"; exit 1; }
         info "EFI partition image attached as $efi_loop"
     fi
 
-    if losetup -j "$ROOT_IMG" 2>/dev/null | grep -q "$ROOT_IMG"; then
-        root_loop=$(losetup -j "$ROOT_IMG" | awk -F: '{print $1}')
+    if losetup -a 2>/dev/null | grep -q "$ROOT_IMG"; then
+        root_loop=$(losetup -a 2>/dev/null | grep "$ROOT_IMG" | awk -F: '{print $1}')
         warning "Root image $ROOT_IMG is already attached as $root_loop"
     else
         root_loop=$(attach_loop "$ROOT_IMG") || { error "Failed to attach $ROOT_IMG as a loop device"; exit 1; }
