@@ -227,6 +227,19 @@ jobs:
           ROOTFS_PATH="dist/$ROOTFS_NAME"
           docker export iknite-rootfs | bsdtar -zcf "$ROOTFS_PATH" --exclude=.dockerenv --exclude=dev/console @-
           sha256sum "$ROOTFS_PATH" >> dist/SHA256SUMS
+
+          METADATA_NAME="iknite-${IKNITE_VERSION}-${KUBERNETES_VERSION}.incus-metadata.tar.gz"
+          {
+            echo "architecture: x86_64"
+            echo "creation_date: $(date +%s)"
+            echo "properties:"
+            echo "  description: \"iknite Alpine Linux container image with Kubernetes ${KUBERNETES_VERSION}\""
+            echo "  os: Alpine Linux"
+            echo "  release: \"edge\""
+            echo "  variant: default"
+          } > /tmp/metadata.yaml
+          tar -czf "dist/$METADATA_NAME" -C /tmp metadata.yaml
+          sha256sum "dist/$METADATA_NAME" >> dist/SHA256SUMS
           echo "::endgroup::"
 
           echo "::group::Building and pushing root fs image to registry"
@@ -414,6 +427,7 @@ jobs:
           mv rootfs/* release/
           cp Get-Iknite.ps1 release/
           cp Get-IkniteVM.ps1 release/
+          cp get-iknite.sh release/
           cp packaging/rootfs/base/*.rsa.pub release/
           (cd release && sha256sum * > SHA256SUMS)
 
