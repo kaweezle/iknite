@@ -19,6 +19,7 @@ updates:
     schedule:
       interval: "daily"
   - package-ecosystem: "opentofu"
-    directory: "/deploy/iac"
+    directories:
+      - "/deploy/iac/modules/*"
     schedule:
       interval: "daily"
