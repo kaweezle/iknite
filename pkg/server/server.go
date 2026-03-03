@@ -28,6 +28,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 	certutil "k8s.io/client-go/util/cert"
@@ -193,30 +194,43 @@ func StartIkniteServer(certDir string, ip net.IP, port int) (*http.Server, error
 		return nil, fmt.Errorf("failed to ensure client cert: %w", err)
 	}
 
-	server, err := NewIkniteServer(certDir, port)
+	srv, err := NewIkniteServer(certDir, port)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create iknite server: %w", err)
 	}
 
+	startErr := make(chan error, 1)
 	go func() {
 		log.WithFields(log.Fields{
-			"addr": server.Addr,
+			"addr": srv.Addr,
 		}).Info("Starting iknite status server")
-		if err := server.ListenAndServeTLS("", ""); err != nil && err != http.ErrServerClosed {
-			log.WithError(err).Error("Iknite status server error")
+		if listenErr := srv.ListenAndServeTLS("", ""); listenErr != nil && listenErr != http.ErrServerClosed {
+			log.WithError(listenErr).Error("Iknite status server error")
+			startErr <- listenErr
 		}
 	}()
 
-	return server, nil
+	// Give the server a brief moment to start and detect immediate failures
+	// (e.g., port already in use).
+	select {
+	case err = <-startErr:
+		return nil, fmt.Errorf("iknite status server failed to start: %w", err)
+	case <-time.After(50 * time.Millisecond):
+		// Server started without an immediate error
+	}
+
+	return srv, nil
 }
 
-// ShutdownServer gracefully shuts down the server.
-func ShutdownServer(server *http.Server) error {
-	if server == nil {
+// ShutdownServer gracefully shuts down the server with a 10-second timeout.
+func ShutdownServer(srv *http.Server) error {
+	if srv == nil {
 		return nil
 	}
 	log.Info("Shutting down iknite status server...")
-	if err := server.Shutdown(context.Background()); err != nil {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if err := srv.Shutdown(ctx); err != nil {
 		return fmt.Errorf("failed to shutdown iknite status server: %w", err)
 	}
 	return nil
