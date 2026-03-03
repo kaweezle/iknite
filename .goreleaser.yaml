@@ -15,7 +15,8 @@ builds:
       - linux
     goarch:
       - amd64
-    mod_timestamp: "{{ .CommitTimestamp }}"
+    # We don't mess with the timestamp as it provokes weird issues with make
+    # mod_timestamp: "{{ .CommitTimestamp }}"
     flags:
       - -trimpath
     ldflags:

@@ -155,7 +155,7 @@ $(DIST_DIR)/$(IKNITE_IMAGES_PACKAGE): $(DIST_DIR)/iknite_linux_amd64_v1/iknite $
 	rmdir "$(DIST_DIR)/$(ARCH)/"
 
 
-goreleaser: $(DIST_DIR)/metadata.json
+goreleaser: $(DIST_DIR)/$(IKNITE_PACKAGE) $(DIST_DIR)/metadata.json $(DIST_DIR)/iknite_linux_amd64_v1/iknite
 
 fetch-karmafun: $(DIST_DIR)/$(KARMAFUN_PACKAGE)
 
@@ -235,7 +235,7 @@ rootfs-image: $(IKNITE_ROOTFS_IMAGE_MARKER)
 
 $(IKNITE_VM_IMAGE_QCOW2) $(IKNITE_VM_IMAGE_VHDX) &: $(ROOTFS_PATH) $(BUILD_VM_IMAGE_SCRIPTS) | check-prerequisites
 	rm -f "$(dir $@)*" || true
-	"$(ROOT_DIR)/packaging/scripts/build-vm-image.sh"
+	$(SUDO_CMD) "$(ROOT_DIR)/packaging/scripts/build-vm-image.sh"
 
 vm-image: $(IKNITE_VM_IMAGE_QCOW2) $(IKNITE_VM_IMAGE_VHDX)
 

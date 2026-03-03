@@ -1,5 +1,5 @@
 #!/usr/bin/env sh
-# cSpell: words nocloud genisoimage volid cidata subformat qcow2 cdrkit nodiscard blockdev getsize writeback blkid
+# cSpell: words nocloud volid cidata subformat qcow2 cdrkit nodiscard blockdev getsize writeback blkid
 # cSpell: words mountpoint resolv resolvconf runlevel runlevels hotplug udevadm mdev extlinux virt mkinitfs virtio
 # cSpell: words inittab securetty gsub toplevel uefi efi sfdisk dosfstools efistub secureboot ukifile vfat mkdosfs mkfat
 # cSpell: words fsprogs progname wgets syslinux relatime vhdx bootable noatime fmask iocharset bootx tarcmd bsdtar
@@ -175,19 +175,6 @@ prepare_chroot() {
 	echo "$RESOLVCONF_MARK" >> "$dest"/etc/resolv.conf
 }
 
-# Adds specified services to the runlevel. Current working directory must be
-# root of the image.
-rc_add() {
-	local runlevel="$1"; shift  # runlevel name
-	local services="$*"  # names of services
-
-	local svc; for svc in $services; do
-		mkdir -p "etc/runlevels/$runlevel"
-		ln -s "/etc/init.d/$svc" "etc/runlevels/$runlevel/$svc"
-		echo " * service $svc added to runlevel $runlevel"
-	done
-}
-
 # Tests if the specified command exists on the system.
 has_cmd() {
 	command -v "$1" >/dev/null
@@ -225,36 +212,6 @@ create_gpt() {
 		| sfdisk "$dev"
 }
 
-# Installs and configures extlinux.
-setup_extlinux() {
-	local mnt="$1"  # path of directory where is root device currently mounted
-	local root_dev="$2"  # root device
-	local modules="$3"  # modules which should be loaded before pivot_root
-	local kernel_flavor="$4"  # name of default kernel to boot
-	local serial_port="$5"  # serial port number for serial console
-	local default_kernel="$kernel_flavor"
-	local kernel_opts=''
-
-	[ -z "$serial_port" ] || kernel_opts="console=tty0 console=$serial_port,115200n8"
-
-	if [ "$kernel_flavor" = 'virt' ]; then
-		_apk search --root . --exact --quiet linux-lts | grep -q . \
-			&& default_kernel='lts' \
-			|| default_kernel='vanilla'
-	fi
-
-	sed -Ei \
-		-e "s|^[# ]*(root)=.*|\1=$root_dev|" \
-		-e "s|^[# ]*(default_kernel_opts)=.*|\1=\"$kernel_opts\"|" \
-		-e "s|^[# ]*(modules)=.*|\1=\"$modules\"|" \
-		-e "s|^[# ]*(default)=.*|\1=$default_kernel|" \
-		-e "s|^[# ]*(serial_port)=.*|\1=$serial_port|" \
-		"$mnt"/etc/update-extlinux.conf
-
-	chroot "$mnt" extlinux --install /boot
-	chroot "$mnt" update-extlinux --warn-only 2>&1 \
-		| { grep -Fv 'extlinux: cannot open device /dev' ||:; } >&2
-}
 
 # Configures mkinitfs.
 setup_mkinitfs() {
@@ -393,7 +350,7 @@ trap cleanup EXIT HUP INT TERM
 # Alpine packages required for building VM image
 # qemu-img cdrkit e2fsprogs sfdisk dosfstools
 
-NEEDED_COMMANDS="qemu-img qemu-nbd genisoimage sfdisk"
+NEEDED_COMMANDS="qemu-img qemu-nbd sfdisk"
 for cmd in $NEEDED_COMMANDS; do
     if ! command -v "$cmd" >/dev/null 2>&1; then
         error "Required command not found: $cmd"
