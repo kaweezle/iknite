@@ -234,8 +234,10 @@ $(IKNITE_ROOTFS_IMAGE_MARKER): $(ROOTFS_PATH) $(IKNITE_ROOTFS_SOURCES) | check-p
 rootfs-image: $(IKNITE_ROOTFS_IMAGE_MARKER)
 
 $(IKNITE_VM_IMAGE_QCOW2) $(IKNITE_VM_IMAGE_VHDX) &: $(ROOTFS_PATH) $(BUILD_VM_IMAGE_SCRIPTS) | check-prerequisites
+	$(SUDO_CMD) chown -R "$$(id -u):$$(id -g)" "$(dir $@)" || true
 	rm -f "$(dir $@)*" || true
 	$(SUDO_CMD) "$(ROOT_DIR)/packaging/scripts/build-vm-image.sh"
+	$(SUDO_CMD) chown -R "$$(id -u):$$(id -g)" "$(dir $@)" || true
 
 vm-image: $(IKNITE_VM_IMAGE_QCOW2) $(IKNITE_VM_IMAGE_VHDX)
 
