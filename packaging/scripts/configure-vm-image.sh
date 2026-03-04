@@ -43,7 +43,8 @@ rc_add() {
 }
 
 step 'Add services packages...'
-apk add --quiet --no-cache --no-progress less logrotate openssh chrony cloud-init dhcpcd doas acpi e2fsprogs-extra py3-pyserial py3-netifaces alpine-base
+apk add --quiet --no-cache --no-progress less logrotate openssh chrony cloud-init dhcpcd doas acpi e2fsprogs-extra \
+    py3-pyserial py3-netifaces alpine-base virt-what
 
 step 'Set up timezone'
 setup-timezone -z Europe/Paris
