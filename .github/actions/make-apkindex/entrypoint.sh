@@ -20,9 +20,10 @@ if  [ -z "$INPUT_SIGNATURE_KEY" ]; then
     echo "No signature key given!"
     exit 1
 else
-    signature_file="/root/$INPUT_SIGNATURE_KEY_NAME"
+    signature_file=$(mktemp)
     # shellcheck disable=SC2059
     printf "$INPUT_SIGNATURE_KEY" > "$signature_file"
+    trap 'rm -f "$signature_file"' EXIT
     # Makes signature file trusted
     openssl rsa -in "$signature_file" -pubout -out "/etc/apk/keys/${INPUT_SIGNATURE_KEY_NAME}.pub"
 fi
@@ -85,7 +86,7 @@ for arch in $archs; do
     echo "Running apk index -o ${index_file} ${arch_directory}/*.apk..."
     apk index -o "${index_file}" "${arch_directory}"/*.apk
     echo "Signing ${index_file} with ${signature_file}..."
-    abuild-sign -k "${signature_file}" "${index_file}"
+    abuild-sign -k "${signature_file}" -p "${INPUT_SIGNATURE_KEY_NAME}.pub" "${index_file}"
 done
 
 echo "::endgroup::"

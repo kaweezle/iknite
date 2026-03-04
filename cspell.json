@@ -22,7 +22,13 @@
     "checkmake.ini"
   ],
   "dictionaryDefinitions": [],
-  "dictionaries": ["bash", "docker", "golang", "terraform", "softwareTerms"],
+  "dictionaries": [
+    "bash",
+    "docker",
+    "golang",
+    "terraform",
+    "softwareTerms"
+  ],
   "words": [
     "abuild",
     "afero",
@@ -114,6 +120,7 @@
     "uefi",
     "unparam",
     "vancluever",
+    "virtio",
     "Warnf",
     "Warningf",
     "Warningln",

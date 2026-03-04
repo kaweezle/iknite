@@ -15,7 +15,7 @@ RUN --mount=type=bind,target=/apks  \
     install -m 644 -o root -g root /apks/${IKNITE_KEY_NAME} /etc/apk/keys/${IKNITE_KEY_NAME} && \
     apk update --quiet && \
     apk add --no-progress --no-cache openrc zsh nerdctl openssh && \
-    apk add --no-progress --no-cache /apks/iknite-${IKNITE_VERSION}.$(uname -m).apk /apks/karmafun-*.$(uname -m).apk && \
+    apk add --no-progress --no-cache /apks/iknite-${IKNITE_VERSION}.$(uname -m).apk /apks/karmafun-*.$(uname -m).apk /apks/incus-agent-*.$(uname -m).apk && \
     rm -rf `find /var/cache/apk/ -type f`
 
 # Configuration

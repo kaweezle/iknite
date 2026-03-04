@@ -6,7 +6,6 @@ ROOT_DIR := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
 ARCH ?= $(shell uname -m)
 KUBERNETES_VERSION ?= $(shell grep 'k8s.io/kubernetes' "$(ROOT_DIR)/go.mod" | awk '{gsub(/^v/,"",$$2); print $$2;}')
 KEY_NAME ?= kaweezle-devel@kaweezle.com-c9d89864.rsa
-IKNITE_REPO_NAME ?= test
 ROOTLESS ?= false
 ROOTFULL ?= true
 BUILDKIT_NAMESPACE ?= k8s.io
@@ -31,6 +30,13 @@ KARMAFUN_LATEST_VERSION := $(shell curl --silent https://api.github.com/repos/ka
 # Exact tag match of current version + 1 patch, with -devel suffix (e.g. v0.1.0 -> v0.1.1-devel)
 IKNITE_VERSION := $(shell git describe --exact-match --tags --match="v[0-9]*" 2>/dev/null || (git describe --abbrev=0 --tags --match="v[0-9]*" | awk -F'.' '{ printf "%s.%s.%s-devel",$$1,$$2,$$3+1;}'))
 IKNITE_NUMBER_VERSION := $(IKNITE_VERSION:v%=%)
+# test if IKNITE_VERSION contains -devel suffix, if so use test repo name, otherwise use iknite repo name
+IKNITE_REPO_NAME ?= $(shell \
+	if git describe --exact-match --tags --match="v[0-9]*" >/dev/null 2>&1; then \
+		echo "release"; \
+	else \
+		echo "test"; \
+	fi)
 
 # Base image for rootfs, containing only the APK packages without preloaded images
 IKNITE_ROOTFS_BASE := iknite-rootfs-base:$(IKNITE_VERSION)
@@ -50,6 +56,11 @@ KARMAFUN_PACKAGE := karmafun-$(patsubst v%,%,$(KARMAFUN_LATEST_VERSION)).$(ARCH)
 IKNITE_PACKAGE := iknite-$(IKNITE_NUMBER_VERSION).$(ARCH).apk
 IKNITE_IMAGES_PACKAGE := iknite-images-$(KUBERNETES_VERSION).$(ARCH).apk
 
+INCUS_AGENT_VERSION := 6.22
+INCUS_AGENT_PACKAGE := incus-agent-$(INCUS_AGENT_VERSION).$(ARCH).apk
+INCUS_AGENT_SOURCE_DIR := packaging/apk/incus-agent
+INCUS_AGENT_SOURCES := $(wildcard $(ROOT_DIR)/$(INCUS_AGENT_SOURCE_DIR)/*)
+
 KUSTOMIZATION_FILES = $(wildcard $(ROOT_DIR)/packaging/apk/iknite/iknite.d/**/*)
 GOLANG_FILES = $(shell find "$(ROOT_DIR)/cmd" "$(ROOT_DIR)/pkg" -type f -name '*.go' ! -name '*_test.go')
 APK_FILES = $(wildcard $(ROOT_DIR)/packaging/apk/iknite/**/*)
@@ -64,7 +75,7 @@ IMAGES_ID = $(shell $(SUDO_CMD) nerdctl -n $(BUILDKIT_NAMESPACE) image ls -q --f
 
 BUILD_VM_IMAGE_SCRIPTS = $(ROOT_DIR)/packaging/scripts/build-vm-image.sh $(ROOT_DIR)/packaging/scripts/configure-vm-image.sh
 
-.PHONY: help all goreleaser rootfs-base-image images-apk rootfs-container rootfs rootfs-image fetch-karmafun apk-repo upload-repo vm-image clean check-prerequisites test
+.PHONY: help all goreleaser rootfs-base-image images-apk incus-agent-apk rootfs-container rootfs rootfs-image fetch-karmafun apk-repo upload-repo vm-image clean check-prerequisites test
 
 help: # ignore checkmake
 	@echo "Iknite build targets"
@@ -73,6 +84,7 @@ help: # ignore checkmake
 	@echo "  make goreleaser         Build iknite package (goreleaser)"
 	@echo "  make fetch-karmafun     Download latest karmafun APK into dist/"
 	@echo "  make images-apk         Build iknite-images APK"
+	@echo "  make incus-agent-apk    Build incus-agent APK"
 	@echo "  make apk-repo           Create APK repository in dist/repo"
 	@echo "  make upload-repo        Upload APK repository with terragrunt"
 	@echo "  make rootfs-base-image  Build rootfs base image"
@@ -96,7 +108,7 @@ help: # ignore checkmake
 	@echo "  CACHE_FLAG=$(CACHE_FLAG)"
 	@echo "  SNAPSHOT=$(SNAPSHOT)"
 
-all: goreleaser fetch-karmafun images-apk apk-repo rootfs-base-image rootfs-container rootfs rootfs-image vm-image
+all: goreleaser fetch-karmafun images-apk incus-agent-apk apk-repo rootfs-base-image rootfs-container rootfs rootfs-image vm-image
 
 print-% : ; $(info $* is a $(flavor $*) variable set to [$($*)]) @true
 
@@ -154,6 +166,20 @@ $(DIST_DIR)/$(IKNITE_IMAGES_PACKAGE): $(DIST_DIR)/iknite_linux_amd64_v1/iknite $
 	(cd "$(DIST_DIR)/$(ARCH)" && for f in *.apk; do mv "$$f" "../$$(echo "$$f" | sed 's/\-r0.apk$$//').$(ARCH).apk"; done); \
 	rmdir "$(DIST_DIR)/$(ARCH)/"
 
+$(DIST_DIR)/$(INCUS_AGENT_PACKAGE): $(INCUS_AGENT_SOURCES) | check-prerequisites
+	export INCUS_AGENT_VERSION="$(INCUS_AGENT_VERSION)"; \
+	$(SUDO_CMD) nerdctl run --privileged --rm -v "$(ROOT_DIR):/work" cgr.dev/chainguard/melange \
+		build packaging/apk/incus-agent/incus-agent.yaml \
+		--arch "$(ARCH)" \
+		--source-dir "$(INCUS_AGENT_SOURCE_DIR)" \
+		--out-dir "dist" \
+		--signing-key $(KEY_NAME) \
+		--generate-index=false; \
+ 	if [ "$(ROOTLESS)" = "false" ]; then \
+		$(SUDO_CMD) chown -R "$$(id -u):$$(id -g)" "$(DIST_DIR)"; \
+	fi; \
+	(cd "$(DIST_DIR)/$(ARCH)" && for f in *.apk; do mv "$$f" "../$$(echo "$$f" | sed 's/\-r0.apk$$//').$(ARCH).apk"; done); \
+	rmdir "$(DIST_DIR)/$(ARCH)/"
 
 goreleaser: $(DIST_DIR)/$(IKNITE_PACKAGE) $(DIST_DIR)/metadata.json $(DIST_DIR)/iknite_linux_amd64_v1/iknite
 
@@ -161,7 +187,9 @@ fetch-karmafun: $(DIST_DIR)/$(KARMAFUN_PACKAGE)
 
 images-apk: $(DIST_DIR)/$(IKNITE_IMAGES_PACKAGE)
 
-$(APK_INDEX_FILE): $(DIST_DIR)/$(KARMAFUN_PACKAGE) $(DIST_DIR)/$(IKNITE_PACKAGE) $(DIST_DIR)/$(IKNITE_IMAGES_PACKAGE) | check-prerequisites
+incus-agent-apk: $(DIST_DIR)/$(INCUS_AGENT_PACKAGE)
+
+$(APK_INDEX_FILE): $(DIST_DIR)/$(KARMAFUN_PACKAGE) $(DIST_DIR)/$(IKNITE_PACKAGE) $(DIST_DIR)/$(IKNITE_IMAGES_PACKAGE) $(DIST_DIR)/$(INCUS_AGENT_PACKAGE) | check-prerequisites
 	rm -rf "$(DIST_DIR)/repo"
 	mkdir -p "$(DIST_DIR)/repo"
 	INPUT_APK_FILES="$(DIST_DIR)/*.apk" \
@@ -169,7 +197,9 @@ $(APK_INDEX_FILE): $(DIST_DIR)/$(KARMAFUN_PACKAGE) $(DIST_DIR)/$(IKNITE_PACKAGE)
 	INPUT_SIGNATURE_KEY_NAME="$(KEY_NAME)" \
 	INPUT_SIGNATURE_KEY="$$(cat "$(ROOT_DIR)/$(KEY_NAME)")" \
 	GITHUB_WORKSPACE="$(ROOT_DIR)" \
-	"$(ROOT_DIR)/.github/actions/make-apkindex/entrypoint.sh"
+	$(SUDO_CMD) "$(ROOT_DIR)/.github/actions/make-apkindex/entrypoint.sh"; \
+	$(SUDO_CMD) chown -R "$$(id -u):$$(id -g)" "$(DIST_DIR)/repo"
+
 
 apk-repo: $(APK_INDEX_FILE)
 
@@ -177,13 +207,14 @@ upload-repo: $(APK_INDEX_FILE) | check-prerequisites
 	cd "$(ROOT_DIR)/deploy/iac/iknite/$(IKNITE_REPO_NAME)repo" && terragrunt init && terragrunt apply -auto-approve
 
 
-$(IKNITE_ROOTFS_BASE_MARKER): $(DIST_DIR)/$(KARMAFUN_PACKAGE) $(DIST_DIR)/$(IKNITE_PACKAGE) $(IKNITE_ROOTFS_BASE_SOURCES) | check-prerequisites
+$(IKNITE_ROOTFS_BASE_MARKER): $(DIST_DIR)/$(KARMAFUN_PACKAGE) $(DIST_DIR)/$(IKNITE_PACKAGE) $(DIST_DIR)/$(INCUS_AGENT_PACKAGE) $(IKNITE_ROOTFS_BASE_SOURCES) | check-prerequisites
 	BUILD_DIR_PATH="$(BUILD_DIR)/rootfs/base"; \
 	rm -rf "$$BUILD_DIR_PATH"; \
 	mkdir -p "$$BUILD_DIR_PATH"; \
 	cp -r "$(ROOT_DIR)/packaging/rootfs/base/." "$$BUILD_DIR_PATH/"; \
 	cp "$(DIST_DIR)/$(IKNITE_PACKAGE)" "$$BUILD_DIR_PATH/"; \
 	cp "$(DIST_DIR)/$(KARMAFUN_PACKAGE)" "$$BUILD_DIR_PATH/"; \
+	cp "$(DIST_DIR)/$(INCUS_AGENT_PACKAGE)" "$$BUILD_DIR_PATH/"; \
 	$(SUDO_CMD) buildctl build \
 		--frontend dockerfile.v0 \
 		--local "context=$$BUILD_DIR_PATH" \

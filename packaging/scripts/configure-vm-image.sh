@@ -167,7 +167,7 @@ rc_add sysinit devfs dmesg mdev hwdrivers
 [ -e /etc/init.d/cgroups ] && rc_add sysinit cgroups ||:  # since v3.8
 
 step 'Enable boot services'
-rc_add boot modules hwclock swap hostname sysctl bootmisc syslog cloud-init-local
+rc_add boot modules hwclock swap hostname sysctl bootmisc syslog incus-agent cloud-init-local
 # urandom was renamed to seedrng in v3.17
 if [ -e /etc/init.d/seedrng ]; then
     rc_add boot seedrng

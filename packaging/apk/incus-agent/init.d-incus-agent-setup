@@ -1,0 +1,5 @@
+#!/sbin/openrc-run
+
+description="Incus - agent - setup"
+command=/usr/bin/incus-agent-setup
+required_dirs=/dev/virtio-ports/
