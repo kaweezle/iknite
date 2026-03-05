@@ -7,6 +7,8 @@ ARG IKNITE_REPO_URL=https://static.iknite.app/release/
 ARG IKNITE_KEY_NAME=kaweezle-devel@kaweezle.com-c9d89864.rsa.pub
 ARG KUBERNETES_VERSION=1.35.0
 
+LABEL org.opencontainers.image.source="https://github.com/kaweezle/iknite.git"
+
 # Add the dependencies
 RUN --mount=type=bind,target=/apks  \
     echo "https://dl-cdn.alpinelinux.org/alpine/edge/community/" >> /etc/apk/repositories && \

@@ -7,11 +7,13 @@ ARG GROUPNAME=alpine
 ARG TFLINT_VERSION=0.60.0
 ARG TERRAFORM_DOCS_VERSION=0.21.0
 
+LABEL org.opencontainers.image.source="https://github.com/kaweezle/iknite.git"
+
 # Add the dependencies
 RUN echo "http://dl-cdn.alpinelinux.org/alpine/edge/testing/" >> /etc/apk/repositories && \
     apk update --quiet && \
     apk add --quiet --no-progress --no-cache zsh tzdata git libstdc++ doas iproute2 gnupg socat openssh openrc curl tar zstd && \
-    apk add --quiet --no-progress --no-cache pipx uv go make jq skopeo tenv kubectl k9s golangci-lint gnupg sops age nodejs npm openssl abuild && \
+    apk add --quiet --no-progress --no-cache pipx uv go make jq skopeo tenv kubectl k9s golangci-lint gnupg sops age nodejs npm openssl abuild libarchive-tools && \
     apk add --quiet --no-progress --no-cache ip6tables containerd kubelet kubeadm cni-plugins cni-plugin-flannel util-linux-misc buildkit buildctl \
     nerdctl rootlesskit slirp4netns qemu-img cdrkit sfdisk e2fsprogs && \
     GORELEASER_VERSION=$(curl --silent  https://api.github.com/repos/goreleaser/goreleaser/releases/latest | jq -r .tag_name | sed -e 's/^v//') && \

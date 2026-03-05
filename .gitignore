@@ -39,3 +39,4 @@ packages/
 *.iso
 *.log
 docs/site/
+release/

@@ -84,7 +84,7 @@ locals {
   cloudflare_account_id = "a54f6b2557d54a9bff5eef36482b7fe6"
 
   kubernetes_version = get_env("KUBERNETES_VERSION", "1.35.1")
-  iknite_version     = get_env("IKNITE_VERSION", try(jsondecode(file("${get_repo_root()}/dist/metadata.json")).version, "0.6.1-devel"))
+  iknite_version     = get_env("IKNITE_NUMBER_VERSION", try(jsondecode(file("${get_repo_root()}/dist/metadata.json")).version, "0.6.1-devel"))
 }
 
 terraform {
