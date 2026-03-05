@@ -7,11 +7,11 @@ terraform {
     }
     ovh = {
       source  = "ovh/ovh"
-      version = "2.1.0"
+      version = "2.11.0"
     }
     aws = {
       source  = "hashicorp/aws"
-      version = "~> 4.0"
+      version = "~> 6.34"
     }
   }
 }
