@@ -1,5 +1,5 @@
 # cSpell: disable
-name: Buid iknite package, rootfs, and VM images
+name: Release (GoReleaser, Root FS, VM images, APK repo, E2E tests)
 
 on:
   pull_request:
@@ -13,7 +13,7 @@ env:
 
 jobs:
   goreleaser-snapshot:
-    name: Test GoReleaser packaging
+    name: Build and release
     runs-on: ubuntu-latest
     if: ${{ github.event_name == 'push' || contains(github.event.pull_request.labels.*.name, 'e2e') && github.actor != 'dependabot[bot]' }}
     permissions:
@@ -31,15 +31,8 @@ jobs:
         with:
           go-version: ^1
       -
-        name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-        with:
-          driver-opts: |
-            image=moby/buildkit:master
-          buildkitd-flags: "--allow-insecure-entitlement security.insecure"
-      -
         name: Log in to Container Registry
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
@@ -65,7 +58,21 @@ jobs:
         name: Install image building dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends buildkit libarchive-tools
+          sudo apt-get install -y --no-install-recommends libarchive-tools
+          # Install buildctl
+          BUILDKIT_VERSION=0.28.0
+          curl -L -o buildkit.tar.gz https://github.com/moby/buildkit/releases/download/v${BUILDKIT_VERSION}/buildkit-v${BUILDKIT_VERSION}.linux-amd64.tar.gz
+          tar -xzf buildkit.tar.gz -C /usr/local/bin --strip-components=1 bin/buildctl
+          buildctl --version
+          make print-HAS_WORKING_DOCKER  || true
+          make print-BUILDX_BUILDER || true
+          make print-BUILDKIT_HOST || true
+          docker buildx ls || true
+          BUILDKIT_HOST=docker-container://buildx_buildkit_iknite0 buildctl debug workers || true
+          make print-HAS_WORKING_ROOTLESS_BUILDCTL || true
+          make print-BUILD_CONTAINER_CMD || true
+          helmfile init --force
+          helm plugin install https://github.com/mumoshu/helm-x
       -
         name: Import Signature key
         id: import-signing-key
@@ -107,7 +114,7 @@ jobs:
           make upload-apk-repo
       -
         name: Upload All packages artifact
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: packages
           path: |
@@ -117,6 +124,13 @@ jobs:
         run: |
           make rootfs
       -
+        name: Upload root fs artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: rootfs
+          path: |
+            dist/*.rootfs.tar.gz
+      -
         name: Make rootfs image
         run: |
           make rootfs-image
@@ -125,13 +139,6 @@ jobs:
         run: |
           rm -rf /tmp/.buildx-cache
           mv /tmp/.buildx-cache-new /tmp/.buildx-cache
-      -
-        name: Upload root fs artifact
-        uses: actions/upload-artifact@v6
-        with:
-          name: rootfs
-          path: |
-            dist/*.rootfs.tar.gz
       -
         name: Install VM image building dependencies
         run: |

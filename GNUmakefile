@@ -39,7 +39,7 @@ SUDO_CMD := $(shell \
 ifeq ($(DOCKER_CMD),)
 	HAS_WORKING_DOCKER := ""
 else
-	HAS_WORKING_DOCKER := $(if $(filter null,$(shell $(SUDO_CMD) docker version --format json 2>/dev/null | jq -c .Server)),,true)
+	HAS_WORKING_DOCKER := $(if $(filter null,$(shell docker version --format json 2>/dev/null | jq -c .Server)),,true)
 endif
 
 ifeq ($(BUILDX_CMD),)
@@ -68,7 +68,7 @@ ifeq ($(BUILDCTL_CMD),)
 	HAS_WORKING_ROOTLESS_BUILDCTL := ""
 	HAS_WORKING_ROOTFULL_BUILDCTL := ""
 else
-	HAS_WORKING_ROOTLESS_BUILDCTL := $(shell buildctl debug workers >/dev/null 2>&1 && echo 'true' || echo '')
+	HAS_WORKING_ROOTLESS_BUILDCTL := $(if $(BUILDKIT_HOST),true,$(shell buildctl debug workers >/dev/null 2>&1 && echo 'true' || echo ''))
 	HAS_WORKING_ROOTFULL_BUILDCTL := $(shell $(SUDO_CMD) buildctl debug workers >/dev/null 2>&1 && echo 'true' || echo '')
 endif
 
@@ -182,7 +182,7 @@ help: # ignore checkmake
 	@echo "  make images-apk          Build iknite-images APK"
 	@echo "  make incus-agent-apk     Build incus-agent APK"
 	@echo "  make apk-repo            Create APK repository in dist/repo"
-	@echo "  make upload-repo         Upload APK repository with terragrunt"
+	@echo "  make upload-apk-repo     Upload APK repository with terragrunt"
 	@echo "  make rootfs-base-image   Build rootfs base image"
 	@echo "  make rootfs-container    Add preloaded images into rootfs container"
 	@echo "  make rootfs              Build rootfs"
@@ -340,8 +340,8 @@ $(APK_INDEX_FILE): $(DIST_DIR)/$(KARMAFUN_PACKAGE) $(DIST_DIR)/$(IKNITE_PACKAGE)
 apk-repo: $(APK_INDEX_FILE)
 
 # Upload APK repository with terragrunt by applying Terraform configuration in deploy/iac/iknite/$(IKNITE_REPO_NAME)repo
-.PHONY: upload-repo
-upload-repo: $(APK_INDEX_FILE) | check-prerequisites
+.PHONY: upload-apk-repo
+upload-apk-repo: $(APK_INDEX_FILE) | check-prerequisites
 	cd "$(ROOT_DIR)/deploy/iac/iknite/$(IKNITE_REPO_NAME)repo" && terragrunt init && terragrunt apply -auto-approve
 
 # Build rootfs base image
@@ -394,7 +394,7 @@ rootfs: $(ROOTFS_PATH)
 # Create final rootfs flat image from the rootfs tarball
 $(IKNITE_ROOTFS_IMAGE_MARKER): $(ROOTFS_PATH) $(IKNITE_ROOTFS_SOURCES) | check-prerequisites
 	BUILD_DIR_PATH="$(BUILD_DIR)/rootfs/with-images"; \
-	rm -rf "$$BUILD_DIR_PATH"; \make
+	rm -rf "$$BUILD_DIR_PATH"; \
 	mkdir -p "$$BUILD_DIR_PATH"; \
 	cp -r "$(ROOT_DIR)/packaging/rootfs/with-images/." "$$BUILD_DIR_PATH/"; \
 	cp "$(DIST_DIR)/$(ROOTFS_NAME)" "$$BUILD_DIR_PATH/$(ROOTFS_NAME)"; \
@@ -474,6 +474,11 @@ e2e-tg-refresh:
 .PHONY: e2e-tg-apply
 e2e-tg-apply:
 	cd "$(ROOT_DIR)/deploy/iac/iknite/iknite-image"; \
+	terragrunt run --graph apply --non-interactive -- -auto-approve
+
+.PHONY: e2e-tg-apply-vm
+e2e-tg-apply-vm:
+	cd "$(ROOT_DIR)/deploy/iac/iknite/iknite-vm"; \
 	terragrunt run --graph apply --non-interactive -- -auto-approve
 
 .PHONY: e2e-tg-destroy
