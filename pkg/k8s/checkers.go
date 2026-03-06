@@ -4,22 +4,18 @@ package k8s
 // cSpell: disable
 import (
 	"context"
-	"crypto/tls"
-	"crypto/x509"
 	"errors"
 	"fmt"
 	"io"
-	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/charmbracelet/lipgloss"
-	log "github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/client-go/rest"
 	kubeadmConstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	kubeConfigUtil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
@@ -456,65 +452,22 @@ func CheckWorkloads(ctx context.Context, data CheckData) (bool, string, error) {
 // server using the mTLS client configuration stored in constants.IkniteLocalConfPath
 // (/root/.kube/iknite.conf). It returns true when the server responds with "ok".
 func CheckIkniteServerHealth(timeout time.Duration) (bool, string, error) {
-	kubeConfig, err := clientcmd.LoadFromFile(constants.IkniteLocalConfPath)
+	kubeConfig, err := LoadFromFile(constants.IkniteLocalConfPath)
 	if err != nil {
-		return false, "", fmt.Errorf("failed to load iknite client config: %w", err)
+		return false, "", fmt.Errorf("failed to load iknite config from %s: %w", constants.IkniteLocalConfPath, err)
 	}
 
-	currentContext := kubeConfig.Contexts[kubeConfig.CurrentContext]
-	if currentContext == nil {
-		return false, "", fmt.Errorf("no current context in %s", constants.IkniteLocalConfPath)
+	var restClient rest.Interface
+	if restClient, err = kubeConfig.NewRESTClient(); err != nil {
+		return false, "", fmt.Errorf("failed to create REST client: %w", err)
 	}
 
-	cluster := kubeConfig.Clusters[currentContext.Cluster]
-	if cluster == nil {
-		return false, "", fmt.Errorf("cluster %q not found in %s", currentContext.Cluster, constants.IkniteLocalConfPath)
-	}
-
-	authInfo := kubeConfig.AuthInfos[currentContext.AuthInfo]
-	if authInfo == nil {
-		return false, "", fmt.Errorf("user %q not found in %s", currentContext.AuthInfo, constants.IkniteLocalConfPath)
-	}
-
-	caPool := x509.NewCertPool()
-	if !caPool.AppendCertsFromPEM(cluster.CertificateAuthorityData) {
-		return false, "", fmt.Errorf("failed to parse CA cert from %s", constants.IkniteLocalConfPath)
-	}
-
-	clientCert, err := tls.X509KeyPair(authInfo.ClientCertificateData, authInfo.ClientKeyData)
+	body, err := restClient.Get().AbsPath("/healthz").DoRaw(context.Background())
 	if err != nil {
-		return false, "", fmt.Errorf("failed to parse client credentials from %s: %w", constants.IkniteLocalConfPath, err)
+		return false, "", fmt.Errorf("failed to call /healthz endpoint: %w", err)
 	}
-
-	httpClient := &http.Client{
-		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{
-				Certificates: []tls.Certificate{clientCert},
-				RootCAs:      caPool,
-				MinVersion:   tls.VersionTLS12,
-			},
-		},
-		Timeout: timeout,
-	}
-
-	url := cluster.Server + "/healthz"
-	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, url, nil)
-	if err != nil {
-		return false, "", fmt.Errorf("failed to build iknite healthz request: %w", err)
-	}
-
-	resp, err := httpClient.Do(req)
-	if err != nil {
-		return false, "", fmt.Errorf("failed to reach iknite status server at %s: %w", url, err)
-	}
-	defer func() {
-		if closeErr := resp.Body.Close(); closeErr != nil {
-			log.WithError(closeErr).Debug("failed to close iknite healthz response body")
-		}
-	}()
-
-	if resp.StatusCode != http.StatusOK {
-		return false, fmt.Sprintf("iknite status server returned %s", resp.Status), nil
+	if string(body) != "ok" {
+		return false, fmt.Sprintf("iknite status server returned unexpected response: %s", string(body)), nil
 	}
 	return true, "Iknite status server is healthy", nil
 }
