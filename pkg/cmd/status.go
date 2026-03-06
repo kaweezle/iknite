@@ -326,6 +326,15 @@ func performStatus(ikniteConfig *v1alpha1.IkniteClusterSpec) {
 				},
 				CheckDataBuilder: checkDataBuilder,
 			},
+			//   - Check if the iknite status server is healthy
+			{
+				Name:        "iknite_server_health",
+				DependsOn:   []string{"apiserver_health"},
+				Description: "Check if the iknite status server is healthy",
+				CheckFn: func(_ context.Context, _ k8s.CheckData) (bool, string, error) {
+					return k8s.CheckIkniteServerHealth(checkTimeout)
+				},
+			},
 		}),
 		{
 			Name:             "workload_status",

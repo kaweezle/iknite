@@ -150,6 +150,27 @@ func TestSetClusterUpdatesInMemoryStatus(t *testing.T) {
 	require.Equal(t, "iknite.kaweezle.com/v1alpha1", got.APIVersion)
 }
 
+func TestHealthzEndpoint(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	createTestCA(t, dir)
+
+	spec := makeTestSpec(0)
+	require.NoError(t, server.EnsureServerCertAndKey(dir, []string{"iknite.local"}, []net.IP{spec.Ip}))
+
+	iSrv, err := server.NewIkniteServer(dir, spec)
+	require.NoError(t, err)
+
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, "/healthz", nil)
+	require.NoError(t, err)
+	rec := httptest.NewRecorder()
+	iSrv.ServeHTTP(rec, req)
+
+	require.Equal(t, http.StatusOK, rec.Code)
+	require.Equal(t, "text/plain", rec.Header().Get("Content-Type"))
+	require.Equal(t, "ok", rec.Body.String())
+}
+
 func TestStatusEndpoint(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()

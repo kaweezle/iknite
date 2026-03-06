@@ -86,6 +86,20 @@ func (s *IkniteServer) statusHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// healthzHandler serves a simple liveness check. It always returns 200 OK with
+// the body "ok" so that clients can verify the server is reachable and the mTLS
+// handshake succeeds without parsing JSON.
+func (s *IkniteServer) healthzHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	w.Header().Set("Content-Type", "text/plain")
+	if _, err := w.Write([]byte("ok")); err != nil {
+		log.WithError(err).Error("Failed to write healthz response")
+	}
+}
+
 // ServeHTTP implements http.Handler so that IkniteServer can be used directly
 // as a handler for a custom http.Server (useful in tests or when embedding
 // the mux into a larger application).
@@ -270,6 +284,7 @@ func NewIkniteServer(certDir string, spec *v1alpha1.IkniteClusterSpec) (*IkniteS
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/status", s.statusHandler)
+	mux.HandleFunc("/healthz", s.healthzHandler)
 
 	addr := net.JoinHostPort("0.0.0.0", strconv.Itoa(spec.StatusServerPort))
 	s.httpServer = &http.Server{
