@@ -60,6 +60,10 @@ var pkiFiles = []string{
 	"apiserver-etcd-client.key",
 	"apiserver-kubelet-client.key",
 	"front-proxy-ca.crt",
+	"iknite-client.crt",
+	"iknite-client.key",
+	"iknite-server.crt",
+	"iknite-server.key",
 }
 
 var (
@@ -233,6 +237,7 @@ func performStatus(ikniteConfig *v1alpha1.IkniteClusterSpec) {
 			k8s.KubernetesFileCheck("admin_conf", "/etc/kubernetes/admin.conf"),
 			k8s.KubernetesFileCheck("kubelet_config", "/var/lib/kubelet/config.yaml"),
 			k8s.KubernetesFileCheck("kubeadm_flags", "/var/lib/kubelet/kubeadm-flags.env"),
+			k8s.KubernetesFileCheck("iknite_conf", "/etc/kubernetes/iknite.conf"),
 			// Check that the etcd data directory is present and contains data
 			{
 				Name: fmt.Sprintf("api_backend_%s_data", apiBackendName),

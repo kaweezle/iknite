@@ -16,7 +16,7 @@ limitations under the License.
 
 package server
 
-// cSpell: words pkiutil certutil
+// cSpell: words pkiutil certutil sirupsen kubeadmapi
 
 import (
 	"context"
@@ -285,7 +285,11 @@ func NewIkniteServer(certDir string, spec *v1alpha1.IkniteClusterSpec) (*IkniteS
 // iknite HTTPS server. The initial cluster status is set from cluster.
 // The returned IkniteServer's SetCluster method should be called on every
 // subsequent cluster status update.
-func StartIkniteServer(certDir string, spec *v1alpha1.IkniteClusterSpec, cluster *v1alpha1.IkniteCluster) (*IkniteServer, error) {
+func StartIkniteServer(
+	certDir string,
+	spec *v1alpha1.IkniteClusterSpec,
+	cluster *v1alpha1.IkniteCluster,
+) (*IkniteServer, error) {
 	// Build SAN extensions from the cluster spec.
 	var dnsNames []string
 	if spec.DomainName != "" {
@@ -321,7 +325,11 @@ func StartIkniteServer(certDir string, spec *v1alpha1.IkniteClusterSpec, cluster
 		log.WithFields(log.Fields{
 			"addr": srv.httpServer.Addr,
 		}).Info("Starting iknite status server")
-		if listenErr := srv.httpServer.ListenAndServeTLS("", ""); listenErr != nil && listenErr != http.ErrServerClosed {
+		if listenErr := srv.httpServer.ListenAndServeTLS(
+			"",
+			"",
+		); listenErr != nil &&
+			listenErr != http.ErrServerClosed {
 			log.WithError(listenErr).Error("Iknite status server error")
 			startErr <- listenErr
 		}

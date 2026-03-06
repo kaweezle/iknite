@@ -16,7 +16,7 @@ limitations under the License.
 
 package server_test
 
-// cSpell: words pkiutil certutil clientcmd
+// cSpell: words pkiutil certutil clientcmd kubeadmapi stretchr noctx
 
 import (
 	"context"
@@ -34,8 +34,8 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
-	certutil "k8s.io/client-go/util/cert"
 	"k8s.io/client-go/tools/clientcmd"
+	certutil "k8s.io/client-go/util/cert"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	pkiutil "k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
 
