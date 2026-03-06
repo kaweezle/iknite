@@ -40,6 +40,12 @@ inputs = {
   private_keys = {
     "iknite" = local.iknite_vm.ssh_private_key
   }
+  # Fixed SSH host keys ensure the VM always presents the same host key across
+  # recreations, enabling strict host key verification on SSH clients.
+  ssh_host_keys = {
+    ecdsa_private = local.iknite_vm.ssh_host_ecdsa_private
+    ecdsa_public  = local.iknite_vm.ssh_host_ecdsa_public
+  }
   instances = {
     "iknite-vm-instance" = {
       name    = "iknite-vm-instance"

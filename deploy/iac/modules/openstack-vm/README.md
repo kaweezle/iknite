@@ -38,6 +38,13 @@ module "vms" {
     "default" = file("~/.ssh/id_rsa")
   }
 
+  # Optional: fixed SSH host keys ensure the VM always presents the same host key,
+  # enabling strict host key verification without StrictHostKeyChecking=no.
+  ssh_host_keys = {
+    ed25519_private = file("~/.ssh/iknite_vm_host_ed25519")
+    ed25519_public  = file("~/.ssh/iknite_vm_host_ed25519.pub")
+  }
+
   instances = {
     "my-vm" = {
       name         = "my-vm-instance"
@@ -59,7 +66,7 @@ module "vms" {
 | <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | >= 1.11.0 |
 | <a name="requirement_null"></a> [null](#requirement\_null) | 3.2.4 |
 | <a name="requirement_openstack"></a> [openstack](#requirement\_openstack) | 3.4.0 |
-| <a name="requirement_ovh"></a> [ovh](#requirement\_ovh) | 2.10.0 |
+| <a name="requirement_ovh"></a> [ovh](#requirement\_ovh) | 2.11.0 |
 
 ## Modules
 
@@ -72,7 +79,7 @@ No modules.
 | [null_resource.wait_ssh](https://registry.terraform.io/providers/hashicorp/null/3.2.4/docs/resources/resource) | resource |
 | [openstack_compute_instance_v2.this](https://registry.terraform.io/providers/terraform-provider-openstack/openstack/3.4.0/docs/resources/compute_instance_v2) | resource |
 | [openstack_compute_keypair_v2.this](https://registry.terraform.io/providers/terraform-provider-openstack/openstack/3.4.0/docs/resources/compute_keypair_v2) | resource |
-| [ovh_domain_zone_record.this](https://registry.terraform.io/providers/ovh/ovh/2.10.0/docs/resources/domain_zone_record) | resource |
+| [ovh_domain_zone_record.this](https://registry.terraform.io/providers/ovh/ovh/2.11.0/docs/resources/domain_zone_record) | resource |
 
 ## Inputs
 
@@ -83,6 +90,7 @@ No modules.
 | <a name="input_openstack"></a> [openstack](#input\_openstack) | OpenStack credentials | <pre>object({<br/>    auth_url            = string<br/>    user_domain_name    = string<br/>    project_domain_name = string<br/>    user_name           = string<br/>    password            = string<br/>    region              = string<br/>    tenant_id           = string<br/>  })</pre> | n/a | yes |
 | <a name="input_ovh"></a> [ovh](#input\_ovh) | OVH credentials | <pre>object({<br/>    endpoint           = optional(string, "ovh-eu")<br/>    application_key    = string<br/>    application_secret = string<br/>    consumer_key       = string<br/>  })</pre> | n/a | yes |
 | <a name="input_private_keys"></a> [private\_keys](#input\_private\_keys) | Map of private keys for the created keypairs | `map(string)` | n/a | yes |
+| <a name="input_ssh_host_keys"></a> [ssh\_host\_keys](#input\_ssh\_host\_keys) | Fixed SSH host keys to configure on instances via cloud-init. When provided, the VM always presents the same host key, enabling strict host key verification without StrictHostKeyChecking=no. | <pre>object({<br/>    ecdsa_private = string<br/>    ecdsa_public  = string<br/>  })</pre> | `null` | no |
 
 ## Outputs
 

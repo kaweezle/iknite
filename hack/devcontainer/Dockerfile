@@ -55,6 +55,7 @@ RUN --mount=type=bind,target=/conf \
     install -m 600 -o root -g root /conf/p10k.zsh /etc/skel/.p10k.zsh && \
     install --directory -o root -g root -m 0700 /etc/skel/.ssh && \
     install -m 600 -o root -g root /conf/config /etc/skel/.ssh/config && \
+    install -m 600 -o root -g root /conf/iknite_known_hosts /etc/skel/.ssh/iknite_known_hosts && \
     touch /etc/subuid && touch /etc/subgid
 
 # Allow OpenRC to run as non init
@@ -69,16 +70,18 @@ RUN --mount=type=bind,target=/conf mkdir -p /lib/rc/init.d && \
 
 # Configure the root user for zsh/oh-my-zsh/powerlevel10k
 USER root
-RUN install -m 700 -o root -g root /usr/share/oh-my-zsh/templates/zshrc.zsh-template /root/.zshrc && \
+RUN --mount=type=bind,target=/conf \
+    install -m 700 -o root -g root /usr/share/oh-my-zsh/templates/zshrc.zsh-template /root/.zshrc && \
     install --directory -o root -g root -m 0700 /root/.ssh && \
+    install -m 600 -o root -g root /conf/config /root/.ssh/config && \
+    install -m 600 -o root -g root /conf/iknite_known_hosts /root/.ssh/iknite_known_hosts && \
     install -m 600 -o root -g root /etc/skel/.p10k.zsh /root/.p10k.zsh && \
     (gpg -k && gpgconf --kill keyboxd || /bin/true) >/dev/null 2>&1
 
 # Add user alpine
 RUN adduser -s /bin/zsh -g ${USERNAME} -D ${GROUPNAME} && \
     addgroup ${USERNAME} wheel && \
-    echo "permit nopass keepenv :wheel" >> /etc/doas.d/doas.conf # && \
-    echo "Host *" > /home/${USERNAME}/.ssh/config && echo " StrictHostKeyChecking no" >> /home/${USERNAME}/.ssh/config && \
+    echo "permit nopass keepenv :wheel" >> /etc/doas.d/doas.conf && \
     chown -R ${USERNAME}:${GROUPNAME} /home/${USERNAME}/.ssh && \
     su -l ${USERNAME} -c "gpg -k && gpgconf --kill keyboxd || /bin/true" >/dev/null 2>&1 && \
     su -l ${USERNAME} -c "pipx ensurepath || /bin/true" >/dev/null 2>&1

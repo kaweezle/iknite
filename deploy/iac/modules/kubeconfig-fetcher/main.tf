@@ -6,12 +6,20 @@ locals {
 EOT
   )
 
-  # Build SSH connection string for remote command execution
-  ssh_command = chomp(<<EOT
+  # When a known host key is provided, write it to a temporary file and use
+  # StrictHostKeyChecking=yes to prevent man-in-the-middle attacks.
+  # Otherwise, fall back to accept-new (accepts new keys but rejects changed ones).
+  ssh_command = var.ssh_host_public_key != null ? chomp(<<EOT
 eval "$(ssh-agent -s)" > /dev/null && ssh-add <(cat - <<EOF
 ${var.private_key}
 EOF
-) > /dev/null && ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=${var.timeout} -p ${var.ssh_port} ${var.username}@${var.host} sh -c '${local.remote_kubeconfig_script}'
+) > /dev/null && TMP_KH=$(mktemp) && echo "${var.host} ${var.ssh_host_public_key}" > "$TMP_KH" && trap 'rm -f $TMP_KH' EXIT && ssh -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$TMP_KH" -o ConnectTimeout=${var.timeout} -p ${var.ssh_port} ${var.username}@${var.host} sh -c '${local.remote_kubeconfig_script}'
+EOT
+    ) : chomp(<<EOT
+eval "$(ssh-agent -s)" > /dev/null && ssh-add <(cat - <<EOF
+${var.private_key}
+EOF
+) > /dev/null && ssh -o StrictHostKeyChecking=accept-new -o ConnectTimeout=${var.timeout} -p ${var.ssh_port} ${var.username}@${var.host} sh -c '${local.remote_kubeconfig_script}'
 EOT
   )
 }
