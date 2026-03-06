@@ -1,6 +1,6 @@
 locals {
   remote_kubeconfig_script = chomp(<<EOT
-:;t="${var.timeout}";e=0;k="${var.kubeconfig_path}"; while [ ! -s "$k" ]; do if [ "$e" -ge "$t" ]; then echo "exit $e $t";exit 1;fi;sleep 1;e=$((e + 1));done;cat "$k"
+:;e=0;while [ ! -s "$1" ]; do if [ "$e" -ge "$2" ]; then exit 1;fi;sleep 1;e=$((e + 1));done;cat "$1"
 EOT
   )
 
@@ -9,7 +9,7 @@ EOT
 eval "$(ssh-agent -s)" > /dev/null && ssh-add <(cat - <<EOF
 ${var.private_key}
 EOF
-) > /dev/null && ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=${var.timeout} -p ${var.ssh_port} ${var.username}@${var.host} sh -c '${local.remote_kubeconfig_script}'
+) > /dev/null && ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=${var.timeout} -p ${var.ssh_port} ${var.username}@${var.host} sh -c '${local.remote_kubeconfig_script}' _ "${var.kubeconfig_path}" "${var.timeout}"
 EOT
   )
 }
