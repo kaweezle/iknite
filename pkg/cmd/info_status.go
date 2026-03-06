@@ -19,18 +19,14 @@ package cmd
 
 import (
 	"context"
-	"crypto/tls"
-	"crypto/x509"
 	"fmt"
-	"io"
-	"net/http"
 	"os"
 	"path/filepath"
-	"time"
 
-	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
-	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/client-go/rest"
+
+	"github.com/kaweezle/iknite/pkg/k8s"
 )
 
 // ikniteConfigFlag is the flag name for the iknite client config path.
@@ -80,69 +76,20 @@ a remote host.`,
 // builds an mTLS HTTP client from the embedded credentials, and prints the
 // JSON response from the /status endpoint.
 func performInfoStatus(configPath string) error {
-	kubeConfig, err := clientcmd.LoadFromFile(configPath)
+	kubeConfig, err := k8s.LoadFromFile(configPath)
 	if err != nil {
 		return fmt.Errorf("failed to load iknite config from %s: %w", configPath, err)
 	}
 
-	currentContext := kubeConfig.Contexts[kubeConfig.CurrentContext]
-	if currentContext == nil {
-		return fmt.Errorf("no current context in %s", configPath)
+	var restClient rest.Interface
+	if restClient, err = kubeConfig.NewRESTClient(); err != nil {
+		return fmt.Errorf("failed to create REST client: %w", err)
 	}
 
-	cluster := kubeConfig.Clusters[currentContext.Cluster]
-	if cluster == nil {
-		return fmt.Errorf("cluster %q not found in %s", currentContext.Cluster, configPath)
-	}
-
-	authInfo := kubeConfig.AuthInfos[currentContext.AuthInfo]
-	if authInfo == nil {
-		return fmt.Errorf("user %q not found in %s", currentContext.AuthInfo, configPath)
-	}
-
-	caPool := x509.NewCertPool()
-	if !caPool.AppendCertsFromPEM(cluster.CertificateAuthorityData) {
-		return fmt.Errorf("failed to parse CA cert from %s", configPath)
-	}
-
-	clientCert, err := tls.X509KeyPair(authInfo.ClientCertificateData, authInfo.ClientKeyData)
+	req := restClient.Get().AbsPath("/status")
+	body, err := req.DoRaw(context.Background())
 	if err != nil {
-		return fmt.Errorf("failed to parse client credentials from %s: %w", configPath, err)
-	}
-
-	tlsConfig := &tls.Config{
-		Certificates: []tls.Certificate{clientCert},
-		RootCAs:      caPool,
-		MinVersion:   tls.VersionTLS12,
-	}
-	httpClient := &http.Client{
-		Transport: &http.Transport{TLSClientConfig: tlsConfig},
-		Timeout:   10 * time.Second,
-	}
-
-	url := cluster.Server + "/status"
-	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, url, nil)
-	if err != nil {
-		return fmt.Errorf("failed to create request: %w", err)
-	}
-
-	resp, err := httpClient.Do(req)
-	if err != nil {
-		return fmt.Errorf("failed to contact iknite status server at %s: %w", url, err)
-	}
-	defer func() {
-		if closeErr := resp.Body.Close(); closeErr != nil {
-			log.WithError(closeErr).Debug("failed to close iknite status response body")
-		}
-	}()
-
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("iknite status server returned %s", resp.Status)
-	}
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return fmt.Errorf("failed to read response from iknite status server: %w", err)
+		return fmt.Errorf("error while getting iknite status %s: %w", req.URL().String(), err)
 	}
 
 	fmt.Println(string(body)) //nolint:forbidigo // printing is expected here
