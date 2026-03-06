@@ -7,6 +7,8 @@ ARG IKNITE_REPO_URL=https://static.iknite.app/release/
 ARG IKNITE_KEY_NAME=kaweezle-devel@kaweezle.com-c9d89864.rsa.pub
 ARG KUBERNETES_VERSION=1.35.0
 
+LABEL org.opencontainers.image.source="https://github.com/kaweezle/iknite.git"
+
 # Add the dependencies
 RUN --mount=type=bind,target=/apks  \
     echo "https://dl-cdn.alpinelinux.org/alpine/edge/community/" >> /etc/apk/repositories && \
@@ -15,7 +17,7 @@ RUN --mount=type=bind,target=/apks  \
     install -m 644 -o root -g root /apks/${IKNITE_KEY_NAME} /etc/apk/keys/${IKNITE_KEY_NAME} && \
     apk update --quiet && \
     apk add --no-progress --no-cache openrc zsh nerdctl openssh && \
-    apk add --no-progress --no-cache /apks/iknite-${IKNITE_VERSION}.$(uname -m).apk /apks/karmafun-*.$(uname -m).apk && \
+    apk add --no-progress --no-cache /apks/iknite-${IKNITE_VERSION}.$(uname -m).apk /apks/karmafun-*.$(uname -m).apk /apks/incus-agent-*.$(uname -m).apk && \
     rm -rf `find /var/cache/apk/ -type f`
 
 # Configuration

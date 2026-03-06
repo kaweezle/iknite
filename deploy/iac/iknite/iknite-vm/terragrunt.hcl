@@ -43,7 +43,7 @@ inputs = {
   instances = {
     "iknite-vm-instance" = {
       name    = "iknite-vm-instance"
-      enabled = tobool(get_env("IKNITE_CREATE_INSTANCE", "false"))
+      enabled = tobool(get_env("IKNITE_CREATE_INSTANCE", "true"))
 
       image_id    = try(dependency.image.outputs.images["iknite-vm-image"].id, "mock-image-id")
       flavor_name = "b3-16"

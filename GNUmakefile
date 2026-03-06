@@ -1,0 +1,558 @@
+# Makefile for building Iknite packages, rootfs images, and VM images.
+# cSpell: words gsub rootfull chainguard apkindex doas vhdx apks covermode coverprofile checkmake
+# cSpell: words moby oras hyperv
+SHELL := /bin/sh
+
+ROOT_DIR := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
+ARCH ?= $(shell uname -m)
+KUBERNETES_VERSION ?= $(shell grep 'k8s.io/kubernetes' "$(ROOT_DIR)/go.mod" | awk '{gsub(/^v/,"",$$2); print $$2;}')
+export KUBERNETES_VERSION
+KEY_NAME ?= kaweezle-devel@kaweezle.com-c9d89864.rsa
+CONTAINERD_NAMESPACE ?= k8s.io
+REGISTRY ?= ghcr.io
+IMAGE_NAME ?= kaweezle/iknite
+export CONTAINERD_NAMESPACE
+CACHE_FLAG ?= "" # --no-cache
+
+#######
+# BEGIN: COMMANDS
+#######
+NERDCTL_CMD := $(shell command -v nerdctl 2>/dev/null)
+DOCKER_CMD := $(shell command -v docker 2>/dev/null)
+BUILDCTL_CMD := $(shell command -v buildctl 2>/dev/null)
+BUILDX_CMD := $(shell \
+	if [ -n "$(DOCKER_CMD)" ] && docker buildx version >/dev/null 2>&1; then \
+		echo "docker buildx"; \
+	else \
+		echo ""; \
+	fi)
+
+SUDO_CMD := $(shell \
+	if command -v doas >/dev/null 2>&1; then \
+		echo doas; \
+	elif command -v sudo >/dev/null 2>&1; then \
+		echo sudo; \
+	else \
+		echo ""; \
+	fi)
+
+ifeq ($(DOCKER_CMD),)
+	HAS_WORKING_DOCKER := ""
+else
+	HAS_WORKING_DOCKER := $(if $(filter null,$(shell docker version --format json 2>/dev/null | jq -c .Server)),,true)
+endif
+
+ifeq ($(BUILDX_CMD),)
+	HAS_WORKING_BUILDX := ""
+else
+	HAS_WORKING_BUILDX := $(shell $(BUILDX_CMD) inspect | grep -q '^Error' >/dev/null 2>&1 && echo '' || echo 'true')
+endif
+
+# If we have both docker and buildx, let's create a buildx builder instance that
+# buildctl will catch and use
+ifneq ($(and $(HAS_WORKING_DOCKER),$(HAS_WORKING_BUILDX)),)
+	BUILDX_BUILDER := $(shell $(BUILDX_CMD) use iknite >/dev/null 2>&1 && echo iknite || $(BUILDX_CMD) create --name iknite --use --driver docker-container --buildkitd-flags '--allow-insecure-entitlement security.insecure'  --driver-opt "image=moby/buildkit:master" --bootstrap 2>/dev/null)
+	export BUILDKIT_HOST := docker-container://buildx_buildkit_$(BUILDX_BUILDER)0
+endif
+
+# 'null' as output means not working
+ifeq ($(NERDCTL_CMD),)
+	HAS_WORKING_ROOTLESS_NERDCTL := ""
+	HAS_WORKING_ROOTFULL_NERDCTL := ""
+else
+	HAS_WORKING_ROOTLESS_NERDCTL := $(if $(filter null,$(shell nerdctl version --format '{{json .}}' 2>/dev/null | jq -c .Server)),,true)
+	HAS_WORKING_ROOTFULL_NERDCTL := $(if $(filter null,$(shell $(SUDO_CMD) nerdctl version --format '{{json .}}' 2>/dev/null | jq -c .Server)),,true)
+endif
+
+ifeq ($(BUILDCTL_CMD),)
+	HAS_WORKING_ROOTLESS_BUILDCTL := ""
+	HAS_WORKING_ROOTFULL_BUILDCTL := ""
+else
+	HAS_WORKING_ROOTLESS_BUILDCTL := $(if $(BUILDKIT_HOST),true,$(shell buildctl debug workers >/dev/null 2>&1 && echo 'true' || echo ''))
+	HAS_WORKING_ROOTFULL_BUILDCTL := $(shell $(SUDO_CMD) buildctl debug workers >/dev/null 2>&1 && echo 'true' || echo '')
+endif
+
+RUN_CONTAINER_CMD := $(if $(HAS_WORKING_DOCKER),$(DOCKER_CMD),$(if $(HAS_WORKING_ROOTFULL_NERDCTL),$(SUDO_CMD) $(NERDCTL_CMD),$(if $(HAS_WORKING_ROOTLESS_NERDCTL),$(NERDCTL_CMD),":")))
+BUILD_CONTAINER_CMD := $(if $(HAS_WORKING_ROOTLESS_BUILDCTL),$(BUILDCTL_CMD),$(if $(HAS_WORKING_ROOTFULL_BUILDCTL),$(SUDO_CMD) $(BUILDCTL_CMD),":"))
+
+BUILD_CONTAINER_CACHE_FROM_PATH := /tmp/.buildx-cache
+BUILD_CONTAINER_CACHE_TO_PATH := /tmp/.buildx-cache-new
+BUILD_CONTAINER_CACHE_FROM ?= type=local,src=$(BUILD_CONTAINER_CACHE_FROM_PATH)
+BUILD_CONTAINER_CACHE_TO ?= type=local,dest=$(BUILD_CONTAINER_CACHE_TO_PATH)
+
+SOPS_DECRYPT_CMD := sops --decrypt --input-type yaml --output-type json
+
+#######
+# END: COMMANDS
+#######
+
+ifneq ($(RUN_CONTAINER_CMD),$(SUDO_CMD) $(NERDCTL_CMD))
+	ROOTLESS := true
+else
+	ROOTLESS := false
+endif
+
+ROOTFULL := $(shell id -u 2>/dev/null | grep -q 0 && echo true || echo false)
+
+DIST_DIR := dist
+BUILD_DIR := build
+KARMAFUN_LATEST_VERSION := $(shell curl --silent https://api.github.com/repos/karmafun/karmafun/releases/latest | jq -r .tag_name)
+# IKNITE_VERSION := $(shell jq -Mr ".version" "$(DIST_DIR)/metadata.json" 2>/dev/null)
+# Exact tag match of current version + 1 patch, with -devel suffix (e.g. v0.1.0 -> v0.1.1-devel)
+IKNITE_VERSION := $(shell git describe --exact-match --tags --match="v[0-9]*" 2>/dev/null || (git describe --abbrev=0 --tags --match="v[0-9]*" | awk -F'.' '{ printf "%s.%s.%s-devel",$$1,$$2,$$3+1;}'))
+export IKNITE_VERSION
+IKNITE_NUMBER_VERSION := $(IKNITE_VERSION:v%=%)
+export IKNITE_NUMBER_VERSION
+# test if IKNITE_VERSION contains -devel suffix, if so use test repo name, otherwise use iknite repo name
+IKNITE_REPO_NAME ?= $(shell \
+	if git describe --exact-match --tags --match="v[0-9]*" >/dev/null 2>&1; then \
+		echo "release"; \
+	else \
+		echo "test"; \
+	fi)
+
+ifeq ($(IKNITE_REPO_NAME),release)
+	PUSH_IMAGES := true
+	IKNITE_ROOTFS_IMAGE_ADDITIONAL_TAG := ",name=$(IKNITE_ROOTFS_IMAGE):latest"
+	SNAPSHOT := ""
+else
+	PUSH_IMAGES := false
+	IKNITE_ROOTFS_IMAGE_ADDITIONAL_TAG := ""
+	SNAPSHOT := --snapshot
+endif
+
+# Variables for APK index builder image
+APK_INDEX_BUILDER_IMAGE := apk-index-builder:latest
+APK_INDEX_BUILDER_IMAGE_MARKER := $(DIST_DIR)/apk-index-builder.marker
+APK_INDEX_BUILDER_IMAGE_DIR := $(ROOT_DIR)/.github/actions/make-apkindex
+APK_INDEX_BUILDER_IMAGE_SOURCES := $(wildcard $(APK_INDEX_BUILDER_IMAGE_DIR)/*)
+
+# Base image for rootfs, containing only the APK packages without preloaded images
+IKNITE_ROOTFS_BASE := iknite-rootfs-base:$(IKNITE_VERSION)
+IKNITE_ROOTFS_BASE_MARKER = $(DIST_DIR)/iknite-rootfs-base_$(IKNITE_VERSION).marker
+IKNITE_ROOTFS_BASE_SOURCES := $(wildcard $(ROOT_DIR)/packaging/rootfs/base/*)
+
+# Final rootfs image with preloaded Kubernetes images
+IKNITE_ROOTFS_IMAGE := $(REGISTRY)/$(IMAGE_NAME):$(IKNITE_VERSION)-$(KUBERNETES_VERSION)
+IKNITE_ROOTFS_IMAGE_MARKER = $(DIST_DIR)/iknite_$(IKNITE_VERSION)-$(KUBERNETES_VERSION).marker
+IKNITE_ROOTFS_SOURCES := $(wildcard $(ROOT_DIR)/packaging/rootfs/with-images/*)
+
+ROOTFS_NAME := iknite-$(IKNITE_NUMBER_VERSION)-$(KUBERNETES_VERSION).rootfs.tar.gz
+ROOTFS_PATH := $(DIST_DIR)/$(ROOTFS_NAME)
+
+# Package file names
+KARMAFUN_PACKAGE := karmafun-$(patsubst v%,%,$(KARMAFUN_LATEST_VERSION)).$(ARCH).apk
+IKNITE_PACKAGE := iknite-$(IKNITE_NUMBER_VERSION).$(ARCH).apk
+IKNITE_IMAGES_PACKAGE := iknite-images-$(KUBERNETES_VERSION).$(ARCH).apk
+
+INCUS_AGENT_VERSION := 6.22
+INCUS_AGENT_PACKAGE := incus-agent-$(INCUS_AGENT_VERSION).$(ARCH).apk
+INCUS_AGENT_SOURCE_DIR := packaging/apk/incus-agent
+INCUS_AGENT_SOURCES := $(wildcard $(ROOT_DIR)/$(INCUS_AGENT_SOURCE_DIR)/*)
+
+KUSTOMIZATION_FILES = $(wildcard $(ROOT_DIR)/packaging/apk/iknite/iknite.d/**/*)
+GOLANG_FILES = $(shell find "$(ROOT_DIR)/cmd" "$(ROOT_DIR)/pkg" -type f -name '*.go' ! -name '*_test.go')
+APK_FILES = $(wildcard $(ROOT_DIR)/packaging/apk/iknite/**/*)
+APK_INDEX_FILE = $(DIST_DIR)/repo/$(ARCH)/APKINDEX.tar.gz
+
+IKNITE_ROOTFS_CONTAINER_MARKER = $(DIST_DIR)/iknite-rootfs-container_$(IKNITE_VERSION)-$(KUBERNETES_VERSION).marker
+
+IKNITE_VM_IMAGE_QCOW2_BASENAME = iknite-vm.$(IKNITE_NUMBER_VERSION)-$(KUBERNETES_VERSION).qcow2
+IKNITE_VM_IMAGE_QCOW2 = $(DIST_DIR)/images/$(IKNITE_VM_IMAGE_QCOW2_BASENAME)
+IKNITE_VM_IMAGE_QCOW2_CONTAINER_MARKER = $(DIST_DIR)/images/$(IKNITE_VM_IMAGE_QCOW2_BASENAME)-container.marker
+IKNITE_VM_IMAGE_VHDX_BASENAME = iknite-vm.$(IKNITE_NUMBER_VERSION)-$(KUBERNETES_VERSION).vhdx
+IKNITE_VM_IMAGE_VHDX = $(DIST_DIR)/images/$(IKNITE_VM_IMAGE_VHDX_BASENAME)
+IKNITE_VM_IMAGE_VHDX_CONTAINER_MARKER = $(DIST_DIR)/images/$(IKNITE_VM_IMAGE_VHDX_BASENAME)-container.marker
+
+IMAGES_ID = $(shell $(RUN_CONTAINER_CMD) image ls -q --filter "label=org.opencontainers.image.source=https://github.com/kaweezle/iknite.git" | sort -u)
+
+BUILD_VM_IMAGE_SCRIPTS = $(ROOT_DIR)/packaging/scripts/build-vm-image.sh $(ROOT_DIR)/packaging/scripts/configure-vm-image.sh
+
+SECRETS_FILE := $(ROOT_DIR)/deploy/k8s/secrets/secrets.sops.yaml
+
+
+.PHONY: help
+help: # ignore checkmake
+	@echo "Iknite build targets"
+	@echo ""
+	@echo "Step targets:"
+	@echo "  make extract-key         Extract signing key from sops file"
+	@echo "  make goreleaser          Build iknite package (goreleaser)"
+	@echo "  make fetch-karmafun      Download latest karmafun APK into dist/"
+	@echo "  make images-apk          Build iknite-images APK"
+	@echo "  make incus-agent-apk     Build incus-agent APK"
+	@echo "  make apk-repo            Create APK repository in dist/repo"
+	@echo "  make upload-apk-repo     Upload APK repository with terragrunt"
+	@echo "  make rootfs-base-image   Build rootfs base image"
+	@echo "  make rootfs-container    Add preloaded images into rootfs container"
+	@echo "  make rootfs              Build rootfs"
+	@echo "  make rootfs-image        Build final rootfs image"
+	@echo "  make vm-image            Build VM images (qcow2, vhdx)"
+	@echo "  make vm-container-images Build VM images as container images"
+	@echo "  make clean               Remove build artifacts and temp container"
+	@echo "  make all                 Run full pipeline"
+	@echo "  make ssh-key             Extract SSH key for iknite VMs from sops file"
+	@echo "  make e2e-tg-init         Initialize terragrunt E2E test configuration"
+	@echo "  make e2e-tg-refresh      Refresh terragrunt E2E test state without applying changes"
+	@echo "  make e2e-tg-apply        Apply terragrunt E2E test configuration to create E2E test VM"
+	@echo "  make e2e-tg-destroy      Destroy E2E test VM with terragrunt"
+	@echo "  make e2e-check-argocd    Check ArgoCD application status for E2E test cluster"
+	@echo "  make release-files       Generate SHA256SUMS file for release artifacts"
+	@echo ""
+	@echo "File targets (examples):"
+	@echo "  make dist/iknite-<version>.$(ARCH).apk"
+	@echo "  make dist/iknite-images-<k8s-version>.$(ARCH).apk"
+	@echo "  make dist/karmafun-<version>.$(ARCH).apk"
+	@echo "  make dist/SHA256SUMS"
+	@echo ""
+	@echo "Common variables (override with VAR=value):"
+	@echo "  ARCH=$(ARCH)"
+	@echo "  KUBERNETES_VERSION=$(KUBERNETES_VERSION)"
+	@echo "  IKNITE_REPO_NAME=$(IKNITE_REPO_NAME)"
+	@echo "  ROOTLESS=$(ROOTLESS)"
+	@echo "  CACHE_FLAG=$(CACHE_FLAG)"
+	@echo "  SNAPSHOT=$(SNAPSHOT)"
+
+
+.PHONY: all
+all: extract-key goreleaser fetch-karmafun images-apk incus-agent-apk apk-repo rootfs-base-image rootfs-container rootfs rootfs-image vm-image vm-container-images
+
+print-% : ; $(info $* is a $(flavor $*) variable set to [$($*)]) @true
+
+# Check prerequisites before running any target and install tools with aqua if needed
+.PHONY: check-prerequisites
+check-prerequisites:
+	@mkdir -p "$(BUILD_DIR)" "$(DIST_DIR)"
+	@command -v jq >/dev/null 2>&1 || { echo "Error: jq is not installed"; exit 1; }
+	@command -v curl >/dev/null 2>&1 || { echo "Error: curl is not installed"; exit 1; }
+	@command -v bsdtar >/dev/null 2>&1 || { echo "Error: bsdtar is not installed"; exit 1; }
+	@command -v aqua >/dev/null 2>&1 || { echo "Error: aqua is not installed"; exit 1; }
+	@command -v yq >/dev/null 2>&1 || { echo "Error: yq is not installed"; exit 1; }
+	@aqua i
+	@test "$(RUN_CONTAINER_CMD) != :" || { echo "Error: No container runner (either docker or nerdctl) available"; exit 1; }
+	@test "$(BUILD_CONTAINER_CMD) != :" || { echo "Error: No container image builder (either buildctl or docker buildx) available"; exit 1; }
+	@mkdir -p "$(BUILD_CONTAINER_CACHE_FROM_PATH)" "$(BUILD_CONTAINER_CACHE_TO_PATH)"
+
+# Login to container registry using credentials from sops file or GitHub Actions secrets
+.PHONY: container-login
+container-login: $(SECRETS_FILE) | check-prerequisites
+	@echo "Logging into container registry $(REGISTRY)..."
+	if [ -n "$(GITHUB_TOKEN)" ] && [ -n "$(GITHUB_ACTOR)" ]; then \
+		echo "$$GITHUB_TOKEN" | $(RUN_CONTAINER_CMD) login $(REGISTRY) --username $(shell echo "$$GITHUB_ACTOR" | sed 's/[^a-zA-Z0-9]/-/g') --password-stdin; \
+	else \
+		USERNAME=`$(SOPS_DECRYPT_CMD) $< | jq -r '.data.docker.registry.username'` ; \
+		echo "login as $$USERNAME to $(REGISTRY)..."; \
+		$(SOPS_DECRYPT_CMD) $< | jq -r '.data.docker.registry.password' |  $(RUN_CONTAINER_CMD) login $(REGISTRY) --username "$$USERNAME" --password-stdin; \
+	fi
+
+# Extract signing key from sops file
+$(ROOT_DIR)/$(KEY_NAME): $(SECRETS_FILE) | check-prerequisites
+	@echo "Extracting signing key '$@' from $<..."
+	$(SOPS_DECRYPT_CMD) $< | jq -r '.data.apk_signing_key.private_key' > "$@"
+	chmod 600 "$@"
+
+.PHONY: extract-key
+extract-key: $(ROOT_DIR)/$(KEY_NAME)
+
+# Goreleaser build
+$(DIST_DIR)/$(IKNITE_PACKAGE) $(DIST_DIR)/metadata.json $(DIST_DIR)/iknite_linux_amd64_v1/iknite &: $(GOLANG_FILES) $(APK_FILES) go.mod .goreleaser.yaml | check-prerequisites
+	goreleaser release --skip=publish $(SNAPSHOT) --clean
+
+.PHONY: goreleaser
+goreleaser: $(DIST_DIR)/$(IKNITE_PACKAGE) $(DIST_DIR)/metadata.json $(DIST_DIR)/iknite_linux_amd64_v1/iknite
+
+# Download latest karmafun release from GitHub
+$(DIST_DIR)/$(KARMAFUN_PACKAGE): | check-prerequisites
+	@echo "Latest karmafun version is $(KARMAFUN_LATEST_VERSION)"
+	curl -o $@ -L "https://github.com/karmafun/karmafun/releases/download/$(KARMAFUN_LATEST_VERSION)/$(KARMAFUN_PACKAGE)"
+
+.PHONY: fetch-karmafun
+fetch-karmafun: $(DIST_DIR)/$(KARMAFUN_PACKAGE)
+
+# Build iknite-images APK by extracting image list from kustomization and using melange in a container
+$(DIST_DIR)/$(IKNITE_IMAGES_PACKAGE): $(DIST_DIR)/iknite_linux_amd64_v1/iknite $(KUSTOMIZATION_FILES) $(ROOT_DIR)/$(KEY_NAME)| check-prerequisites
+	BUILD_DIR_SUFFIX="build/apk/iknite-images"; \
+	BUILD_DIR="$(ROOT_DIR)/$$BUILD_DIR_SUFFIX"; \
+	rm -rf "$$BUILD_DIR"; \
+	mkdir -p "$$BUILD_DIR"; \
+	echo "KUBERNETES_VERSION: $(KUBERNETES_VERSION)" > "$$BUILD_DIR/.env"; \
+	"$(DIST_DIR)/iknite_linux_amd64_v1/iknite" kustomize -d "$(ROOT_DIR)/packaging/apk/iknite/iknite.d" print | grep image: | awk '{ print $$2; }' > "$$BUILD_DIR/image-list.txt"; \
+	"$(DIST_DIR)/iknite_linux_amd64_v1/iknite" info images >> "$$BUILD_DIR/image-list.txt"; \
+	sort -u "$$BUILD_DIR/image-list.txt" -o "$$BUILD_DIR/image-list.txt"; \
+	$(RUN_CONTAINER_CMD) run --privileged --rm -v "$(ROOT_DIR):/work" cgr.dev/chainguard/melange \
+		build packaging/apk/iknite-images/iknite-images.yaml \
+		--arch "$(ARCH)" \
+		--vars-file "$$BUILD_DIR_SUFFIX/.env" \
+		--source-dir "$$BUILD_DIR_SUFFIX" \
+		--out-dir "dist" \
+		--signing-key $(KEY_NAME) \
+		--generate-index=false; \
+	$(SUDO_CMD) chown -R "$$(id -u):$$(id -g)" "$(DIST_DIR)"; \
+	(cd "$(DIST_DIR)/$(ARCH)" && for f in *.apk; do mv "$$f" "../$$(echo "$$f" | sed 's/\-r0.apk$$//').$(ARCH).apk"; done); \
+	rmdir "$(DIST_DIR)/$(ARCH)/"
+
+.PHONY: images-apk
+images-apk: $(DIST_DIR)/$(IKNITE_IMAGES_PACKAGE)
+
+# Build incus-agent APK using melange in a container
+$(DIST_DIR)/$(INCUS_AGENT_PACKAGE): $(INCUS_AGENT_SOURCES) $(ROOT_DIR)/$(KEY_NAME) | check-prerequisites
+	export INCUS_AGENT_VERSION="$(INCUS_AGENT_VERSION)"; \
+	$(RUN_CONTAINER_CMD) run --privileged --rm -v "$(ROOT_DIR):/work" cgr.dev/chainguard/melange \
+		build packaging/apk/incus-agent/incus-agent.yaml \
+		--arch "$(ARCH)" \
+		--source-dir "$(INCUS_AGENT_SOURCE_DIR)" \
+		--out-dir "dist" \
+		--signing-key $(KEY_NAME) \
+		--generate-index=false; \
+	$(SUDO_CMD) chown -R "$$(id -u):$$(id -g)" "$(DIST_DIR)"; \
+	(cd "$(DIST_DIR)/$(ARCH)" && for f in *.apk; do mv "$$f" "../$$(echo "$$f" | sed 's/\-r0.apk$$//').$(ARCH).apk"; done); \
+	rmdir "$(DIST_DIR)/$(ARCH)/"
+
+.PHONY: incus-agent-apk
+incus-agent-apk: $(DIST_DIR)/$(INCUS_AGENT_PACKAGE)
+
+$(APK_INDEX_BUILDER_IMAGE_MARKER): $(APK_INDEX_BUILDER_IMAGE_SOURCES) | check-prerequisites
+	$(BUILD_CONTAINER_CMD) build \
+		--frontend dockerfile.v0 \
+		--import-cache=$(BUILD_CONTAINER_CACHE_FROM) \
+		--export-cache=$(BUILD_CONTAINER_CACHE_TO) \
+		--local "context=$(APK_INDEX_BUILDER_IMAGE_DIR)" \
+		--local "dockerfile=$(APK_INDEX_BUILDER_IMAGE_DIR)" \
+		$(CACHE_FLAG) \
+		--output "type=docker,name=$(APK_INDEX_BUILDER_IMAGE),push=false" | $(RUN_CONTAINER_CMD) load
+	touch "$@"
+
+# Create APK repository in dist/repo by generating APKINDEX.tar.gz with the built packages and copying APKs
+$(APK_INDEX_FILE): $(DIST_DIR)/$(KARMAFUN_PACKAGE) $(DIST_DIR)/$(IKNITE_PACKAGE) $(DIST_DIR)/$(IKNITE_IMAGES_PACKAGE) $(DIST_DIR)/$(INCUS_AGENT_PACKAGE) $(ROOT_DIR)/$(KEY_NAME) $(APK_INDEX_BUILDER_IMAGE_MARKER) | check-prerequisites
+	rm -rf "$(DIST_DIR)/repo"
+	mkdir -p "$(DIST_DIR)/repo"
+	$(RUN_CONTAINER_CMD) run --rm \
+		-v "$(ROOT_DIR):/workspace" \
+		-e "INPUT_APK_FILES=$(DIST_DIR)/*.apk" \
+		-e "INPUT_DESTINATION=$(DIST_DIR)/repo" \
+		-e "INPUT_SIGNATURE_KEY_NAME=$(KEY_NAME)" \
+		-e "INPUT_SIGNATURE_KEY=$$(cat "$(ROOT_DIR)/$(KEY_NAME)")" \
+		-e "GITHUB_WORKSPACE=/workspace" \
+			$(APK_INDEX_BUILDER_IMAGE); \
+	$(SUDO_CMD) chown -R "$$(id -u):$$(id -g)" "$(DIST_DIR)/repo"
+
+.PHONY: apk-repo
+apk-repo: $(APK_INDEX_FILE)
+
+# Upload APK repository with terragrunt by applying Terraform configuration in deploy/iac/iknite/$(IKNITE_REPO_NAME)repo
+.PHONY: upload-apk-repo
+upload-apk-repo: $(APK_INDEX_FILE) | check-prerequisites
+	cd "$(ROOT_DIR)/deploy/iac/iknite/$(IKNITE_REPO_NAME)repo" && terragrunt init && terragrunt apply -auto-approve
+
+# Build rootfs base image
+$(IKNITE_ROOTFS_BASE_MARKER): $(DIST_DIR)/$(KARMAFUN_PACKAGE) $(DIST_DIR)/$(IKNITE_PACKAGE) $(DIST_DIR)/$(INCUS_AGENT_PACKAGE) $(IKNITE_ROOTFS_BASE_SOURCES) | check-prerequisites
+	BUILD_DIR_PATH="$(BUILD_DIR)/rootfs/base"; \
+	rm -rf "$$BUILD_DIR_PATH"; \
+	mkdir -p "$$BUILD_DIR_PATH"; \
+	cp -r "$(ROOT_DIR)/packaging/rootfs/base/." "$$BUILD_DIR_PATH/"; \
+	cp "$(DIST_DIR)/$(IKNITE_PACKAGE)" "$$BUILD_DIR_PATH/"; \
+	cp "$(DIST_DIR)/$(KARMAFUN_PACKAGE)" "$$BUILD_DIR_PATH/"; \
+	cp "$(DIST_DIR)/$(INCUS_AGENT_PACKAGE)" "$$BUILD_DIR_PATH/"; \
+	$(BUILD_CONTAINER_CMD) build \
+		--frontend dockerfile.v0 \
+		--import-cache=$(BUILD_CONTAINER_CACHE_FROM) \
+		--export-cache=$(BUILD_CONTAINER_CACHE_TO) \
+		--local "context=$$BUILD_DIR_PATH" \
+		--local "dockerfile=$$BUILD_DIR_PATH" \
+		--opt "build-arg:IKNITE_REPO_URL=https://static.iknite.app/$(IKNITE_REPO_NAME)/" \
+		--opt "build-arg:IKNITE_VERSION=$(IKNITE_NUMBER_VERSION)" \
+		$(CACHE_FLAG) \
+		--output "type=docker,dest=-,name=$(IKNITE_ROOTFS_BASE),push=false" | $(RUN_CONTAINER_CMD) load
+	@touch "$@"
+
+.PHONY: rootfs-base-image
+rootfs-base-image: $(IKNITE_ROOTFS_BASE_MARKER)
+
+# Create a container from the base image and install the iknite-images package to preload the Kubernetes images
+$(IKNITE_ROOTFS_CONTAINER_MARKER): $(DIST_DIR)/$(IKNITE_IMAGES_PACKAGE) $(IKNITE_ROOTFS_BASE_MARKER) | check-prerequisites
+	$(RUN_CONTAINER_CMD) rm -f iknite-rootfs 2>/dev/null || true
+	$(RUN_CONTAINER_CMD) run \
+		--name iknite-rootfs \
+		--device /dev/fuse --cap-add SYS_ADMIN \
+		-v "$(realpath $(DIST_DIR)):/apks" \
+		-e "IKNITE_IMAGES_PACKAGE=$(IKNITE_IMAGES_PACKAGE)" \
+		"$(IKNITE_ROOTFS_BASE)" \
+		/bin/sh -c 'apk --no-cache add /apks/$$IKNITE_IMAGES_PACKAGE; apk del iknite-images'
+	@touch "$@"
+
+.PHONY: rootfs-container
+rootfs-container: $(IKNITE_ROOTFS_CONTAINER_MARKER)
+
+# Export the container filesystem as a tar.gz archive, excluding the .dockerenv file and dev/console device
+$(ROOTFS_PATH): $(IKNITE_ROOTFS_CONTAINER_MARKER) | check-prerequisites
+	rm -f "$@" || true
+	$(RUN_CONTAINER_CMD) export iknite-rootfs | bsdtar -zcf "$@" --exclude=.dockerenv --exclude=dev/console @-
+
+.PHONY: rootfs
+rootfs: $(ROOTFS_PATH)
+
+# Create final rootfs flat image from the rootfs tarball
+$(IKNITE_ROOTFS_IMAGE_MARKER): $(ROOTFS_PATH) $(IKNITE_ROOTFS_SOURCES) | check-prerequisites
+	BUILD_DIR_PATH="$(BUILD_DIR)/rootfs/with-images"; \
+	rm -rf "$$BUILD_DIR_PATH"; \
+	mkdir -p "$$BUILD_DIR_PATH"; \
+	cp -r "$(ROOT_DIR)/packaging/rootfs/with-images/." "$$BUILD_DIR_PATH/"; \
+	cp "$(DIST_DIR)/$(ROOTFS_NAME)" "$$BUILD_DIR_PATH/$(ROOTFS_NAME)"; \
+	$(BUILD_CONTAINER_CMD) build \
+		--frontend dockerfile.v0 \
+		--import-cache=$(BUILD_CONTAINER_CACHE_FROM) \
+		--export-cache=$(BUILD_CONTAINER_CACHE_TO) \
+		--local "context=$$BUILD_DIR_PATH" \
+		--local "dockerfile=$$BUILD_DIR_PATH" \
+		--opt "build-arg:IKNITE_VERSION=$(IKNITE_NUMBER_VERSION)" \
+		--opt "build-arg:KUBERNETES_VERSION=$(KUBERNETES_VERSION)" \
+		$(CACHE_FLAG) \
+		--output "type=docker,name=$(IKNITE_ROOTFS_IMAGE),push=$(PUSH_IMAGES)$(IKNITE_ROOTFS_IMAGE_ADDITIONAL_TAG)" | $(RUN_CONTAINER_CMD) load
+	@touch "$@"
+
+.PHONY: rootfs-image
+rootfs-image: $(IKNITE_ROOTFS_IMAGE_MARKER)
+
+# Create the VM images from the rootfs tarball
+$(IKNITE_VM_IMAGE_QCOW2) $(IKNITE_VM_IMAGE_VHDX) &: $(ROOTFS_PATH) $(BUILD_VM_IMAGE_SCRIPTS) | check-prerequisites
+	$(SUDO_CMD) rm -rf "$(ROOT_DIR)/dist/images" || true
+	mkdir -p "$(ROOT_DIR)/dist/images"
+	$(SUDO_CMD) "$(ROOT_DIR)/packaging/scripts/build-vm-image.sh"
+	$(SUDO_CMD) chown -R "$$(id -u):$$(id -g)" "$(ROOT_DIR)/dist/images" || true
+
+.PHONY: vm-image
+vm-image: $(IKNITE_VM_IMAGE_QCOW2) $(IKNITE_VM_IMAGE_VHDX)
+
+# Push the VM images to the container registry using oras, with appropriate annotations and tags
+$(IKNITE_VM_IMAGE_VHDX_CONTAINER_MARKER): $(IKNITE_VM_IMAGE_VHDX) | check-prerequisites container-login
+	cd "$(ROOT_DIR)/dist/images"; \
+	IMAGE_TAG="$(REGISTRY)/$(IMAGE_NAME)-vm-vhdx:$(IKNITE_VERSION)-$(KUBERNETES_VERSION)"; \
+	oras push $$IMAGE_TAG \
+	--artifact-type application/vnd.oci.image.layer.vhdx \
+	--annotation org.opencontainers.image.title="iknite-vm-$(IKNITE_VERSION)-$(KUBERNETES_VERSION).vhdx" \
+	--annotation org.opencontainers.image.version="$(IKNITE_VERSION)" \
+	--annotation org.opencontainers.image.description="VM image for iknite $(IKNITE_VERSION) with Kubernetes $(KUBERNETES_VERSION)" \
+	$(IKNITE_VM_IMAGE_VHDX_BASENAME):application/x-hyperv-disk; \
+	if [ "$(IKNITE_REPO_NAME)" = "release" ]; then \
+		oras tag "$$IMAGE_TAG" "$(REGISTRY)/$(IMAGE_NAME)-vm-vhdx:latest"; \
+	fi
+	touch "$@"
+
+$(IKNITE_VM_IMAGE_QCOW2_CONTAINER_MARKER): $(IKNITE_VM_IMAGE_QCOW2) | check-prerequisites container-login
+	cd "$(ROOT_DIR)/dist/images"; \
+	IMAGE_TAG="$(REGISTRY)/$(IMAGE_NAME)-vm-qcow2:$(IKNITE_VERSION)-$(KUBERNETES_VERSION)"; \
+	oras push $$IMAGE_TAG \
+	--artifact-type application/vnd.oci.image.layer.qcow2 \
+	--annotation org.opencontainers.image.title="iknite-vm-$(IKNITE_VERSION)-$(KUBERNETES_VERSION).qcow2" \
+	--annotation org.opencontainers.image.version="$(IKNITE_VERSION)" \
+	--annotation org.opencontainers.image.description="VM image for iknite $(IKNITE_VERSION) with Kubernetes $(KUBERNETES_VERSION)" \
+	$(IKNITE_VM_IMAGE_QCOW2_BASENAME):application/x-qcow2; \
+	if [ "$(IKNITE_REPO_NAME)" = "release" ]; then \
+		oras tag "$$IMAGE_TAG" "$(REGISTRY)/$(IMAGE_NAME)-vm-qcow2:latest"; \
+	fi
+	touch "$@"
+
+.PHONY: vm-container-images
+vm-container-images: $(IKNITE_VM_IMAGE_QCOW2_CONTAINER_MARKER) $(IKNITE_VM_IMAGE_VHDX_CONTAINER_MARKER)
+
+.PHONY: publish-vm-images
+publish-vm-images: $(IKNITE_VM_IMAGE_QCOW2_CONTAINER_MARKER) $(IKNITE_VM_IMAGE_VHDX_CONTAINER_MARKER) | check-prerequisites
+	@echo "VM images have been pushed to the container registry. If this is a release build, they are also tagged as latest."
+	cd $(ROOT_DIR)/deploy/iac/iknite/iknite-public-images; \
+	terragrunt run --graph --non-interactive apply -- -auto-approve
+
+.PHONY: e2e-tg-init
+e2e-tg-init:
+	cd "$(ROOT_DIR)/deploy/iac/iknite/iknite-image"; \
+	terragrunt run --graph init
+
+.PHONY: e2e-tg-refresh
+e2e-tg-refresh:
+	cd "$(ROOT_DIR)/deploy/iac/iknite/iknite-image"; \
+	terragrunt run --graph apply --non-interactive -- -auto-approve -refresh-only
+
+.PHONY: e2e-tg-apply
+e2e-tg-apply:
+	cd "$(ROOT_DIR)/deploy/iac/iknite/iknite-image"; \
+	terragrunt run --graph apply --non-interactive -- -auto-approve
+
+.PHONY: e2e-tg-apply-vm
+e2e-tg-apply-vm:
+	cd "$(ROOT_DIR)/deploy/iac/iknite/iknite-vm"; \
+	terragrunt run --graph apply --non-interactive -- -auto-approve
+
+.PHONY: e2e-tg-destroy
+e2e-tg-destroy:
+	cd "$(ROOT_DIR)/deploy/iac/iknite/iknite-vm"; \
+	terragrunt run --graph destroy --non-interactive -- -auto-approve
+
+.PHONY: e2e-check-argocd
+e2e-check-argocd:
+	@echo "Checking ArgoCD application status..."
+	./test/e2e/argocd-checker.sh
+
+.PHONY: e2e
+e2e: e2e-tg-init e2e-tg-apply e2e-check-argocd e2e-tg-destroy
+
+
+RELEASE_FILES := \
+	$(DIST_DIR)/$(IKNITE_PACKAGE) \
+	$(DIST_DIR)/$(IKNITE_IMAGES_PACKAGE) \
+	$(ROOT_DIR)/packaging/rootfs/base/$(KEY_NAME).pub \
+	$(ROOT_DIR)/Get-Iknite.ps1 \
+	$(ROOT_DIR)/Get-IkniteVM.ps1 \
+	$(ROOTFS_PATH)
+
+RELEASE_DIR := $(ROOT_DIR)/release
+
+# Link release files into release/ directory for easier access when creating GitHub releases or similar
+RELEASE_LINKS := $(foreach f,$(RELEASE_FILES),$(RELEASE_DIR)/$(notdir $(f)))
+
+$(RELEASE_DIR):
+	mkdir -p "$@"
+
+define RELEASE_LINK_RULE
+$(RELEASE_DIR)/$(notdir $(1)): $(1) | $(RELEASE_DIR)
+	@echo "Linking `realpath "$(1)"` to $$@..."
+	ln -sf `realpath "$(1)"` "$$@"
+endef
+$(foreach f,$(RELEASE_FILES),$(eval $(call RELEASE_LINK_RULE,$(f))))
+
+$(RELEASE_DIR)/SHA256SUMS: $(RELEASE_LINKS) | $(RELEASE_DIR)
+	@echo "Generating SHA256SUMS file for release artifacts..."
+	cd "$(RELEASE_DIR)" && sha256sum $(notdir $(RELEASE_FILES)) > SHA256SUMS
+
+release-files: $(RELEASE_DIR)/SHA256SUMS
+
+.PHONY: clean
+clean:
+	rm -rf "$(BUILD_DIR)"
+	rm -rf "$(DIST_DIR)"
+	$(RUN_CONTAINER_CMD) rm -f iknite-rootfs >/dev/null 2>&1 || true
+	$(BUILD_CONTAINER_CMD) prune >/dev/null 2>&1 || true
+	$(RUN_CONTAINER_CMD) image rm -f $(IMAGES_ID) >/dev/null 2>&1 || true
+
+.PHONY: test
+test: check-prerequisites
+	@echo "Running tests..."
+	go test -v -race -covermode=atomic -coverprofile=coverage.out ./...
+
+$(HOME)/.ssh/iknite: $(SECRETS_FILE) | check-prerequisites
+	@echo "Extracting SSH key for iknite from $<..."
+	mkdir -p "$(HOME)/.ssh"
+	chmod 700 "$(HOME)/.ssh"
+	$(SOPS_DECRYPT_CMD) $< | jq -r '.data.iknite_vm.ssh_private_key' > "$@"
+	chmod 600 "$@"
+
+.PHONY: ssh-key
+ssh-key: $(HOME)/.ssh/iknite
+
+.PHONY: rotate-cache
+rotate-cache:
+	@echo "Rotating build container cache..."
+	if [ -d "$(BUILD_CONTAINER_CACHE_FROM_PATH)" ]; then \
+		rm -rf "$(BUILD_CONTAINER_CACHE_FROM_PATH)"; \
+	fi; \
+	if [ -d "$(BUILD_CONTAINER_CACHE_TO_PATH)" ]; then \
+		mv "$(BUILD_CONTAINER_CACHE_TO_PATH)" "$(BUILD_CONTAINER_CACHE_FROM_PATH)"; \
+	fi

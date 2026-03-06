@@ -1,12 +1,12 @@
 #!/usr/bin/env sh
-# cSpell: words nocloud genisoimage volid cidata subformat qcow2 cdrkit nodiscard blockdev getsize writeback blkid
+# cSpell: words nocloud volid cidata subformat qcow2 cdrkit nodiscard blkid losetup notrunc
 # cSpell: words mountpoint resolv resolvconf runlevel runlevels hotplug udevadm mdev extlinux virt mkinitfs virtio
 # cSpell: words inittab securetty gsub toplevel uefi efi sfdisk dosfstools efistub secureboot ukifile vfat mkdosfs mkfat
 # cSpell: words fsprogs progname wgets syslinux relatime vhdx bootable noatime fmask iocharset bootx tarcmd bsdtar
 set -e
 
 # Step names for dynamic --skip-* and --only-* handling
-STEP_NAMES="create-image mount-image copy-rootfs install-kernel install-bootloader configure-vm cleanup build-vhdx build-iso"
+STEP_NAMES="create-image mount-image copy-rootfs install-kernel install-bootloader configure-vm cleanup build-qcow2 build-vhdx build-iso"
 # TODO:try git rev-parse --show-toplevel
 ROOT_DIR=$(cd "$(dirname "$0")/../../" && pwd)
 
@@ -17,7 +17,7 @@ IMAGE_SIZE="3G"
 SERIAL_PORT="ttyS0"
 KUBERNETES_VERSION=${KUBERNETES_VERSION:-$(grep k8s.io/kubernetes "$ROOT_DIR/go.mod" | awk '{gsub(/^v/,"",$2);print $2;}')}
 if [ -z "$IKNITE_VERSION" ]; then
-    IKNITE_VERSION=$(jq -Mr ".version" dist/metadata.json)
+    IKNITE_VERSION=$(jq -Mr ".version" "$ROOT_DIR/dist/metadata.json")
 fi
 readonly PROGNAME='build-vm-image'
 HOST_ARCH="$(uname -m)"
@@ -118,35 +118,11 @@ should_run_step() {
     return 0
 }
 
-# Prints path of available nbdX device, or returns 1 if not any.
-get_available_nbd() {
-	local dev
-    # shellcheck disable=SC2044
-    for dev in $(find /dev -maxdepth 2 -name 'nbd[0-9]*'); do
-		if [ "$(blockdev --getsize64 "$dev")" -eq 0 ]; then
-			echo "$dev"; return 0
-		fi
-	done
-	return 1
-}
-
-# Attaches the specified image as a NBD block device and prints its path.
-attach_image() {
-	local image="$1"
-	local format="${2:-}"
-	local disk_dev
-
-	disk_dev=$(get_available_nbd) || {
-		modprobe nbd max_part=16
-		sleep 1
-		disk_dev=$(get_available_nbd)
-	} || { error 'No available nbd device found!'; exit 1; }
-
-	qemu-nbd --connect="$disk_dev" --cache=writeback \
-		${format:+--format=$format} "$image" || return 1
-
-	sleep 1  # see #45
-	echo "$disk_dev"
+# Attaches the specified raw image as a loop device and prints its path.
+attach_loop() {
+	local img="$1"
+	losetup -f "$img"
+    losetup -a 2>/dev/null | grep "$img" | awk -F: '{print $1}'
 }
 
 # Prints UUID of filesystem on the specified block device.
@@ -173,19 +149,6 @@ prepare_chroot() {
 
 	install -D -m 644 /etc/resolv.conf "$dest"/etc/resolv.conf
 	echo "$RESOLVCONF_MARK" >> "$dest"/etc/resolv.conf
-}
-
-# Adds specified services to the runlevel. Current working directory must be
-# root of the image.
-rc_add() {
-	local runlevel="$1"; shift  # runlevel name
-	local services="$*"  # names of services
-
-	local svc; for svc in $services; do
-		mkdir -p "etc/runlevels/$runlevel"
-		ln -s "/etc/init.d/$svc" "etc/runlevels/$runlevel/$svc"
-		echo " * service $svc added to runlevel $runlevel"
-	done
 }
 
 # Tests if the specified command exists on the system.
@@ -225,36 +188,6 @@ create_gpt() {
 		| sfdisk "$dev"
 }
 
-# Installs and configures extlinux.
-setup_extlinux() {
-	local mnt="$1"  # path of directory where is root device currently mounted
-	local root_dev="$2"  # root device
-	local modules="$3"  # modules which should be loaded before pivot_root
-	local kernel_flavor="$4"  # name of default kernel to boot
-	local serial_port="$5"  # serial port number for serial console
-	local default_kernel="$kernel_flavor"
-	local kernel_opts=''
-
-	[ -z "$serial_port" ] || kernel_opts="console=tty0 console=$serial_port,115200n8"
-
-	if [ "$kernel_flavor" = 'virt' ]; then
-		_apk search --root . --exact --quiet linux-lts | grep -q . \
-			&& default_kernel='lts' \
-			|| default_kernel='vanilla'
-	fi
-
-	sed -Ei \
-		-e "s|^[# ]*(root)=.*|\1=$root_dev|" \
-		-e "s|^[# ]*(default_kernel_opts)=.*|\1=\"$kernel_opts\"|" \
-		-e "s|^[# ]*(modules)=.*|\1=\"$modules\"|" \
-		-e "s|^[# ]*(default)=.*|\1=$default_kernel|" \
-		-e "s|^[# ]*(serial_port)=.*|\1=$serial_port|" \
-		"$mnt"/etc/update-extlinux.conf
-
-	chroot "$mnt" extlinux --install /boot
-	chroot "$mnt" update-extlinux --warn-only 2>&1 \
-		| { grep -Fv 'extlinux: cannot open device /dev' ||:; } >&2
-}
 
 # Configures mkinitfs.
 setup_mkinitfs() {
@@ -301,14 +234,23 @@ cleanup() {
             info "Unmounting filesystems under $mount_dir"
             umount_recursively "$mount_dir"
         fi
-        rmdir "$mount_dir" || warning "Failed to remove mount directory $mount_dir"
-        if [ -n "$disk_dev" ] && ! [ -b "$IMAGE_FILE" ]; then
-            info "Detaching NBD device $disk_dev"
-            sync
-            sleep 1
-            qemu-nbd --disconnect "$disk_dev"
+        rmdir "$mount_dir" 2>/dev/null || warning "Failed to remove mount directory $mount_dir"
+        # Detach loop devices
+        sync
+        sleep 1
+        if [ -n "$efi_loop" ]; then
+            info "Detaching EFI loop device $efi_loop"
+            losetup -d "$efi_loop" || warning "Failed to detach EFI loop device $efi_loop"
+            efi_loop=''
         else
-            warning "No NBD device to detach."
+            warning "No EFI loop device to detach."
+        fi
+        if [ -n "$root_loop" ]; then
+            info "Detaching root loop device $root_loop"
+            losetup -d "$root_loop" || warning "Failed to detach root loop device $root_loop"
+            root_loop=''
+        else
+            warning "No root loop device to detach."
         fi
         # Remove temporary directory for APK tools if created
         if [ -d "$temp_dir" ]; then
@@ -342,6 +284,7 @@ STEPS:
     configure-vm       Configure the VM (networking, ssh, etc.)
     unmount-image      Unmount the VM image
     cleanup            Clean up temporary resources
+    build-qcow2        Assemble partition images into raw disk and convert to qcow2
     build-vhdx         Build VHDX image
     build-iso          Build ISO image
 EOF
@@ -393,7 +336,7 @@ trap cleanup EXIT HUP INT TERM
 # Alpine packages required for building VM image
 # qemu-img cdrkit e2fsprogs sfdisk dosfstools
 
-NEEDED_COMMANDS="qemu-img qemu-nbd genisoimage sfdisk"
+NEEDED_COMMANDS="qemu-img sfdisk losetup"
 for cmd in $NEEDED_COMMANDS; do
     if ! command -v "$cmd" >/dev/null 2>&1; then
         error "Required command not found: $cmd"
@@ -408,83 +351,100 @@ if ! command -v mkfs.fat >/dev/null 2>&1 && ! command -v mkdosfs >/dev/null 2>&1
 fi
 MKFS_FAT=$(command -v mkfs.fat 2>/dev/null || command -v mkdosfs)
 
-# rm -rf build
-# mkdir -p build
 IMAGE_FORMAT="qcow2"
-IMAGE_DIR="dist/images"
+IMAGE_DIR="$ROOT_DIR/dist/images"
 mkdir -p "$IMAGE_DIR"
 IMAGE_FILE="$IMAGE_DIR/iknite-vm.${IKNITE_VERSION}-${KUBERNETES_VERSION}.${IMAGE_FORMAT}"
+RAW_IMAGE_FILE="$IMAGE_DIR/iknite-vm.${IKNITE_VERSION}-${KUBERNETES_VERSION}.raw"
+EFI_IMG="$IMAGE_DIR/efi-${IKNITE_VERSION}-${KUBERNETES_VERSION}.raw"
+ROOT_IMG="$IMAGE_DIR/root-${IKNITE_VERSION}-${KUBERNETES_VERSION}.raw"
 
 CLOUD_CONFIG_FILE=${1:-cloud-config.yaml}
 info "Creating iknite VM image $IMAGE_FILE using cloud config file: $CLOUD_CONFIG_FILE"
 
 
 if should_run_step "create-image"; then
-    step "Creating VM image..."
+    step "Creating VM image partition files..."
 
-    if [ -f "$IMAGE_FILE" ]; then
-        warning "Image file $IMAGE_FILE already exists. Skipping creation."
+    # Create raw disk image with GPT partition table to determine partition layout
+    if [ -f "$RAW_IMAGE_FILE" ]; then
+        warning "Raw image file $RAW_IMAGE_FILE already exists. Skipping creation."
     else
-        qemu-img create -f $IMAGE_FORMAT "$IMAGE_FILE" $IMAGE_SIZE
+        info "Creating raw disk image $RAW_IMAGE_FILE ($IMAGE_SIZE)"
+        truncate -s "$IMAGE_SIZE" "$RAW_IMAGE_FILE"
+        info "Creating GPT partition table on $RAW_IMAGE_FILE"
+        create_gpt "$RAW_IMAGE_FILE"
     fi
 
-    if pgrep -f "qemu-nbd.*$IMAGE_FILE" >/dev/null 2>&1; then
-        warning "Image $IMAGE_FILE is already attached as a NBD device."
-        disk_dev=$(pgrep -f "qemu-nbd.*$IMAGE_FILE" | xargs -I{} readlink /proc/{}/fd/13)
-    else
-        info "Attaching image $IMAGE_FILE as a NBD device"
-        disk_dev=$(attach_image "$IMAGE_FILE" "$IMAGE_FORMAT")
-    fi
-    info "Image attached as $disk_dev"
+    # Read partition layout from the GPT raw image (sectors of 512 bytes each)
+    efi_sectors=$(sfdisk --dump "$RAW_IMAGE_FILE" | awk -F'size=' '/name="efi"/{split($2,a,","); gsub(/[^0-9]/,"",a[1]); print a[1]}')
+    root_sectors=$(sfdisk --dump "$RAW_IMAGE_FILE" | awk -F'size=' '/name="system"/{split($2,a,","); gsub(/[^0-9]/,"",a[1]); print a[1]}')
 
-    # Create GPT partition table with EFI (400M) and root partitions
-    if sfdisk --dump "$disk_dev" 2>/dev/null | grep -q 'type=U'; then
-        warning "GPT partition table already exists on $disk_dev. Skipping creation."
-    else
-        info "Creating GPT partition table on $disk_dev"
-        create_gpt "$disk_dev"
-        sleep 1
+    if [ -z "$efi_sectors" ] || [ -z "$root_sectors" ]; then
+        error "Failed to read partition sizes from GPT layout in $RAW_IMAGE_FILE"
+        exit 1
     fi
 
-    esp_dev="${disk_dev}p1"
-    root_dev="${disk_dev}p2"
+    efi_bytes=$((efi_sectors * 512))
+    root_bytes=$((root_sectors * 512))
 
-    # Wait for partition device nodes to appear
-    settle_dev_node "$esp_dev" || { error "EFI partition $esp_dev did not appear"; exit 1; }
-    settle_dev_node "$root_dev" || { error "Root partition $root_dev did not appear"; exit 1; }
+    # Create raw partition images sized exactly to match the GPT layout
+    if [ ! -f "$EFI_IMG" ]; then
+        info "Creating EFI partition image $EFI_IMG ($efi_bytes bytes)"
+        truncate -s "$efi_bytes" "$EFI_IMG"
+    fi
+    if [ ! -f "$ROOT_IMG" ]; then
+        info "Creating root partition image $ROOT_IMG ($root_bytes bytes)"
+        truncate -s "$root_bytes" "$ROOT_IMG"
+    fi
+
+    # Attach partition images as loop devices
+    if losetup -a 2>/dev/null | grep -q "$EFI_IMG"; then
+        efi_loop=$(losetup -a 2>/dev/null | grep "$EFI_IMG" | awk -F: '{print $1}')
+        warning "EFI image $EFI_IMG is already attached as $efi_loop"
+    else
+        efi_loop=$(attach_loop "$EFI_IMG") || { error "Failed to attach $EFI_IMG as a loop device"; exit 1; }
+        info "EFI partition image attached as $efi_loop"
+    fi
+
+    if losetup -a 2>/dev/null | grep -q "$ROOT_IMG"; then
+        root_loop=$(losetup -a 2>/dev/null | grep "$ROOT_IMG" | awk -F: '{print $1}')
+        warning "Root image $ROOT_IMG is already attached as $root_loop"
+    else
+        root_loop=$(attach_loop "$ROOT_IMG") || { error "Failed to attach $ROOT_IMG as a loop device"; exit 1; }
+        info "Root partition image attached as $root_loop"
+    fi
 
     # Format EFI partition as FAT32
-    if blkid "$esp_dev" 2>/dev/null | grep -q 'TYPE="vfat"'; then
-        warning "EFI partition $esp_dev already formatted as FAT32. Skipping."
+    if blkid "$efi_loop" 2>/dev/null | grep -q 'TYPE="vfat"'; then
+        warning "EFI partition $efi_loop already formatted as FAT32. Skipping."
     else
-        info "Formatting EFI partition $esp_dev as FAT32 (400M)"
-        "$MKFS_FAT" -F32 -n EFI "$esp_dev" || {
-            error "Failed to format EFI partition $esp_dev as FAT32"
+        info "Formatting EFI partition $efi_loop as FAT32 ($efi_bytes bytes)"
+        "$MKFS_FAT" -F32 -n EFI "$efi_loop" || {
+            error "Failed to format EFI partition $efi_loop as FAT32"
             exit 1
         }
     fi
 
     # Format root partition as ext4
-    if blkid "$root_dev" 2>/dev/null | grep -q 'TYPE="ext4"'; then
-        warning "Root partition $root_dev already has a filesystem. Skipping."
+    if blkid "$root_loop" 2>/dev/null | grep -q 'TYPE="ext4"'; then
+        warning "Root partition $root_loop already has a filesystem. Skipping."
     else
-        info "Creating ext4 filesystem on root partition $root_dev"
-        mkfs.ext4 -O ^64bit -E nodiscard "$root_dev" >/dev/null || {
-            error "Failed to create ext4 filesystem on $root_dev"
+        info "Creating ext4 filesystem on root partition $root_loop"
+        mkfs.ext4 -O ^64bit -E nodiscard "$root_loop" >/dev/null || {
+            error "Failed to create ext4 filesystem on $root_loop"
             exit 1
         }
     fi
     eval "DONE_$(step_to_var "create-image")=true"
 else
-    skip "Creating VM image"
+    skip "Creating VM image partition files"
 fi
 
 
 if should_run_step "mount-image"; then
-    step "Mounting VM image..."
-    esp_dev="${disk_dev}p1"
-    root_dev="${disk_dev}p2"
-    root_uuid=$(blk_uuid "$root_dev")
+    step "Mounting VM partition images..."
+    root_uuid=$(blk_uuid "$root_loop")
     mount_dir=$(mktemp -d /tmp/$PROGNAME.XXXXXX)
 
     info "Mounting root filesystem (UUID: $root_uuid) at $mount_dir"
@@ -495,13 +455,13 @@ if should_run_step "mount-image"; then
 
     info "Mounting EFI partition at $mount_dir/efi"
     mkdir -p "$mount_dir/efi"
-    mount -t vfat "$esp_dev" "$mount_dir/efi" || {
-        error "Failed to mount EFI partition $esp_dev at $mount_dir/efi"
+    mount -t vfat "$efi_loop" "$mount_dir/efi" || {
+        error "Failed to mount EFI partition $efi_loop at $mount_dir/efi"
         exit 1
     }
     eval "DONE_$(step_to_var "mount-image")=true"
 else
-    skip "Mounting VM image"
+    skip "Mounting VM partition images"
 fi
 
 if should_run_step "copy-rootfs"; then
@@ -511,11 +471,11 @@ if should_run_step "copy-rootfs"; then
         warning "Root filesystem already exists in $mount_dir. Skipping copy."
     else
         info "Extracting root filesystem to $mount_dir"
-        $TARCMD -C "$mount_dir" -xpf "dist/iknite-${IKNITE_VERSION}-${KUBERNETES_VERSION}.rootfs.tar.gz" || {
+        $TARCMD -C "$mount_dir" -xpf "$ROOT_DIR/dist/iknite-${IKNITE_VERSION}-${KUBERNETES_VERSION}.rootfs.tar.gz" || {
             error "Failed to extract root filesystem to $mount_dir"
             exit 1
         }
-        sha256sum "dist/iknite-${IKNITE_VERSION}-${KUBERNETES_VERSION}.rootfs.tar.gz" > "$mount_dir/root/.rootfs.sha256sum"
+        sha256sum "$ROOT_DIR/dist/iknite-${IKNITE_VERSION}-${KUBERNETES_VERSION}.rootfs.tar.gz" > "$mount_dir/root/.rootfs.sha256sum"
     fi
     eval "DONE_$(step_to_var "copy-rootfs")=true"
 else
@@ -604,6 +564,48 @@ else
 fi
 
 cleanup
+
+if should_run_step "build-qcow2"; then
+    step "Assembling and converting VM image to qcow2..."
+
+    if [ -f "$IMAGE_FILE" ]; then
+        warning "Image file $IMAGE_FILE already exists. Skipping conversion."
+    else
+        # Read partition offsets from the GPT raw image (partition data written at these sector offsets)
+        efi_start=$(sfdisk --dump "$RAW_IMAGE_FILE" | awk -F'start=' '/name="efi"/{split($2,a,","); gsub(/[^0-9]/,"",a[1]); print a[1]}')
+        root_start=$(sfdisk --dump "$RAW_IMAGE_FILE" | awk -F'start=' '/name="system"/{split($2,a,","); gsub(/[^0-9]/,"",a[1]); print a[1]}')
+
+        if [ -z "$efi_start" ] || [ -z "$root_start" ]; then
+            error "Failed to read partition offsets from GPT layout in $RAW_IMAGE_FILE"
+            exit 1
+        fi
+
+        info "Merging EFI partition image into raw disk at sector $efi_start"
+        dd if="$EFI_IMG" of="$RAW_IMAGE_FILE" bs=512 seek="$efi_start" conv=notrunc || {
+            error "Failed to merge EFI partition image into raw disk"
+            exit 1
+        }
+
+        info "Merging root partition image into raw disk at sector $root_start"
+        dd if="$ROOT_IMG" of="$RAW_IMAGE_FILE" bs=512 seek="$root_start" conv=notrunc || {
+            error "Failed to merge root partition image into raw disk"
+            exit 1
+        }
+
+        info "Converting raw disk image to $IMAGE_FORMAT: $IMAGE_FILE"
+        qemu-img convert -f raw -O $IMAGE_FORMAT "$RAW_IMAGE_FILE" "$IMAGE_FILE" || {
+            error "Failed to convert raw disk image to $IMAGE_FORMAT"
+            exit 1
+        }
+
+        info "Removing intermediate partition image files"
+        rm -f "$EFI_IMG" "$ROOT_IMG" "$RAW_IMAGE_FILE"
+    fi
+
+    eval "DONE_$(step_to_var "build-qcow2")=true"
+else
+    skip "Assembling and converting VM image to qcow2"
+fi
 
 if should_run_step "build-vhdx"; then
     step "Building VHDX image from $IMAGE_FILE..."

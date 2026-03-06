@@ -1,5 +1,5 @@
 # cSpell: disable
-name: End to end tests
+name: Openstack VM image E2E test
 
 on:
   pull_request:
@@ -19,39 +19,21 @@ jobs:
       contents: read
       packages: write
     steps:
-      - uses: actions/checkout@v6
+      -
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
           fetch-tags: "true"
-      - name: Import Signature key
-        id: import-signing-key
-        shell: bash
-        run: |
-          echo -e "$GPG_PRIVATE_KEY" > kaweezle-devel@kaweezle.com-c9d89864.rsa
-          chmod 600 kaweezle-devel@kaweezle.com-c9d89864.rsa
-          mkdir -p ~/.ssh && chmod 700 ~/.ssh
-          cp kaweezle-devel@kaweezle.com-c9d89864.rsa ~/.ssh/id_rsa
-          mkdir -p ~/.config/sops/age
-          echo -e "$AGE_PRIVATE_KEY" > ~/.config/sops/age/keys.txt
-          chmod 600 ~/.config/sops/age/keys.txt
-          KUBERNETES_VERSION=$(grep k8s.io/kubernetes go.mod | awk '{gsub(/^v/,"",$2);print $2;}')
-          IKNITE_VERSION=$(git describe --abbrev=0 --tags --match="v[0-9]*" | awk -F'.' '{ printf "%s.%s.%s-devel",$1,$2,$3+1;}')
-          echo "Using Kubernetes version $KUBERNETES_VERSION, iknite version $IKNITE_VERSION"
-          echo "KUBERNETES_VERSION=$KUBERNETES_VERSION" >> $GITHUB_ENV
-          echo "KUBERNETES_VERSION=$KUBERNETES_VERSION" >> $GITHUB_OUTPUT
-          echo "IKNITE_VERSION=$IKNITE_VERSION" >> $GITHUB_ENV
-          echo "IKNITE_VERSION=$IKNITE_VERSION" >> $GITHUB_OUTPUT
-        env:
-          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
-          AGE_PRIVATE_KEY: ${{ secrets.AGE_PRIVATE_KEY }}
-      - name: Retrieve aqua cache
+      -
+        name: Retrieve aqua cache
         uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
         with:
           path: ~/.local/share/aquaproj-aqua
           key: v2-aqua-installer-${{runner.os}}-${{runner.arch}}-${{hashFiles('aqua.yaml')}}
           restore-keys: |
             v2-aqua-installer-${{runner.os}}-${{runner.arch}}-
-      - name: Install aqua dependencies
+      -
+        name: Install aqua dependencies
         uses: aquaproj/aqua-installer@11dd79b4e498d471a9385aa9fb7f62bb5f52a73c # v4.0.4
         with:
           aqua_version: v2.56.6
@@ -59,10 +41,39 @@ jobs:
         env:
           AQUA_DISABLE_COSIGN: "true"
           AQUA_DISABLE_SLSA: "true"
-      - name: Checking argocd deployment
+      -
+        name: Install image building dependencies
         run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libarchive-tools
+          # Install buildctl
+          BUILDKIT_VERSION=0.28.0
+          curl -L -o buildkit.tar.gz https://github.com/moby/buildkit/releases/download/v${BUILDKIT_VERSION}/buildkit-v${BUILDKIT_VERSION}.linux-amd64.tar.gz
+          tar -xzf buildkit.tar.gz -C /usr/local/bin --strip-components=1 bin/buildctl
+          buildctl --version
+          make print-HAS_WORKING_DOCKER  || true
+          make print-BUILDX_BUILDER || true
+          make print-BUILDKIT_HOST || true
+          docker buildx ls || true
+          BUILDKIT_HOST=docker-container://buildx_buildkit_iknite0 buildctl debug workers || true
+          make print-HAS_WORKING_ROOTLESS_BUILDCTL || true
+          make print-BUILD_CONTAINER_CMD || true
           helmfile init --force
           helm plugin install https://github.com/mumoshu/helm-x
+      -
+        name: Import Signature key
+        id: import-signing-key
+        shell: bash
+        run: |
+          mkdir -p ~/.config/sops/age
+          echo -e "$AGE_PRIVATE_KEY" > ~/.config/sops/age/keys.txt
+          chmod 600 ~/.config/sops/age/keys.txt
+          make extract-key
+        env:
+          AGE_PRIVATE_KEY: ${{ secrets.AGE_PRIVATE_KEY }}
+      -
+        name: Checking argocd deployment
+        run: |
           cd deploy/k8s/components/argocd
           echo "############################################################"
           echo "Release list..."
@@ -70,37 +81,17 @@ jobs:
           echo "############################################################"
           echo "Build checksum..."
           helmfile build --embed-values | grep -v '^#' | grep -v '^filepath: ' | sha256sum
-
-      - name: Create OpenStack image and test VM deployment
+      -
+        name: Create OpenStack image and test VM deployment
         id: create-and-test-openstack-image
         run: |
-          set -euo pipefail
-          cd deploy/iac/iknite/iknite-image
-          export IKNITE_CREATE_INSTANCE=true
-          echo "::group::Initializing terragrunt units chain..."
-          terragrunt run --graph --non-interactive init
-          echo "::endgroup::"
-
-          echo "::group::Refreshing terragrunt state for image..."
-          terragrunt apply -auto-approve -refresh-only
-          echo "::endgroup::"
-
-          echo "::group::Now performing chain starting with vm creation..."
-          cd ../iknite-vm
-          terragrunt run --graph --non-interactive apply
-          echo "::endgroup::"
-
-          echo "::group::Testing VM instance"
-          ../../../../test/e2e/argocd-checker.sh
-          echo "::endgroup::"
-
-      - name: Clean OpenStack image
+          make e2e-tg-init
+          make e2e-tg-refresh
+          make e2e-tg-apply-vm
+          make e2e-check-argocd
+      -
+        name: Clean OpenStack image
         id: clean-openstack-image
         if: ${{ contains(github.event.pull_request.labels.*.name, 'clean-e2e') }}
         run: |
-          set -euo pipefail
-          echo "::group::Teardown VM instance"
-          export IKNITE_CREATE_INSTANCE=true
-          cd deploy/iac/iknite/iknite-vm
-          terragrunt run --graph --non-interactive destroy -- -auto-approve
-          echo "::endgroup::"
+          make e2e-tg-destroy

@@ -1,5 +1,5 @@
 # cSpell: disable
-name: Buid iknite package, rootfs, and VM images
+name: Release (GoReleaser, Root FS, VM images, APK repo, E2E tests)
 
 on:
   pull_request:
@@ -9,331 +9,44 @@ on:
     tags: ["v*"]
 
 env:
-  tf_version: "1.14.3"
-  tg_version: "0.97.2"
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository_owner }}/iknite
-  IKNITE_REPO_NAME: ${{ (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) && 'release' || 'test' }}
 
 jobs:
   goreleaser-snapshot:
-    name: Test GoReleaser packaging
+    name: Build and release
     runs-on: ubuntu-latest
     if: ${{ github.event_name == 'push' || contains(github.event.pull_request.labels.*.name, 'e2e') && github.actor != 'dependabot[bot]' }}
-    outputs:
-      KUBERNETES_VERSION: ${{ steps.import-signing-key.outputs.KUBERNETES_VERSION }}
-      IKNITE_VERSION: ${{ steps.get-iknite-version.outputs.IKNITE_VERSION }}
+    permissions:
+      contents: write
+      packages: write
     steps:
-      - name: Checkout
+      -
+        name: Checkout
         uses: actions/checkout@v6
         with:
           fetch-depth: 0
-      - name: Set up Go
+      -
+        name: Set up Go
         uses: actions/setup-go@v6
         with:
           go-version: ^1
-      - name: Import Signature key
-        id: import-signing-key
-        shell: bash
-        run: |
-          echo -e "$GPG_PRIVATE_KEY" > kaweezle-devel@kaweezle.com-c9d89864.rsa
-          chmod 600 kaweezle-devel@kaweezle.com-c9d89864.rsa
-          mkdir -p ~/.ssh && chmod 700 ~/.ssh
-          cp kaweezle-devel@kaweezle.com-c9d89864.rsa ~/.ssh/id_rsa
-          mkdir -p ~/.config/sops/age
-          echo -e "$AGE_PRIVATE_KEY" > ~/.config/sops/age/keys.txt
-          chmod 600 ~/.config/sops/age/keys.txt
-          KUBERNETES_VERSION=$(grep k8s.io/kubernetes go.mod | awk '{gsub(/^v/,"",$2);print $2;}')
-          echo "Using Kubernetes version $KUBERNETES_VERSION"
-          echo "KUBERNETES_VERSION=$KUBERNETES_VERSION" >> $GITHUB_ENV
-          echo "KUBERNETES_VERSION=$KUBERNETES_VERSION" >> $GITHUB_OUTPUT
-        env:
-          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
-          AGE_PRIVATE_KEY: ${{ secrets.AGE_PRIVATE_KEY }}
-      - name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@v7
-        if: github.event_name == 'pull_request'
-        with:
-          version: "~> v2"
-          args: --snapshot --skip=publish --clean
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@v7
-        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
-        with:
-          version: "~> v2"
-          args: release --skip=publish --clean
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Get iknite version
-        id: get-iknite-version
-        run: |
-          IKNITE_VERSION=$(jq -Mr ".version" dist/metadata.json)
-          echo "IKNITE_VERSION=$IKNITE_VERSION" >> $GITHUB_ENV
-          echo "IKNITE_VERSION=$IKNITE_VERSION" >> $GITHUB_OUTPUT
-      - name: Build iknite images APK
-        run: |
-          BUILD_DIR="build/apk/iknite-images"
-          ARCH=$(uname -m)
-          rm -rf "$BUILD_DIR" || /bin/true
-          mkdir -p "$BUILD_DIR"
-
-          echo "KUBERNETES_VERSION: ${KUBERNETES_VERSION}" > "$BUILD_DIR/.env"
-          ./dist/iknite_linux_amd64_v1/iknite kustomize  -d packaging/apk/iknite/iknite.d print | grep image: | awk '{ print $2; }' > "$BUILD_DIR/image-list.txt"
-          ./dist/iknite_linux_amd64_v1/iknite info images >> "$BUILD_DIR/image-list.txt"
-          sort -u "$BUILD_DIR/image-list.txt" -o "$BUILD_DIR/image-list.txt"
-
-          docker run --rm --privileged \
-            -v /var/run/docker.sock:/var/run/docker.sock \
-            -v $(pwd):/work \
-            cgr.dev/chainguard/melange build packaging/apk/iknite-images/iknite-images.yaml \
-            --arch "$ARCH" \
-            --signing-key kaweezle-devel@kaweezle.com-c9d89864.rsa \
-            --vars-file "$BUILD_DIR/.env" \
-            --source-dir "$BUILD_DIR" \
-            --out-dir ./dist/ \
-            --generate-index=false
-          sudo chown -R $(id -u):$(id -g) dist
-          (cd "dist/$ARCH"/ && \
-           sha256sum *.apk >>../SHA256SUMS && \
-           for f in *.apk; do mv $f ../$(echo $f | sed 's/\-r0.apk$//').$ARCH.apk; done)
-          rmdir "dist/$ARCH/"
-      - name: Download karmafun apk
-        run: |
-          cd dist
-          LATEST_VERSION=$(curl --silent  https://api.github.com/repos/karmafun/karmafun/releases/latest | jq -r .tag_name)
-          echo "Latest karmafun version is ${LATEST_VERSION}"
-          curl -O -L "https://github.com/karmafun/karmafun/releases/download/${LATEST_VERSION}/karmafun-${LATEST_VERSION#v}.x86_64.apk"
-          cd ..
-      - name: Upload assets
-        uses: actions/upload-artifact@v6
-        with:
-          name: packages
-          path: |
-            dist/*.apk
-            dist/metadata.json
-            dist/SHA256SUMS
-      - name: Build APK repo
-        uses: ./.github/actions/make-apkindex
-        with:
-          apk_files: dist/*.apk
-          signature_key: "${{ secrets.GPG_PRIVATE_KEY }}"
-          signature_key_name: kaweezle-devel@kaweezle.com-c9d89864.rsa
-          destination: dist/repo
-      - name: Retrieve aqua cache
-        uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
-        with:
-          path: ~/.local/share/aquaproj-aqua
-          key: v2-aqua-installer-${{runner.os}}-${{runner.arch}}-${{hashFiles('aqua.yaml')}}
-          restore-keys: |
-            v2-aqua-installer-${{runner.os}}-${{runner.arch}}-
-      - name: Install aqua dependencies
-        uses: aquaproj/aqua-installer@11dd79b4e498d471a9385aa9fb7f62bb5f52a73c # v4.0.4
-        with:
-          aqua_version: v2.56.6
-          aqua_opts: "" # Unset `-l` option
-        env:
-          AQUA_DISABLE_COSIGN: "true"
-          AQUA_DISABLE_SLSA: "true"
-      - name: Upload APK repo
-        run: |
-          echo "::group::Running terragrunt module"
-          export TF_PLUGIN_CACHE_DIR="$HOME/.cache/terraform/plugin-cache"
-          mkdir -p $TF_PLUGIN_CACHE_DIR
-          cd deploy/iac/iknite/${IKNITE_REPO_NAME}repo
-          terragrunt init
-          terragrunt apply -auto-approve
-          echo "::endgroup::"
-
-  build-rootfs:
-    name: Build Root Filesystem for WSL
-    needs: [goreleaser-snapshot]
-    runs-on: ubuntu-latest
-    env:
-      KUBERNETES_VERSION: ${{ needs.goreleaser-snapshot.outputs.KUBERNETES_VERSION }}
-      IKNITE_VERSION: ${{ needs.goreleaser-snapshot.outputs.IKNITE_VERSION }}
-    permissions:
-      contents: read
-      packages: write
-    steps:
-      - uses: actions/checkout@v6
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-        with:
-          driver-opts: |
-            image=moby/buildkit:master
-          buildkitd-flags: "--allow-insecure-entitlement security.insecure"
-
-      - name: Log in to Container Registry
-        uses: docker/login-action@v3
+      -
+        name: Log in to Container Registry
+        uses: docker/login-action@v4
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Cache Docker layers
+      -
+        name: Cache Docker layers
         uses: actions/cache@v5
         with:
           path: /tmp/.buildx-cache
           key: ${{ runner.os }}-single-buildx-${{ github.sha }}
           restore-keys: |
             ${{ runner.os }}-single-buildx
-
-      - name: Get built apks
-        uses: actions/download-artifact@v7
-        with:
-          name: packages
-          path: packages
-
-      - name: Build root fs
-        run: |
-          sudo apt-get update -y
-          sudo apt-get install -y --no-install-recommends libarchive-tools
-
-          mkdir -p dist
-          BUILD_DIR="build/rootfs/base"
-          rm -rf "$BUILD_DIR" || /bin/true
-          mkdir -p "$BUILD_DIR"
-          cp -r "packaging/rootfs/base/." "$BUILD_DIR/"
-
-          echo "Version is $IKNITE_VERSION"
-          cp packages/iknite-${IKNITE_VERSION}.$(uname -m).apk "$BUILD_DIR"
-          cp packages/karmafun-*.$(uname -m).apk "$BUILD_DIR"
-          mkdir -p /tmp/.buildx-cache
-          mkdir -p /tmp/.buildx-cache-new
-          echo "::group::Building iknite-rootfs-base:${IKNITE_VERSION}"
-          docker buildx build \
-             --build-arg IKNITE_REPO_URL=https://static.iknite.app/${IKNITE_REPO_NAME}/ \
-             --build-arg IKNITE_VERSION=$IKNITE_VERSION \
-             --build-arg KUBERNETES_VERSION=${KUBERNETES_VERSION} \
-             --cache-from type=local,src=/tmp/.buildx-cache \
-             --cache-to type=local,dest=/tmp/.buildx-cache-new \
-             --tag iknite-rootfs-base:${IKNITE_VERSION} \
-             --load \
-             "$BUILD_DIR"
-          echo "::endgroup::"
-
-          echo "::group::Adding base iknite images to root fs and exporting"
-          docker run \
-            --name iknite-rootfs \
-            --privileged \
-            -v $(pwd)/packages:/apks \
-            iknite-rootfs-base:${IKNITE_VERSION} \
-            /bin/sh -c 'apk --no-cache add /apks/iknite-images-*.apk; apk del iknite-images'
-
-          ROOTFS_NAME="iknite-${IKNITE_VERSION}-${KUBERNETES_VERSION}.rootfs.tar.gz"
-          ROOTFS_PATH="dist/$ROOTFS_NAME"
-          docker export iknite-rootfs | bsdtar -zcf "$ROOTFS_PATH" --exclude=.dockerenv --exclude=dev/console @-
-          sha256sum "$ROOTFS_PATH" >> dist/SHA256SUMS
-          echo "::endgroup::"
-
-          echo "::group::Building and pushing root fs image to registry"
-          if [ "$IKNITE_REPO_NAME" = "release" ]; then
-            ADDITIONAL_TAG="--tag ${REGISTRY}/${IMAGE_NAME}:latest"
-          else
-            ADDITIONAL_TAG=""
-          fi
-
-          BUILD_DIR="build/rootfs/with-images"
-          rm -rf "$BUILD_DIR" || /bin/true
-          mkdir -p "$BUILD_DIR"
-          cp -r "packaging/rootfs/with-images/." "$BUILD_DIR/"
-          cp "dist/${ROOTFS_NAME}" "$BUILD_DIR/$ROOTFS_NAME"
-
-          docker buildx build \
-             --build-arg IKNITE_VERSION=$IKNITE_VERSION \
-             --build-arg KUBERNETES_VERSION=${KUBERNETES_VERSION} \
-             --tag ${REGISTRY}/${IMAGE_NAME}:${IKNITE_VERSION}-${KUBERNETES_VERSION} \
-             $ADDITIONAL_TAG \
-             --push \
-             "$BUILD_DIR"
-          echo "::endgroup::"
-
-      - name: Upload root fs artifact
-        uses: actions/upload-artifact@v6
-        with:
-          name: rootfs
-          path: |
-            dist/*
-
-      - name: Move cache
-        run: |
-          rm -rf /tmp/.buildx-cache
-          mv /tmp/.buildx-cache-new /tmp/.buildx-cache
-
-  build-vm-images:
-    name: Build VM images
-    needs: [build-rootfs, goreleaser-snapshot]
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
-    env:
-      KUBERNETES_VERSION: ${{ needs.goreleaser-snapshot.outputs.KUBERNETES_VERSION }}
-      IKNITE_VERSION: ${{ needs.goreleaser-snapshot.outputs.IKNITE_VERSION }}
-    steps:
-      - uses: actions/checkout@v6
-
-      - name: Get root fs artifact
-        uses: actions/download-artifact@v7
-        with:
-          name: rootfs
-          path: dist
-
-      # What is needed: qemu-img qemu-nbd genisoimage
-      - name: Install dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends qemu-utils qemu-guest-agent genisoimage libarchive-tools
-          ls -Rl dist/
-
-      - name: Build VM images
-        run: |
-          sudo KUBERNETES_VERSION=${KUBERNETES_VERSION} IKNITE_VERSION=${IKNITE_VERSION} ./packaging/scripts/build-vm-image.sh
-
-      - name: Install oras
-        uses: oras-project/setup-oras@v1
-
-      - name: Log in with ORAS CLI
-        run: |
-          echo ${{ secrets.GITHUB_TOKEN }} | oras login ghcr.io -u ${{ github.actor }} --password-stdin
-
-      - name: Push VM images to registry
-        run: |
-          cd dist/images
-          IMAGE_TAG="${REGISTRY}/${IMAGE_NAME}-vm-vhdx:${IKNITE_VERSION}-${KUBERNETES_VERSION}"
-          oras push $IMAGE_TAG \
-            --artifact-type application/vnd.oci.image.layer.vhdx \
-            --annotation org.opencontainers.image.title="iknite-vm-${IKNITE_VERSION}-${KUBERNETES_VERSION}.vhdx" \
-            --annotation org.opencontainers.image.version="${IKNITE_VERSION}" \
-            --annotation org.opencontainers.image.description="VM image for iknite ${IKNITE_VERSION} with Kubernetes ${KUBERNETES_VERSION}" \
-            iknite-vm.${IKNITE_VERSION}-${KUBERNETES_VERSION}.vhdx:application/x-hyperv-disk
-          if [ "$IKNITE_REPO_NAME" = "release" ]; then
-            IMAGE_TAG="${REGISTRY}/${IMAGE_NAME}-vm-vhdx:latest"
-            oras tag ${REGISTRY}/${IMAGE_NAME}-vm-vhdx:${IKNITE_VERSION}-${KUBERNETES_VERSION} $IMAGE_TAG
-          fi
-
-          IMAGE_TAG="${REGISTRY}/${IMAGE_NAME}-vm-qcow2:${IKNITE_VERSION}-${KUBERNETES_VERSION}"
-          oras push $IMAGE_TAG \
-            --artifact-type application/vnd.oci.image.layer.qcow2 \
-            --annotation org.opencontainers.image.title="iknite-vm-${IKNITE_VERSION}-${KUBERNETES_VERSION}.qcow2" \
-            --annotation org.opencontainers.image.version="${IKNITE_VERSION}" \
-            --annotation org.opencontainers.image.description="VM image for iknite ${IKNITE_VERSION} with Kubernetes ${KUBERNETES_VERSION}" \
-            iknite-vm.${IKNITE_VERSION}-${KUBERNETES_VERSION}.qcow2:application/x-qemu-disk
-          if [ "$IKNITE_REPO_NAME" = "release" ]; then
-            IMAGE_TAG="${REGISTRY}/${IMAGE_NAME}-vm-qcow2:latest"
-            oras tag ${REGISTRY}/${IMAGE_NAME}-vm-qcow2:${IKNITE_VERSION}-${KUBERNETES_VERSION} $IMAGE_TAG
-          fi
-      - name: Retrieve aqua cache
-        uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
-        with:
-          path: ~/.local/share/aquaproj-aqua
-          key: v2-aqua-installer-${{runner.os}}-${{runner.arch}}-${{hashFiles('aqua.yaml')}}
-          restore-keys: |
-            v2-aqua-installer-${{runner.os}}-${{runner.arch}}-
-      - name: Install aqua dependencies
+      -
+        name: Install aqua dependencies
         uses: aquaproj/aqua-installer@11dd79b4e498d471a9385aa9fb7f62bb5f52a73c # v4.0.4
         with:
           aqua_version: v2.56.6
@@ -341,84 +54,125 @@ jobs:
         env:
           AQUA_DISABLE_COSIGN: "true"
           AQUA_DISABLE_SLSA: "true"
-
-      - name: Import Age key
+      -
+        name: Install image building dependencies
         run: |
-          echo "::group::Import Age key"
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libarchive-tools
+          # Install buildctl
+          BUILDKIT_VERSION=0.28.0
+          curl -L -o buildkit.tar.gz https://github.com/moby/buildkit/releases/download/v${BUILDKIT_VERSION}/buildkit-v${BUILDKIT_VERSION}.linux-amd64.tar.gz
+          tar -xzf buildkit.tar.gz -C /usr/local/bin --strip-components=1 bin/buildctl
+          buildctl --version
+          make print-HAS_WORKING_DOCKER  || true
+          make print-BUILDX_BUILDER || true
+          make print-BUILDKIT_HOST || true
+          docker buildx ls || true
+          BUILDKIT_HOST=docker-container://buildx_buildkit_iknite0 buildctl debug workers || true
+          make print-HAS_WORKING_ROOTLESS_BUILDCTL || true
+          make print-BUILD_CONTAINER_CMD || true
+          helmfile init --force
+          helm plugin install https://github.com/mumoshu/helm-x
+      -
+        name: Import Signature key
+        id: import-signing-key
+        shell: bash
+        run: |
           mkdir -p ~/.config/sops/age
           echo -e "$AGE_PRIVATE_KEY" > ~/.config/sops/age/keys.txt
           chmod 600 ~/.config/sops/age/keys.txt
-          echo "::endgroup::"
-          echo "::group::Force helmfile initialization"
-          helmfile init --force
-          helm plugin install https://github.com/mumoshu/helm-x
-          echo "::endgroup::"
+          make extract-key
+          KUBERNETES_VERSION=$(grep k8s.io/kubernetes go.mod | awk '{gsub(/^v/,"",$2);print $2;}')
+          echo "Using Kubernetes version $KUBERNETES_VERSION"
+          echo "KUBERNETES_VERSION=$KUBERNETES_VERSION" >> $GITHUB_ENV
+          echo "KUBERNETES_VERSION=$KUBERNETES_VERSION" >> $GITHUB_OUTPUT
         env:
           AGE_PRIVATE_KEY: ${{ secrets.AGE_PRIVATE_KEY }}
-
-      - name: Create OpenStack image and test VM deployment
+      -
+        name: Run GoReleaser
+        run: |
+          make goreleaser
+      -
+        name: Build iknite images APK
+        run: |
+          make images-apk
+      -
+        name: Build incus agent APK
+        run: |
+          make incus-agent-apk
+      -
+        name: Download karmafun apk
+        run: |
+          make fetch-karmafun
+      -
+        name: Build APK repo
+        run: |
+          make apk-repo
+      -
+        name: Upload APK repo
+        run: |
+          make upload-apk-repo
+      -
+        name: Upload All packages artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: packages
+          path: |
+            dist/repo/*
+      -
+        name: Make rootfs
+        run: |
+          make rootfs
+      -
+        name: Upload root fs artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: rootfs
+          path: |
+            dist/*.rootfs.tar.gz
+      -
+        name: Make rootfs image
+        run: |
+          make rootfs-image
+      -
+        name: Move cache
+        run: |
+          rm -rf /tmp/.buildx-cache
+          mv /tmp/.buildx-cache-new /tmp/.buildx-cache
+      -
+        name: Install VM image building dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends qemu-utils qemu-guest-agent genisoimage libarchive-tools
+      -
+        name: Build VM images
+        run: |
+          make vm-image
+      -
+        name: Push VM images to registry
+        run: |
+          make vm-container-images
+      -
+        name: Create OpenStack image and test VM deployment
         id: create-and-test-openstack-image
         # if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
         if: github.event_name == 'pull_request'
         run: |
-          cd deploy/iac/iknite/iknite-image
-          export IKNITE_CREATE_INSTANCE=true
-          echo "::group::Running terragrunt module init"
-          terragrunt run --graph --non-interactive init
-          echo "::endgroup::"
-
-          echo "::group::Running terragrunt module with instance creation"
-          terragrunt run --graph --non-interactive apply
-          echo "::endgroup::"
-
-          echo "::group::Testing VM instance"
-          ../../../../test/e2e/argocd-checker.sh
-          echo "::endgroup::"
-
-          echo "::group::Teardown VM instance"
-          cd ../iknite-vm
-          terragrunt run --graph --non-interactive destroy -- -auto-approve
-          echo "::endgroup::"
-
-      - name: push Images to object storage
+          make e2e
+      -
+        name: Push Images to object storage
         if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
         run: |
-          echo "::group::Running terragrunt module to push images to object storage"
-          cd deploy/iac/iknite/iknite-public-images
-          terragrunt run --graph --non-interactive apply
-          echo "::endgroup::"
-
-  make-release:
-    name: Release iknite package
-    needs: [build-rootfs, goreleaser-snapshot, build-vm-images]
-    runs-on: ubuntu-latest
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
-    env:
-      KUBERNETES_VERSION: ${{ needs.goreleaser-snapshot.outputs.KUBERNETES_VERSION }}
-      IKNITE_VERSION: ${{ needs.goreleaser-snapshot.outputs.IKNITE_VERSION }}
-    permissions:
-      contents: write
-      packages: write
-    steps:
-      - uses: actions/checkout@v6
-
-      # Import all the artifacts from previous jobs
-      - name: Get All artifacts
-        uses: actions/download-artifact@v7
-
-      - name: Prepare release files
+          make publish-vm-images
+      -
+        name: Prepare release files
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
         run: |
-          ls -Rl
-          mkdir -p release
-          mv packages/iknite-*.apk release/
-          mv rootfs/* release/
-          cp Get-Iknite.ps1 release/
-          cp Get-IkniteVM.ps1 release/
-          cp packaging/rootfs/base/*.rsa.pub release/
-          (cd release && sha256sum * > SHA256SUMS)
-
-      - name: Create the GitHub Release (draft)
+          make release-files
+      -
+        name: Create the GitHub Release (draft)
         uses: softprops/action-gh-release@v2
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
         with:
           draft: true
           generate_release_notes: true

@@ -4,6 +4,7 @@
 #   pre-commit install
 # Run on all files:
 #   pre-commit run --all-files
+# cSpell: words checkmake
 
 repos:
   # General, language-agnostic sanity checks
@@ -125,6 +126,12 @@ repos:
               deploy/iac/iknite/.*/terragrunt\.hcl
           )$
         exclude: \.terraform/.*$
+  - repo: https://github.com/checkmake/checkmake.git
+    # Or another commit hash or version
+    rev: 0.2.2
+    hooks:
+      # Use this hook to let pre-commit build checkmake in its sandbox
+      - id: checkmake
 
 # Global exclusions for all hooks
 exclude: |

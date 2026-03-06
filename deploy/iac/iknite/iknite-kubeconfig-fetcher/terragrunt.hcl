@@ -28,5 +28,5 @@ inputs = {
   username    = "root"
   private_key = local.iknite_vm.ssh_private_key
   ssh_port    = 22
-  timeout     = "10m"
+  timeout     = 300
 }

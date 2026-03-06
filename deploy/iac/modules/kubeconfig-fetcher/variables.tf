@@ -27,7 +27,7 @@ variable "ssh_port" {
 }
 
 variable "timeout" {
-  type        = string
-  default     = "5m"
-  description = "The timeout for SSH connection attempts"
+  type        = number
+  default     = 300
+  description = "The timeout for SSH connection attempts in seconds"
 }

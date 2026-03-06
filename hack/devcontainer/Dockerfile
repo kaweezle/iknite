@@ -7,12 +7,15 @@ ARG GROUPNAME=alpine
 ARG TFLINT_VERSION=0.60.0
 ARG TERRAFORM_DOCS_VERSION=0.21.0
 
+LABEL org.opencontainers.image.source="https://github.com/kaweezle/iknite.git"
+
 # Add the dependencies
 RUN echo "http://dl-cdn.alpinelinux.org/alpine/edge/testing/" >> /etc/apk/repositories && \
     apk update --quiet && \
     apk add --quiet --no-progress --no-cache zsh tzdata git libstdc++ doas iproute2 gnupg socat openssh openrc curl tar zstd && \
-    apk add --quiet --no-progress --no-cache pipx uv go jq skopeo tenv kubectl k9s golangci-lint gnupg sops age nodejs npm openssl abuild && \
-    apk add --quiet --no-progress --no-cache ip6tables containerd kubelet kubeadm cni-plugins cni-plugin-flannel util-linux-misc buildkit buildctl nerdctl rootlesskit slirp4netns && \
+    apk add --quiet --no-progress --no-cache pipx uv go make jq skopeo tenv kubectl k9s golangci-lint gnupg sops age nodejs npm openssl abuild libarchive-tools && \
+    apk add --quiet --no-progress --no-cache ip6tables containerd kubelet kubeadm cni-plugins cni-plugin-flannel util-linux-misc buildkit buildctl \
+    nerdctl rootlesskit slirp4netns qemu-img cdrkit sfdisk e2fsprogs && \
     GORELEASER_VERSION=$(curl --silent  https://api.github.com/repos/goreleaser/goreleaser/releases/latest | jq -r .tag_name | sed -e 's/^v//') && \
     wget -q -O /tmp/goreleaser.apk "https://github.com/goreleaser/goreleaser/releases/download/v${GORELEASER_VERSION}/goreleaser_${GORELEASER_VERSION}_x86_64.apk" && \
     apk add --quiet --no-progress --allow-untrusted --no-cache /tmp/goreleaser.apk && \
@@ -23,6 +26,14 @@ RUN echo "http://dl-cdn.alpinelinux.org/alpine/edge/testing/" >> /etc/apk/reposi
     wget -q -O /tmp/terraform-docs.tar.gz "https://github.com/terraform-docs/terraform-docs/releases/download/v${TERRAFORM_DOCS_VERSION}/terraform-docs-v${TERRAFORM_DOCS_VERSION}-linux-amd64.tar.gz" && \
     tar -xzf /tmp/terraform-docs.tar.gz -C /usr/local/bin/ terraform-docs && \
     rm -f /tmp/terraform-docs.tar.gz && \
+    AQUA_VERSION=$(curl --silent "https://api.github.com/repos/aquaproj/aqua/releases/latest" | jq -r .tag_name | sed -e 's/^v//') && \
+    wget -q -O /tmp/aqua.tar.gz "https://github.com/aquaproj/aqua/releases/download/v${AQUA_VERSION}/aqua_linux_amd64.tar.gz" && \
+    tar -xzf /tmp/aqua.tar.gz -C /usr/local/bin/ aqua && \
+    rm -f /tmp/aqua.tar.gz && \
+    # karmafun
+    KARMAFUN_VERSION=$(curl --silent "https://api.github.com/repos/karmafun/karmafun/releases/latest" | jq -r .tag_name) && \
+    curl -sLo /usr/local/bin/karmafun https://github.com/karmafun/karmafun/releases/download/${KARMAFUN_VERSION}/karmafun_musl_${KARMAFUN_VERSION}_linux_amd64 && \
+    chmod +x /usr/local/bin/karmafun && \
     rm -rf `find /var/cache/apk/ -type f`
 
 # Change root shell
@@ -40,8 +51,10 @@ RUN --mount=type=bind,target=/conf \
     echo '[[ ! -f ~/.p10k.zsh ]] || source ~/.p10k.zsh' >> /usr/share/oh-my-zsh/templates/zshrc.zsh-template && \
     mkdir -p /etc/skel && \
     install -m 700 -o root -g root /usr/share/oh-my-zsh/templates/zshrc.zsh-template /etc/skel/.zshrc  && \
+    echo 'export PATH="$HOME/.local/bin:$HOME/go/bin:$(aqua root-dir)/bin:$PATH"' >>/etc/skel/.zshrc && \
     install -m 600 -o root -g root /conf/p10k.zsh /etc/skel/.p10k.zsh && \
     install --directory -o root -g root -m 0700 /etc/skel/.ssh && \
+    install -m 600 -o root -g root /conf/config /etc/skel/.ssh/config && \
     touch /etc/subuid && touch /etc/subgid
 
 # Allow OpenRC to run as non init

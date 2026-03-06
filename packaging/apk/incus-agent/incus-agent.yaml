@@ -1,0 +1,30 @@
+# cSpell: words destdir
+package:
+  name: incus-agent
+  version: "6.22"
+  # epoch: 1
+  description: Incus agent for iknite
+  copyright:
+    - license: Apache-2.0
+  dependencies:
+    runtime:
+      - busybox
+      - openrc
+  scriptlets: {}
+
+environment:
+  contents:
+    repositories:
+      - https://packages.wolfi.dev/os
+    keyring:
+      - https://packages.wolfi.dev/os/wolfi-signing.rsa.pub
+    packages:
+      - busybox
+
+pipeline:
+  - name: Install files
+    runs: |
+      # installs both init.d scripts in /etc/init.d and the agent setup script in /usr/bin
+      install -Dm755 incus-agent-setup "${{targets.destdir}}"/usr/bin/incus-agent-setup
+      install -Dm755 init.d-incus-agent-setup "${{targets.destdir}}"/etc/init.d/incus-agent-setup
+      install -Dm755 init.d-incus-agent "${{targets.destdir}}"/etc/init.d/incus-agent

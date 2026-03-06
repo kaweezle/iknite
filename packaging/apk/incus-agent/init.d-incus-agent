@@ -1,0 +1,15 @@
+#!/sbin/openrc-run
+
+description="Incus - agent"
+command=/run/incus_agent/incus-agent
+command_background=true
+pidfile=/run/incus-agent.pid
+start_stop_daemon_args="--chdir /run/incus_agent"
+required_dirs=/run/incus_agent
+
+depend() {
+	need incus-agent-setup
+	after incus-agent-setup
+	before cloud-init
+	before cloud-init-local
+}
