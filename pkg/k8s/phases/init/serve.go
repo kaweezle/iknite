@@ -27,13 +27,13 @@ func runServe(c workflow.RunData) error {
 		return fmt.Errorf("serve phase invoked with an invalid data struct")
 	}
 
-	ikniteSpec := data.IkniteCluster().Spec
-	srv, err := server.StartIkniteServer(constants.KubernetesPKIDir, ikniteSpec.Ip, constants.IkniteServerPort)
+	ikniteCluster := data.IkniteCluster()
+	srv, err := server.StartIkniteServer(constants.KubernetesPKIDir, &ikniteCluster.Spec, ikniteCluster)
 	if err != nil {
 		return fmt.Errorf("failed to start iknite status server: %w", err)
 	}
 
-	log.WithField("port", constants.IkniteServerPort).Info("Iknite status server started")
+	log.WithField("port", ikniteCluster.Spec.StatusServerPort).Info("Iknite status server started")
 	data.SetStatusServer(srv)
 	return nil
 }

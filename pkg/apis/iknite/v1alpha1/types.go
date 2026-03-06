@@ -48,6 +48,8 @@ type IkniteClusterSpec struct {
 	UseEtcd bool `json:"useEtcd,omitempty" protobuf:"bytes,9,opt,name=useEtcd" mapstructure:"use_etcd"` //nolint:lll // for readability
 	// +optional
 	APIBackendDatabaseDirectory string `json:"apiBackendDatabaseDirectory,omitempty" protobuf:"bytes,10,opt,name=apiBackendDatabaseDirectory" mapstructure:"api_backend_database_directory"` //nolint:lll // for readability
+	// +optional
+	StatusServerPort int `json:"statusServerPort,omitempty" protobuf:"varint,11,opt,name=statusServerPort" mapstructure:"status_server_port"` //nolint:lll // for readability
 }
 
 func (c *IkniteClusterSpec) GetApiEndPoint() string {

@@ -50,6 +50,9 @@ func SetDefaults_IkniteClusterSpec(obj *IkniteClusterSpec) {
 	if obj.APIBackendDatabaseDirectory == "" {
 		obj.APIBackendDatabaseDirectory = constants.KineDirectory
 	}
+	if obj.StatusServerPort == 0 {
+		obj.StatusServerPort = constants.IkniteServerPort
+	}
 }
 
 func SetDefaults_IkniteClusterStatus(obj *IkniteClusterStatus) {

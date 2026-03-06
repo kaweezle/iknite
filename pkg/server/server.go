@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-	http://www.apache.org/licenses/LICENSE-2.0
+http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -22,12 +22,14 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/json"
 	"fmt"
 	"net"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strconv"
+	"sync"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -35,13 +37,80 @@ import (
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	pkiutil "k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
 
+	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
 	"github.com/kaweezle/iknite/pkg/constants"
 )
 
+// IkniteServer encapsulates the HTTPS status server together with the
+// configuration and an in-memory snapshot of the cluster status.
+// Access to the cluster snapshot is protected by a read/write mutex so that
+// concurrent HTTP requests and background status updates do not race.
+type IkniteServer struct {
+	httpServer  *http.Server
+	spec        *v1alpha1.IkniteClusterSpec
+	mu          sync.RWMutex
+	clusterJSON []byte // pre-serialized cluster, updated by SetCluster
+}
+
+// SetCluster serializes c to JSON and stores it under the write lock so that
+// subsequent /status requests serve the latest in-memory state.
+func (s *IkniteServer) SetCluster(c *v1alpha1.IkniteCluster) {
+	data, err := json.MarshalIndent(c, "", "  ")
+	if err != nil {
+		log.WithError(err).Error("Failed to serialize cluster status for in-memory cache")
+		return
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.clusterJSON = data
+}
+
+// statusHandler serves the current cluster status as JSON.
+func (s *IkniteServer) statusHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	s.mu.RLock()
+	data := s.clusterJSON
+	s.mu.RUnlock()
+
+	if data == nil {
+		http.Error(w, "status not available", http.StatusServiceUnavailable)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if _, err := w.Write(data); err != nil {
+		log.WithError(err).Error("Failed to write status response")
+	}
+}
+
+// ServeHTTP implements http.Handler so that IkniteServer can be used directly
+// as a handler for a custom http.Server (useful in tests or when embedding
+// the mux into a larger application).
+func (s *IkniteServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	s.httpServer.Handler.ServeHTTP(w, r)
+}
+
+// Shutdown gracefully shuts down the server with a 10-second timeout.
+func (s *IkniteServer) Shutdown() error {
+	if s == nil {
+		return nil
+	}
+	log.Info("Shutting down iknite status server...")
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if err := s.httpServer.Shutdown(ctx); err != nil {
+		return fmt.Errorf("failed to shutdown iknite status server: %w", err)
+	}
+	return nil
+}
+
 // EnsureServerCertAndKey ensures that the iknite server certificate and key
-// exist in the given directory. If they don't exist, they are created and
-// signed by the Kubernetes CA.
-func EnsureServerCertAndKey(certDir string, ip net.IP) error {
+// exist in certDir. If they don't exist, they are created signed by the
+// Kubernetes CA. dnsNames and ips extend the built-in SANs (iknite, localhost,
+// 127.0.0.1) with values from the cluster configuration.
+func EnsureServerCertAndKey(certDir string, dnsNames []string, ips []net.IP) error {
 	if pkiutil.CertOrKeyExist(certDir, constants.IkniteServerCertName) {
 		log.WithField("certDir", certDir).Debug("Server cert already exists, skipping creation")
 		return nil
@@ -53,11 +122,8 @@ func EnsureServerCertAndKey(certDir string, ip net.IP) error {
 	}
 
 	altNames := certutil.AltNames{
-		DNSNames: []string{"iknite", "iknite.local", "localhost"},
-		IPs:      []net.IP{net.ParseIP("127.0.0.1")},
-	}
-	if ip != nil && !ip.IsLoopback() {
-		altNames.IPs = append(altNames.IPs, ip)
+		DNSNames: append([]string{"iknite", "localhost"}, dnsNames...),
+		IPs:      append([]net.IP{net.ParseIP("127.0.0.1")}, ips...),
 	}
 
 	certConfig := &pkiutil.CertConfig{
@@ -84,8 +150,8 @@ func EnsureServerCertAndKey(certDir string, ip net.IP) error {
 }
 
 // EnsureClientCertAndKey ensures that the iknite client certificate and key
-// exist in the given directory. If they don't exist, they are created and
-// signed by the Kubernetes CA.
+// exist in certDir. If they don't exist, they are created signed by the
+// Kubernetes CA.
 func EnsureClientCertAndKey(certDir string) error {
 	if pkiutil.CertOrKeyExist(certDir, constants.IkniteClientCertName) {
 		log.WithField("certDir", certDir).Debug("Client cert already exists, skipping creation")
@@ -119,34 +185,9 @@ func EnsureClientCertAndKey(certDir string) error {
 	return nil
 }
 
-// statusHandler handles GET /status requests and returns the contents of
-// the iknite status file as JSON.
-func statusHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-	data, err := os.ReadFile(constants.StatusFile)
-	if err != nil {
-		if os.IsNotExist(err) {
-			http.Error(w, "status not available", http.StatusServiceUnavailable)
-			return
-		}
-		log.WithError(err).Error("Failed to read status file")
-		http.Error(w, "internal server error", http.StatusInternalServerError)
-		return
-	}
-	w.Header().Set("Content-Type", "application/json")
-	_, err = w.Write(data)
-	if err != nil {
-		log.WithError(err).Error("Failed to write status response")
-	}
-}
-
-// NewIkniteServer creates a new HTTPS server for the iknite status API.
-// It uses mTLS with the Kubernetes CA so that only clients presenting a
-// certificate signed by the same CA are allowed.
-func NewIkniteServer(certDir string, port int) (*http.Server, error) {
+// NewIkniteServer builds an IkniteServer from spec and the certificates in
+// certDir. The port is taken from spec.StatusServerPort.
+func NewIkniteServer(certDir string, spec *v1alpha1.IkniteClusterSpec) (*IkniteServer, error) {
 	caCertPEM, err := os.ReadFile(filepath.Join(certDir, "ca.crt"))
 	if err != nil {
 		return nil, fmt.Errorf("failed to read CA cert: %w", err)
@@ -171,40 +212,59 @@ func NewIkniteServer(certDir string, port int) (*http.Server, error) {
 		MinVersion:   tls.VersionTLS12,
 	}
 
-	mux := http.NewServeMux()
-	mux.HandleFunc("/status", statusHandler)
+	s := &IkniteServer{spec: spec}
 
-	addr := net.JoinHostPort("0.0.0.0", strconv.Itoa(port))
-	server := &http.Server{
+	mux := http.NewServeMux()
+	mux.HandleFunc("/status", s.statusHandler)
+
+	addr := net.JoinHostPort("0.0.0.0", strconv.Itoa(spec.StatusServerPort))
+	s.httpServer = &http.Server{
 		Addr:      addr,
 		Handler:   mux,
 		TLSConfig: tlsConfig,
 	}
 
-	return server, nil
+	return s, nil
 }
 
-// StartIkniteServer creates and starts the iknite HTTPS server in a goroutine.
-// It returns the server instance so that it can be shut down gracefully.
-func StartIkniteServer(certDir string, ip net.IP, port int) (*http.Server, error) {
-	if err := EnsureServerCertAndKey(certDir, ip); err != nil {
+// StartIkniteServer creates certificates (if needed), builds, and starts the
+// iknite HTTPS server. The initial cluster status is set from cluster.
+// The returned IkniteServer's SetCluster method should be called on every
+// subsequent cluster status update.
+func StartIkniteServer(certDir string, spec *v1alpha1.IkniteClusterSpec, cluster *v1alpha1.IkniteCluster) (*IkniteServer, error) {
+	// Build SAN extensions from the cluster spec.
+	var dnsNames []string
+	if spec.DomainName != "" {
+		dnsNames = append(dnsNames, spec.DomainName)
+	}
+	var ips []net.IP
+	if spec.Ip != nil && !spec.Ip.IsLoopback() {
+		ips = append(ips, spec.Ip)
+	}
+
+	if err := EnsureServerCertAndKey(certDir, dnsNames, ips); err != nil {
 		return nil, fmt.Errorf("failed to ensure server cert: %w", err)
 	}
 	if err := EnsureClientCertAndKey(certDir); err != nil {
 		return nil, fmt.Errorf("failed to ensure client cert: %w", err)
 	}
 
-	srv, err := NewIkniteServer(certDir, port)
+	srv, err := NewIkniteServer(certDir, spec)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create iknite server: %w", err)
+	}
+
+	// Seed the in-memory status with the current cluster state.
+	if cluster != nil {
+		srv.SetCluster(cluster)
 	}
 
 	startErr := make(chan error, 1)
 	go func() {
 		log.WithFields(log.Fields{
-			"addr": srv.Addr,
+			"addr": srv.httpServer.Addr,
 		}).Info("Starting iknite status server")
-		if listenErr := srv.ListenAndServeTLS("", ""); listenErr != nil && listenErr != http.ErrServerClosed {
+		if listenErr := srv.httpServer.ListenAndServeTLS("", ""); listenErr != nil && listenErr != http.ErrServerClosed {
 			log.WithError(listenErr).Error("Iknite status server error")
 			startErr <- listenErr
 		}
@@ -216,22 +276,13 @@ func StartIkniteServer(certDir string, ip net.IP, port int) (*http.Server, error
 	case err = <-startErr:
 		return nil, fmt.Errorf("iknite status server failed to start: %w", err)
 	case <-time.After(50 * time.Millisecond):
-		// Server started without an immediate error
+		// Server started without an immediate error.
 	}
 
 	return srv, nil
 }
 
-// ShutdownServer gracefully shuts down the server with a 10-second timeout.
-func ShutdownServer(srv *http.Server) error {
-	if srv == nil {
-		return nil
-	}
-	log.Info("Shutting down iknite status server...")
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-	if err := srv.Shutdown(ctx); err != nil {
-		return fmt.Errorf("failed to shutdown iknite status server: %w", err)
-	}
-	return nil
+// ShutdownServer is a convenience wrapper around (*IkniteServer).Shutdown.
+func ShutdownServer(srv *IkniteServer) error {
+	return srv.Shutdown()
 }

@@ -24,7 +24,6 @@ import (
 	"fmt"
 	"io"
 	"net"
-	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -132,7 +131,7 @@ type initData struct {
 	ikniteCluster               *v1alpha1.IkniteCluster
 	kubeletCmd                  *exec.Cmd
 	mdnsConn                    *mdns.Conn
-	statusServer                *http.Server
+	statusServer                *ikniteServer.IkniteServer
 	ctx                         context.Context //nolint:containedctx // passed around but not stored
 	ctxCancel                   context.CancelFunc
 }
@@ -813,11 +812,11 @@ func (d *initData) MDnsConn() *mdns.Conn {
 	return d.mdnsConn
 }
 
-func (d *initData) SetStatusServer(srv *http.Server) {
+func (d *initData) SetStatusServer(srv *ikniteServer.IkniteServer) {
 	d.statusServer = srv
 }
 
-func (d *initData) StatusServer() *http.Server {
+func (d *initData) StatusServer() *ikniteServer.IkniteServer {
 	return d.statusServer
 }
 
