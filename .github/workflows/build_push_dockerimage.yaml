@@ -42,7 +42,7 @@ jobs:
 
       - name: Extract metadata
         id: meta
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@v6
         with:
           images: ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ steps.split.outputs.docker_image_name }}
           tags: |
@@ -51,7 +51,7 @@ jobs:
             type=ref,event=pr,prefix=pr
 
       - name: Build and push
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: ./deploy/k8s/container-images/${{ steps.split.outputs.docker_image_name }}
           push: true
