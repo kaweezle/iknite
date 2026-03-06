@@ -21,6 +21,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"net/http"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -29,7 +30,9 @@ import (
 	k8Errors "k8s.io/apimachinery/pkg/api/errors"
 	metaV1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/clientcmd/api"
 	kubeadmConstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
@@ -97,6 +100,34 @@ func (config *Config) IsConfigServerAddress(address string) bool {
 	return true
 }
 
+// HTTPClient returns an HTTP client for config.
+func (config *Config) HTTPClient() (*http.Client, error) {
+	clientConfig := clientcmd.NewDefaultClientConfig(api.Config(*config), nil)
+	restConfig, err := clientConfig.ClientConfig()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get client config: %w", err)
+	}
+	httpClient, err := rest.HTTPClientFor(restConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create HTTP client: %w", err)
+	}
+	return httpClient, nil
+}
+
+// Return a REST client for config. To make simple HTTP requests to the API server.
+func (config *Config) NewRESTClient() (rest.Interface, error) {
+	clientConfig := clientcmd.NewDefaultClientConfig(api.Config(*config), nil)
+	restConfig, err := clientConfig.ClientConfig()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get client config: %w", err)
+	}
+	dis, err := discovery.NewDiscoveryClientForConfig(restConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create discovery client: %w", err)
+	}
+	return dis.RESTClient(), nil
+}
+
 // Client returns a clientset for config.
 func (config *Config) Client() (*kubernetes.Clientset, error) {
 	clientConfig := clientcmd.NewDefaultClientConfig(api.Config(*config), nil)
@@ -116,13 +147,13 @@ func (config *Config) Client() (*kubernetes.Clientset, error) {
 // milliseconds between each check. It needs at least okResponses good responses
 // from the server.
 func (config *Config) CheckClusterRunning(retries, okResponses, waitTime int) error {
-	client, err := config.Client()
+	client, err := config.NewRESTClient()
 	if err != nil {
 		return err
 	}
 
 	okTries := 0
-	query := client.Discovery().RESTClient().Get().AbsPath("/readyz")
+	query := client.Get().AbsPath("/readyz")
 	first := true
 	for ; retries > 0; retries-- {
 		if !first {

@@ -1,6 +1,6 @@
 package k8s
 
-// cSpell: words apiclient lipgloss
+// cSpell: words apiclient lipgloss clientcmd
 // cSpell: disable
 import (
 	"context"
@@ -15,6 +15,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	v1 "k8s.io/api/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 	kubeadmConstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	kubeConfigUtil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
@@ -22,6 +23,7 @@ import (
 
 	"github.com/kaweezle/iknite/pkg/alpine"
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
+	"github.com/kaweezle/iknite/pkg/constants"
 )
 
 // cSpell: enable
@@ -444,4 +446,28 @@ func CheckWorkloads(ctx context.Context, data CheckData) (bool, string, error) {
 		return false, "", fmt.Errorf("while waiting for workloads: %w", err)
 	}
 	return workloadData.IsOk(), "", nil
+}
+
+// CheckIkniteServerHealth checks the /healthz endpoint of the iknite status
+// server using the mTLS client configuration stored in constants.IkniteLocalConfPath
+// (/root/.kube/iknite.conf). It returns true when the server responds with "ok".
+func CheckIkniteServerHealth(timeout time.Duration) (bool, string, error) {
+	kubeConfig, err := LoadFromFile(constants.IkniteLocalConfPath)
+	if err != nil {
+		return false, "", fmt.Errorf("failed to load iknite config from %s: %w", constants.IkniteLocalConfPath, err)
+	}
+
+	var restClient rest.Interface
+	if restClient, err = kubeConfig.NewRESTClient(); err != nil {
+		return false, "", fmt.Errorf("failed to create REST client: %w", err)
+	}
+
+	body, err := restClient.Get().AbsPath("/healthz").DoRaw(context.Background())
+	if err != nil {
+		return false, "", fmt.Errorf("failed to call /healthz endpoint: %w", err)
+	}
+	if string(body) != "ok" {
+		return false, fmt.Sprintf("iknite status server returned unexpected response: %s", string(body)), nil
+	}
+	return true, "Iknite status server is healthy", nil
 }

@@ -8,6 +8,7 @@ import (
 	initPhases "k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/init"
 
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
+	"github.com/kaweezle/iknite/pkg/server"
 )
 
 type IkniteInitData interface {
@@ -19,4 +20,6 @@ type IkniteInitData interface {
 	SetMDnsConn(conn *mdns.Conn)
 	MDnsConn() *mdns.Conn
 	ContextWithCancel() (context.Context, context.CancelFunc)
+	SetStatusServer(srv *server.IkniteServer)
+	StatusServer() *server.IkniteServer
 }
