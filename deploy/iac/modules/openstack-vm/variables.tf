@@ -34,11 +34,11 @@ variable "private_keys" {
 variable "ssh_host_keys" {
   description = "Fixed SSH host keys to configure on instances via cloud-init. When provided, the VM always presents the same host key, enabling strict host key verification without StrictHostKeyChecking=no."
   type = object({
-    ed25519_private = string
-    ed25519_public  = string
+    ecdsa_private = string
+    ecdsa_public  = string
   })
-  sensitive = true
-  default   = null
+  #   sensitive = true
+  default = null
 }
 
 variable "ovh" {

@@ -8,7 +8,7 @@
 #   require_checksum: true
 #   supported_envs:
 #   - all
-# cSpell: words getsops
+# cSpell: words getsops oras
 registries:
   - type: standard
     ref: v4.476.0 # renovate: depName=aquaproj/aqua-registry

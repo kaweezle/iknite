@@ -1,6 +1,6 @@
 # Makefile for building Iknite packages, rootfs images, and VM images.
 # cSpell: words gsub rootfull chainguard apkindex doas vhdx apks covermode coverprofile checkmake
-# cSpell: words moby oras hyperv
+# cSpell: words moby oras hyperv keygen nistp
 SHELL := /bin/sh
 
 ROOT_DIR := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
@@ -169,38 +169,38 @@ IMAGES_ID = $(shell $(RUN_CONTAINER_CMD) image ls -q --filter "label=org.opencon
 BUILD_VM_IMAGE_SCRIPTS = $(ROOT_DIR)/packaging/scripts/build-vm-image.sh $(ROOT_DIR)/packaging/scripts/configure-vm-image.sh
 
 SECRETS_FILE := $(ROOT_DIR)/deploy/k8s/secrets/secrets.sops.yaml
-
+SSH_KNOWN_HOSTS_FILE := $(ROOT_DIR)/hack/devcontainer/iknite_known_hosts
 
 .PHONY: help
 help: # ignore checkmake
 	@echo "Iknite build targets"
 	@echo ""
 	@echo "Step targets:"
-	@echo "  make extract-key         Extract signing key from sops file"
-	@echo "  make goreleaser          Build iknite package (goreleaser)"
-	@echo "  make fetch-karmafun      Download latest karmafun APK into dist/"
-	@echo "  make images-apk          Build iknite-images APK"
-	@echo "  make incus-agent-apk     Build incus-agent APK"
-	@echo "  make apk-repo            Create APK repository in dist/repo"
-	@echo "  make upload-apk-repo     Upload APK repository with terragrunt"
-	@echo "  make rootfs-base-image   Build rootfs base image"
-	@echo "  make rootfs-container    Add preloaded images into rootfs container"
-	@echo "  make rootfs              Build rootfs"
-	@echo "  make rootfs-image        Build final rootfs image"
-	@echo "  make vm-image            Build VM images (qcow2, vhdx)"
-	@echo "  make vm-container-images Build VM images as container images"
-	@echo "  make clean               Remove build artifacts and temp container"
-	@echo "  make all                 Run full pipeline"
-	@echo "  make ssh-key             Extract SSH key for iknite VMs from sops file"
-	@echo "  make vm-known-hosts      Extract VM SSH host public key to ~/.ssh/iknite_known_hosts"
-	@echo "  make generate-vm-host-keys Generate new fixed SSH host keys for iknite VMs"
-	@echo "  make vm-ssh              Connect to the E2E test VM using the fixed host key"
-	@echo "  make e2e-tg-init         Initialize terragrunt E2E test configuration"
-	@echo "  make e2e-tg-refresh      Refresh terragrunt E2E test state without applying changes"
-	@echo "  make e2e-tg-apply        Apply terragrunt E2E test configuration to create E2E test VM"
-	@echo "  make e2e-tg-destroy      Destroy E2E test VM with terragrunt"
-	@echo "  make e2e-check-argocd    Check ArgoCD application status for E2E test cluster"
-	@echo "  make release-files       Generate SHA256SUMS file for release artifacts"
+	@echo "  make extract-key            Extract signing key from sops file"
+	@echo "  make goreleaser             Build iknite package (goreleaser)"
+	@echo "  make fetch-karmafun         Download latest karmafun APK into dist/"
+	@echo "  make images-apk             Build iknite-images APK"
+	@echo "  make incus-agent-apk        Build incus-agent APK"
+	@echo "  make apk-repo               Create APK repository in dist/repo"
+	@echo "  make upload-apk-repo        Upload APK repository with terragrunt"
+	@echo "  make rootfs-base-image      Build rootfs base image"
+	@echo "  make rootfs-container       Add preloaded images into rootfs container"
+	@echo "  make rootfs                 Build rootfs"
+	@echo "  make rootfs-image           Build final rootfs image"
+	@echo "  make vm-image               Build VM images (qcow2, vhdx)"
+	@echo "  make vm-container-images    Build VM images as container images"
+	@echo "  make clean                  Remove build artifacts and temp container"
+	@echo "  make all                    Run full pipeline"
+	@echo "  make ssh-key                Extract SSH key for iknite VMs from sops file"
+	@echo "  make vm-known-hosts         Extract VM SSH host public key to ~/.ssh/iknite_known_hosts"
+	@echo "  make generate-vm-host-keys  Generate new fixed SSH host keys for iknite VMs"
+	@echo "  make vm-ssh                 Connect to the E2E test VM using the fixed host key"
+	@echo "  make e2e-tg-init            Initialize terragrunt E2E test configuration"
+	@echo "  make e2e-tg-refresh         Refresh terragrunt E2E test state without applying changes"
+	@echo "  make e2e-tg-apply           Apply terragrunt E2E test configuration to create E2E test VM"
+	@echo "  make e2e-tg-destroy         Destroy E2E test VM with terragrunt"
+	@echo "  make e2e-check-argocd       Check ArgoCD application status for E2E test cluster"
+	@echo "  make release-files          Generate SHA256SUMS file for release artifacts"
 	@echo ""
 	@echo "File targets (examples):"
 	@echo "  make dist/iknite-<version>.$(ARCH).apk"
@@ -554,7 +554,7 @@ $(HOME)/.ssh/iknite_known_hosts: $(SECRETS_FILE) | check-prerequisites
 	@echo "Extracting VM SSH host public key for known_hosts from $<..."
 	mkdir -p "$(HOME)/.ssh"
 	chmod 700 "$(HOME)/.ssh"
-	$(SOPS_DECRYPT_CMD) $< | jq -r '"iknite-vm " + .data.iknite_vm.ssh_host_ed25519_public' > "$@"
+	$(SOPS_DECRYPT_CMD) $< | jq -r '"* " + .data.iknite_vm.ssh_host_ecdsa_public' > "$@"
 	chmod 600 "$@"
 
 .PHONY: vm-known-hosts
@@ -564,26 +564,26 @@ vm-known-hosts: $(HOME)/.ssh/iknite_known_hosts ## Extract VM SSH host public ke
 generate-vm-host-keys: ## Generate new fixed SSH host keys for iknite VMs and update devcontainer known_hosts
 	@echo "Generating new SSH host key pair for iknite VMs..."
 	@TMP_KEY=$$(mktemp) && \
-	ssh-keygen -t ed25519 -C "iknite-vm-host-key" -f "$$TMP_KEY" -N "" -q && \
-	PRIVATE_KEY=$$(cat "$$TMP_KEY") && \
+	echo "y" | ssh-keygen -t ecdsa-sha2-nistp256 -b 256 -C "iknite-vm-host-key" -f "$$TMP_KEY" -N "" -q && \
+	PRIVATE_KEY=$$(cat "$$TMP_KEY" | jq -Rs 'split("\n") | join("\n")') && \
 	PUBLIC_KEY=$$(cat "$$TMP_KEY.pub") && \
 	rm -f "$$TMP_KEY" "$$TMP_KEY.pub" && \
-	echo "# Pre-trusted SSH host key for iknite VMs." > "$(ROOT_DIR)/hack/devcontainer/iknite_known_hosts" && \
-	echo "# The iknite VM always presents this host key (configured via cloud-init ssh_keys)," >> "$(ROOT_DIR)/hack/devcontainer/iknite_known_hosts" && \
-	echo "# allowing strict host key verification without accepting unknown keys." >> "$(ROOT_DIR)/hack/devcontainer/iknite_known_hosts" && \
-	echo "# Use: ssh -o Hostname=<VM_IP> iknite-vm" >> "$(ROOT_DIR)/hack/devcontainer/iknite_known_hosts" && \
-	echo "iknite-vm $$PUBLIC_KEY" >> "$(ROOT_DIR)/hack/devcontainer/iknite_known_hosts" && \
+	echo "# cSpell: disable" > "$(SSH_KNOWN_HOSTS_FILE)" && \
+	echo "# Pre-trusted SSH host key for iknite VMs." >> "$(SSH_KNOWN_HOSTS_FILE)" && \
+	echo "# The iknite VM always presents this host key (configured via cloud-init ssh_keys)," >> "$(SSH_KNOWN_HOSTS_FILE)" && \
+	echo "# allowing strict host key verification without accepting unknown keys." >> "$(SSH_KNOWN_HOSTS_FILE)" && \
+	echo "# Use: ssh -o Hostname=<VM_IP> iknite-vm" >> "$(SSH_KNOWN_HOSTS_FILE)" && \
+	echo "* $$PUBLIC_KEY" >> "$(SSH_KNOWN_HOSTS_FILE)" && \
+	PUBLIC_KEY_ESCAPED=$$(echo "$$PUBLIC_KEY" | jq -Rs 'split("\n") | join("\n")') && \
+	sops set $(SECRETS_FILE) '["data"]["iknite_vm"]["ssh_host_ecdsa_private"]' "$$PRIVATE_KEY" && \
+	sops set $(SECRETS_FILE) '["data"]["iknite_vm"]["ssh_host_ecdsa_public"]' "$$PUBLIC_KEY_ESCAPED" && \
 	echo "" && \
 	echo "Generated new SSH host key pair." && \
 	echo "Public key: $$PUBLIC_KEY" && \
 	echo "" && \
-	echo "Next steps:" && \
-	echo "  1. Update SOPS secrets with the new keys:" && \
-	echo "       sops $(ROOT_DIR)/deploy/k8s/secrets/secrets.sops.yaml" && \
-	echo "     Set iknite_vm.ssh_host_ed25519_private to the private key (run with SHOW_PRIVATE=1 to display it)." && \
-	echo "     Set iknite_vm.ssh_host_ed25519_public to: $$PUBLIC_KEY" && \
-	echo "  2. Commit the updated hack/devcontainer/iknite_known_hosts" && \
-	if [ "$${SHOW_PRIVATE:-0}" = "1" ]; then echo "  Private key: $$PRIVATE_KEY"; fi
+	echo "The following files have been modified and need to be committed:" && \
+	echo "  - $(SSH_KNOWN_HOSTS_FILE)" && \
+	echo "  - $(SECRETS_FILE)"
 
 .PHONY: vm-ssh
 vm-ssh: $(HOME)/.ssh/iknite $(HOME)/.ssh/iknite_known_hosts ## Connect to the E2E test VM using the fixed host key

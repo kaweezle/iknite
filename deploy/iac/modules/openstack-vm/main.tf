@@ -14,8 +14,8 @@ locals {
   # that configures fixed SSH host keys on the VM. This overrides any user_data set on
   # individual instances, allowing clients to verify the host key without StrictHostKeyChecking=no.
   ssh_host_keys_user_data = var.ssh_host_keys != null ? templatefile("${path.module}/cloud-config.yaml.tpl", {
-    ssh_host_ed25519_private = var.ssh_host_keys.ed25519_private
-    ssh_host_ed25519_public  = var.ssh_host_keys.ed25519_public
+    ssh_host_ecdsa_private = var.ssh_host_keys.ecdsa_private
+    ssh_host_ecdsa_public  = chomp(var.ssh_host_keys.ecdsa_public)
   }) : null
 }
 
@@ -65,7 +65,8 @@ resource "null_resource" "wait_ssh" {
       timeout     = "1m"
       # When fixed SSH host keys are configured, verify the server's host key.
       # This prevents man-in-the-middle attacks during provisioning.
-      host_key = var.ssh_host_keys != null ? var.ssh_host_keys.ed25519_public : null
+      host_key = var.ssh_host_keys != null ? chomp(var.ssh_host_keys.ecdsa_public) : null
+
     }
 
     inline = ["echo 'connected!'"]
