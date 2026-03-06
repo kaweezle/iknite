@@ -38,6 +38,13 @@ module "vms" {
     "default" = file("~/.ssh/id_rsa")
   }
 
+  # Optional: fixed SSH host keys ensure the VM always presents the same host key,
+  # enabling strict host key verification without StrictHostKeyChecking=no.
+  ssh_host_keys = {
+    ed25519_private = file("~/.ssh/iknite_vm_host_ed25519")
+    ed25519_public  = file("~/.ssh/iknite_vm_host_ed25519.pub")
+  }
+
   instances = {
     "my-vm" = {
       name         = "my-vm-instance"
@@ -83,6 +90,7 @@ No modules.
 | <a name="input_openstack"></a> [openstack](#input\_openstack) | OpenStack credentials | <pre>object({<br/>    auth_url            = string<br/>    user_domain_name    = string<br/>    project_domain_name = string<br/>    user_name           = string<br/>    password            = string<br/>    region              = string<br/>    tenant_id           = string<br/>  })</pre> | n/a | yes |
 | <a name="input_ovh"></a> [ovh](#input\_ovh) | OVH credentials | <pre>object({<br/>    endpoint           = optional(string, "ovh-eu")<br/>    application_key    = string<br/>    application_secret = string<br/>    consumer_key       = string<br/>  })</pre> | n/a | yes |
 | <a name="input_private_keys"></a> [private\_keys](#input\_private\_keys) | Map of private keys for the created keypairs | `map(string)` | n/a | yes |
+| <a name="input_ssh_host_keys"></a> [ssh\_host\_keys](#input\_ssh\_host\_keys) | Fixed SSH host keys to configure on instances via cloud-init. When provided, the VM always presents the same host key, enabling strict host key verification without StrictHostKeyChecking=no. | <pre>object({<br/>    ed25519_private = string<br/>    ed25519_public  = string<br/>  })</pre> | `null` | no |
 
 ## Outputs
 

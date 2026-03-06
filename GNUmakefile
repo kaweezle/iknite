@@ -192,6 +192,9 @@ help: # ignore checkmake
 	@echo "  make clean               Remove build artifacts and temp container"
 	@echo "  make all                 Run full pipeline"
 	@echo "  make ssh-key             Extract SSH key for iknite VMs from sops file"
+	@echo "  make vm-known-hosts      Extract VM SSH host public key to ~/.ssh/iknite_known_hosts"
+	@echo "  make generate-vm-host-keys Generate new fixed SSH host keys for iknite VMs"
+	@echo "  make vm-ssh              Connect to the E2E test VM using the fixed host key"
 	@echo "  make e2e-tg-init         Initialize terragrunt E2E test configuration"
 	@echo "  make e2e-tg-refresh      Refresh terragrunt E2E test state without applying changes"
 	@echo "  make e2e-tg-apply        Apply terragrunt E2E test configuration to create E2E test VM"
@@ -546,6 +549,51 @@ $(HOME)/.ssh/iknite: $(SECRETS_FILE) | check-prerequisites
 
 .PHONY: ssh-key
 ssh-key: $(HOME)/.ssh/iknite
+
+$(HOME)/.ssh/iknite_known_hosts: $(SECRETS_FILE) | check-prerequisites
+	@echo "Extracting VM SSH host public key for known_hosts from $<..."
+	mkdir -p "$(HOME)/.ssh"
+	chmod 700 "$(HOME)/.ssh"
+	$(SOPS_DECRYPT_CMD) $< | jq -r '"iknite-vm " + .data.iknite_vm.ssh_host_ed25519_public' > "$@"
+	chmod 600 "$@"
+
+.PHONY: vm-known-hosts
+vm-known-hosts: $(HOME)/.ssh/iknite_known_hosts ## Extract VM SSH host public key to ~/.ssh/iknite_known_hosts
+
+.PHONY: generate-vm-host-keys
+generate-vm-host-keys: ## Generate new fixed SSH host keys for iknite VMs and update devcontainer known_hosts
+	@echo "Generating new SSH host key pair for iknite VMs..."
+	@TMP_KEY=$$(mktemp) && \
+	ssh-keygen -t ed25519 -C "iknite-vm-host-key" -f "$$TMP_KEY" -N "" -q && \
+	PRIVATE_KEY=$$(cat "$$TMP_KEY") && \
+	PUBLIC_KEY=$$(cat "$$TMP_KEY.pub") && \
+	rm -f "$$TMP_KEY" "$$TMP_KEY.pub" && \
+	echo "# Pre-trusted SSH host key for iknite VMs." > "$(ROOT_DIR)/hack/devcontainer/iknite_known_hosts" && \
+	echo "# The iknite VM always presents this host key (configured via cloud-init ssh_keys)," >> "$(ROOT_DIR)/hack/devcontainer/iknite_known_hosts" && \
+	echo "# allowing strict host key verification without accepting unknown keys." >> "$(ROOT_DIR)/hack/devcontainer/iknite_known_hosts" && \
+	echo "# Use: ssh -o Hostname=<VM_IP> iknite-vm" >> "$(ROOT_DIR)/hack/devcontainer/iknite_known_hosts" && \
+	echo "iknite-vm $$PUBLIC_KEY" >> "$(ROOT_DIR)/hack/devcontainer/iknite_known_hosts" && \
+	echo "" && \
+	echo "Generated new SSH host key pair." && \
+	echo "Public key: $$PUBLIC_KEY" && \
+	echo "" && \
+	echo "Next steps:" && \
+	echo "  1. Update SOPS secrets with the new keys:" && \
+	echo "       sops $(ROOT_DIR)/deploy/k8s/secrets/secrets.sops.yaml" && \
+	echo "     Set iknite_vm.ssh_host_ed25519_private to the private key (run with SHOW_PRIVATE=1 to display it)." && \
+	echo "     Set iknite_vm.ssh_host_ed25519_public to: $$PUBLIC_KEY" && \
+	echo "  2. Commit the updated hack/devcontainer/iknite_known_hosts" && \
+	if [ "$${SHOW_PRIVATE:-0}" = "1" ]; then echo "  Private key: $$PRIVATE_KEY"; fi
+
+.PHONY: vm-ssh
+vm-ssh: $(HOME)/.ssh/iknite $(HOME)/.ssh/iknite_known_hosts ## Connect to the E2E test VM using the fixed host key
+	@VM_IP=$$(cd "$(ROOT_DIR)/deploy/iac/iknite/iknite-vm" && terragrunt output --raw --non-interactive instances 2>/dev/null | jq -r '."iknite-vm-instance".access_ip_v4' 2>/dev/null || echo ""); \
+	if [ -z "$$VM_IP" ]; then \
+		echo "Error: Could not determine VM IP. Run 'make e2e-tg-apply' first."; \
+		exit 1; \
+	fi; \
+	echo "Connecting to iknite VM at $$VM_IP..."; \
+	ssh -o Hostname="$$VM_IP" iknite-vm
 
 .PHONY: rotate-cache
 rotate-cache:

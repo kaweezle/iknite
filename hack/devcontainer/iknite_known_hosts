@@ -1,0 +1,5 @@
+# Pre-trusted SSH host key for iknite VMs.
+# The iknite VM always presents this host key (configured via cloud-init ssh_keys),
+# allowing strict host key verification without accepting unknown keys.
+# Use: ssh -o Hostname=<VM_IP> iknite-vm
+iknite-vm ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHBhO/E1saMvL8DB6saYokv5s5ELsR46N/tVWCMg3lu3 iknite-vm-host-key

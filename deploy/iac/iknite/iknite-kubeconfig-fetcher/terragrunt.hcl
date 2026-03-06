@@ -24,9 +24,10 @@ locals {
 }
 
 inputs = {
-  host        = try(dependency.vm.outputs.instances["iknite-vm-instance"].access_ip_v4, "")
-  username    = "root"
-  private_key = local.iknite_vm.ssh_private_key
-  ssh_port    = 22
-  timeout     = 300
+  host                = try(dependency.vm.outputs.instances["iknite-vm-instance"].access_ip_v4, "")
+  username            = "root"
+  private_key         = local.iknite_vm.ssh_private_key
+  ssh_host_public_key = local.iknite_vm.ssh_host_ed25519_public
+  ssh_port            = 22
+  timeout             = 300
 }

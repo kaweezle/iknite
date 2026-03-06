@@ -26,6 +26,13 @@ variable "ssh_port" {
   description = "The SSH port for connection"
 }
 
+variable "ssh_host_public_key" {
+  type        = string
+  sensitive   = false
+  default     = null
+  description = "The expected SSH host public key of the remote server. When set, enables strict host key checking to prevent man-in-the-middle attacks."
+}
+
 variable "timeout" {
   type        = number
   default     = 300

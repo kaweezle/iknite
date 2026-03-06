@@ -9,6 +9,14 @@ locals {
     for k, v in var.instances : k => v
     if lookup(v, "enabled", true)
   }
+
+  # When ssh_host_keys are provided, generate user_data from the cloud-config template
+  # that configures fixed SSH host keys on the VM. This overrides any user_data set on
+  # individual instances, allowing clients to verify the host key without StrictHostKeyChecking=no.
+  ssh_host_keys_user_data = var.ssh_host_keys != null ? templatefile("${path.module}/cloud-config.yaml.tpl", {
+    ssh_host_ed25519_private = var.ssh_host_keys.ed25519_private
+    ssh_host_ed25519_public  = var.ssh_host_keys.ed25519_public
+  }) : null
 }
 
 // Create instance from the image
@@ -18,7 +26,7 @@ resource "openstack_compute_instance_v2" "this" {
   image_id    = each.value.image_id
   flavor_name = each.value.flavor_name
   key_pair    = each.value.key_name
-  user_data   = each.value.user_data
+  user_data   = local.ssh_host_keys_user_data != null ? local.ssh_host_keys_user_data : each.value.user_data
   metadata    = each.value.metadata
   tags        = each.value.tags
   network {
@@ -55,6 +63,9 @@ resource "null_resource" "wait_ssh" {
       user        = "root"
       private_key = var.private_keys[each.value.key_name]
       timeout     = "1m"
+      # When fixed SSH host keys are configured, verify the server's host key.
+      # This prevents man-in-the-middle attacks during provisioning.
+      host_key = var.ssh_host_keys != null ? var.ssh_host_keys.ed25519_public : null
     }
 
     inline = ["echo 'connected!'"]
