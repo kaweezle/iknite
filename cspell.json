@@ -18,7 +18,8 @@
     "**/**.sops.yaml",
     "**/*.lock.hcl",
     "packaging/apk/iknite/**",
-    ".gitattributes"
+    ".gitattributes",
+    "checkmake.ini"
   ],
   "dictionaryDefinitions": [],
   "dictionaries": [
@@ -34,9 +35,11 @@
     "antoinemartin",
     "apkrepo",
     "appstage",
+    "bsdtar",
     "buildctl",
     "buildkit",
     "buildkitd",
+    "checkmake",
     "clientset",
     "codegen",
     "configmap",
@@ -62,6 +65,7 @@
     "gocyclo",
     "Golangci",
     "GOPATH",
+    "gomplate",
     "goreleaser",
     "gosec",
     "gotmpl",
@@ -119,6 +123,7 @@
     "uefi",
     "unparam",
     "vancluever",
+    "virtio",
     "Warnf",
     "Warningf",
     "Warningln",

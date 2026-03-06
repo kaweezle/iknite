@@ -135,17 +135,17 @@ trap 'rm -rf "${TEMP_DIR}"' EXIT
 print_info "Fetching release information..."
 
 ROOTFS_URL=$(get_release_asset_url "${VERSION}" "rootfs\.tar\.gz")
-METADATA_URL=$(get_release_asset_url "${VERSION}" "incus-metadata\.tar\.gz")
+METADATA_URL=$(get_release_asset_url "${VERSION}" "incus\.tar\.xz")
 
 print_info "Downloading rootfs..."
 curl -fL --progress-bar -o "${TEMP_DIR}/rootfs.tar.gz" "${ROOTFS_URL}"
 
 print_info "Downloading incus metadata..."
-curl -fL --progress-bar -o "${TEMP_DIR}/metadata.tar.gz" "${METADATA_URL}"
+curl -fL --progress-bar -o "${TEMP_DIR}/incus.tar.xz" "${METADATA_URL}"
 
 ALIAS="iknite/${VERSION}"
 print_info "Importing image into incus with alias '${ALIAS}'..."
-incus image import "${TEMP_DIR}/metadata.tar.gz" "${TEMP_DIR}/rootfs.tar.gz" --alias "${ALIAS}"
+incus image import "${TEMP_DIR}/incus.tar.xz" "${TEMP_DIR}/rootfs.tar.gz" --alias "${ALIAS}"
 
 if [ "${START_CONTAINER}" = "true" ]; then
     print_info "Launching container '${CONTAINER_NAME}'..."

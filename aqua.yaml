@@ -1,6 +1,6 @@
 ---
 # yaml-language-server: $schema=https://raw.githubusercontent.com/aquaproj/aqua/main/json-schema/aqua-yaml.json
-# cSpell: words aquaproj filosottile FairwindsOps yannh jpillora ahmetb
+# cSpell: words aquaproj filosottile FairwindsOps yannh jpillora ahmetb hairyhenderson
 # aqua - Declarative CLI Version Manager
 # https://aquaproj.github.io/
 # checksum:
@@ -8,7 +8,7 @@
 #   require_checksum: true
 #   supported_envs:
 #   - all
-# cSpell: words getsops
+# cSpell: words getsops oras
 registries:
   - type: standard
     ref: v4.476.0 # renovate: depName=aquaproj/aqua-registry
@@ -29,3 +29,4 @@ packages:
   - name: argoproj/argo-cd@v3.3.2
   - name: ahmetb/kubectx@v0.9.5
   - name: oras-project/oras@v1.3.0
+  - name: hairyhenderson/gomplate@v3.11.9
