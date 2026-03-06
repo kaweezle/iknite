@@ -35,6 +35,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	certutil "k8s.io/client-go/util/cert"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	kubeConfigUtil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 	pkiutil "k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
 
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
@@ -185,6 +186,59 @@ func EnsureClientCertAndKey(certDir string) error {
 	return nil
 }
 
+// EnsureIkniteConf generates a kubeconfig-style client configuration file at
+// confPath with the CA cert and client cert/key embedded. The server URL is
+// derived from spec.Ip (or localhost as fallback) and spec.StatusServerPort.
+// This file is analogous to /etc/kubernetes/admin.conf but targets the iknite
+// status server. It is (re-)created on every start so that the IP address is
+// always up to date.
+func EnsureIkniteConf(certDir, confPath string, spec *v1alpha1.IkniteClusterSpec) error {
+	// Determine the server address from the cluster spec
+	serverAddr := "localhost"
+	if spec.Ip != nil && !spec.Ip.IsLoopback() {
+		serverAddr = spec.Ip.String()
+	} else if spec.DomainName != "" {
+		serverAddr = spec.DomainName
+	}
+	serverURL := fmt.Sprintf("https://%s", net.JoinHostPort(serverAddr, strconv.Itoa(spec.StatusServerPort)))
+
+	caCertPEM, err := os.ReadFile(filepath.Join(certDir, "ca.crt"))
+	if err != nil {
+		return fmt.Errorf("failed to read CA cert: %w", err)
+	}
+
+	clientCertPEM, err := os.ReadFile(filepath.Join(certDir, constants.IkniteClientCertName+".crt"))
+	if err != nil {
+		return fmt.Errorf("failed to read client cert: %w", err)
+	}
+
+	clientKeyPEM, err := os.ReadFile(filepath.Join(certDir, constants.IkniteClientCertName+".key"))
+	if err != nil {
+		return fmt.Errorf("failed to read client key: %w", err)
+	}
+
+	kubeconfig := kubeConfigUtil.CreateWithCerts(
+		serverURL,
+		constants.IkniteConfName, // cluster name
+		constants.IkniteConfName, // user name
+		caCertPEM,
+		clientKeyPEM,
+		clientCertPEM,
+	)
+	// Note: CreateWithCerts (via CreateBasic) already sets CurrentContext to
+	// "<user>@<cluster>" = "iknite@iknite". Do not overwrite it.
+
+	if err := kubeConfigUtil.WriteToDisk(confPath, kubeconfig); err != nil {
+		return fmt.Errorf("failed to write iknite.conf to %s: %w", confPath, err)
+	}
+
+	log.WithFields(log.Fields{
+		"path":   confPath,
+		"server": serverURL,
+	}).Info("iknite.conf written")
+	return nil
+}
+
 // NewIkniteServer builds an IkniteServer from spec and the certificates in
 // certDir. The port is taken from spec.StatusServerPort.
 func NewIkniteServer(certDir string, spec *v1alpha1.IkniteClusterSpec) (*IkniteServer, error) {
@@ -247,6 +301,9 @@ func StartIkniteServer(certDir string, spec *v1alpha1.IkniteClusterSpec, cluster
 	}
 	if err := EnsureClientCertAndKey(certDir); err != nil {
 		return nil, fmt.Errorf("failed to ensure client cert: %w", err)
+	}
+	if err := EnsureIkniteConf(certDir, constants.IkniteConfPath, spec); err != nil {
+		return nil, fmt.Errorf("failed to write iknite client config to %s: %w", constants.IkniteConfPath, err)
 	}
 
 	srv, err := NewIkniteServer(certDir, spec)

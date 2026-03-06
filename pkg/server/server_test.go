@@ -16,7 +16,7 @@ limitations under the License.
 
 package server_test
 
-// cSpell: words pkiutil certutil
+// cSpell: words pkiutil certutil clientcmd
 
 import (
 	"context"
@@ -35,6 +35,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	certutil "k8s.io/client-go/util/cert"
+	"k8s.io/client-go/tools/clientcmd"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	pkiutil "k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
 
@@ -229,4 +230,41 @@ func TestStatusEndpoint(t *testing.T) {
 	body, err := io.ReadAll(resp.Body)
 	require.NoError(t, err)
 	require.True(t, json.Valid(body))
+}
+
+func TestEnsureIkniteConf(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	createTestCA(t, dir)
+
+	spec := makeTestSpec(11443)
+	require.NoError(t, server.EnsureServerCertAndKey(dir, []string{spec.DomainName}, []net.IP{spec.Ip}))
+	require.NoError(t, server.EnsureClientCertAndKey(dir))
+
+	confPath := filepath.Join(dir, "iknite.conf")
+	err := server.EnsureIkniteConf(dir, confPath, spec)
+	require.NoError(t, err)
+	require.FileExists(t, confPath)
+
+	// Load the kubeconfig and validate its content
+	kubeConfig, err := clientcmd.LoadFromFile(confPath)
+	require.NoError(t, err)
+	require.NotEmpty(t, kubeConfig.CurrentContext)
+
+	ctx := kubeConfig.Contexts[kubeConfig.CurrentContext]
+	require.NotNil(t, ctx, "context %q should exist in loaded kubeconfig", kubeConfig.CurrentContext)
+
+	cluster := kubeConfig.Clusters[ctx.Cluster]
+	require.NotNil(t, cluster)
+	require.Contains(t, cluster.Server, "11443", "server URL should include the port")
+	require.NotEmpty(t, cluster.CertificateAuthorityData)
+
+	authInfo := kubeConfig.AuthInfos[ctx.AuthInfo]
+	require.NotNil(t, authInfo)
+	require.NotEmpty(t, authInfo.ClientCertificateData)
+	require.NotEmpty(t, authInfo.ClientKeyData)
+
+	// Regeneration should succeed (overwrites with updated IP)
+	err = server.EnsureIkniteConf(dir, confPath, spec)
+	require.NoError(t, err)
 }
