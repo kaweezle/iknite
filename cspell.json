@@ -22,13 +22,7 @@
     "checkmake.ini"
   ],
   "dictionaryDefinitions": [],
-  "dictionaries": [
-    "bash",
-    "docker",
-    "golang",
-    "terraform",
-    "softwareTerms"
-  ],
+  "dictionaries": ["bash", "docker", "golang", "terraform", "softwareTerms"],
   "words": [
     "abuild",
     "afero",
@@ -64,6 +58,7 @@
     "gocritic",
     "gocyclo",
     "Golangci",
+    "gomplate",
     "GOPATH",
     "goreleaser",
     "gosec",
@@ -72,6 +67,7 @@
     "Healthz",
     "iknite",
     "iknitedev",
+    "incus",
     "Infof",
     "Infoln",
     "interfacebloat",
@@ -117,6 +113,7 @@
     "testdata",
     "tflint",
     "tfstate",
+    "tmpl",
     "traefik",
     "uefi",
     "unparam",
