@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# cSpell: words incus iknite apparmor lxc unconfined ghcr aarch mikefarah yq rootfs referrers
+# cSpell: words incus iknite apparmor lxc unconfined ghcr aarch mikefarah yq rootfs referrers armv oras
 #
 # Install iknite as an Incus container.
 #
@@ -171,7 +171,8 @@ registry_fetch_manifest() {
             "application/vnd.oci.image.manifest.v1+json,application/vnd.docker.distribution.manifest.v2+json")
     fi
 
-    echo "${manifest}"
+    # Insert the manifest digest into the manifest JSON for later use when looking up referrers.
+    echo "${manifest}" | "${YQ_CMD}" -r ".manifestDigest = \"${TAG_MANIFEST_DIGEST}\""
 }
 
 # Download the rootfs tarball from the single layer of the container image.
@@ -182,6 +183,8 @@ download_rootfs() {
     print_info "Fetching manifest for ${REPOSITORY}:${image_tag}..."
     local manifest
     manifest=$(registry_fetch_manifest "${image_tag}")
+    cat - > "${TEMP_DIR}/manifest.json" <<< "${manifest}"
+    TAG_MANIFEST_DIGEST=$(echo "${manifest}" | "${YQ_CMD}" -r '.manifestDigest')
 
     local layer_digest
     layer_digest=$(echo "${manifest}" | "${YQ_CMD}" -r '.layers[0].digest')
@@ -199,16 +202,17 @@ download_rootfs() {
 
 # Download the Incus metadata tarball from the OCI referrers attached to the image.
 download_incus_metadata() {
-    local subject_digest="$1"
+    local subject_digest
+    subject_digest=$(echo "$1" | tr ":" "-")
     local output_file="$2"
     local accept_all="application/vnd.oci.image.manifest.v1+json,application/vnd.docker.distribution.manifest.v2+json"
 
-    print_info "Fetching OCI referrers for manifest ${subject_digest}..."
+    print_info "Fetching OCI referrers for manifest https://${REGISTRY}/v2/${REPOSITORY}/manifests/${subject_digest}..."
     local referrers
     referrers=$(curl -fsSL \
         -H "Authorization: Bearer ${TOKEN}" \
         -H "Accept: application/vnd.oci.image.index.v1+json" \
-        "https://${REGISTRY}/v2/${REPOSITORY}/referrers/${subject_digest}")
+        "https://${REGISTRY}/v2/${REPOSITORY}/manifests/${subject_digest}")
 
     local attachment_digest
     attachment_digest=$(echo "${referrers}" | "${YQ_CMD}" -r \
@@ -228,7 +232,7 @@ download_incus_metadata() {
         print_error "Could not find blob in Incus metadata attachment manifest."
     fi
 
-    print_info "Downloading Incus metadata (${blob_digest})..."
+    print_info "Downloading Incus metadata (${blob_digest}) to ${output_file}..."
     curl -fL --progress-bar \
         -H "Authorization: Bearer ${TOKEN}" \
         -o "${output_file}" \
@@ -266,8 +270,9 @@ print_info "Installing iknite as Incus container '${CONTAINER_NAME}' (version: $
 
 check_prerequisites
 
-TEMP_DIR=$(mktemp -d)
-trap 'rm -rf "${TEMP_DIR}"' EXIT
+# TEMP_DIR=$(mktemp -d)
+# trap 'rm -rf "${TEMP_DIR}"' EXIT
+TEMP_DIR="$HOME/tmp"
 
 ensure_yq
 registry_auth
