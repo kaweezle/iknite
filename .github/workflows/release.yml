@@ -133,7 +133,8 @@ jobs:
       -
         name: Make rootfs image
         run: |
-          make rootfs-image
+          make rootfs-image PUSH_IMAGES=true
+          make rootfs-image-incus-attachment
       -
         name: Move cache
         run: |

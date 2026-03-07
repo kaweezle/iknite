@@ -166,6 +166,7 @@ IKNITE_VM_IMAGE_VHDX_CONTAINER_MARKER = $(DIST_DIR)/images/$(IKNITE_VM_IMAGE_VHD
 
 INCUS_METADATA := $(DIST_DIR)/images/incus.tar.xz
 VM_PACKAGING_DIR := $(ROOT_DIR)/packaging/vm
+IKNITE_ROOTFS_IMAGE_INCUS_ATTACHMENT_MARKER = $(DIST_DIR)/iknite_$(IKNITE_VERSION_TAG)-$(KUBERNETES_VERSION)-incus.marker
 
 IMAGES_ID = $(shell $(RUN_CONTAINER_CMD) image ls -q --filter "label=org.opencontainers.image.source=https://github.com/kaweezle/iknite.git" | sort -u)
 
@@ -179,32 +180,33 @@ help: # ignore checkmake
 	@echo "Iknite build targets"
 	@echo ""
 	@echo "Step targets:"
-	@echo "  make extract-key            Extract signing key from sops file"
-	@echo "  make goreleaser             Build iknite package (goreleaser)"
-	@echo "  make fetch-karmafun         Download latest karmafun APK into dist/"
-	@echo "  make images-apk             Build iknite-images APK"
-	@echo "  make incus-agent-apk        Build incus-agent APK"
-	@echo "  make apk-repo               Create APK repository in dist/repo"
-	@echo "  make upload-apk-repo        Upload APK repository with terragrunt"
-	@echo "  make rootfs-base-image      Build rootfs base image"
-	@echo "  make rootfs-container       Add preloaded images into rootfs container"
-	@echo "  make rootfs                 Build rootfs"
-	@echo "  make rootfs-image           Build final rootfs image"
-	@echo "  make vm-image               Build VM images (qcow2, vhdx)"
-	@echo "  make incus-metadata         Build Incus metadata tarball (dist/images/incus.tar.xz)"
-	@echo "  make vm-container-images    Build VM images as container images"
-	@echo "  make clean                  Remove build artifacts and temp container"
-	@echo "  make all                    Run full pipeline"
-	@echo "  make ssh-key                Extract SSH key for iknite VMs from sops file"
-	@echo "  make vm-known-hosts         Extract VM SSH host public key to ~/.ssh/iknite_known_hosts"
-	@echo "  make generate-vm-host-keys  Generate new fixed SSH host keys for iknite VMs"
-	@echo "  make vm-ssh                 Connect to the E2E test VM using the fixed host key"
-	@echo "  make e2e-tg-init            Initialize terragrunt E2E test configuration"
-	@echo "  make e2e-tg-refresh         Refresh terragrunt E2E test state without applying changes"
-	@echo "  make e2e-tg-apply           Apply terragrunt E2E test configuration to create E2E test VM"
-	@echo "  make e2e-tg-destroy         Destroy E2E test VM with terragrunt"
-	@echo "  make e2e-check-argocd       Check ArgoCD application status for E2E test cluster"
-	@echo "  make release-files          Generate SHA256SUMS file for release artifacts"
+	@echo "  make extract-key                    Extract signing key from sops file"
+	@echo "  make goreleaser                     Build iknite package (goreleaser)"
+	@echo "  make fetch-karmafun                 Download latest karmafun APK into dist/"
+	@echo "  make images-apk                     Build iknite-images APK"
+	@echo "  make incus-agent-apk                Build incus-agent APK"
+	@echo "  make apk-repo                       Create APK repository in dist/repo"
+	@echo "  make upload-apk-repo                Upload APK repository with terragrunt"
+	@echo "  make rootfs-base-image              Build rootfs base image"
+	@echo "  make rootfs-container               Add preloaded images into rootfs container"
+	@echo "  make rootfs                         Build rootfs"
+	@echo "  make rootfs-image                   Build final rootfs image"
+	@echo "  make vm-image                       Build VM images (qcow2, vhdx)"
+	@echo "  make incus-metadata                 Build Incus metadata tarball (dist/images/incus.tar.xz)"
+	@echo "  make rootfs-image-incus-attachment  Attach Incus metadata to rootfs image in container registry with oras"
+	@echo "  make vm-container-images            Build VM images as container images"
+	@echo "  make clean                          Remove build artifacts and temp container"
+	@echo "  make all                            Run full pipeline"
+	@echo "  make ssh-key                        Extract SSH key for iknite VMs from sops file"
+	@echo "  make vm-known-hosts                 Extract VM SSH host public key to ~/.ssh/iknite_known_hosts"
+	@echo "  make generate-vm-host-keys          Generate new fixed SSH host keys for iknite VMs"
+	@echo "  make vm-ssh                         Connect to the E2E test VM using the fixed host key"
+	@echo "  make e2e-tg-init                    Initialize terragrunt E2E test configuration"
+	@echo "  make e2e-tg-refresh                 Refresh terragrunt E2E test state without applying changes"
+	@echo "  make e2e-tg-apply                   Apply terragrunt E2E test configuration to create E2E test VM"
+	@echo "  make e2e-tg-destroy                 Destroy E2E test VM with terragrunt"
+	@echo "  make e2e-check-argocd               Check ArgoCD application status for E2E test cluster"
+	@echo "  make release-files                  Generate SHA256SUMS file for release artifacts"
 	@echo ""
 	@echo "File targets (examples):"
 	@echo "  make dist/iknite-<version>.$(ARCH).apk"
@@ -222,7 +224,7 @@ help: # ignore checkmake
 
 
 .PHONY: all
-all: extract-key goreleaser fetch-karmafun images-apk incus-agent-apk apk-repo rootfs-base-image rootfs-container rootfs rootfs-image vm-image incus-metadata vm-container-images
+all: extract-key goreleaser fetch-karmafun images-apk incus-agent-apk apk-repo rootfs-base-image rootfs-container rootfs rootfs-image vm-image incus-metadata vm-container-images rootfs-image-incus-attachment
 
 print-% : ; $(info $* is a $(flavor $*) variable set to [$($*)]) @true
 
@@ -450,6 +452,17 @@ $(INCUS_METADATA): $(VM_PACKAGING_DIR)/metadata.yaml.tmpl $(IKNITE_VM_IMAGE_QCOW
 
 .PHONY: incus-metadata
 incus-metadata: $(INCUS_METADATA)
+
+# Attach the Incus metadata tarball to the rootfs image in the container registry using oras, so it can be consumed by Incus when pulling the image
+$(IKNITE_ROOTFS_IMAGE_INCUS_ATTACHMENT_MARKER): $(IKNITE_ROOTFS_IMAGE_MARKER) $(INCUS_METADATA) | check-prerequisites container-login
+	cd "$(ROOT_DIR)/dist/images"; \
+	oras attach "$(IKNITE_ROOTFS_IMAGE)" \
+	--artifact-type application/vnd.incus.metadata \
+	incus.tar.xz:application/x-xz
+	touch "$@"
+
+.PHONY: rootfs-image-incus-attachment
+rootfs-image-incus-attachment: $(IKNITE_ROOTFS_IMAGE_INCUS_ATTACHMENT_MARKER)
 
 # Push the VM images to the container registry using oras, with appropriate annotations and tags
 $(IKNITE_VM_IMAGE_VHDX_CONTAINER_MARKER): $(IKNITE_VM_IMAGE_VHDX) | check-prerequisites container-login
