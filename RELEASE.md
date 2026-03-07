@@ -21,7 +21,7 @@ You can customize the installation with parameters:
 
 ```powershell
 # Set environment variables for custom installation
-$env:IKNITE_VERSION = 'latest'
+$env:IKNITE_VERSION_TAG = 'latest'
 $env:IKNITE_NAME = 'iknite'
 $env:IKNITE_DIR = "$env:LOCALAPPDATA\iknite"
 

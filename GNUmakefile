@@ -1,6 +1,6 @@
 # Makefile for building Iknite packages, rootfs images, and VM images.
 # cSpell: words gsub rootfull chainguard apkindex doas vhdx apks covermode coverprofile checkmake
-# cSpell: words moby oras hyperv keygen nistp
+# cSpell: words moby oras hyperv keygen nistp gomplate
 SHELL := /bin/sh
 
 ROOT_DIR := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
@@ -72,7 +72,7 @@ else
 	HAS_WORKING_ROOTFULL_BUILDCTL := $(shell $(SUDO_CMD) buildctl debug workers >/dev/null 2>&1 && echo 'true' || echo '')
 endif
 
-RUN_CONTAINER_CMD := $(if $(HAS_WORKING_DOCKER),$(DOCKER_CMD),$(if $(HAS_WORKING_ROOTFULL_NERDCTL),$(SUDO_CMD) $(NERDCTL_CMD),$(if $(HAS_WORKING_ROOTLESS_NERDCTL),$(NERDCTL_CMD),":")))
+RUN_CONTAINER_CMD := $(if $(HAS_WORKING_DOCKER),$(DOCKER_CMD),$(if $(HAS_WORKING_ROOTLESS_NERDCTL),$(NERDCTL_CMD),$(if $(HAS_WORKING_ROOTFULL_NERDCTL),$(SUDO_CMD) $(NERDCTL_CMD),":")))
 BUILD_CONTAINER_CMD := $(if $(HAS_WORKING_ROOTLESS_BUILDCTL),$(BUILDCTL_CMD),$(if $(HAS_WORKING_ROOTFULL_BUILDCTL),$(SUDO_CMD) $(BUILDCTL_CMD),":"))
 
 BUILD_CONTAINER_CACHE_FROM_PATH := /tmp/.buildx-cache
@@ -93,33 +93,23 @@ else
 endif
 
 ROOTFULL := $(shell id -u 2>/dev/null | grep -q 0 && echo true || echo false)
+ROOT_CMD := $(if $(ROOTFULL),,$(SUDO_CMD))
 
 DIST_DIR := dist
 BUILD_DIR := build
 KARMAFUN_LATEST_VERSION := $(shell curl --silent https://api.github.com/repos/karmafun/karmafun/releases/latest | jq -r .tag_name)
-# IKNITE_VERSION := $(shell jq -Mr ".version" "$(DIST_DIR)/metadata.json" 2>/dev/null)
 # Exact tag match of current version + 1 patch, with -devel suffix (e.g. v0.1.0 -> v0.1.1-devel)
-IKNITE_VERSION := $(shell git describe --exact-match --tags --match="v[0-9]*" 2>/dev/null || (git describe --abbrev=0 --tags --match="v[0-9]*" | awk -F'.' '{ printf "%s.%s.%s-devel",$$1,$$2,$$3+1;}'))
+IKNITE_VERSION_TAG := $(shell git describe --exact-match --tags --match="v[0-9]*" 2>/dev/null || (git describe --abbrev=0 --tags --match="v[0-9]*" | awk -F'.' '{ printf "%s.%s.%s-devel",$$1,$$2,$$3+1;}'))
+export IKNITE_VERSION_TAG
+IKNITE_VERSION := $(IKNITE_VERSION_TAG:v%=%)
 export IKNITE_VERSION
-IKNITE_NUMBER_VERSION := $(IKNITE_VERSION:v%=%)
-export IKNITE_NUMBER_VERSION
-# test if IKNITE_VERSION contains -devel suffix, if so use test repo name, otherwise use iknite repo name
+# test if IKNITE_VERSION_TAG contains -devel suffix, if so use test repo name, otherwise use iknite repo name
 IKNITE_REPO_NAME ?= $(shell \
 	if git describe --exact-match --tags --match="v[0-9]*" >/dev/null 2>&1; then \
 		echo "release"; \
 	else \
 		echo "test"; \
 	fi)
-
-ifeq ($(IKNITE_REPO_NAME),release)
-	PUSH_IMAGES := true
-	IKNITE_ROOTFS_IMAGE_ADDITIONAL_TAG := ",name=$(IKNITE_ROOTFS_IMAGE):latest"
-	SNAPSHOT := ""
-else
-	PUSH_IMAGES := false
-	IKNITE_ROOTFS_IMAGE_ADDITIONAL_TAG := ""
-	SNAPSHOT := --snapshot
-endif
 
 # Variables for APK index builder image
 APK_INDEX_BUILDER_IMAGE := apk-index-builder:latest
@@ -128,21 +118,31 @@ APK_INDEX_BUILDER_IMAGE_DIR := $(ROOT_DIR)/.github/actions/make-apkindex
 APK_INDEX_BUILDER_IMAGE_SOURCES := $(wildcard $(APK_INDEX_BUILDER_IMAGE_DIR)/*)
 
 # Base image for rootfs, containing only the APK packages without preloaded images
-IKNITE_ROOTFS_BASE := iknite-rootfs-base:$(IKNITE_VERSION)
-IKNITE_ROOTFS_BASE_MARKER = $(DIST_DIR)/iknite-rootfs-base_$(IKNITE_VERSION).marker
+IKNITE_ROOTFS_BASE := iknite-rootfs-base:$(IKNITE_VERSION_TAG)
+IKNITE_ROOTFS_BASE_MARKER = $(DIST_DIR)/iknite-rootfs-base_$(IKNITE_VERSION_TAG).marker
 IKNITE_ROOTFS_BASE_SOURCES := $(wildcard $(ROOT_DIR)/packaging/rootfs/base/*)
 
 # Final rootfs image with preloaded Kubernetes images
-IKNITE_ROOTFS_IMAGE := $(REGISTRY)/$(IMAGE_NAME):$(IKNITE_VERSION)-$(KUBERNETES_VERSION)
-IKNITE_ROOTFS_IMAGE_MARKER = $(DIST_DIR)/iknite_$(IKNITE_VERSION)-$(KUBERNETES_VERSION).marker
+IKNITE_ROOTFS_IMAGE := $(REGISTRY)/$(IMAGE_NAME):$(IKNITE_VERSION_TAG)-$(KUBERNETES_VERSION)
+IKNITE_ROOTFS_IMAGE_MARKER = $(DIST_DIR)/iknite_$(IKNITE_VERSION_TAG)-$(KUBERNETES_VERSION).marker
 IKNITE_ROOTFS_SOURCES := $(wildcard $(ROOT_DIR)/packaging/rootfs/with-images/*)
 
-ROOTFS_NAME := iknite-$(IKNITE_NUMBER_VERSION)-$(KUBERNETES_VERSION).rootfs.tar.gz
+ifeq ($(IKNITE_REPO_NAME),release)
+	PUSH_IMAGES := true
+	IKNITE_ROOTFS_IMAGE_ADDITIONAL_TAG := $(IKNITE_ROOTFS_IMAGE):latest
+	SNAPSHOT := ""
+else
+	PUSH_IMAGES := false
+	IKNITE_ROOTFS_IMAGE_ADDITIONAL_TAG :=
+	SNAPSHOT := --snapshot
+endif
+
+ROOTFS_NAME := iknite-$(IKNITE_VERSION)-$(KUBERNETES_VERSION).rootfs.tar.gz
 ROOTFS_PATH := $(DIST_DIR)/$(ROOTFS_NAME)
 
 # Package file names
 KARMAFUN_PACKAGE := karmafun-$(patsubst v%,%,$(KARMAFUN_LATEST_VERSION)).$(ARCH).apk
-IKNITE_PACKAGE := iknite-$(IKNITE_NUMBER_VERSION).$(ARCH).apk
+IKNITE_PACKAGE := iknite-$(IKNITE_VERSION).$(ARCH).apk
 IKNITE_IMAGES_PACKAGE := iknite-images-$(KUBERNETES_VERSION).$(ARCH).apk
 
 INCUS_AGENT_VERSION := 6.22
@@ -155,14 +155,17 @@ GOLANG_FILES = $(shell find "$(ROOT_DIR)/cmd" "$(ROOT_DIR)/pkg" -type f -name '*
 APK_FILES = $(wildcard $(ROOT_DIR)/packaging/apk/iknite/**/*)
 APK_INDEX_FILE = $(DIST_DIR)/repo/$(ARCH)/APKINDEX.tar.gz
 
-IKNITE_ROOTFS_CONTAINER_MARKER = $(DIST_DIR)/iknite-rootfs-container_$(IKNITE_VERSION)-$(KUBERNETES_VERSION).marker
+IKNITE_ROOTFS_CONTAINER_MARKER = $(DIST_DIR)/iknite-rootfs-container_$(IKNITE_VERSION_TAG)-$(KUBERNETES_VERSION).marker
 
-IKNITE_VM_IMAGE_QCOW2_BASENAME = iknite-vm.$(IKNITE_NUMBER_VERSION)-$(KUBERNETES_VERSION).qcow2
+IKNITE_VM_IMAGE_QCOW2_BASENAME = iknite-vm.$(IKNITE_VERSION)-$(KUBERNETES_VERSION).qcow2
 IKNITE_VM_IMAGE_QCOW2 = $(DIST_DIR)/images/$(IKNITE_VM_IMAGE_QCOW2_BASENAME)
 IKNITE_VM_IMAGE_QCOW2_CONTAINER_MARKER = $(DIST_DIR)/images/$(IKNITE_VM_IMAGE_QCOW2_BASENAME)-container.marker
-IKNITE_VM_IMAGE_VHDX_BASENAME = iknite-vm.$(IKNITE_NUMBER_VERSION)-$(KUBERNETES_VERSION).vhdx
+IKNITE_VM_IMAGE_VHDX_BASENAME = iknite-vm.$(IKNITE_VERSION)-$(KUBERNETES_VERSION).vhdx
 IKNITE_VM_IMAGE_VHDX = $(DIST_DIR)/images/$(IKNITE_VM_IMAGE_VHDX_BASENAME)
 IKNITE_VM_IMAGE_VHDX_CONTAINER_MARKER = $(DIST_DIR)/images/$(IKNITE_VM_IMAGE_VHDX_BASENAME)-container.marker
+
+INCUS_METADATA := $(DIST_DIR)/images/incus.tar.xz
+VM_PACKAGING_DIR := $(ROOT_DIR)/packaging/vm
 
 IMAGES_ID = $(shell $(RUN_CONTAINER_CMD) image ls -q --filter "label=org.opencontainers.image.source=https://github.com/kaweezle/iknite.git" | sort -u)
 
@@ -188,6 +191,7 @@ help: # ignore checkmake
 	@echo "  make rootfs                 Build rootfs"
 	@echo "  make rootfs-image           Build final rootfs image"
 	@echo "  make vm-image               Build VM images (qcow2, vhdx)"
+	@echo "  make incus-metadata         Build Incus metadata tarball (dist/images/incus.tar.xz)"
 	@echo "  make vm-container-images    Build VM images as container images"
 	@echo "  make clean                  Remove build artifacts and temp container"
 	@echo "  make all                    Run full pipeline"
@@ -218,7 +222,7 @@ help: # ignore checkmake
 
 
 .PHONY: all
-all: extract-key goreleaser fetch-karmafun images-apk incus-agent-apk apk-repo rootfs-base-image rootfs-container rootfs rootfs-image vm-image vm-container-images
+all: extract-key goreleaser fetch-karmafun images-apk incus-agent-apk apk-repo rootfs-base-image rootfs-container rootfs rootfs-image vm-image incus-metadata vm-container-images
 
 print-% : ; $(info $* is a $(flavor $*) variable set to [$($*)]) @true
 
@@ -290,7 +294,7 @@ $(DIST_DIR)/$(IKNITE_IMAGES_PACKAGE): $(DIST_DIR)/iknite_linux_amd64_v1/iknite $
 		--out-dir "dist" \
 		--signing-key $(KEY_NAME) \
 		--generate-index=false; \
-	$(SUDO_CMD) chown -R "$$(id -u):$$(id -g)" "$(DIST_DIR)"; \
+	$(ROOT_CMD) chown -R "$$(id -u):$$(id -g)" "$(DIST_DIR)"; \
 	(cd "$(DIST_DIR)/$(ARCH)" && for f in *.apk; do mv "$$f" "../$$(echo "$$f" | sed 's/\-r0.apk$$//').$(ARCH).apk"; done); \
 	rmdir "$(DIST_DIR)/$(ARCH)/"
 
@@ -307,7 +311,7 @@ $(DIST_DIR)/$(INCUS_AGENT_PACKAGE): $(INCUS_AGENT_SOURCES) $(ROOT_DIR)/$(KEY_NAM
 		--out-dir "dist" \
 		--signing-key $(KEY_NAME) \
 		--generate-index=false; \
-	$(SUDO_CMD) chown -R "$$(id -u):$$(id -g)" "$(DIST_DIR)"; \
+	$(ROOT_CMD) chown -R "$$(id -u):$$(id -g)" "$(DIST_DIR)"; \
 	(cd "$(DIST_DIR)/$(ARCH)" && for f in *.apk; do mv "$$f" "../$$(echo "$$f" | sed 's/\-r0.apk$$//').$(ARCH).apk"; done); \
 	rmdir "$(DIST_DIR)/$(ARCH)/"
 
@@ -337,7 +341,7 @@ $(APK_INDEX_FILE): $(DIST_DIR)/$(KARMAFUN_PACKAGE) $(DIST_DIR)/$(IKNITE_PACKAGE)
 		-e "INPUT_SIGNATURE_KEY=$$(cat "$(ROOT_DIR)/$(KEY_NAME)")" \
 		-e "GITHUB_WORKSPACE=/workspace" \
 			$(APK_INDEX_BUILDER_IMAGE); \
-	$(SUDO_CMD) chown -R "$$(id -u):$$(id -g)" "$(DIST_DIR)/repo"
+	$(ROOT_CMD) chown -R "$$(id -u):$$(id -g)" "$(DIST_DIR)/repo"
 
 .PHONY: apk-repo
 apk-repo: $(APK_INDEX_FILE)
@@ -363,7 +367,7 @@ $(IKNITE_ROOTFS_BASE_MARKER): $(DIST_DIR)/$(KARMAFUN_PACKAGE) $(DIST_DIR)/$(IKNI
 		--local "context=$$BUILD_DIR_PATH" \
 		--local "dockerfile=$$BUILD_DIR_PATH" \
 		--opt "build-arg:IKNITE_REPO_URL=https://static.iknite.app/$(IKNITE_REPO_NAME)/" \
-		--opt "build-arg:IKNITE_VERSION=$(IKNITE_NUMBER_VERSION)" \
+		--opt "build-arg:IKNITE_VERSION_TAG=$(IKNITE_VERSION)" \
 		$(CACHE_FLAG) \
 		--output "type=docker,dest=-,name=$(IKNITE_ROOTFS_BASE),push=false" | $(RUN_CONTAINER_CMD) load
 	@touch "$@"
@@ -407,10 +411,17 @@ $(IKNITE_ROOTFS_IMAGE_MARKER): $(ROOTFS_PATH) $(IKNITE_ROOTFS_SOURCES) | check-p
 		--export-cache=$(BUILD_CONTAINER_CACHE_TO) \
 		--local "context=$$BUILD_DIR_PATH" \
 		--local "dockerfile=$$BUILD_DIR_PATH" \
-		--opt "build-arg:IKNITE_VERSION=$(IKNITE_NUMBER_VERSION)" \
+		--opt "build-arg:IKNITE_VERSION=$(IKNITE_VERSION)" \
 		--opt "build-arg:KUBERNETES_VERSION=$(KUBERNETES_VERSION)" \
 		$(CACHE_FLAG) \
-		--output "type=docker,name=$(IKNITE_ROOTFS_IMAGE),push=$(PUSH_IMAGES)$(IKNITE_ROOTFS_IMAGE_ADDITIONAL_TAG)" | $(RUN_CONTAINER_CMD) load
+		--output "type=docker,name=$(IKNITE_ROOTFS_IMAGE)" | $(RUN_CONTAINER_CMD) load; \
+	if [ "$(PUSH_IMAGES)" = "true" ]; then \
+		$(RUN_CONTAINER_CMD) push "$(IKNITE_ROOTFS_IMAGE)"; \
+		if [ -n "$(IKNITE_ROOTFS_IMAGE_ADDITIONAL_TAG)" ]; then \
+			$(RUN_CONTAINER_CMD) tag "$(IKNITE_ROOTFS_IMAGE)" "$(IKNITE_ROOTFS_IMAGE_ADDITIONAL_TAG)"; \
+			$(RUN_CONTAINER_CMD) push "$(IKNITE_ROOTFS_IMAGE_ADDITIONAL_TAG)"; \
+		fi; \
+	fi
 	@touch "$@"
 
 .PHONY: rootfs-image
@@ -418,22 +429,36 @@ rootfs-image: $(IKNITE_ROOTFS_IMAGE_MARKER)
 
 # Create the VM images from the rootfs tarball
 $(IKNITE_VM_IMAGE_QCOW2) $(IKNITE_VM_IMAGE_VHDX) &: $(ROOTFS_PATH) $(BUILD_VM_IMAGE_SCRIPTS) | check-prerequisites
-	$(SUDO_CMD) rm -rf "$(ROOT_DIR)/dist/images" || true
+	$(ROOT_CMD) rm -rf "$(ROOT_DIR)/dist/images" || true
 	mkdir -p "$(ROOT_DIR)/dist/images"
-	$(SUDO_CMD) "$(ROOT_DIR)/packaging/scripts/build-vm-image.sh"
-	$(SUDO_CMD) chown -R "$$(id -u):$$(id -g)" "$(ROOT_DIR)/dist/images" || true
+	$(ROOT_CMD) "$(ROOT_DIR)/packaging/scripts/build-vm-image.sh"
+	$(ROOT_CMD) chown -R "$$(id -u):$$(id -g)" "$(ROOT_DIR)/dist/images" || true
 
 .PHONY: vm-image
 vm-image: $(IKNITE_VM_IMAGE_QCOW2) $(IKNITE_VM_IMAGE_VHDX)
 
+# Build Incus metadata tarball (dist/images/incus.tar.xz) from gomplate template
+$(INCUS_METADATA): $(VM_PACKAGING_DIR)/metadata.yaml.tmpl $(IKNITE_VM_IMAGE_QCOW2) | check-prerequisites
+	mkdir -p "$(dir $@)"
+	KUBERNETES_VERSION="$(KUBERNETES_VERSION)" \
+	IKNITE_VERSION="$(IKNITE_VERSION)" \
+	IKNITE_VERSION_TAG="$(IKNITE_VERSION_TAG)" \
+	IMAGE=$(IKNITE_VM_IMAGE_QCOW2) \
+		gomplate -f "$<" -o "$(dir $@)metadata.yaml"
+	bsdtar -cJf "$@" -C "$(dir $@)" metadata.yaml
+	rm -f "$(dir $@)metadata.yaml"
+
+.PHONY: incus-metadata
+incus-metadata: $(INCUS_METADATA)
+
 # Push the VM images to the container registry using oras, with appropriate annotations and tags
 $(IKNITE_VM_IMAGE_VHDX_CONTAINER_MARKER): $(IKNITE_VM_IMAGE_VHDX) | check-prerequisites container-login
 	cd "$(ROOT_DIR)/dist/images"; \
-	IMAGE_TAG="$(REGISTRY)/$(IMAGE_NAME)-vm-vhdx:$(IKNITE_VERSION)-$(KUBERNETES_VERSION)"; \
+	IMAGE_TAG="$(REGISTRY)/$(IMAGE_NAME)-vm-vhdx:$(IKNITE_VERSION_TAG)-$(KUBERNETES_VERSION)"; \
 	oras push $$IMAGE_TAG \
 	--artifact-type application/vnd.oci.image.layer.vhdx \
-	--annotation org.opencontainers.image.title="iknite-vm-$(IKNITE_VERSION)-$(KUBERNETES_VERSION).vhdx" \
-	--annotation org.opencontainers.image.version="$(IKNITE_VERSION)" \
+	--annotation org.opencontainers.image.title="iknite-vm-$(IKNITE_VERSION_TAG)-$(KUBERNETES_VERSION).vhdx" \
+	--annotation org.opencontainers.image.version="$(IKNITE_VERSION_TAG)" \
 	--annotation org.opencontainers.image.description="VM image for iknite $(IKNITE_VERSION) with Kubernetes $(KUBERNETES_VERSION)" \
 	$(IKNITE_VM_IMAGE_VHDX_BASENAME):application/x-hyperv-disk; \
 	if [ "$(IKNITE_REPO_NAME)" = "release" ]; then \
@@ -441,15 +466,16 @@ $(IKNITE_VM_IMAGE_VHDX_CONTAINER_MARKER): $(IKNITE_VM_IMAGE_VHDX) | check-prereq
 	fi
 	touch "$@"
 
-$(IKNITE_VM_IMAGE_QCOW2_CONTAINER_MARKER): $(IKNITE_VM_IMAGE_QCOW2) | check-prerequisites container-login
+$(IKNITE_VM_IMAGE_QCOW2_CONTAINER_MARKER): $(IKNITE_VM_IMAGE_QCOW2) $(INCUS_METADATA) | check-prerequisites container-login
 	cd "$(ROOT_DIR)/dist/images"; \
-	IMAGE_TAG="$(REGISTRY)/$(IMAGE_NAME)-vm-qcow2:$(IKNITE_VERSION)-$(KUBERNETES_VERSION)"; \
+	IMAGE_TAG="$(REGISTRY)/$(IMAGE_NAME)-vm-qcow2:$(IKNITE_VERSION_TAG)-$(KUBERNETES_VERSION)"; \
 	oras push $$IMAGE_TAG \
 	--artifact-type application/vnd.oci.image.layer.qcow2 \
-	--annotation org.opencontainers.image.title="iknite-vm-$(IKNITE_VERSION)-$(KUBERNETES_VERSION).qcow2" \
-	--annotation org.opencontainers.image.version="$(IKNITE_VERSION)" \
+	--annotation org.opencontainers.image.title="iknite-vm-$(IKNITE_VERSION_TAG)-$(KUBERNETES_VERSION).qcow2" \
+	--annotation org.opencontainers.image.version="$(IKNITE_VERSION_TAG)" \
 	--annotation org.opencontainers.image.description="VM image for iknite $(IKNITE_VERSION) with Kubernetes $(KUBERNETES_VERSION)" \
-	$(IKNITE_VM_IMAGE_QCOW2_BASENAME):application/x-qcow2; \
+	$(IKNITE_VM_IMAGE_QCOW2_BASENAME):application/x-qcow2 \
+	incus.tar.xz:application/vnd.incus.metadata; \
 	if [ "$(IKNITE_REPO_NAME)" = "release" ]; then \
 		oras tag "$$IMAGE_TAG" "$(REGISTRY)/$(IMAGE_NAME)-vm-qcow2:latest"; \
 	fi
@@ -504,6 +530,8 @@ RELEASE_FILES := \
 	$(ROOT_DIR)/packaging/rootfs/base/$(KEY_NAME).pub \
 	$(ROOT_DIR)/Get-Iknite.ps1 \
 	$(ROOT_DIR)/Get-IkniteVM.ps1 \
+	$(ROOT_DIR)/get-iknite.sh \
+	$(INCUS_METADATA) \
 	$(ROOTFS_PATH)
 
 RELEASE_DIR := $(ROOT_DIR)/release

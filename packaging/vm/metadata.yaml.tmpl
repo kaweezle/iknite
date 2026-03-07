@@ -1,0 +1,9 @@
+architecture: "x86_64"
+creation_date: {{ (file.Stat .Env.IMAGE).ModTime.Unix }}
+properties:
+  description: "iknite Alpine Linux container image with Kubernetes {{ .Env.KUBERNETES_VERSION }}"
+  os: "Alpine Linux"
+  release: "edge"
+  variant: "default"
+  version: "{{ .Env.IKNITE_VERSION }}"
+  image_date: {{ (file.Stat .Env.IMAGE).ModTime }}
