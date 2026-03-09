@@ -352,7 +352,7 @@ func CheckKubeletRunning(retries, okResponses, waitTime int) error {
 			log.WithError(err).Debug("while making HTTP request")
 			continue
 		}
-		resp, err = client.Do(req) //nolint:gosec // Want to make HTTP request to localhost
+		resp, err = client.Do(req) //nolint:gosec // Want to check if kubelet is healthy
 		if err != nil {
 			log.WithError(err).Debug("while making HTTP request")
 			continue

@@ -85,3 +85,58 @@ func TestPreventKubeletServiceFromStarting_WhenLineIsPresent(t *testing.T) {
 	req.NoError(err)
 	req.Equal(existingContent, string(content))
 }
+
+//nolint:paralleltest // Using a global variable util.Exec
+func TestMakeIkniteServiceNeedNetworking(t *testing.T) {
+	teardown := setupExecutor(t)
+	defer teardown()
+
+	// cSpell: disable
+	rcConfFileContent := dedent.Dedent(`
+    rc_sys="prefix"
+    rc_controller_cgroups="NO"
+    rc_depend_strict="NO"
+    rc_need="!net !dev !udev-mount !sysfs !checkfs !fsck !netmount !logger !clock !modules"
+    `)
+	// cSpell: enable
+
+	req := require.New(t)
+
+	err := utils.FS.WriteFile(confFilePath, []byte(rcConfFileContent), 0o644)
+	req.NoError(err)
+
+	err = k8s.MakeIkniteServiceNeedNetworking(confFilePath)
+	req.NoError(err)
+
+	content, err := utils.FS.ReadFile(confFilePath)
+	req.NoError(err)
+	req.Equal(rcConfFileContent+k8s.RcConfIkniteNeedsNetworking+"\n", string(content))
+}
+
+//nolint:paralleltest // Using a global variable util.Exec
+func TestMakeIkniteServiceNeedNetworking_WhenLineIsPresent(t *testing.T) {
+	teardown := setupExecutor(t)
+	defer teardown()
+
+	// cSpell: disable
+	existingContent := dedent.Dedent(`
+    rc_sys="prefix"
+    rc_controller_cgroups="NO"
+    rc_depend_strict="NO"
+    rc_need="!net !dev !udev-mount !sysfs !checkfs !fsck !netmount !logger !clock !modules"
+    rc_iknite_need="networking"
+    `)
+	// cSpell: enable
+
+	req := require.New(t)
+
+	err := utils.FS.WriteFile(confFilePath, []byte(existingContent), 0o644)
+	req.NoError(err)
+
+	err = k8s.MakeIkniteServiceNeedNetworking(confFilePath)
+	req.NoError(err)
+
+	content, err := utils.FS.ReadFile(confFilePath)
+	req.NoError(err)
+	req.Equal(existingContent, string(content))
+}

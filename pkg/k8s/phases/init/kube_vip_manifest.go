@@ -49,6 +49,8 @@ spec:
           value: {{ .Ip }}
         - name: prometheus_server
           value: :2112
+        - name: dhcp_mode
+          value: ipv4
       image: {{ KubeVipImage }}
       imagePullPolicy: IfNotPresent
       name: kube-vip

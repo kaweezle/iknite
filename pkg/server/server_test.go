@@ -13,7 +13,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-
+//nolint:gosec,errcheck,forcetypeassert // Unit testing
 package server_test
 
 // cSpell: words pkiutil certutil clientcmd kubeadmapi stretchr noctx
@@ -135,7 +135,7 @@ func TestSetClusterUpdatesInMemoryStatus(t *testing.T) {
 
 	// Verify that SetCluster updated the in-memory state by routing a request
 	// through ServeHTTP (no network needed – httptest.ResponseRecorder captures it).
-	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, "/status", nil)
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, "/status", http.NoBody)
 	require.NoError(t, err)
 	rec := httptest.NewRecorder()
 	iSrv.ServeHTTP(rec, req)
@@ -161,7 +161,7 @@ func TestHealthzEndpoint(t *testing.T) {
 	iSrv, err := server.NewIkniteServer(dir, spec)
 	require.NoError(t, err)
 
-	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, "/healthz", nil)
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, "/healthz", http.NoBody)
 	require.NoError(t, err)
 	rec := httptest.NewRecorder()
 	iSrv.ServeHTTP(rec, req)

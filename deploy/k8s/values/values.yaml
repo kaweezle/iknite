@@ -4,6 +4,16 @@ metadata:
   name: iknite-values
 data:
   domain_suffix: iknite.app
+  project:
+    name: Iknite
+    label: Iknite
+    slug: iknite
+    email: antoine@mrtn.fr
+    git:
+      # The main Git repository for the platform.
+      repoURL: git@github.com:kaweezle/iknite.git
+      targetRevision: main
+      basePath: iknite
   argocd:
     domain: argocd-e2e.iknite.app
     repo_server_image_name: ghcr.io/kaweezle/argocd-helmfile
