@@ -27,7 +27,8 @@ RUN --mount=type=bind,target=/conf sed -ie '/^root:/ s#:/bin/.*$#:/bin/zsh#' /et
     ln -s /lib/rc/init.d /run/openrc && \
     touch /lib/rc/init.d/softlevel && \
     cp /etc/rc.conf /etc/rc.conf.orig && \
-    install -m 644 -o root -g root /conf/rc.conf /etc/rc.conf
+    install -m 644 -o root -g root /conf/rc.conf /etc/rc.conf  && \
+    install -m 644 -o root -g root /conf/interfaces /etc/network/interfaces
 
 # Add Oh-my-zsh
 RUN --mount=type=bind,target=/conf git clone --quiet --depth 1 https://github.com/ohmyzsh/ohmyzsh.git /usr/share/oh-my-zsh && \

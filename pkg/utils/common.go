@@ -94,3 +94,11 @@ func IsOnWSL() bool {
 	}
 	return wsl
 }
+
+func IsOnIncus() bool {
+	incus, err := FS.DirExists("/dev/.lxc/proc")
+	if err != nil {
+		return false
+	}
+	return incus
+}

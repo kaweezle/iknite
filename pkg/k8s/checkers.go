@@ -451,7 +451,7 @@ func CheckWorkloads(ctx context.Context, data CheckData) (bool, string, error) {
 // CheckIkniteServerHealth checks the /healthz endpoint of the iknite status
 // server using the mTLS client configuration stored in constants.IkniteLocalConfPath
 // (/root/.kube/iknite.conf). It returns true when the server responds with "ok".
-func CheckIkniteServerHealth(timeout time.Duration) (bool, string, error) {
+func CheckIkniteServerHealth(ctx context.Context, timeout time.Duration) (bool, string, error) {
 	kubeConfig, err := LoadFromFile(constants.IkniteLocalConfPath)
 	if err != nil {
 		return false, "", fmt.Errorf("failed to load iknite config from %s: %w", constants.IkniteLocalConfPath, err)
@@ -462,7 +462,7 @@ func CheckIkniteServerHealth(timeout time.Duration) (bool, string, error) {
 		return false, "", fmt.Errorf("failed to create REST client: %w", err)
 	}
 
-	body, err := restClient.Get().AbsPath("/healthz").DoRaw(context.Background())
+	body, err := restClient.Get().AbsPath("/healthz").Timeout(timeout).DoRaw(ctx)
 	if err != nil {
 		return false, "", fmt.Errorf("failed to call /healthz endpoint: %w", err)
 	}

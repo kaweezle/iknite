@@ -1,4 +1,4 @@
-# cSpell: words websecure
+# cSpell: words websecure dhcp
 global:
   checkNewVersion: false
   sendAnonymousUsage: false
@@ -29,6 +29,13 @@ service:
   enabled: true
   single: true
   type: LoadBalancer
+  {{ if (or (.Values.data | dig "load_balancer" "dhcp" "") (env "IKNITE_LB_DHCP"))  }}
+  # Enable load balancing via kube-vip in DHCP mode, which will automatically assign an IP address to the service.
+  # Useful with Incus. The load balancer will be available at traefik-{{ .Values.data.project.slug }}.incus
+  annotations:
+    kube-vip.io/loadbalancerIPs: "0.0.0.0"
+    kube-vip.io/loadbalancerHostname: traefik-{{ .Values.data.project.slug }}
+  {{ end }}
 
 ports:
   traefik:

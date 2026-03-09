@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# cSpell: words incus iknite apparmor lxc unconfined ghcr aarch mikefarah yq rootfs referrers armv oras
+# cSpell: words incus iknite apparmor lxc unconfined ghcr aarch mikefarah yq rootfs referrers armv oras incusbr
+# cSpell: words kmsg contracking hashsize conntrack syscalls setxattr
 #
 # Install iknite as an Incus container.
 #
@@ -285,12 +286,54 @@ ALIAS="iknite/${VERSION}"
 print_info "Importing image into Incus with alias '${ALIAS}'..."
 incus image import "${TEMP_DIR}/incus.tar.xz" "${TEMP_DIR}/rootfs.tar.gz" --alias "${ALIAS}"
 
+# Create profile with necessary privileges for running Kubernetes in the container.
+PROFILE_NAME="iknite-k8s"
+if ! incus profile show "${PROFILE_NAME}" >/dev/null 2>&1; then
+    print_info "Creating Incus profile '${PROFILE_NAME}' with necessary privileges for Kubernetes..."
+    profile_tmp=$(mktemp)
+cat - > "${profile_tmp}" <<EOF
+config:
+  security.privileged: "true"
+  security.nesting: "true"
+  security.syscalls.intercept.bpf: "true"
+  security.syscalls.intercept.bpf.devices: "true"
+  security.syscalls.intercept.mknod: "true"
+  security.syscalls.intercept.setxattr: "true"
+  raw.lxc:  |-
+    lxc.apparmor.profile=unconfined
+    lxc.sysctl.net.ipv4.ip_forward=1
+    lxc.sysctl.net.bridge.bridge-nf-call-iptables=1
+    lxc.sysctl.net.bridge.bridge-nf-call-ip6tables=1
+    lxc.cgroup2.devices.allow=a
+    lxc.mount.auto=proc:rw sys:rw
+    lxc.mount.entry = /dev/kmsg dev/kmsg none defaults,bind,create=file
+devices:
+  conntrack_hashsize:
+    path: /sys/module/nf_conntrack/parameters/hashsize
+    source: /sys/module/nf_conntrack/parameters/hashsize
+    type: disk
+  kmsg:
+    path: /dev/kmsg
+    source: /dev/kmsg
+    type: unix-char
+  eth0:
+    network: incusbr0
+    type: nic
+  root:
+    path: /
+    pool: default
+    type: disk
+EOF
+    incus profile create "${PROFILE_NAME}" < "${profile_tmp}"
+    rm -f "${profile_tmp}"
+fi
+
+
 if [ "${START_CONTAINER}" = "true" ]; then
     print_info "Launching container '${CONTAINER_NAME}'..."
     incus launch "${ALIAS}" "${CONTAINER_NAME}" \
-        --config security.privileged=true \
-        --config security.nesting=true \
-        --config raw.lxc="lxc.apparmor.profile=unconfined"
+        --profile "${PROFILE_NAME}" \
+        --profile "default"
     print_success "iknite container '${CONTAINER_NAME}' created and started successfully!"
     print_info "Start Kubernetes with: incus exec ${CONTAINER_NAME} -- iknite start"
     print_info "Access the container shell with: incus exec ${CONTAINER_NAME} -- /bin/zsh"
@@ -299,9 +342,8 @@ if [ "${START_CONTAINER}" = "true" ]; then
 else
     print_info "Creating container '${CONTAINER_NAME}' (not starting)..."
     incus init "${ALIAS}" "${CONTAINER_NAME}" \
-        --config security.privileged=true \
-        --config security.nesting=true \
-        --config raw.lxc="lxc.apparmor.profile=unconfined"
+        --profile "${PROFILE_NAME}" \
+        --profile "default"
     print_success "iknite container '${CONTAINER_NAME}' created successfully!"
     print_info "Start the container with: incus start ${CONTAINER_NAME}"
     print_info "Then start Kubernetes with: incus exec ${CONTAINER_NAME} -- iknite start"

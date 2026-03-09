@@ -27,29 +27,19 @@ type IkniteCluster struct {
 	Status IkniteClusterStatus `json:"status,omitempty" protobuf:"bytes,3,opt,name=status"`
 }
 
+//nolint:lll // long struct tags
 type IkniteClusterSpec struct {
-	// +optional
-	KubernetesVersion string `json:"kubernetesVersion,omitempty" protobuf:"bytes,2,opt,name=kubernetesVersion" mapstructure:"kubernetes_version"` //nolint:lll // for readability
-	// +optional
-	DomainName string `json:"domainName,omitempty" protobuf:"bytes,3,opt,name=domainName" mapstructure:"domain_name"` //nolint:lll // for readability
-	// +optional
-	NetworkInterface string `json:"networkInterface,omitempty" protobuf:"bytes,5,opt,name=networkInterface" mapstructure:"network_interface"` //nolint:lll // for readability
-	// +optional
-	ClusterName string `json:"clusterName,omitempty" protobuf:"bytes,7,opt,name=clusterName" mapstructure:"cluster_name"` //nolint:lll // for readability
-	// +optional
-	Kustomization string `json:"kustomization,omitempty" protobuf:"bytes,8,opt,name=kustomization"`
-	// +optional
-	Ip net.IP `json:"ip,omitempty" protobuf:"bytes,1,opt,name=ip" mapstructure:"ip"`
-	// +optional
-	CreateIp bool `json:"createIp,omitempty" protobuf:"bytes,4,opt,name=createIp" mapstructure:"create_ip"` //nolint:lll // for readability
-	// +optional
-	EnableMDNS bool `json:"enableMDNS,omitempty" protobuf:"bytes,6,opt,name=enableMDNS" mapstructure:"enable_mdns"` //nolint:lll // for readability
-	// +optional
-	UseEtcd bool `json:"useEtcd,omitempty" protobuf:"bytes,9,opt,name=useEtcd" mapstructure:"use_etcd"` //nolint:lll // for readability
-	// +optional
-	APIBackendDatabaseDirectory string `json:"apiBackendDatabaseDirectory,omitempty" protobuf:"bytes,10,opt,name=apiBackendDatabaseDirectory" mapstructure:"api_backend_database_directory"` //nolint:lll // for readability
-	// +optional
-	StatusServerPort int `json:"statusServerPort,omitempty" protobuf:"varint,11,opt,name=statusServerPort" mapstructure:"status_server_port"` //nolint:lll // for readability
+	KubernetesVersion           string `json:"kubernetesVersion,omitempty"           protobuf:"bytes,2,opt,name=kubernetesVersion"            mapstructure:"kubernetes_version"`
+	DomainName                  string `json:"domainName,omitempty"                  protobuf:"bytes,3,opt,name=domainName"                   mapstructure:"domain_name"`
+	NetworkInterface            string `json:"networkInterface,omitempty"            protobuf:"bytes,5,opt,name=networkInterface"             mapstructure:"network_interface"`
+	ClusterName                 string `json:"clusterName,omitempty"                 protobuf:"bytes,7,opt,name=clusterName"                  mapstructure:"cluster_name"`
+	Kustomization               string `json:"kustomization,omitempty"               protobuf:"bytes,8,opt,name=kustomization"`
+	APIBackendDatabaseDirectory string `json:"apiBackendDatabaseDirectory,omitempty" protobuf:"bytes,10,opt,name=apiBackendDatabaseDirectory" mapstructure:"api_backend_database_directory"`
+	Ip                          net.IP `json:"ip,omitempty"                          protobuf:"bytes,1,opt,name=ip"                           mapstructure:"ip"`
+	StatusServerPort            int    `json:"statusServerPort,omitempty"            protobuf:"varint,11,opt,name=statusServerPort"           mapstructure:"status_server_port"`
+	CreateIp                    bool   `json:"createIp,omitempty"                    protobuf:"bytes,4,opt,name=createIp"                     mapstructure:"create_ip"`
+	EnableMDNS                  bool   `json:"enableMDNS,omitempty"                  protobuf:"bytes,6,opt,name=enableMDNS"                   mapstructure:"enable_mdns"`
+	UseEtcd                     bool   `json:"useEtcd,omitempty"                     protobuf:"bytes,9,opt,name=useEtcd"                      mapstructure:"use_etcd"`
 }
 
 func (c *IkniteClusterSpec) GetApiEndPoint() string {
