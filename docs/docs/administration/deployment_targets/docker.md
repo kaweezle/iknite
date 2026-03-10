@@ -4,6 +4,11 @@
 
 # Docker Deployment
 
+!!! warning "Docker support is ongoing"
+    Docker deployment support is currently under active development. Some
+    features may not work as expected. Follow the progress at
+    [GitHub issue #182](https://github.com/kaweezle/iknite/issues/182).
+
 Iknite can run inside a Docker container in privileged mode. This deployment
 target is useful on Linux, macOS, and Windows when Docker is available.
 
@@ -26,10 +31,7 @@ docker run \
   --privileged \
   --name iknite \
   -d \
-  ghcr.io/kaweezle/iknite:latest
-
-# Wait for initialization (up to 120 seconds)
-docker exec iknite /sbin/iknite start -t 120
+  ghcr.io/kaweezle/iknite:latest /sbin/iknite init
 ```
 
 ### With Persistent Storage
@@ -43,8 +45,9 @@ docker run \
   -d \
   -v iknite-etcd:/var/lib/kine \
   -v iknite-kubelet:/var/lib/kubelet \
+  -v iknite-k8s:/etc/kubernetes \
   -v iknite-pv:/opt/local-path-provisioner \
-  ghcr.io/kaweezle/iknite:latest
+  ghcr.io/kaweezle/iknite:latest /sbin/iknite init
 ```
 
 ### With Port Mapping
@@ -55,17 +58,17 @@ docker run \
   --name iknite \
   -d \
   -p 6443:6443 \
+  -p 11443:11443 \
   -p 80:80 \
   -p 443:443 \
-  ghcr.io/kaweezle/iknite:latest
+  ghcr.io/kaweezle/iknite:latest /sbin/iknite init
 ```
+
+Port `11443` is the Iknite status server port (mTLS, used by `iknite info status`).
 
 ## Accessing the Cluster
 
 ```bash
-# Wait for initialization
-docker exec iknite /sbin/iknite start -t 120
-
 # Copy kubeconfig
 docker cp iknite:/root/.kube/config ~/.kube/iknite-docker-config
 
@@ -85,25 +88,28 @@ services:
     image: ghcr.io/kaweezle/iknite:latest
     container_name: iknite
     privileged: true
+    command: ["/sbin/iknite", "init"]
     ports:
       - "6443:6443"
+      - "11443:11443"
       - "80:80"
       - "443:443"
     volumes:
       - iknite-kine:/var/lib/kine
       - iknite-kubelet:/var/lib/kubelet
+      - iknite-k8s:/etc/kubernetes
       - iknite-pv:/opt/local-path-provisioner
     restart: unless-stopped
 
 volumes:
   iknite-kine:
   iknite-kubelet:
+  iknite-k8s:
   iknite-pv:
 ```
 
 ```bash
 docker compose up -d
-docker compose exec iknite /sbin/iknite start -t 120
 ```
 
 ## Configuration

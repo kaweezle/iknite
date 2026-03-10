@@ -17,9 +17,9 @@ graph TD
     C --> D{Kubeconfig exists?}
     D -- No --> E[iknite init]
     D -- Yes, unchanged --> F[Poll for cluster ready]
-    E --> G[kubeadm init phases]
-    G --> H[Launch kubelet subprocess]
-    H --> I[Start status server]
+    E --> H[Launch kubelet subprocess]
+    H --> G[kubeadm init phases]
+    G --> I[Start status server]
     I --> J[Apply base kustomization]
     J --> K[Wait for workloads]
     K --> F
@@ -63,15 +63,15 @@ pkg/
 
 ## Kubeadm Wrapping
 
-One of Iknite's key innovations is **deep kubeadm integration** through Go's
-`//go:linkname` directive. Instead of shelling out to kubeadm, Iknite:
+Iknite embeds kubeadm as a Go library and uses Go's `//go:linkname` directive
+to access unexported kubeadm functions. This approach avoids forking kubeadm or
+copy-pasting large swaths of its source code while still allowing deep
+customization of individual workflow phases. Instead of shelling out to kubeadm,
+Iknite:
 
 1. Imports kubeadm packages directly
 2. Uses `//go:linkname` to access unexported kubeadm functions
 3. Customizes individual **workflow phases**
-
-This allows Iknite to modify specific kubeadm init phases without forking the
-entire kubeadm codebase.
 
 ### Modified Init Phases
 
@@ -80,7 +80,8 @@ Iknite customizes the following kubeadm init phases:
 - **Kube-VIP injection**: Inserts Kube-VIP as a static pod manifest before
   the control plane starts, so the virtual IP is available immediately
 - **CoreDNS suppression**: Prevents kubeadm from deploying CoreDNS (it is
-  deployed via the kustomization instead, allowing customization)
+  deployed via the kustomization instead, which reduces the number of replicas
+  and improves startup time)
 - **Kubelet launch**: Instead of starting kubelet via OpenRC, Iknite launches
   it as a supervised subprocess. This allows precise lifecycle control
 - **Node taint removal**: The control plane taint is removed so workloads can
@@ -95,6 +96,12 @@ The `iknite reset` command similarly wraps `kubeadm reset`, adding:
 - Stopping the kubelet subprocess
 - Cleaning up containerd namespaces
 - Removing iknite-specific configuration
+
+!!! tip "Prefer `iknite clean` for most use cases"
+    `iknite reset` performs a full kubeadm reset which removes all cluster
+    certificates and configuration. In most situations, `iknite clean` (or
+    `iknite clean --clean-all`) is faster and more granular.
+    See [Resetting](administration/lifecycle/resetting.md) for details.
 
 ## Kubelet Lifecycle
 
@@ -202,12 +209,13 @@ successful application, a `ConfigMap` named `iknite-config` is created in the
 `kube-system` namespace to mark the kustomization as applied and prevent
 re-application on subsequent starts.
 
-## IP Address Management (WSL2)
+## IP Address Management (WSL2 and Incus)
 
-In WSL2 environments, the dynamic IP makes stable cluster configuration
-impossible. Iknite handles this by:
+In WSL2 and Incus environments, the container/VM IP can be dynamic or
+unpredictable, making stable cluster configuration difficult. Iknite handles
+this by:
 
-1. Detecting WSL2 via environment or configuration
+1. Detecting WSL2 or Incus via environment or configuration
 2. Adding a **virtual IP** (`192.168.99.2/24` by default) to `eth0`:
    ```
    ip addr add 192.168.99.2/24 dev eth0
