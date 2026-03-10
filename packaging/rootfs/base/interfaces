@@ -1,0 +1,7 @@
+# cSpell: words iface
+auto lo
+iface lo inet loopback
+
+auto eth0
+iface eth0
+  use dhcp

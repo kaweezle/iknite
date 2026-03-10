@@ -23,8 +23,9 @@ func addDefaultingFuncs(scheme *runtime.Scheme) error {
 
 func SetDefaults_IkniteClusterSpec(obj *IkniteClusterSpec) {
 	wsl := utils.IsOnWSL()
+	incus := utils.IsOnIncus()
 	if obj.Ip == nil {
-		if wsl {
+		if wsl || incus {
 			obj.Ip = net.ParseIP(constants.WslIPAddress)
 		} else {
 			obj.Ip, _ = utils.GetOutboundIP() //nolint:errcheck // it fails, no default
@@ -40,7 +41,7 @@ func SetDefaults_IkniteClusterSpec(obj *IkniteClusterSpec) {
 	if obj.NetworkInterface == "" {
 		obj.NetworkInterface = constants.NetworkInterface
 	}
-	obj.CreateIp = wsl
+	obj.CreateIp = wsl || incus
 	if obj.ClusterName == "" {
 		obj.ClusterName = constants.DefaultClusterName
 	}

@@ -289,7 +289,7 @@ func DeleteNetworkInterfaces(isDryRun bool) error {
 	logger.Info("Deleting pods network interfaces...")
 	//nolint:lll // long string (jq pipeline)
 	p := s.Exec("ip -j link show").
-		JQ(`sort_by(.ifname)| reverse | .[] | select(has("link_netnsid") or .ifname == "cni0" or .ifname == "flannel.1") | .ifname`).
+		JQ(`sort_by(.ifname)| reverse | .[] | select((has("link_netnsid") and .ifname != "eth0") or .ifname == "cni0" or .ifname == "flannel.1" or (.ifname | startswith("vip-"))) | .ifname`).
 		FilterLine(func(s string) string {
 			ifname := s[1 : len(s)-1]
 			command := fmt.Sprintf("%s ip link delete %s", prefix, ifname)

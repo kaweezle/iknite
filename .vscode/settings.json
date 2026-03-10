@@ -18,5 +18,7 @@
   "editor.renderWhitespace": "boundary",
   "editor.rulers": [80, 120],
   "go.formatTool": "default",
-  "shellcheck.exclude": ["3043"]
+  "shellcheck.exclude": ["3043"],
+  "makefile.makefilePath": "GNUmakefile",
+  "makefile.configureOnOpen": false,
 }

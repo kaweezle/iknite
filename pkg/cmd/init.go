@@ -16,7 +16,7 @@ limitations under the License.
 
 package cmd
 
-// cSpell:words kubeproxyconfig clientcmdapi clientcmd
+// cSpell:words kubeproxyconfig clientcmdapi clientcmd kubeletconfig conntrack
 // cSpell: disable
 import (
 	"context"
@@ -42,6 +42,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	kubeproxyconfig "k8s.io/kube-proxy/config/v1alpha1"
+	kubeletconfig "k8s.io/kubelet/config/v1beta1"
 	kubeadmApi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmScheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
 	kubeadmApiV1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta4"
@@ -277,12 +278,12 @@ func newCmdInit(out io.Writer, initOptions *initOptions) *cobra.Command {
 	initRunner.AppendPhase(WrapPhase(phases.NewBootstrapTokenPhase(), ikniteApi.Initializing, nil))
 	initRunner.AppendPhase(WrapPhase(phases.NewKubeletFinalizePhase(), ikniteApi.Initializing, nil))
 	initRunner.AppendPhase(WrapPhase(phases.NewAddonPhase(), ikniteApi.Initializing, nil))
+	initRunner.AppendPhase(WrapPhase(iknitePhase.NewCopyConfigPhase(), ikniteApi.Stabilizing, nil))
 	initRunner.AppendPhase(WrapPhase(iknitePhase.NewMDnsPublishPhase(), ikniteApi.Stabilizing, nil))
 	initRunner.AppendPhase(
 		WrapPhase(iknitePhase.NewKustomizeClusterPhase(), ikniteApi.Stabilizing, nil),
 	)
 	initRunner.AppendPhase(WrapPhase(iknitePhase.NewServePhase(), ikniteApi.Stabilizing, nil))
-	initRunner.AppendPhase(WrapPhase(iknitePhase.NewCopyConfigPhase(), ikniteApi.Stabilizing, nil))
 	initRunner.AppendPhase(WrapPhase(iknitePhase.NewWorkloadsPhase(), ikniteApi.Stabilizing, nil))
 	initRunner.AppendPhase(WrapPhase(iknitePhase.NewDaemonizePhase(), ikniteApi.Stabilizing, nil))
 	//nolint:gocritic // standalone node
@@ -308,10 +309,10 @@ func newCmdInit(out io.Writer, initOptions *initOptions) *cobra.Command {
 
 			// Skip either kine or etcd based on UseEtcd setting.
 			if data.IkniteCluster().Spec.UseEtcd {
-				initRunner.Options.SkipPhases = append(initRunner.Options.SkipPhases, "kine")
+				initRunner.Options.SkipPhases = append(initRunner.Options.SkipPhases, constants.KineBackendName)
 				data.ikniteCluster.Spec.APIBackendDatabaseDirectory = data.cfg.Etcd.Local.DataDir
 			} else {
-				initRunner.Options.SkipPhases = append(initRunner.Options.SkipPhases, "etcd")
+				initRunner.Options.SkipPhases = append(initRunner.Options.SkipPhases, constants.EtcdBackendName)
 			}
 
 			initRunner.Options.SkipPhases = manageSkippedAddons(
@@ -432,6 +433,21 @@ func newInitData(
 		return nil, errors.New("could not convert the KubeletConfiguration to a typed object")
 	}
 	kubeProxyConfigTyped.IPTables.SyncPeriod.Duration = 10 * time.Second
+	var maxPerCore int32 = 0
+	kubeProxyConfigTyped.Conntrack.MaxPerCore = &maxPerCore
+
+	// Set FailSwapOn to false. Kubelet checks for /proc/swaps and if it exists, it will fail to start if FailSwapOn is
+	// true. On Incus, the device is passed to the containers so it's ok to ignore it.
+	kubeletComponentConfig, ok := cfg.ComponentConfigs[componentConfigs.KubeletGroup]
+	if !ok {
+		return nil, errors.New("no kubelet component config found")
+	}
+	kubeletConfig, ok := kubeletComponentConfig.Get().(*kubeletconfig.KubeletConfiguration)
+	if !ok {
+		return nil, errors.New("could not convert the KubeletConfiguration to a typed object")
+	}
+	failSwapOn := false
+	kubeletConfig.FailSwapOn = &failSwapOn
 
 	ignorePreflightErrorsSet, err := validation.ValidateIgnorePreflightErrors(
 		initOptions.ignorePreflightErrors,

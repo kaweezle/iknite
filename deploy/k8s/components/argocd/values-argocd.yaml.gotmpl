@@ -41,7 +41,7 @@ configs:
           teamNameField: slug
           useLoginAsId: true
 
-      {{ if .Environment.Values.data | dig "argo_workflows" "domain" "" }}
+      {{ if .Values.data | dig "argo_workflows" "domain" "" }}
       staticClients:
       - id: argo-workflows-sso
         name: Argo Workflows
@@ -88,7 +88,7 @@ configs:
     argocdServerAdminPasswordMtime: 2022-10-11T11:21:11Z
 
 ## Dex
-{{ if .Environment.Values.data | dig "argo_workflows" "client_secret" "" }}
+{{ if .Values.data | dig "argo_workflows" "client_secret" "" }}
 dex:
   # -- Environment variables to pass to the Dex server
   env:

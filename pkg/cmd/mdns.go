@@ -47,7 +47,7 @@ It assumes that mDNS is not use elsewhere inside WSL.
 
 	hostname, err := os.Hostname()
 	cobra.CheckErr(err)
-	if utils.IsOnWSL() {
+	if utils.IsOnWSL() || utils.IsOnIncus() {
 		hostname = constants.WSLHostName
 	}
 	mdnsCmd.Flags().String(options.DomainName, hostname, "Domain name of the cluster")

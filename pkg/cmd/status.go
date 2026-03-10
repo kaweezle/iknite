@@ -101,9 +101,9 @@ func performStatus(ikniteConfig *v1alpha1.IkniteClusterSpec) {
 
 	var apiBackendName string
 	if ikniteConfig.UseEtcd {
-		apiBackendName = "etcd"
+		apiBackendName = constants.EtcdBackendName
 	} else {
-		apiBackendName = "kine"
+		apiBackendName = constants.KineBackendName
 	}
 	dBManifestCheck := k8s.KubernetesFileCheck(
 		fmt.Sprintf("manifest_%s", apiBackendName),
@@ -248,7 +248,7 @@ func performStatus(ikniteConfig *v1alpha1.IkniteClusterSpec) {
 				),
 				CheckFn: func(_ context.Context, _ k8s.CheckData) (bool, string, error) {
 					var expectedFiles []string
-					if apiBackendName == "etcd" {
+					if apiBackendName == constants.EtcdBackendName {
 						expectedFiles = []string{"member/snap/db"}
 					} else {
 						expectedFiles = []string{"kine.db"}
@@ -331,8 +331,8 @@ func performStatus(ikniteConfig *v1alpha1.IkniteClusterSpec) {
 				Name:        "iknite_server_health",
 				DependsOn:   []string{"apiserver_health"},
 				Description: "Check if the iknite status server is healthy",
-				CheckFn: func(_ context.Context, _ k8s.CheckData) (bool, string, error) {
-					return k8s.CheckIkniteServerHealth(checkTimeout)
+				CheckFn: func(ctx context.Context, _ k8s.CheckData) (bool, string, error) {
+					return k8s.CheckIkniteServerHealth(ctx, checkTimeout)
 				},
 			},
 		}),

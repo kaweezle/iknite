@@ -28,7 +28,7 @@ func runServe(c workflow.RunData) error {
 	}
 
 	ikniteCluster := data.IkniteCluster()
-	srv, err := server.StartIkniteServer(constants.KubernetesPKIDir, &ikniteCluster.Spec, ikniteCluster)
+	srv, err := server.StartIkniteServer(constants.KubernetesPKIDir, ikniteCluster)
 	if err != nil {
 		return fmt.Errorf("failed to start iknite status server: %w", err)
 	}

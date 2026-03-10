@@ -11,6 +11,7 @@ import (
 
 	"github.com/kaweezle/iknite/pkg/constants"
 	"github.com/kaweezle/iknite/pkg/k8s"
+	"github.com/kaweezle/iknite/pkg/server"
 )
 
 // cSpell: enable
@@ -42,6 +43,12 @@ func runCopyConfig(c workflow.RunData) error {
 		return fmt.Errorf("failed to copy admin.conf to %s: %w", constants.KubernetesRootConfig, err)
 	}
 
+	// Ensure the iknite configuration actually exists
+	// TODO: This should be done where all the certificates are done.
+	if err := server.EnsureIkniteServerConfiguration(constants.KubernetesPKIDir, &ikniteConfig); err != nil {
+		return fmt.Errorf("failed to ensure iknite server configuration: %w", err)
+	}
+
 	// Copy iknite.conf to /root/.kube/iknite.conf.
 	if err := copyFile(constants.IkniteConfPath, constants.IkniteLocalConfPath); err != nil {
 		return fmt.Errorf("failed to copy iknite.conf to %s: %w", constants.IkniteLocalConfPath, err)
@@ -70,7 +77,7 @@ func copyAdminConf(clusterName string) error {
 
 // copyFile copies the file at src to dst, creating parent directories as needed.
 func copyFile(src, dst string) error {
-	data, err := os.ReadFile(src)
+	data, err := os.ReadFile(src) //nolint:gosec // Copying files from constant file paths, not user input.
 	if err != nil {
 		return fmt.Errorf("failed to read %s: %w", src, err)
 	}

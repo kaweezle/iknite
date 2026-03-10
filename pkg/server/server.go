@@ -49,8 +49,8 @@ import (
 type IkniteServer struct {
 	httpServer  *http.Server
 	spec        *v1alpha1.IkniteClusterSpec
+	clusterJSON []byte
 	mu          sync.RWMutex
-	clusterJSON []byte // pre-serialized cluster, updated by SetCluster
 }
 
 // SetCluster serializes c to JSON and stores it under the write lock so that
@@ -123,7 +123,7 @@ func (s *IkniteServer) Shutdown() error {
 
 // EnsureServerCertAndKey ensures that the iknite server certificate and key
 // exist in certDir. If they don't exist, they are created signed by the
-// Kubernetes CA. dnsNames and ips extend the built-in SANs (iknite, localhost,
+// Kubernetes CA. DnsNames and ips extend the built-in SANs (iknite, localhost,
 // 127.0.0.1) with values from the cluster configuration.
 func EnsureServerCertAndKey(certDir string, dnsNames []string, ips []net.IP) error {
 	if pkiutil.CertOrKeyExist(certDir, constants.IkniteServerCertName) {
@@ -206,6 +206,8 @@ func EnsureClientCertAndKey(certDir string) error {
 // This file is analogous to /etc/kubernetes/admin.conf but targets the iknite
 // status server. It is (re-)created on every start so that the IP address is
 // always up to date.
+//
+//nolint:gosec // Reading from a protected directory
 func EnsureIkniteConf(certDir, confPath string, spec *v1alpha1.IkniteClusterSpec) error {
 	// Determine the server address from the cluster spec
 	serverAddr := "localhost"
@@ -255,6 +257,8 @@ func EnsureIkniteConf(certDir, confPath string, spec *v1alpha1.IkniteClusterSpec
 
 // NewIkniteServer builds an IkniteServer from spec and the certificates in
 // certDir. The port is taken from spec.StatusServerPort.
+//
+//nolint:gosec // Reading from a protected directory
 func NewIkniteServer(certDir string, spec *v1alpha1.IkniteClusterSpec) (*IkniteServer, error) {
 	caCertPEM, err := os.ReadFile(filepath.Join(certDir, "ca.crt"))
 	if err != nil {
@@ -288,23 +292,23 @@ func NewIkniteServer(certDir string, spec *v1alpha1.IkniteClusterSpec) (*IkniteS
 
 	addr := net.JoinHostPort("0.0.0.0", strconv.Itoa(spec.StatusServerPort))
 	s.httpServer = &http.Server{
-		Addr:      addr,
-		Handler:   mux,
-		TLSConfig: tlsConfig,
+		Addr:              addr,
+		Handler:           mux,
+		TLSConfig:         tlsConfig,
+		ReadHeaderTimeout: 10 * time.Second,
 	}
 
 	return s, nil
 }
 
-// StartIkniteServer creates certificates (if needed), builds, and starts the
-// iknite HTTPS server. The initial cluster status is set from cluster.
-// The returned IkniteServer's SetCluster method should be called on every
-// subsequent cluster status update.
-func StartIkniteServer(
+// EnsureIkniteServerConfiguration ensures that the necessary certificates and client configuration file for the iknite
+// server exist in certDir.
+// It uses the cluster spec to determine the SANs for the server certificate and the server URL for the client
+// configuration.
+func EnsureIkniteServerConfiguration(
 	certDir string,
 	spec *v1alpha1.IkniteClusterSpec,
-	cluster *v1alpha1.IkniteCluster,
-) (*IkniteServer, error) {
+) error {
 	// Build SAN extensions from the cluster spec.
 	var dnsNames []string
 	if spec.DomainName != "" {
@@ -316,13 +320,30 @@ func StartIkniteServer(
 	}
 
 	if err := EnsureServerCertAndKey(certDir, dnsNames, ips); err != nil {
-		return nil, fmt.Errorf("failed to ensure server cert: %w", err)
+		return fmt.Errorf("failed to ensure server cert: %w", err)
 	}
 	if err := EnsureClientCertAndKey(certDir); err != nil {
-		return nil, fmt.Errorf("failed to ensure client cert: %w", err)
+		return fmt.Errorf("failed to ensure client cert: %w", err)
 	}
 	if err := EnsureIkniteConf(certDir, constants.IkniteConfPath, spec); err != nil {
-		return nil, fmt.Errorf("failed to write iknite client config to %s: %w", constants.IkniteConfPath, err)
+		return fmt.Errorf("failed to write iknite client config to %s: %w", constants.IkniteConfPath, err)
+	}
+	return nil
+}
+
+// StartIkniteServer creates certificates (if needed), builds, and starts the
+// iknite HTTPS server. The initial cluster status is set from cluster.
+// The returned IkniteServer's SetCluster method should be called on every
+// subsequent cluster status update.
+func StartIkniteServer(
+	certDir string,
+	cluster *v1alpha1.IkniteCluster,
+) (*IkniteServer, error) {
+	spec := &cluster.Spec
+
+	err := EnsureIkniteServerConfiguration(certDir, spec)
+	if err != nil {
+		return nil, fmt.Errorf("failed to ensure iknite server configuration: %w", err)
 	}
 
 	srv, err := NewIkniteServer(certDir, spec)
