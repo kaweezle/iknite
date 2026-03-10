@@ -12,35 +12,46 @@ Hyper-V, enabling full VM isolation for your Kubernetes cluster.
 
 - Windows 10 Pro/Enterprise or Windows 11 Pro/Enterprise
 - Hyper-V enabled
-- At least 4 GB RAM to assign to the VM
+- At least 8 GB RAM to assign to the VM (more is better)
 - At least 20 GB of free disk space
 
-## Enabling Hyper-V
+## Installation
+
+### Automated Installation (Recommended)
+
+The easiest way to set up an Iknite Hyper-V VM is with the automated PowerShell
+script:
+
+```powershell
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+Invoke-RestMethod -Uri https://github.com/kaweezle/iknite/releases/latest/download/Get-IkniteVM.ps1 | Invoke-Expression
+```
+
+The script will automatically:
+
+- Download the Hyper-V VHDX image from GitHub Container Registry
+- Create a new Hyper-V VM named `iknite` with the downloaded image
+- Create a pair of SSH keys for VM access
+- Create a cloud-init ISO with default user configuration and attach it to the VM
+- Start the VM and wait for it to be ready, printing the VM IP address for SSH access
+
+### Manual Installation
+
+If you prefer to set up the VM manually:
+
+#### 1. Enable Hyper-V
 
 ```powershell
 # Enable Hyper-V (requires admin, then reboot)
 Enable-WindowsOptionalFeature -Online -FeatureName Microsoft-Hyper-V -All
-
-# After reboot, verify
-Get-WindowsOptionalFeature -Online -FeatureName Microsoft-Hyper-V
 ```
 
-## Installation
-
-### 1. Download the VHDX Image
+#### 2. Download the VHDX Image
 
 Download `iknite-<version>.vhdx` from the
 [releases page](https://github.com/kaweezle/iknite/releases).
 
-Alternatively, use the PowerShell downloader:
-
-```powershell
-$version = "latest"
-$url = "https://github.com/kaweezle/iknite/releases/$version/download/iknite.vhdx"
-Invoke-WebRequest $url -OutFile ".\iknite.vhdx"
-```
-
-### 2. Create the Hyper-V VM
+#### 3. Create the Hyper-V VM
 
 ```powershell
 $vmName = "iknite"
@@ -71,35 +82,15 @@ Set-VMFirmware -VMName $vmName -EnableSecureBoot Off
 Start-VM -Name $vmName
 ```
 
-### 3. Find the VM IP Address
+#### 4. Find the VM IP Address
 
 ```powershell
 # Wait for the VM to get an IP
 Start-Sleep -Seconds 30
-
-# Get the VM IP
 (Get-VM $vmName | Get-VMNetworkAdapter).IPAddresses | Where-Object { $_ -match '\d+\.\d+\.\d+\.\d+' }
 ```
 
-### 4. Connect to the VM
-
-```powershell
-# Via Hyper-V console
-vmconnect.exe localhost $vmName
-
-# Or via SSH (if SSH key is configured)
-ssh root@<vm-ip>
-```
-
-### 5. Start the Cluster
-
-Inside the VM:
-
-```bash
-/sbin/iknite start -t 120
-```
-
-Or via SSH:
+#### 5. Connect via SSH and Start the Cluster
 
 ```powershell
 ssh root@<vm-ip> "/sbin/iknite start -t 120"

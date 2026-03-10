@@ -70,10 +70,10 @@ as part of the bootstrap, enabling:
 - [Horizontal Pod Autoscaling](https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/)
 - Metrics in tools like [K9s](https://k9scli.io/)
 
-## WSL2 / Stable IP
+## WSL2 and Incus / Stable IP
 
-In WSL2, the VM IP address changes on every Windows restart. Iknite solves this
-by:
+In WSL2 and Incus environments, the container/VM IP can change across restarts.
+Iknite solves this by:
 
 1. Adding a **stable secondary IP address** (`192.168.99.2` by default) to `eth0`
 2. Registering the domain name `iknite.local` (or `kaweezle.local`) to this IP
@@ -83,9 +83,9 @@ This means `kubectl` configuration does not break across restarts.
 
 ### mDNS Responder
 
-In WSL2, Iknite launches a small mDNS responder so that `iknite.local` resolves
-to the stable IP from the Windows host. You can then use `iknite.local` in your
-kubeconfig or browser.
+In WSL2 and Incus environments, Iknite launches a small mDNS responder so that
+`iknite.local` resolves to the stable IP from the host. You can then use
+`iknite.local` in your kubeconfig or browser.
 
 ## API Backend Options
 
@@ -167,5 +167,5 @@ first-boot time (by 2–5 minutes).
 | API backend | Kine (SQLite) | ✅ |
 | API backend (alternative) | etcd | Optional |
 | Init system | OpenRC | ✅ |
-| Stable IP (WSL2) | Secondary NIC address | WSL2 only |
-| mDNS | pion/mdns | WSL2 only |
+| Stable IP (WSL2 / Incus) | Secondary NIC address | WSL2 and Incus |
+| mDNS | pion/mdns | WSL2 and Incus |
