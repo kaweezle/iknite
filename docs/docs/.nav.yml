@@ -1,25 +1,44 @@
-# Navigation
-# TODO: Implement the following kind of navigation structure
-# nav:
-#   - Introduction:
-#       - Home: index.md
-#       - Quick Start: quick_start.md
-#       - Installation: installation.md
-#       - Features: features.md
-#   - Usage:
-#       - Basic Usage: usage/basic_usage.md
-#       - Advanced Usage: usage/advanced_usage.md
-#   - Configuration:
-#       - Configuration File: configuration/configuration_file.md
-#       - Settings Reference: configuration/settings_reference.md
-#   - Development:
-#       - Contributing: development/contributing.md
-#       - Code Structure: development/code_structure.md
-#   - FAQ: faq.md
-#   - Changelog: changelog.md
 nav:
   - Introduction:
       - Welcome: index.md
+      - Getting Started: getting_started.md
+      - Features: features.md
+      - Architecture: architecture.md
+  - User Guide:
+      - Tutorial:
+        - Installation: tutorial/installation.md
+        - Accessing the cluster: tutorial/accessing_cluster.md
+        - Deploying Argo CD: tutorial/deploying_argocd.md
+        - Deploying Applications: tutorial/deploying_applications.md
+        - Tunneling: tutorial/tunneling.md
+        - Developing in the cluster: tutorial/developing_in_cluster.md
+        - Resetting the cluster: tutorial/resetting_cluster.md
+      - Usage: user_guide/usage.md
+      - Configuration: user_guide/configuration.md
+      - Best Practices: user_guide/best_practices.md
+      - Troubleshooting: operator/troubleshooting.md
+  - Advanced Administration:
+      - Deployment targets:
+        - WSL: administration/deployment_targets/wsl.md
+        - Incus: administration/deployment_targets/incus.md
+        - Hyper-V: administration/deployment_targets/hyperv.md
+        - Openstack: administration/deployment_targets/openstack.md
+        - Docker: administration/deployment_targets/docker.md
+        - Other / Rootless: administration/deployment_targets/other.md
+      - Kubernetes configuration:
+        - Overview: administration/kubernetes_configuration/overview.md
+        - Differences with kubeadm: administration/kubernetes_configuration/differences_with_kubeadm.md
+        - Directories: administration/kubernetes_configuration/directories.md
+      - Cluster lifecycle:
+        - Initialization: administration/lifecycle/initialization.md
+        - Start / Stop: administration/lifecycle/starting_stopping.md
+        - Resetting: administration/lifecycle/resetting.md
+        - Upgrading: administration/lifecycle/upgrading.md
+  - Developer Guide:
+      - Getting started: developer/getting_started.md
+      - Development Workflow: developer/development_workflow.md
+      - Testing: developer/testing.md
+      - Code Style: developer/code_style.md
   - About:
       - Contributing: CONTRIBUTING.md
       - "Code of Conduct": CODE_OF_CONDUCT.md
