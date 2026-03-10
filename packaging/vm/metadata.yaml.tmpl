@@ -7,3 +7,11 @@ properties:
   variant: "default"
   version: "{{ .Env.IKNITE_VERSION }}"
   image_date: {{ (file.Stat .Env.IMAGE).ModTime }}
+templates:
+    /root/prepare.sh:
+      when:
+        - create
+      template: prepare.sh.tpl
+      uid: 0
+      gid: 0
+      mode: 744

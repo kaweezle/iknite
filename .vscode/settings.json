@@ -19,10 +19,6 @@
   "editor.rulers": [80, 120],
   "go.formatTool": "default",
   "shellcheck.exclude": ["3043"],
-  "gopls": {
-    "verboseOutput": true
-  },
-  "go.languageServerFlags": [
-    "-rpc.trace",
-  ]
+  "makefile.makefilePath": "GNUmakefile",
+  "makefile.configureOnOpen": false,
 }

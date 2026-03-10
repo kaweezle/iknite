@@ -92,7 +92,7 @@ else
 	ROOTLESS := false
 endif
 
-ROOTFULL := $(shell id -u 2>/dev/null | grep -q 0 && echo true || echo false)
+ROOTFULL := $(shell if [ "`id -u 2>/dev/null`" == "0" ]; then echo true; fi)
 ROOT_CMD := $(if $(ROOTFULL),,$(SUDO_CMD))
 
 DIST_DIR := dist
@@ -166,6 +166,7 @@ IKNITE_VM_IMAGE_VHDX_CONTAINER_MARKER = $(DIST_DIR)/images/$(IKNITE_VM_IMAGE_VHD
 
 INCUS_METADATA := $(DIST_DIR)/images/incus.tar.xz
 VM_PACKAGING_DIR := $(ROOT_DIR)/packaging/vm
+VM_PACKAGING_SOURCES := $(shell find $(VM_PACKAGING_DIR) -type f)
 IKNITE_ROOTFS_IMAGE_INCUS_ATTACHMENT_MARKER = $(DIST_DIR)/iknite_$(IKNITE_VERSION_TAG)-$(KUBERNETES_VERSION)-incus.marker
 
 IMAGES_ID = $(shell $(RUN_CONTAINER_CMD) image ls -q --filter "label=org.opencontainers.image.source=https://github.com/kaweezle/iknite.git" | sort -u)
@@ -369,7 +370,7 @@ $(IKNITE_ROOTFS_BASE_MARKER): $(DIST_DIR)/$(KARMAFUN_PACKAGE) $(DIST_DIR)/$(IKNI
 		--local "context=$$BUILD_DIR_PATH" \
 		--local "dockerfile=$$BUILD_DIR_PATH" \
 		--opt "build-arg:IKNITE_REPO_URL=https://static.iknite.app/$(IKNITE_REPO_NAME)/" \
-		--opt "build-arg:IKNITE_VERSION_TAG=$(IKNITE_VERSION)" \
+		--opt "build-arg:IKNITE_VERSION=$(IKNITE_VERSION)" \
 		$(CACHE_FLAG) \
 		--output "type=docker,dest=-,name=$(IKNITE_ROOTFS_BASE),push=false" | $(RUN_CONTAINER_CMD) load
 	@touch "$@"
@@ -440,15 +441,17 @@ $(IKNITE_VM_IMAGE_QCOW2) $(IKNITE_VM_IMAGE_VHDX) &: $(ROOTFS_PATH) $(BUILD_VM_IM
 vm-image: $(IKNITE_VM_IMAGE_QCOW2) $(IKNITE_VM_IMAGE_VHDX)
 
 # Build Incus metadata tarball (dist/images/incus.tar.xz) from gomplate template
-$(INCUS_METADATA): $(VM_PACKAGING_DIR)/metadata.yaml.tmpl $(IKNITE_VM_IMAGE_QCOW2) | check-prerequisites
-	mkdir -p "$(dir $@)"
+$(INCUS_METADATA): $(VM_PACKAGING_SOURCES) $(IKNITE_VM_IMAGE_QCOW2) | check-prerequisites
+	BUILD_DIR_PATH="$(BUILD_DIR)/incus-metadata"; \
+	rm -rf "$$BUILD_DIR_PATH"; \
+	mkdir -p "$$BUILD_DIR_PATH"; \
 	KUBERNETES_VERSION="$(KUBERNETES_VERSION)" \
 	IKNITE_VERSION="$(IKNITE_VERSION)" \
 	IKNITE_VERSION_TAG="$(IKNITE_VERSION_TAG)" \
 	IMAGE=$(IKNITE_VM_IMAGE_QCOW2) \
-		gomplate -f "$<" -o "$(dir $@)metadata.yaml"
-	bsdtar -cJf "$@" -C "$(dir $@)" metadata.yaml
-	rm -f "$(dir $@)metadata.yaml"
+		gomplate -f "$(VM_PACKAGING_DIR)/metadata.yaml.tmpl" -o "$${BUILD_DIR_PATH}/metadata.yaml"; \
+	cp -r "$(VM_PACKAGING_DIR)/templates" "$${BUILD_DIR_PATH}/templates"; \
+	cd "$${BUILD_DIR_PATH}" && bsdtar -cJf "$(shell realpath "$@")" *
 
 .PHONY: incus-metadata
 incus-metadata: $(INCUS_METADATA)
