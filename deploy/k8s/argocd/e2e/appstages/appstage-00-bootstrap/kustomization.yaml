@@ -3,4 +3,4 @@ kind: Kustomization
 metadata:
   name: appstage-00-bootstrap
 resources:
-  - ../../../../apps/available/argocd.yaml
+  - ../../../common/argocd-server/application.yaml

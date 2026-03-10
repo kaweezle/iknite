@@ -13,7 +13,7 @@ spec:
     server: https://kubernetes.default.svc
   project: default
   source:
-    path: deploy/k8s/environments/e2e/apps/appstage-00-bootstrap
+    path: deploy/k8s/argocd/e2e/appstages/appstage-00-bootstrap
     repoURL: git@github.com:kaweezle/iknite.git
     targetRevision: main
   syncPolicy:

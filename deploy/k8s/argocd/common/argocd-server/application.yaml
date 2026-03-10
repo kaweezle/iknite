@@ -19,7 +19,7 @@ spec:
       kind: Application
   project: default
   source:
-    path: deploy/k8s/components/argocd
+    path: deploy/k8s/argocd/common/argocd-server
     repoURL: git@github.com:kaweezle/iknite.git
     targetRevision: main
     plugin:

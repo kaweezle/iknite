@@ -9,8 +9,8 @@ metadata:
 source: ../../values
 replacements:
   - source:
-      name: octave-platform-values
-      fieldPath: data.git.repoURL
+      name: iknite-values
+      fieldPath: data.project.git.repoURL
     targets:
       - select:
           kind: Application
@@ -24,8 +24,8 @@ replacements:
         fieldPaths:
           - spec.generators.*.git.repoURL
   - source:
-      name: octave-platform-values
-      fieldPath: data.git.targetRevision
+      name: iknite-values
+      fieldPath: data.project.git.targetRevision
     targets:
       - select:
           kind: Application
@@ -39,11 +39,11 @@ replacements:
         fieldPaths:
           - spec.generators.*.git.revision
   - source:
-      name: octave-platform-values
-      fieldPath: data.git.basePath
+      name: iknite-values
+      fieldPath: data.project.git.basePath
     targets:
       - select:
           kind: Application
           annotationSelector: "autocloud/local-application=true,autocloud/custom-path=true"
         fieldPaths:
-          - spec.source.path.!!regex.^(k8s)/(\.*)$.1
+          - spec.source.path.!!regex.^(deploy/k8s/argocd)/(\.*)$.1

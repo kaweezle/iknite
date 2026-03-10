@@ -1,194 +1,260 @@
-<!-- cSpell:words testutils vhdx overlayfs releaserepo testrepo devenv -->
+<!-- cSpell:words argocd checkmake codegen devcontainer iknitedev releaserepo testutils vhdx -->
+<!-- cSpell:words overlayfs testrepo devenv prds venv dockerimage -->
 
 # Directory Structure
 
-This document explains the directory organization of the iknite project.
+This document describes the current repository layout of the iknite project. The
+repository follows a typical Go CLI structure, with additional directories for
+Alpine packaging, Kubernetes assets, documentation, and infrastructure.
 
 ## Overview
 
-Iknite follows a standard Go project layout with some additional directories
-specific to Kubernetes cluster management and Alpine Linux packaging.
+At the top level, the repository is organized around the CLI source code,
+packaging and image-building assets, infrastructure definitions, documentation,
+and development tooling.
 
 ## Directory Layout
 
 ```
 iknite/
+├── .devcontainer/    # Root dev container entrypoint for VS Code
+├── .github/          # Workflows, issue templates, and agent instructions
+├── .vscode/          # Workspace tasks and editor settings
+├── build/            # Generated build inputs and staging assets
 ├── cmd/              # Application entry points
-├── pkg/              # Reusable Go libraries
-├── packaging/        # Alpine Linux packages and root filesystem
-├── deploy/           # Deployment and infrastructure as code
-├── docs/             # Documentation site
-├── hack/             # Development utilities and code generation
-├── test/             # Test fixtures and test scripts
-└── .github/          # GitHub workflows and CI/CD
+├── deploy/           # Kubernetes assets and Terraform/Terragrunt config
+├── docs/             # MkDocs site, specs, and doc tooling
+├── hack/             # Developer utilities and code generation helpers
+├── packaging/        # APK packaging, rootfs images, and VM assets
+├── pkg/              # Main reusable Go packages
+├── test/             # Test scripts and supporting fixtures
+└── dist/             # Generated release artifacts
 ```
 
 ## Core Directories
 
 ### `cmd/`
 
-Application entry points and main packages.
+Application entry points.
 
-- `cmd/iknite/` - Main iknite CLI application
+- `cmd/iknite/` - main CLI binary entrypoint
 
 ### `pkg/`
 
-Reusable Go packages and libraries organized by functionality:
+Reusable Go packages organized by domain:
 
-- `alpine/` - Alpine Linux specific utilities
-- `apis/` - Kubernetes API definitions
-- `cmd/` - CLI command implementations
-- `config/` - Configuration management
-- `constants/` - Project-wide constants
-- `cri/` - Container Runtime Interface (CRI) utilities
-- `k8s/` - Kubernetes cluster management
-- `provision/` - Cluster provisioning logic (Kustomize-based)
-- `testutils/` - Testing utilities
-- `utils/` - General purpose utilities
+- `pkg/alpine/` - Alpine-specific helpers such as networking and services
+- `pkg/apis/` - API types and generated Kubernetes-style objects
+- `pkg/cmd/` - Cobra command implementations for the CLI
+- `pkg/config/` - configuration loading and defaults
+- `pkg/constants/` - project-wide constants
+- `pkg/cri/` - container runtime helpers
+- `pkg/k8s/` - Kubernetes runtime, readiness, and lifecycle logic
+- `pkg/provision/` - provisioning helpers and embedded base assets
+- `pkg/server/` - HTTP or service-facing helpers used by the project
+- `pkg/testutils/` - testing support code and mocks
+- `pkg/utils/` - general shared utilities
 
-## Deployment & Packaging
+Notable subtrees:
+
+- `pkg/apis/iknite/v1alpha1/` - versioned API types and generated files
+- `pkg/k8s/phases/init/` - custom kubeadm init phase logic
+- `pkg/cmd/options/` - shared Cobra option helpers
+
+## Packaging And Deployment
 
 ### `packaging/`
 
-Alpine Linux packages, root filesystem, and build scripts.
+Assets used to build Alpine packages, root filesystems, and VM images.
 
 #### `packaging/apk/`
 
-Alpine Linux package configuration files:
+APK package definitions and contents:
 
-- `iknite/` - Main iknite package configuration
-  - `buildkit/` - BuildKit configuration
-  - `conf.d/` - Service configuration files
-  - `flannel/` - Flannel CNI configuration
-  - `iknite.d/` - Iknite kustomization files
-  - `init.d/` - OpenRC init scripts
-  - `crictl.yaml` - crictl to containerd socket mapping
-- `iknite-images/` - Pre-pulled container images package
-  - `iknite-images.yaml` - Melange configuration for images APK
+- `packaging/apk/iknite/` - main iknite package contents
+- `packaging/apk/iknite-images/` - image preload APK definition
+- `packaging/apk/incus-agent/` - Incus agent packaging assets
+
+The main iknite APK currently includes:
+
+- `buildkit/` - BuildKit-related configuration
+- `conf.d/` - OpenRC service configuration files
+- `flannel/` - Flannel networking assets
+- `iknite.d/` - default kustomization content
+- `init.d/` - OpenRC init scripts
+- `crictl.yaml` - CRI client configuration
 
 #### `packaging/rootfs/`
 
-Root filesystem build artifacts for creating WSL distributions and VM images:
+Root filesystem image definitions:
 
-- `base/` - Base Alpine rootfs with iknite
-  - `Dockerfile` - Base image build configuration
-  - `*.rsa.pub` - APK signing public keys
-  - `rc.conf`, `p10k.zsh` - System configuration files
-- `with-images/` - Complete rootfs with pre-pulled images
-  - `Dockerfile` - Final image build with embedded tarball
+- `packaging/rootfs/base/` - base Alpine rootfs image setup
+- `packaging/rootfs/with-images/` - rootfs image with imported Kubernetes images
 
 #### `packaging/scripts/`
 
-Build automation and helper scripts:
+Packaging and image build scripts:
 
-- `build-helper.sh` - Main build orchestration script
-- `build-vm-image.sh` - VM image builder (QCOW2, VHDX)
-- `configure-vm-image.sh` - VM image configuration script (chroot setup)
-- `install_images.sh` - Container image installation helper
-- `test-overlayfs.sh` - Filesystem testing utility
+- `build-vm-image.sh` - VM image creation
+- `configure-vm-image.sh` - VM image customization in chroot
+- `install_images.sh` - image import helper
+- `test-overlayfs.sh` - overlay filesystem validation helper
+
+#### `packaging/vm/`
+
+VM metadata and templates:
+
+- `metadata.yaml.tmpl` - base metadata template
+- `templates/` - supporting VM template files
 
 ### `deploy/`
 
-Deployment configurations and infrastructure as code:
+Deployment assets for both Kubernetes manifests and infrastructure.
 
-- `iac/` - Infrastructure as Code (Terraform/Terragrunt)
-  - `iknite/` - Iknite-specific infrastructure
-    - `root.hcl` - Terragrunt root configuration
-    - `secrets.sops.yaml` - Encrypted secrets
-    - `apkrepo/` - Static APK repository website creation
-    - `releaserepo/`, `testrepo/` - APK repository creation and upload
-    - `dns_iknite_app/` - DNS configuration of the iknite.app domain
-    - `iknite-vm/` - VM deployment configuration
-  - `modules/` - Reusable Terraform modules
-    - `object-store-sync/` - Object storage synchronization
-    - `openstack-vm/` - OpenStack VM provisioning
-    - `public-object-store/` - Public object storage on OVH setup
+#### `deploy/k8s/`
 
-## Development
+Cluster-side assets:
+
+- `argocd/` - Argo CD-related manifests
+- `container-images/` - image-related deployment assets
+- `hack/` - support scripts or helpers for deployment workflows
+
+#### `deploy/iac/`
+
+Infrastructure as code definitions.
+
+- `deploy/iac/iknite/` - environment-specific Terragrunt stacks
+- `deploy/iac/modules/` - reusable Terraform and Terragrunt modules
+- `deploy/iac/README.md` - infrastructure documentation
+
+Current `deploy/iac/iknite/` subdirectories include:
+
+- `acme/` - ACME-related configuration
+- `apkrepo/` - APK repository publishing setup
+- `dns_iknite_app/` - DNS configuration for the iknite domain
+- `github-configuration/` - GitHub repository automation/config
+- `iknite-argocd/` - Argo CD deployment stack
+- `iknite-argocd-state/` - Argo CD state storage/config
+- `iknite-image/` - image publishing or image metadata stack
+- `iknite-kubeconfig-fetcher/` - kubeconfig retrieval stack
+- `iknite-kubernetes-state/` - Kubernetes state storage/config
+- `iknite-public-images/` - public image publication stack
+- `iknite-vm/` - VM deployment stack
+- `releaserepo/` - release repository publication
+- `testrepo/` - test repository publication
+- `root.hcl` - shared Terragrunt root configuration
+
+Current `deploy/iac/modules/` subdirectories include:
+
+- `acme/`
+- `dns_cloudflare/`
+- `github-configuration/`
+- `helmfile-deploy/`
+- `kubeconfig-fetcher/`
+- `kubernetes-state/`
+- `object-store-sync/`
+- `openstack-image/`
+- `openstack-vm/`
+- `public-object-store/`
+
+## Development Tooling
 
 ### `hack/`
 
-Development utilities and code generation:
+Development helpers, generator scripts, and local tooling:
 
-- `make-rootfs-devenv.sh` - Development environment setup
-- `tools.go` - Go tool dependencies
-- `update-codegen.sh` - Kubernetes code generator
-- `verify-codegen.sh` - Verify generated code
-- `boilerplate.go.txt` - Go file header template
-- `custom-boilerplate.go.txt` - Custom boilerplate template
-- `devcontainer/` - VS Code devcontainer configuration
-  - `Dockerfile` - Dev container image
-  - `buildkitd.toml` - BuildKit configuration
-  - `p10k.zsh`, `rc.conf` - Shell and system configuration
-- `iknitedev/` - Development utilities package
-  - `cmd/` - CLI commands for development tasks
-    - `install_signing_key.go` - APK signing key installer
+- `boilerplate.go.txt` - code generation boilerplate
+- `custom-boilerplate.go.txt` - project-specific boilerplate
+- `build-container-image.sh` - local container image build helper
+- `make-rootfs-devenv.sh` - rootfs-based development environment helper
+- `tools.go` - Go tool dependency tracking
+- `update-codegen.sh` - regenerate Kubernetes-style code
+- `verify-codegen.sh` - verify generated code is up to date
+- `devcontainer/` - devcontainer build context and supporting config
+- `iknitedev/` - auxiliary development CLI module
 
 ### `test/`
 
-Test fixtures, resources, and test scripts:
+Test scripts and supporting fixtures:
 
-- `ops/` - Operational test resources
-  - `nginx/` - Example nginx deployment
-- `vm/` - VM testing resources
-  - `cloud-init/` - Cloud-init configuration templates
-  - `scripts/` - VM test scripts
+- `test/e2e/` - end-to-end test helpers such as `argocd-checker.sh`
+- `test/ops/` - operational examples such as `nginx/`
+- `test/vm/` - VM testing resources, including `cloud-init/` and `scripts/`
 
 ### `docs/`
 
-Documentation website built with MkDocs:
+Documentation sources and tooling.
 
-- `mkdocs.yaml` - MkDocs configuration
-- `pyproject.toml` - Python dependencies (for `uv install`)
-- `docs/` - Documentation content (Markdown files)
-- `src/` - Additional documentation source files
+- `docs/mkdocs.yaml` - MkDocs configuration
+- `docs/pyproject.toml` - Python dependency manifest for docs tooling
+- `docs/uv.lock` - locked dependency set for docs tooling
+- `docs/docs/` - published Markdown content and site assets
+- `docs/specs/` - documentation specifications, currently `prds/`
+- `docs/src/` - additional documentation source material
+- `docs/.venv/` - local virtual environment for docs work
 
-## Configuration Files
+## Repository Metadata And Configuration
 
-### Root-level Configuration
+### Root-Level Files And Folders
 
-The project root contains various tool configuration files:
+Key repository-wide configuration currently present at the root includes:
 
-- `.golangci.yml` - Go linter configuration
-- `.goreleaser.yaml` - Release automation
-- `.pre-commit-config.yaml` - Pre-commit hooks
-- `.sops.yaml` - Secrets encryption configuration
-- `.prettierrc.json` - Code formatting
-- `.shellcheckrc` - Shell script linting
-- `.editorconfig` - Editor configuration
-- `cspell.json` - Spell checking
-- `go.mod`, `go.sum`, `go.work`, `go.work.sum` - Go module and workspace
-  definitions
-- `.vscode/` - VS Code workspace settings (optional)
+- `.editorconfig` - editor defaults
+- `.golangci.yml` - Go lint configuration
+- `.goreleaser.yaml` - release and package build configuration
+- `.pre-commit-config.yaml` - pre-commit hooks
+- `.prettierrc.json` - formatting configuration
+- `.shellcheckrc` - shell lint configuration
+- `.sops.yaml` - SOPS configuration
+- `aqua.yaml` - tool installation manifest
+- `checkmake.ini` - `checkmake` configuration
+- `cspell.json` - spell checker configuration
+- `go.mod`, `go.sum` - main Go module metadata
+- `go.work`, `go.work.sum` - Go workspace metadata
+- `GNUmakefile` - make targets
+- `README.md`, `BUILD.md`, `CONTRIBUTING.md`, `RELEASE.md`, `STRUCTURE.md` -
+  top-level documentation
 
-### CI/CD
+### `.github/`
 
-GitHub Actions workflows in `.github/workflows/`:
+GitHub-specific automation and contributor support files:
 
-- `go.yaml` - Go build and test
-- `docs.yaml` - Documentation build and deploy
-- `release.yml` - Release automation
-- `devcontainer.yaml` - Development container builds
+- `ISSUE_TEMPLATE/` - issue templates
+- `actions/` - reusable GitHub Actions
+- `instructions/` - agent instruction files used in this repository
+- `workflows/` - CI and release workflows
+- `copilot-instructions.md` - repository guidance for AI agents
+- `dependabot.yaml` - dependency update automation
+- `pull_request_template.md` - PR template
+- `release.yml` - release metadata or automation configuration
+
+Current workflows in `.github/workflows/` include:
+
+- `build_push_dockerimage.yaml`
+- `devcontainer.yaml`
+- `docs.yaml`
+- `go.yaml`
+- `release.yml`
+- `test-e2e.yml`
 
 ## Build Artifacts
 
-The following directories contain build artifacts and should not be committed:
+The following paths are used for generated or local build output:
 
-- `build/` - Build artifacts
-- `dist/` - Distribution packages - e.g., alpine packages, root filesystem
-  tarballs, VM images
+- `build/` - staged build assets, including `build/e2e/`
+- `dist/` - generated packages, images, and release artifacts
+- `coverage.out` - local Go coverage output when tests are run with coverage
 
 ## Getting Started
 
-1. **Building the project**: See [BUILD.md](BUILD.md) for build instructions
-2. **Contributing**: See [CONTRIBUTING.md](CONTRIBUTING.md) for contribution
-   guidelines
-3. **Documentation**: Visit `docs/` or the
-   [project website](https://kaweezle.github.io/iknite/)
+1. See [BUILD.md](BUILD.md) for build instructions.
+2. See [CONTRIBUTING.md](CONTRIBUTING.md) for contribution guidelines.
+3. See [README.md](README.md) for a high-level project overview.
+4. See [docs/](docs/) for the documentation source tree.
 
 ## Related Files
 
-- [BUILD.md](BUILD.md) - Build and release process
-- [CONTRIBUTING.md](CONTRIBUTING.md) - Contribution guidelines
-- [README.md](README.md) - Project overview
-- [RELEASE.md](RELEASE.md) - Release notes
+- [README.md](README.md) - project overview
+- [BUILD.md](BUILD.md) - build and packaging workflows
+- [CONTRIBUTING.md](CONTRIBUTING.md) - contribution process
+- [RELEASE.md](RELEASE.md) - release checklist and notes

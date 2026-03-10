@@ -19,16 +19,24 @@
     "**/*.lock.hcl",
     "packaging/apk/iknite/**",
     ".gitattributes",
-    "checkmake.ini"
+    "checkmake.ini",
+    "deploy/k8s/hack/schemas/**/*.json"
   ],
   "dictionaryDefinitions": [],
-  "dictionaries": ["bash", "docker", "golang", "terraform", "softwareTerms"],
+  "dictionaries": [
+    "bash",
+    "docker",
+    "golang",
+    "terraform",
+    "softwareTerms"
+  ],
   "words": [
     "abuild",
     "afero",
     "antoinemartin",
     "apkrepo",
     "appstage",
+    "appstages",
     "bsdtar",
     "buildctl",
     "buildkit",
@@ -81,6 +89,7 @@
     "kubeadm",
     "kubeconfig",
     "Kubeconfigs",
+    "kubeconform",
     "kubelet",
     "Kustomization",
     "Kustomizations",
