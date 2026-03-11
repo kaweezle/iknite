@@ -1,3 +1,5 @@
+<!-- cSpell: words userprofile wslconfig kwsl addresspool kubevip runlevel -->
+
 !!! wip "Work in progress"
 
     This documentation is in draft form and may change frequently.
@@ -12,9 +14,9 @@ Windows Subsystem for Linux 2 (WSL2).
 WSL2 is the recommended deployment target for Windows users. Iknite is
 specifically designed for WSL2 with:
 
-- **Stable IP management**: Automatic secondary IP assignment to survive WSL2
-  VM restarts
-- **mDNS registration**: `kaweezle.local` resolution from Windows
+- **Stable IP management**: Automatic secondary IP assignment to survive WSL2 VM
+  restarts
+- **mDNS registration**: `iknite.local` resolution from Windows
 - **LoadBalancer support**: Via Kube-VIP with WSL2-accessible IP range
 
 ## Prerequisites
@@ -110,10 +112,10 @@ createIp: true
 
 ### Domain Name Resolution
 
-Iknite registers `kaweezle.local` via mDNS. From Windows:
+Iknite registers `iknite.local` via mDNS. From Windows:
 
 ```powershell
-Resolve-DnsName kaweezle.local
+Resolve-DnsName iknite.local
 # Should return 192.168.99.2
 ```
 
@@ -139,7 +141,7 @@ metadata:
   name: vip-range
   namespace: kube-system
 spec:
-  cidr: "192.168.99.100/27"  # 32 addresses
+  cidr: "192.168.99.100/27" # 32 addresses
 ```
 
 ## Auto-Start on Windows Login
@@ -173,8 +175,8 @@ openrc default
 
 ## Persistent Distribution
 
-WSL2 distributions are stored in the directory you specify during import.
-Back up the distribution regularly:
+WSL2 distributions are stored in the directory you specify during import. Back
+up the distribution regularly:
 
 ```powershell
 # Stop the distribution
@@ -188,8 +190,8 @@ wsl --export kwsl "$env:USERPROFILE\Documents\kwsl-backup.tar.gz"
 
 ### WSL2 VM IP Changes on Restart
 
-This is handled automatically by Iknite's IP management. If the stable IP is
-not bound, check:
+This is handled automatically by Iknite's IP management. If the stable IP is not
+bound, check:
 
 ```bash
 # Inside WSL

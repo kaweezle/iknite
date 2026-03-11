@@ -1,3 +1,5 @@
+<!-- cSpell: words wslconfig userprofile kwsl -->
+
 !!! wip "Work in progress"
 
     This documentation is in draft form and may change frequently.
@@ -43,7 +45,7 @@ CPU than etcd. Use it unless you specifically need etcd compatibility:
 
 ```yaml
 # /etc/iknite.d/iknite.yaml
-useEtcd: false  # default
+useEtcd: false # default
 ```
 
 ### Tune the bootstrap kustomization
@@ -162,7 +164,7 @@ service starts:
 
 ```yaml
 # /etc/iknite.d/iknite.yaml
-domainName: "kaweezle.local"
+domainName: "iknite.local"
 ip: "192.168.99.2"
 createIp: true
 ```
@@ -294,13 +296,13 @@ tar czf /backup/pv-$(date +%Y%m%d).tar.gz /opt/local-path-provisioner/
 
 ## Troubleshooting Quick Reference
 
-| Problem | Solution |
-|---------|---------|
-| Cluster stuck initializing | `iknite clean && iknite start -t 120` |
-| Pod stuck in Pending | `kubectl describe pod <pod> && kubectl top nodes` |
-| IP not accessible from Windows | Check `iknite status` → ip_bound check |
-| Services not loadbalancing | Verify kube-vip is running in kube-system |
-| Disk space low | `nerdctl image prune -a && iknite clean` |
-| Certificate expired | `kubeadm certs renew all` |
+| Problem                        | Solution                                          |
+| ------------------------------ | ------------------------------------------------- |
+| Cluster stuck initializing     | `iknite clean && iknite start -t 120`             |
+| Pod stuck in Pending           | `kubectl describe pod <pod> && kubectl top nodes` |
+| IP not accessible from Windows | Check `iknite status` → ip_bound check            |
+| Services not loadbalancing     | Verify kube-vip is running in kube-system         |
+| Disk space low                 | `nerdctl image prune -a && iknite clean`          |
+| Certificate expired            | `kubeadm certs renew all`                         |
 
 See [Troubleshooting](../operator/troubleshooting.md) for detailed guidance.

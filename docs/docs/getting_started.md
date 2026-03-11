@@ -1,3 +1,5 @@
+<!-- cSpell: words vhdx kwsl -->
+
 !!! wip "Work in progress"
 
     This documentation is in draft form and may change frequently.
@@ -17,12 +19,12 @@ Before installing Iknite, make sure you have:
 
 ## Supported Environments
 
-| Environment | Platform | Notes |
-|-------------|----------|-------|
-| WSL2        | Windows 10/11 | Recommended for Windows users |
-| Incus       | Linux | Lightweight LXC/VM alternative |
-| Hyper-V     | Windows | Full VM isolation |
-| Openstack   | Cloud | Cloud-native VM |
+| Environment | Platform                | Notes                                                                        |
+| ----------- | ----------------------- | ---------------------------------------------------------------------------- |
+| WSL2        | Windows 10/11           | Recommended for Windows users                                                |
+| Incus       | Linux                   | Lightweight LXC/VM alternative                                               |
+| Hyper-V     | Windows                 | Full VM isolation                                                            |
+| Openstack   | Cloud                   | Cloud-native VM                                                              |
 | Docker      | Linux / Windows / macOS | Work in progress – see [Docker](administration/deployment_targets/docker.md) |
 
 ## WSL2 Quick Start
@@ -86,7 +88,8 @@ This will:
 1. Configure the Alpine Linux environment
 2. Start OpenRC services (containerd, buildkitd)
 3. Initialize the Kubernetes cluster with the embedded version of kubeadm
-4. Apply the base kustomization (flannel, metrics-server, kube-vip, local-path-provisioner)
+4. Apply the base kustomization (flannel, metrics-server, kube-vip,
+   local-path-provisioner)
 5. Wait until all workloads are ready
 
 ### 4. Access the Cluster
@@ -119,11 +122,15 @@ incus exec iknite -- /sbin/iknite start -t 120
 For manual installation:
 
 ```bash
+# Download the root filesystem and the metadata
+curl -sLO "https://github.com/kaweezle/iknite/releases/download/latest/iknite-0.6.5-1.35.2.rootfs.tar.gz"
+curl -sLO "https://github.com/kaweezle/iknite/releases/download/latest/incus.tar.xz"
+
 # Import the rootfs as a container image
-incus image import iknite-rootfs.tar.gz --alias iknite
+incus image import --alias iknite-container incus.tar.xz iknite.0.6.5-1.35.2.qcow2 --reuse
 
 # Create and start a container
-incus launch iknite my-cluster
+incus launch iknite-container my-cluster
 
 # Start the Kubernetes cluster
 incus exec my-cluster -- /sbin/iknite start -t 120
@@ -148,10 +155,10 @@ The script will automatically:
 
 ## Docker Quick Start
 
-!!! warning "Work in progress"
-    Docker support is currently under active development and not yet fully
-    supported. See [Docker deployment](administration/deployment_targets/docker.md)
-    for the current status.
+!!! warning "Work in progress" Docker support is currently under active
+development and not yet fully supported. See
+[Docker deployment](administration/deployment_targets/docker.md) for the current
+status.
 
 ```bash
 docker run --privileged -d --name iknite ghcr.io/kaweezle/iknite:latest /sbin/iknite init

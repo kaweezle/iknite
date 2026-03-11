@@ -19,7 +19,7 @@ following search paths (first found wins):
 
 Options are applied in this order (highest priority first):
 
-1. **CLI flags** (e.g., `--domain-name kaweezle.local`)
+1. **CLI flags** (e.g., `--domain-name iknite.local`)
 2. **Environment variables** (prefix `IKNITE_`, e.g., `IKNITE_DOMAIN_NAME`)
 3. **Configuration file** (`iknite.yaml`)
 4. **Built-in defaults**
@@ -30,12 +30,12 @@ Options are applied in this order (highest priority first):
 
 The Kubernetes version to use for cluster initialization.
 
-| Property | Value |
-|----------|-------|
-| Type | `string` |
-| Default | Compiled-in version (see `iknite info versions`) |
-| CLI flag | `--kubernetes-version` |
-| Env var | `IKNITE_KUBERNETES_VERSION` |
+| Property | Value                                            |
+| -------- | ------------------------------------------------ |
+| Type     | `string`                                         |
+| Default  | Compiled-in version (see `iknite info versions`) |
+| CLI flag | `--kubernetes-version`                           |
+| Env var  | `IKNITE_KUBERNETES_VERSION`                      |
 
 ```yaml
 kubernetesVersion: "1.35.0"
@@ -46,15 +46,15 @@ kubernetesVersion: "1.35.0"
 The hostname used as the Kubernetes API server address. Iknite registers this
 name in `/etc/hosts` and optionally via mDNS.
 
-| Property | Value |
-|----------|-------|
-| Type | `string` |
-| Default | `kaweezle.local` |
-| CLI flag | `--domain-name` |
-| Env var | `IKNITE_DOMAIN_NAME` |
+| Property | Value                |
+| -------- | -------------------- |
+| Type     | `string`             |
+| Default  | `iknite.local`       |
+| CLI flag | `--domain-name`      |
+| Env var  | `IKNITE_DOMAIN_NAME` |
 
 ```yaml
-domainName: "kaweezle.local"
+domainName: "iknite.local"
 ```
 
 ### `ip`
@@ -62,12 +62,12 @@ domainName: "kaweezle.local"
 The IP address to use as the Kubernetes API server endpoint. In WSL2
 environments, this is typically a secondary IP added to the `eth0` interface.
 
-| Property | Value |
-|----------|-------|
-| Type | `string` (IP address) |
-| Default | `192.168.99.2` |
-| CLI flag | `--ip` |
-| Env var | `IKNITE_IP` |
+| Property | Value                 |
+| -------- | --------------------- |
+| Type     | `string` (IP address) |
+| Default  | `192.168.99.2`        |
+| CLI flag | `--ip`                |
+| Env var  | `IKNITE_IP`           |
 
 ```yaml
 ip: "192.168.99.2"
@@ -78,12 +78,12 @@ ip: "192.168.99.2"
 Whether to add the configured `ip` as a secondary address to the network
 interface. Enable this in WSL2 to ensure the IP is always available.
 
-| Property | Value |
-|----------|-------|
-| Type | `bool` |
-| Default | `true` |
-| CLI flag | `--create-ip` |
-| Env var | `IKNITE_CREATE_IP` |
+| Property | Value              |
+| -------- | ------------------ |
+| Type     | `bool`             |
+| Default  | `true`             |
+| CLI flag | `--create-ip`      |
+| Env var  | `IKNITE_CREATE_IP` |
 
 ```yaml
 createIp: true
@@ -93,12 +93,12 @@ createIp: true
 
 The network interface to add the secondary IP address to.
 
-| Property | Value |
-|----------|-------|
-| Type | `string` |
-| Default | `eth0` |
-| CLI flag | `--network-interface` |
-| Env var | `IKNITE_NETWORK_INTERFACE` |
+| Property | Value                      |
+| -------- | -------------------------- |
+| Type     | `string`                   |
+| Default  | `eth0`                     |
+| CLI flag | `--network-interface`      |
+| Env var  | `IKNITE_NETWORK_INTERFACE` |
 
 ```yaml
 networkInterface: "eth0"
@@ -106,29 +106,30 @@ networkInterface: "eth0"
 
 ### `clusterName`
 
-The name of the Kubernetes cluster. Used in kubeconfig contexts and certificates.
+The name of the Kubernetes cluster. Used in kubeconfig contexts and
+certificates.
 
-| Property | Value |
-|----------|-------|
-| Type | `string` |
-| Default | `kaweezle` |
-| CLI flag | `--cluster-name` |
-| Env var | `IKNITE_CLUSTER_NAME` |
+| Property | Value                 |
+| -------- | --------------------- |
+| Type     | `string`              |
+| Default  | `iknite`              |
+| CLI flag | `--cluster-name`      |
+| Env var  | `IKNITE_CLUSTER_NAME` |
 
 ```yaml
-clusterName: "kaweezle"
+clusterName: "iknite"
 ```
 
 ### `kustomization`
 
 Path to the directory containing the bootstrap kustomization files.
 
-| Property | Value |
-|----------|-------|
-| Type | `string` |
-| Default | `/etc/iknite.d` |
-| CLI flag | `--kustomization` |
-| Env var | `IKNITE_KUSTOMIZATION` |
+| Property | Value                  |
+| -------- | ---------------------- |
+| Type     | `string`               |
+| Default  | `/etc/iknite.d`        |
+| CLI flag | `--kustomization`      |
+| Env var  | `IKNITE_KUSTOMIZATION` |
 
 ```yaml
 kustomization: "/etc/iknite.d"
@@ -138,12 +139,12 @@ kustomization: "/etc/iknite.d"
 
 Use standard etcd instead of Kine as the API backend.
 
-| Property | Value |
-|----------|-------|
-| Type | `bool` |
-| Default | `false` (Kine is the default) |
-| CLI flag | `--use-etcd` |
-| Env var | `IKNITE_USE_ETCD` |
+| Property | Value                         |
+| -------- | ----------------------------- |
+| Type     | `bool`                        |
+| Default  | `false` (Kine is the default) |
+| CLI flag | `--use-etcd`                  |
+| Env var  | `IKNITE_USE_ETCD`             |
 
 ```yaml
 useEtcd: false
@@ -153,12 +154,12 @@ useEtcd: false
 
 Custom directory for the API backend database files.
 
-| Property | Value |
-|----------|-------|
-| Type | `string` |
-| Default | `/var/lib/kine` (Kine) or `/var/lib/etcd` (etcd) |
-| CLI flag | `--api-backend-database-directory` |
-| Env var | `IKNITE_API_BACKEND_DATABASE_DIRECTORY` |
+| Property | Value                                            |
+| -------- | ------------------------------------------------ |
+| Type     | `string`                                         |
+| Default  | `/var/lib/kine` (Kine) or `/var/lib/etcd` (etcd) |
+| CLI flag | `--api-backend-database-directory`               |
+| Env var  | `IKNITE_API_BACKEND_DATABASE_DIRECTORY`          |
 
 ```yaml
 apiBackendDatabaseDirectory: "/var/lib/kine"
@@ -166,15 +167,15 @@ apiBackendDatabaseDirectory: "/var/lib/kine"
 
 ### `enableMDNS`
 
-Whether to enable the mDNS responder for the cluster domain name. Useful in
-WSL2 for resolving the domain name from Windows.
+Whether to enable the mDNS responder for the cluster domain name. Useful in WSL2
+for resolving the domain name from Windows.
 
-| Property | Value |
-|----------|-------|
-| Type | `bool` |
-| Default | `true` in WSL2 environments |
-| CLI flag | `--enable-mdns` |
-| Env var | `IKNITE_ENABLE_MDNS` |
+| Property | Value                       |
+| -------- | --------------------------- |
+| Type     | `bool`                      |
+| Default  | `true` in WSL2 environments |
+| CLI flag | `--enable-mdns`             |
+| Env var  | `IKNITE_ENABLE_MDNS`        |
 
 ```yaml
 enableMDNS: true
@@ -184,12 +185,12 @@ enableMDNS: true
 
 The port for the Iknite status HTTPS server.
 
-| Property | Value |
-|----------|-------|
-| Type | `int` |
-| Default | `11443` |
-| CLI flag | `--status-server-port` |
-| Env var | `IKNITE_STATUS_SERVER_PORT` |
+| Property | Value                       |
+| -------- | --------------------------- |
+| Type     | `int`                       |
+| Default  | `11443`                     |
+| CLI flag | `--status-server-port`      |
+| Env var  | `IKNITE_STATUS_SERVER_PORT` |
 
 ```yaml
 statusServerPort: 11443
@@ -201,11 +202,11 @@ statusServerPort: 11443
 
 ```yaml
 # /etc/iknite.d/iknite.yaml
-domainName: "kaweezle.local"
+domainName: "iknite.local"
 ip: "192.168.99.2"
 createIp: true
 networkInterface: "eth0"
-clusterName: "kaweezle"
+clusterName: "iknite"
 enableMDNS: true
 useEtcd: false
 kustomization: "/etc/iknite.d"
@@ -215,9 +216,9 @@ kustomization: "/etc/iknite.d"
 
 ```yaml
 # /etc/iknite.d/iknite.yaml
-domainName: ""     # Use actual IP
-createIp: false    # Don't create secondary IP
-enableMDNS: false  # No mDNS needed
+domainName: "" # Use actual IP
+createIp: false # Don't create secondary IP
+enableMDNS: false # No mDNS needed
 clusterName: "my-cluster"
 useEtcd: false
 ```

@@ -1,3 +1,5 @@
+<!-- cSpell: words runlevel runlevels addresspool testutils -->
+
 !!! wip "Work in progress"
 
     This documentation is in draft form and may change frequently.
@@ -16,13 +18,15 @@ graph TD
     B --> C[EnsureOpenRC default runlevel]
     C --> D{Kubeconfig exists?}
     D -- No --> E[iknite init]
-    D -- Yes, unchanged --> F[Poll for cluster ready]
-    E --> H[Launch kubelet subprocess]
-    H --> G[kubeadm init phases]
-    G --> I[Start status server]
-    I --> J[Apply base kustomization]
+    D -- Yes, unchanged --> H[Launch kubelet subprocess]
+    E --> G[kubeadm init phases]
+    G --> H
+    H --> I[Start status server]
+    I --> M{Already configured?}
+    M -- No --> J[Apply base kustomization]
+    M -- Yes --> K
     J --> K[Wait for workloads]
-    K --> F
+    K --> F[Poll for cluster ready]
     F --> L[Cluster ready]
 ```
 
@@ -33,16 +37,16 @@ graph TD
 Iknite is a single Go binary built with [Cobra](https://github.com/spf13/cobra).
 The main commands are:
 
-| Command | Description |
-|---------|-------------|
-| `iknite start` | Start the cluster (OpenRC-based) |
-| `iknite init` | Full kubeadm-based cluster initialization |
-| `iknite reset` | Reset the cluster (calls kubeadm reset) |
-| `iknite clean` | Clean containerd state without full reset |
-| `iknite status` | Display environment, config and workload checks |
-| `iknite info` | Print cluster configuration |
-| `iknite info status` | Query the live status server |
-| `iknite kustomize` | Manage bootstrap kustomizations |
+| Command              | Description                                       |
+| -------------------- | ------------------------------------------------- |
+| `iknite start`       | Start the cluster (OpenRC-based)                  |
+| `iknite init`        | Full kubeadm-based cluster initialization         |
+| `iknite reset`       | Reset the cluster (calls kubeadm reset)           |
+| `iknite clean`       | Clean containerd state with or without full reset |
+| `iknite status`      | Display environment, config and workload checks   |
+| `iknite info`        | Print cluster configuration                       |
+| `iknite info status` | Query the live status server                      |
+| `iknite kustomize`   | Manage bootstrap kustomizations                   |
 
 ### Package Structure
 
@@ -63,8 +67,8 @@ pkg/
 
 ## Kubeadm Wrapping
 
-Iknite embeds kubeadm as a Go library and uses Go's `//go:linkname` directive
-to access unexported kubeadm functions. This approach avoids forking kubeadm or
+Iknite embeds kubeadm as a Go library and uses Go's `//go:linkname` directive to
+access unexported kubeadm functions. This approach avoids forking kubeadm or
 copy-pasting large swaths of its source code while still allowing deep
 customization of individual workflow phases. Instead of shelling out to kubeadm,
 Iknite:
@@ -77,15 +81,15 @@ Iknite:
 
 Iknite customizes the following kubeadm init phases:
 
-- **Kube-VIP injection**: Inserts Kube-VIP as a static pod manifest before
-  the control plane starts, so the virtual IP is available immediately
+- **Kube-VIP injection**: Inserts Kube-VIP as a static pod manifest before the
+  control plane starts, so the virtual IP is available immediately
 - **CoreDNS suppression**: Prevents kubeadm from deploying CoreDNS (it is
   deployed via the kustomization instead, which reduces the number of replicas
   and improves startup time)
-- **Kubelet launch**: Instead of starting kubelet via OpenRC, Iknite launches
-  it as a supervised subprocess. This allows precise lifecycle control
-- **Node taint removal**: The control plane taint is removed so workloads can
-  be scheduled on the single node
+- **Kubelet launch**: Instead of starting kubelet via OpenRC, Iknite launches it
+  as a supervised subprocess. This allows precise lifecycle control
+- **Node taint removal**: The control plane taint is removed so workloads can be
+  scheduled on the single node
 - **IP assignment**: In WSL2, a stable secondary IP is added to `eth0`
 - **mDNS registration**: `iknite.local` is registered via pion/mdns
 
@@ -97,11 +101,12 @@ The `iknite reset` command similarly wraps `kubeadm reset`, adding:
 - Cleaning up containerd namespaces
 - Removing iknite-specific configuration
 
-!!! tip "Prefer `iknite clean` for most use cases"
-    `iknite reset` performs a full kubeadm reset which removes all cluster
-    certificates and configuration. In most situations, `iknite clean` (or
-    `iknite clean --clean-all`) is faster and more granular.
-    See [Resetting](administration/lifecycle/resetting.md) for details.
+!!! tip
+
+    Prefer `iknite clean` for most use cases" `iknite reset` performs a full kubeadm
+    reset which removes all cluster certificates and configuration. In most
+    situations, `iknite clean` (or `iknite clean --clean-all`) is faster and more
+    granular. See [Resetting](administration/lifecycle/resetting.md) for details.
 
 ## Kubelet Lifecycle
 
@@ -115,8 +120,8 @@ iknite init
 ```
 
 This design:
-- Prevents kubelet from auto-starting via OpenRC (patched via `/etc/rc.conf`)
-- Lets Iknite cleanly stop kubelet on shutdown
+
+- Lets Iknite cleanly stop the control plane components on shutdown
 - Enables iknite to detect kubelet crashes and respond accordingly
 
 ## OpenRC Integration
@@ -133,11 +138,11 @@ Alpine's init system:
 On `rc-service iknite start`, OpenRC runs `/sbin/iknite init`, which:
 
 1. Starts containerd (dependency)
-2. Runs kubeadm-based initialization (if first boot)
-3. Applies the bootstrap kustomization
+2. Runs kubeadm-based initialization (if first run)
+3. Applies the bootstrap kustomization (if not already applied)
 4. Waits for workloads to become ready
-5. **Holds** (blocks) to keep the iknite service process alive while the
-   cluster runs
+5. **Holds** (blocks) to keep the iknite service process alive while the cluster
+   runs
 
 On `rc-service iknite stop`, OpenRC sends SIGTERM to the iknite process, which:
 
@@ -168,13 +173,13 @@ The cluster state is tracked in `/run/iknite/status.json`:
 
 Possible states:
 
-| State | Description |
-|-------|-------------|
-| `initializing` | kubeadm init in progress |
-| `running` | Cluster fully running and workloads ready |
-| `stopping` | Graceful shutdown in progress |
-| `stopped` | Cluster stopped |
-| `error` | Error during initialization or runtime |
+| State          | Description                               |
+| -------------- | ----------------------------------------- |
+| `initializing` | kubeadm init in progress                  |
+| `running`      | Cluster fully running and workloads ready |
+| `stopping`     | Graceful shutdown in progress             |
+| `stopped`      | Cluster stopped                           |
+| `error`        | Error during initialization or runtime    |
 
 ## Status Server
 
@@ -223,7 +228,8 @@ this by:
 3. Using this IP as the `advertise-address` for kubeadm
 4. Registering the domain name via `/etc/hosts` and mDNS
 
-On restart, the same IP is re-added, ensuring continuity without re-initialization.
+On restart, the same IP is re-added, ensuring continuity without
+re-initialization.
 
 ## Configuration System
 
@@ -251,4 +257,20 @@ type IkniteClusterSpec struct {
     EnableMDNS                  bool
     UseEtcd                     bool
 }
+```
+
+The following is the default configuration (obtained via `iknite info`):
+
+```yaml
+apiBackendDatabaseDirectory: /var/lib/kine
+clusterName: iknite
+createIp: false
+domainName: iknite.local
+enableMDNS: <true if running on wsl or incus>
+ip: <networkInterface IP>
+kubernetesVersion: 1.35.2
+kustomization: /etc/iknite.d
+networkInterface: eth0
+statusServerPort: 11443
+useEtcd: false
 ```
