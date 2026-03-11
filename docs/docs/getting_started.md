@@ -1,4 +1,4 @@
-<!-- cSpell: words vhdx kwsl -->
+<!-- cSpell: words vhdx kwsl syscalls setxattr conntrack hashsize incusbr kmsg -->
 
 !!! wip "Work in progress"
 
@@ -106,34 +106,74 @@ See [Accessing the cluster](tutorial/accessing_cluster.md) for more details.
 
 ## Incus Quick Start
 
-On Linux with Incus installed, use the automated installation script:
+On Linux with Incus installed, use the automated installation script or perform
+a manual install:
+
+=== "Automated install"
+
+    ```bash
+    bash <(curl -fsSL https://raw.githubusercontent.com/kaweezle/iknite/refs/heads/main/get-iknite.sh)
+    ```
+
+    The script downloads the rootfs from the GitHub Container Registry and creates
+    an Incus container named `iknite`.
+
+=== "Manual Install"
+
+    ```bash
+    # Download the root filesystem and the metadata
+    curl -sLO "https://github.com/kaweezle/iknite/releases/download/latest/iknite-0.6.5-1.35.2.rootfs.tar.gz"
+    curl -sLO "https://github.com/kaweezle/iknite/releases/download/latest/incus.tar.xz"
+
+    # Import the rootfs as a container image
+    incus image import --alias iknite-container incus.tar.xz iknite.0.6.5-1.35.2.qcow2 --reuse
+
+    # Create and start a container with the requested configuration for Kubernetes
+    incus launch iknite-container iknite < <(cat <<EOF
+    config:
+      raw.lxc: |-
+        lxc.apparmor.profile=unconfined
+        lxc.sysctl.net.ipv4.ip_forward=1
+        lxc.sysctl.net.bridge.bridge-nf-call-iptables=1
+        lxc.sysctl.net.bridge.bridge-nf-call-ip6tables=1
+        lxc.cgroup2.devices.allow=a
+        lxc.mount.auto=proc:rw sys:rw
+      security.nesting: "true"
+      security.privileged: "true"
+      security.syscalls.intercept.mknod: "true"
+      security.syscalls.intercept.setxattr: "true"
+    description: ""
+    devices:
+      conntrack_hashsize:
+        path: /sys/module/nf_conntrack/parameters/hashsize
+        source: /sys/module/nf_conntrack/parameters/hashsize
+        type: disk
+      eth0:
+        network: incusbr0
+        type: nic
+      kmsg:
+        path: /dev/kmsg
+        source: /dev/kmsg
+        type: unix-char
+      root:
+        path: /
+        pool: default
+        type: disk
+    EOF
+    )
+    ```
+
+You can then start the cluster:
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/kaweezle/iknite/refs/heads/main/get-iknite.sh)
+incus exec iknite -- /sbin/iknite start
 ```
 
-The script downloads the rootfs from the GitHub Container Registry and creates
-an Incus container named `iknite`. You can then start the cluster:
+Once started, you can retrieve the kubeconfig file and start using the cluster:
 
 ```bash
-incus exec iknite -- /sbin/iknite start -t 120
-```
-
-For manual installation:
-
-```bash
-# Download the root filesystem and the metadata
-curl -sLO "https://github.com/kaweezle/iknite/releases/download/latest/iknite-0.6.5-1.35.2.rootfs.tar.gz"
-curl -sLO "https://github.com/kaweezle/iknite/releases/download/latest/incus.tar.xz"
-
-# Import the rootfs as a container image
-incus image import --alias iknite-container incus.tar.xz iknite.0.6.5-1.35.2.qcow2 --reuse
-
-# Create and start a container
-incus launch iknite-container my-cluster
-
-# Start the Kubernetes cluster
-incus exec my-cluster -- /sbin/iknite start -t 120
+incus file pull "iknite/root/.kube/config" ~/kubeconfig-iknite
+KUBECONFIG="$HOME/kubeconfig-iknite" kubectl get pods -A
 ```
 
 ## Hyper-V Quick Start
@@ -153,12 +193,21 @@ The script will automatically:
 - Create a cloud-init ISO with default user configuration
 - Start the VM and wait for it to be ready
 
+Once started, the kubeconfig can be retrieved with the following command:
+
+```powershell
+scp -i iknite-ssh-key root@iknite.local /root/.kube/config $HOME\kubeconfig-iknite
+$env:KUBECONFiG="$HOME\kubeconfig-iknite"
+kubectl get pods -A
+```
+
 ## Docker Quick Start
 
-!!! warning "Work in progress" Docker support is currently under active
-development and not yet fully supported. See
-[Docker deployment](administration/deployment_targets/docker.md) for the current
-status.
+!!! warning "Work in progress"
+
+    Docker support is currently under active development and not yet fully
+    supported. See [Docker deployment](administration/deployment_targets/docker.md)
+    for the current status.
 
 ```bash
 docker run --privileged -d --name iknite ghcr.io/kaweezle/iknite:latest /sbin/iknite init
