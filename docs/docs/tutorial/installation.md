@@ -18,9 +18,9 @@ This page covers installation of Iknite on all supported platforms.
 
 ### Software Requirements
 
-- For WSL2: Windows 10 version 2004+ or Windows 11
+- For WSL2: Windows 11
 - For Incus: Linux host with Incus 6.0+
-- For Hyper-V: Windows 10 Pro/Enterprise or Windows 11 Pro/Enterprise
+- For Hyper-V: Windows 11 Pro/Enterprise
 - For Docker: Docker 20.10+
 
 ## WSL2 Installation
@@ -49,64 +49,51 @@ irm get.scoop.sh | iex
 scoop install kubectl k9s kubectx kubens
 ```
 
-### Step 3: Download the Iknite Root Filesystem
+### Step 3: Install Iknite
 
-Download the latest rootfs tarball from the
-[releases page](https://github.com/kaweezle/iknite/releases):
+=== "Install Script"
 
-=== "PowerShell"
+    The easiest way is the automated PowerShell installer. It downloads the
+    filesystem from GitHub Container Registry and imports it as a WSL
+    distribution:
+
+    ```powershell
+    Set-ExecutionPolicy RemoteSigned -Scope CurrentUser
+    Invoke-RestMethod -Uri https://github.com/kaweezle/iknite/releases/latest/download/Get-Iknite.ps1 | Invoke-Expression
+    ```
+
+    The script creates a WSL distribution named `iknite` (customisable via
+    `$env:IKNITE_NAME`) and imports the root filesystem automatically.
+
+=== "Manual"
 
     ```powershell
     # Create a directory for the WSL distribution
-    $installDir = "$env:LOCALAPPDATA\kwsl"
+    $installDir = "$env:LOCALAPPDATA\iknite"
     New-Item -ItemType Directory -Force -Path $installDir | Out-Null
-    Set-Location $installDir
 
     # Download the latest rootfs
     $releaseUrl = "https://github.com/kaweezle/iknite/releases/latest/download"
-    Invoke-WebRequest "$releaseUrl/iknite-rootfs.tar.gz" -OutFile rootfs.tar.gz
+    Invoke-WebRequest "$releaseUrl/iknite-rootfs.tar.gz" -OutFile "$installDir\rootfs.tar.gz"
+
+    # Import as a WSL distribution
+    wsl --import iknite $installDir "$installDir\rootfs.tar.gz"
     ```
 
-=== "winget script"
-
-    ```powershell
-    # Using the provided PowerShell installer
-    Invoke-WebRequest https://raw.githubusercontent.com/kaweezle/iknite/main/Get-Iknite.ps1 | Invoke-Expression
-    ```
-
-### Step 4: Import as WSL Distribution
+### Step 4: First Start
 
 ```powershell
-# Import the rootfs as a WSL distribution named "kwsl"
-wsl --import kwsl $installDir rootfs.tar.gz
-
-# Verify the distribution was created
-wsl -l -v
+wsl -d iknite --user root iknite start
 ```
-
-Expected output:
-```
-  NAME    STATE           VERSION
-* kwsl    Stopped         2
-```
-
-### Step 5: First Start
-
-```powershell
-wsl -d kwsl /sbin/iknite start -t 120
-```
-
-The `-t 120` flag waits up to 120 seconds for all workloads to become ready.
 
 !!! tip "First-boot time"
-    The first boot takes 3–5 minutes as Kubernetes components are downloaded and
-    initialized. Subsequent starts are much faster (< 30 seconds) if the
-    `iknite-images` package is pre-installed.
+    The first boot typically takes about **one minute** because all Kubernetes
+    component images are already bundled in the root filesystem.
 
-### Step 6: Verify the Installation
+### Step 5: Verify the Installation
 
 ```powershell
-$env:KUBECONFIG = "\\wsl$\kwsl\root\.kube\config"
+$env:KUBECONFIG = "\\wsl.localhost\iknite\root\.kube\config"
 kubectl get nodes
 kubectl get pods -A
 ```
@@ -126,36 +113,80 @@ curl https://pkgs.zabbly.com/get/incus-stable | sudo sh -s
 sudo incus admin init --minimal
 ```
 
-### Step 2: Import the Iknite Image
+### Step 2: Install Iknite
+
+The easiest way is the automated installation script, which downloads the image
+from GitHub Container Registry and creates an Incus container with the correct
+security profile:
 
 ```bash
-# Download the rootfs
-curl -LO "https://github.com/kaweezle/iknite/releases/latest/download/iknite-rootfs.tar.gz"
-
-# Import as an Incus image
-incus image import iknite-rootfs.tar.gz --alias iknite
+bash <(curl -fsSL https://raw.githubusercontent.com/kaweezle/iknite/refs/heads/main/get-iknite.sh)
 ```
 
-### Step 3: Create and Start a Container
+The script creates an Incus profile named `iknite` with all required kernel and
+security settings, then launches a container named `iknite`.
+
+For a manual installation, create the profile and container yourself:
 
 ```bash
-# Create a privileged container (required for Kubernetes)
-incus launch iknite my-cluster \
-  --config security.privileged=true \
-  --config security.nesting=true
+# Create the Iknite profile with the necessary security settings
+incus profile create iknite
+incus profile edit iknite <<'EOF'
+config:
+  security.privileged: "true"
+  security.nesting: "true"
+  security.syscalls.intercept.bpf: "true"
+  security.syscalls.intercept.bpf.devices: "true"
+  security.syscalls.intercept.mknod: "true"
+  security.syscalls.intercept.setxattr: "true"
+  raw.lxc: |-
+    lxc.apparmor.profile=unconfined
+    lxc.sysctl.net.ipv4.ip_forward=1
+    lxc.sysctl.net.bridge.bridge-nf-call-iptables=1
+    lxc.sysctl.net.bridge.bridge-nf-call-ip6tables=1
+    lxc.cgroup2.devices.allow=a
+    lxc.mount.auto=proc:rw sys:rw
+    lxc.mount.entry = /dev/kmsg dev/kmsg none defaults,bind,create=file
+devices:
+  conntrack_hashsize:
+    path: /sys/module/nf_conntrack/parameters/hashsize
+    source: /sys/module/nf_conntrack/parameters/hashsize
+    type: disk
+  kmsg:
+    path: /dev/kmsg
+    source: /dev/kmsg
+    type: unix-char
+  eth0:
+    network: incusbr0
+    type: nic
+  root:
+    path: /
+    pool: default
+    type: disk
+EOF
 
-# Wait for the container to start
-incus exec my-cluster -- /sbin/iknite start -t 120
+# Download the rootfs and metadata and import as an image
+curl -sLO "https://github.com/kaweezle/iknite/releases/latest/download/iknite-rootfs.tar.gz"
+incus image import iknite-rootfs.tar.gz --alias iknite
+
+# Launch the container with the iknite profile
+incus launch iknite my-cluster --profile iknite --profile default
+```
+
+### Step 3: Start the Cluster
+
+```bash
+incus exec iknite -- iknite start
 ```
 
 ### Step 4: Access the Cluster
 
 ```bash
 # Copy the kubeconfig
-incus file pull my-cluster/root/.kube/config /tmp/kwsl-config
+incus file pull iknite/root/.kube/config ~/.kube/iknite-config
 
 # Use kubectl
-KUBECONFIG=/tmp/kwsl-config kubectl get nodes
+KUBECONFIG=~/.kube/iknite-config kubectl get nodes
 ```
 
 ## Hyper-V Installation
@@ -163,44 +194,42 @@ KUBECONFIG=/tmp/kwsl-config kubectl get nodes
 ### Step 1: Enable Hyper-V
 
 ```powershell
-# Enable Hyper-V feature
+# Enable Hyper-V feature (requires admin, then reboot)
 Enable-WindowsOptionalFeature -Online -FeatureName Microsoft-Hyper-V -All
 ```
 
-### Step 2: Download the VHDX Image
+### Step 2: Install the Iknite VM
 
-Download `iknite-<version>.vhdx` from the
-[releases page](https://github.com/kaweezle/iknite/releases).
-
-### Step 3: Create a Hyper-V VM
+The easiest way is the automated PowerShell script. It downloads the VHDX
+image, creates a Hyper-V VM, generates SSH keys, attaches a cloud-init ISO, and
+starts the VM:
 
 ```powershell
-# Create a Generation 2 VM
-$vmName = "iknite"
-$vhdxPath = ".\iknite.vhdx"
-
-New-VM -Name $vmName `
-       -MemoryStartupBytes 4GB `
-       -VHDPath $vhdxPath `
-       -Generation 2 `
-       -SwitchName "Default Switch"
-
-# Configure the VM
-Set-VMProcessor -VMName $vmName -Count 2
-Set-VMMemory -VMName $vmName -DynamicMemoryEnabled $true -MaximumBytes 8GB
-
-# Start the VM
-Start-VM -Name $vmName
+Set-ExecutionPolicy RemoteSigned -Scope CurrentUser
+Invoke-RestMethod -Uri https://github.com/kaweezle/iknite/releases/latest/download/Get-IkniteVM.ps1 | Invoke-Expression
 ```
 
-### Step 4: Connect and Access
+When the script finishes it prints the VM's IP address for SSH access.
+
+### Step 3: Connect via SSH and Start the Cluster
 
 ```powershell
-# Connect to the VM console
-vmconnect.exe localhost $vmName
-
-# Or via SSH (if SSH is configured)
+# Connect to the VM (the script printed the IP)
 ssh root@<vm-ip>
+
+# Inside the VM – start the cluster
+iknite start
+```
+
+### Step 4: Access the Cluster from Windows
+
+```powershell
+# Copy kubeconfig
+scp root@<vm-ip>:/root/.kube/config "$env:USERPROFILE\.kube\iknite-config"
+
+# Use kubectl
+$env:KUBECONFIG = "$env:USERPROFILE\.kube\iknite-config"
+kubectl get nodes
 ```
 
 ## Docker Installation
