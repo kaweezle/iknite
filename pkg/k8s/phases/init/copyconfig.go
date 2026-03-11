@@ -23,7 +23,7 @@ import (
 func NewCopyConfigPhase() workflow.Phase {
 	return workflow.Phase{
 		Name:  "copy-config",
-		Short: "Copy admin.conf and iknite.conf to /root/.kube/.",
+		Short: "Copy admin.conf and iknite.conf to /root/.kube/",
 		Run:   runCopyConfig,
 	}
 }

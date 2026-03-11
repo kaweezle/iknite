@@ -1,3 +1,5 @@
+<!-- cSpell: words journalctl apiserver tracert nslookup softlevel runlevel  -->
+
 !!! wip "Work in progress"
 
     This documentation is in draft form and may change frequently.
@@ -17,6 +19,7 @@ iknite status
 ```
 
 Each check is organized in phases:
+
 1. **Environment** – IP forwarding, machine ID, crictl config
 2. **Kubernetes configuration** – PKI files, manifests, kubelet config
 3. **Runtime status** – Services, kubelet health, API server health
@@ -68,6 +71,7 @@ cat /run/iknite/status.json | jq .
 ### Cluster Won't Start
 
 #### Symptom
+
 `iknite start` hangs or exits with an error.
 
 #### Diagnosis
@@ -98,6 +102,7 @@ iknite start -t 120
 ### Pods Stuck in Pending
 
 #### Symptom
+
 Pods show `Pending` status and never start.
 
 #### Diagnosis
@@ -127,6 +132,7 @@ nerdctl pull <image>
 ### IP Address Not Accessible from Windows (WSL2)
 
 #### Symptom
+
 Cannot reach `192.168.99.2` or LoadBalancer IPs from Windows.
 
 #### Diagnosis
@@ -156,14 +162,15 @@ iknite start --create-ip=true
 ### Domain Name Not Resolving (WSL2)
 
 #### Symptom
-`kaweezle.local` does not resolve from Windows.
+
+`iknite.local` does not resolve from Windows.
 
 #### Diagnosis
 
 ```powershell
 # From Windows PowerShell
-Resolve-DnsName kaweezle.local
-nslookup kaweezle.local
+Resolve-DnsName iknite.local
+nslookup iknite.local
 ```
 
 #### Solutions
@@ -173,15 +180,16 @@ nslookup kaweezle.local
 ps aux | grep iknite | grep -v grep
 
 # Verify /etc/hosts
-grep kaweezle /etc/hosts
+grep iknite /etc/hosts
 
 # Manually add to Windows hosts file (PowerShell as Admin)
-Add-Content -Path C:\Windows\System32\drivers\etc\hosts -Value "192.168.99.2 kaweezle.local"
+Add-Content -Path C:\Windows\System32\drivers\etc\hosts -Value "192.168.99.2 iknite.local"
 ```
 
 ### Certificate Errors
 
 #### Symptom
+
 `kubectl` shows certificate errors or API server is unreachable.
 
 #### Diagnosis
@@ -208,6 +216,7 @@ iknite start -t 120
 ### containerd Not Starting
 
 #### Symptom
+
 `rc-service containerd status` shows failed or not started.
 
 #### Diagnosis
@@ -237,6 +246,7 @@ rc-service containerd start
 ### Workloads Not Ready After Start
 
 #### Symptom
+
 `iknite start` completes but some workloads are not ready.
 
 #### Diagnosis
@@ -267,6 +277,7 @@ nerdctl pull <image>
 ### kine / etcd Corruption
 
 #### Symptom
+
 API server fails to start with database errors.
 
 #### Diagnosis
@@ -291,6 +302,7 @@ iknite start -t 120
 ### OpenRC Issues
 
 #### Symptom
+
 Services fail to start, or `rc-service` commands fail.
 
 #### Diagnosis
@@ -326,7 +338,8 @@ If you cannot resolve an issue:
 
 1. Run `iknite status -v debug` and save the output
 2. Collect logs: `tar czf /tmp/iknite-debug.tar.gz /var/log/ /run/iknite/`
-3. Check [GitHub Issues](https://github.com/kaweezle/iknite/issues) for similar problems
+3. Check [GitHub Issues](https://github.com/kaweezle/iknite/issues) for similar
+   problems
 4. Open a new issue with:
    - Iknite version: `iknite info versions`
    - Environment (WSL2, Docker, VM)

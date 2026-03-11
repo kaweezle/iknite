@@ -1,3 +1,5 @@
+<!-- cSpell: words kwsl userprofile apiserver winget -->
+
 !!! wip "Work in progress"
 
     This documentation is in draft form and may change frequently.
@@ -59,9 +61,10 @@ kubectl get nodes
 ```
 
 Expected output:
+
 ```
 NAME             STATUS   ROLES           AGE   VERSION
-kaweezle.local   Ready    control-plane   5m    v1.35.0
+iknite.local   Ready    control-plane   5m    v1.35.0
 ```
 
 ```bash
@@ -69,18 +72,19 @@ kubectl get pods -A
 ```
 
 Expected output:
+
 ```
 NAMESPACE            NAME                                       READY   STATUS    RESTARTS   AGE
 kube-flannel         kube-flannel-ds-xxxxx                      1/1     Running   0          5m
 kube-system          coredns-xxxxxxxxxx-xxxxx                   1/1     Running   0          5m
 kube-system          coredns-xxxxxxxxxx-yyyyy                   1/1     Running   0          5m
-kube-system          etcd-kaweezle.local                        1/1     Running   0          5m
-kube-system          kube-apiserver-kaweezle.local              1/1     Running   0          5m
-kube-system          kube-controller-manager-kaweezle.local     1/1     Running   0          5m
+kube-system          etcd-iknite.local                        1/1     Running   0          5m
+kube-system          kube-apiserver-iknite.local              1/1     Running   0          5m
+kube-system          kube-controller-manager-iknite.local     1/1     Running   0          5m
 kube-system          kube-proxy-xxxxx                           1/1     Running   0          5m
-kube-system          kube-scheduler-kaweezle.local              1/1     Running   0          5m
+kube-system          kube-scheduler-iknite.local              1/1     Running   0          5m
 kube-system          metrics-server-xxxxxxxxx-xxxxx             1/1     Running   0          5m
-kube-system          kube-vip-kaweezle.local                    1/1     Running   0          5m
+kube-system          kube-vip-iknite.local                    1/1     Running   0          5m
 local-path-storage   local-path-provisioner-xxxxxxxxx-xxxxx     1/1     Running   0          5m
 ```
 
@@ -182,24 +186,24 @@ Then switch contexts:
 
 ```bash
 kubectl config get-contexts
-kubectl config use-context kaweezle
+kubectl config use-context iknite
 ```
 
 ## Domain Name Access (WSL2)
 
-In WSL2, Iknite registers `kaweezle.local` (or the configured domain name) via
+In WSL2, Iknite registers `iknite.local` (or the configured domain name) via
 mDNS. From Windows, you can access the Kubernetes API at:
 
 ```
-https://kaweezle.local:6443
+https://iknite.local:6443
 ```
 
 The kubeconfig is already configured to use this domain name.
 
 !!! note "mDNS on Windows"
-    Windows supports mDNS natively. The domain `kaweezle.local` should resolve
-    automatically. If it doesn't, try using the IP address `192.168.99.2`
-    directly.
+
+    Windows supports mDNS natively. The domain `iknite.local` should resolve
+    automatically. If it doesn't, try using the IP address `192.168.99.2` directly.
 
 ## Accessing Services via LoadBalancer
 
