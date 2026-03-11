@@ -24,4 +24,4 @@ data:
   bootstrap:
     repo_url: git@github.com:kaweezle/iknite.git
     repo_target_revision: feature/argocd-reorganization
-    application_path: deploy/k8s/argocd/e2e/appstages/appstage-00-bootstrap.yaml
+    application_path: deploy/k8s/argocd/e2e/appstages/appstage-00-bootstrap/application.yaml
