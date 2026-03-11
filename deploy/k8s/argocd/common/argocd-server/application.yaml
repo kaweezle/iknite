@@ -5,7 +5,6 @@ metadata:
   namespace: argocd
   annotations:
     autocloud/local-application: "true"
-    autocloud/custom-path: "true"
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
@@ -21,7 +20,7 @@ spec:
   source:
     path: deploy/k8s/argocd/common/argocd-server
     repoURL: git@github.com:kaweezle/iknite.git
-    targetRevision: main
+    targetRevision: feature/argocd-reorganization
     plugin:
       # Helmfile environment variables
       env:

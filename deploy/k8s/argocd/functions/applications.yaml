@@ -6,7 +6,7 @@ metadata:
     config.kubernetes.io/function: |
       exec:
         path: karmafun
-source: ../../values
+source: ./values
 replacements:
   - source:
       name: iknite-values
