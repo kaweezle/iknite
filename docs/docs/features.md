@@ -1,3 +1,5 @@
+<!-- cSpell: words etcdctl runlevel -->
+
 !!! wip "Work in progress"
 
     This documentation is in draft form and may change frequently.
@@ -11,8 +13,9 @@ running a single-node Kubernetes cluster fast and easy.
 
 ### Kubernetes via kubeadm
 
-Iknite wraps [kubeadm](https://kubernetes.io/docs/reference/setup-tools/kubeadm/)
-to produce a **vanilla Kubernetes** cluster. This means you get:
+Iknite wraps
+[kubeadm](https://kubernetes.io/docs/reference/setup-tools/kubeadm/) to produce
+a **vanilla Kubernetes** cluster. This means you get:
 
 - Full Kubernetes API compliance
 - Standard manifests, certificates, and configuration
@@ -41,9 +44,9 @@ the bootstrap kustomization.
 ### Kube-VIP
 
 [Kube-VIP](https://kube-vip.io/) provides a virtual IP for the Kubernetes API
-server (control plane) and a cloud-provider-style load balancer for `LoadBalancer`
-services. This enables tools like Traefik or Argo CD to be accessed on a stable
-IP without external load balancers.
+server (control plane) and a cloud-provider-style load balancer for
+`LoadBalancer` services. This enables tools like Traefik or Argo CD to be
+accessed on a stable IP without external load balancers.
 
 The default virtual IP is `192.168.99.2` in WSL2 environments, bound to the
 `eth0` interface.
@@ -75,8 +78,9 @@ as part of the bootstrap, enabling:
 In WSL2 and Incus environments, the container/VM IP can change across restarts.
 Iknite solves this by:
 
-1. Adding a **stable secondary IP address** (`192.168.99.2` by default) to `eth0`
-2. Registering the domain name `iknite.local` (or `kaweezle.local`) to this IP
+1. Adding a **stable secondary IP address** (`192.168.99.2` by default) to
+   `eth0`
+2. Registering the domain name `iknite.local` (or `iknite.local`) to this IP
 3. Using this stable IP as the Kubernetes API server endpoint
 
 This means `kubectl` configuration does not break across restarts.
@@ -110,8 +114,8 @@ Enable with `--use-etcd` flag or `useEtcd: true` in configuration:
 
 ### OpenRC Integration
 
-Iknite integrates with Alpine's [OpenRC](https://wiki.alpinelinux.org/wiki/OpenRC)
-init system:
+Iknite integrates with Alpine's
+[OpenRC](https://wiki.alpinelinux.org/wiki/OpenRC) init system:
 
 - `iknite` service in the `default` runlevel
 - `containerd` and `buildkitd` services managed automatically
@@ -150,22 +154,22 @@ need.
 
 ## Pre-pulled Container Images
 
-The optional `iknite-images` APK package pre-imports all container images
-needed by Kubernetes and the bootstrap components, dramatically reducing
-first-boot time (by 2–5 minutes).
+The optional `iknite-images` APK package pre-imports all container images needed
+by Kubernetes and the bootstrap components, dramatically reducing first-boot
+time (by 2–5 minutes).
 
 ## Summary Table
 
-| Feature | Implementation | Default |
-|---------|---------------|---------|
-| Container runtime | containerd | ✅ |
-| Image building | BuildKit | ✅ |
-| CNI | Flannel | ✅ |
-| Load balancer / VIP | Kube-VIP | ✅ |
-| Storage class | Local Path Provisioner | ✅ |
-| Metrics | metrics-server | ✅ |
-| API backend | Kine (SQLite) | ✅ |
-| API backend (alternative) | etcd | Optional |
-| Init system | OpenRC | ✅ |
-| Stable IP (WSL2 / Incus) | Secondary NIC address | WSL2 and Incus |
-| mDNS | pion/mdns | WSL2 and Incus |
+| Feature                   | Implementation         | Default        |
+| ------------------------- | ---------------------- | -------------- |
+| Container runtime         | containerd             | ✅             |
+| Image building            | BuildKit               | ✅             |
+| CNI                       | Flannel                | ✅             |
+| Load balancer / VIP       | Kube-VIP               | ✅             |
+| Storage class             | Local Path Provisioner | ✅             |
+| Metrics                   | metrics-server         | ✅             |
+| API backend               | Kine (SQLite)          | ✅             |
+| API backend (alternative) | etcd                   | Optional       |
+| Init system               | OpenRC                 | ✅             |
+| Stable IP (WSL2 / Incus)  | Secondary NIC address  | WSL2 and Incus |
+| mDNS                      | pion/mdns              | WSL2 and Incus |

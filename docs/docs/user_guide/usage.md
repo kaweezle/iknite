@@ -1,3 +1,5 @@
+<!-- cSpell: words kwsl apiserver runlevels runlevel -->
+
 !!! wip "Work in progress"
 
     This documentation is in draft form and may change frequently.
@@ -25,7 +27,7 @@ Flags:
       --domain-name string  Domain name for the cluster API server
       --ip string           IP address to assign
       --create-ip           Create IP address on the network interface
-      --cluster-name string Cluster name [default: kaweezle]
+      --cluster-name string Cluster name [default: iknite]
   -h, --help                Help for start
 ```
 
@@ -52,9 +54,8 @@ Iknite-specific customizations.
 iknite init [flags]
 ```
 
-!!! note
-    Under normal circumstances you do not need to call `init` directly. Use
-    `iknite start` instead.
+!!! note Under normal circumstances you do not need to call `init` directly. Use
+`iknite start` instead.
 
 ### `iknite status`
 
