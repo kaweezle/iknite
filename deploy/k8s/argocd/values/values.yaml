@@ -12,7 +12,7 @@ data:
     git:
       # The main Git repository for the platform.
       repoURL: git@github.com:kaweezle/iknite.git
-      targetRevision: feature/argocd-reorganization
+      targetRevision: main
       basePath: iknite
   argocd:
     domain: argocd-e2e.iknite.app
@@ -23,5 +23,5 @@ data:
       organization: kaweezle
   bootstrap:
     repo_url: git@github.com:kaweezle/iknite.git
-    repo_target_revision: feature/argocd-reorganization
+    repo_target_revision: main
     application_path: deploy/k8s/argocd/e2e/appstages/appstage-00-bootstrap/application.yaml
