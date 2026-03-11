@@ -19,10 +19,10 @@ the Iknite environment.
 
     ```powershell
     # Direct path access (no copy needed)
-    $env:KUBECONFIG = "\\wsl$\kwsl\root\.kube\config"
+    $env:KUBECONFIG = "\\wsl.localhost\iknite\root\.kube\config"
 
     # Or copy to your Windows profile
-    Copy-Item "\\wsl$\kwsl\root\.kube\config" "$env:USERPROFILE\.kube\config"
+    Copy-Item "\\wsl.localhost\iknite\root\.kube\config" "$env:USERPROFILE\.kube\config"
     ```
 
 === "Docker"
@@ -43,14 +43,6 @@ the Iknite environment.
 
     ```bash
     scp root@<vm-ip>:/root/.kube/config ~/.kube/iknite-config
-    export KUBECONFIG=~/.kube/iknite-config
-    ```
-
-=== "iknite info"
-
-    ```bash
-    # Use the iknite info command to print the config
-    iknite info -o yaml > ~/.kube/iknite-config
     export KUBECONFIG=~/.kube/iknite-config
     ```
 
@@ -104,12 +96,6 @@ local-path-storage   local-path-provisioner-xxxxxxxxx-xxxxx     1/1     Running 
     winget install Kubernetes.kubectl
     ```
 
-=== "macOS"
-
-    ```bash
-    brew install kubectl
-    ```
-
 === "Linux"
 
     ```bash
@@ -148,12 +134,6 @@ kubectl exec -it <pod-name> -- /bin/sh
     scoop install k9s
     ```
 
-=== "macOS"
-
-    ```bash
-    brew install k9s
-    ```
-
 === "Linux"
 
     ```bash
@@ -171,16 +151,31 @@ k9s
 
 If you have multiple clusters, merge the kubeconfigs:
 
-```bash
-# Backup existing kubeconfig
-cp ~/.kube/config ~/.kube/config.backup
+=== "Windows"
 
-# Merge
-KUBECONFIG=~/.kube/config:~/.kube/iknite-config \
-  kubectl config view --flatten > /tmp/merged-config
+    ```powershell
+    # Backup existing kubeconfig
+    Copy-Item -Path "$HOME\.kube\config" -Destination "$HOME\.kube\config.bak" -Force
 
-mv /tmp/merged-config ~/.kube/config
-```
+    # Merge iknite kubeconfig into your existing config
+    $env:KUBECONFIG = "$HOME\.kube\config;$HOME\.kube\iknite-config"
+    kubectl config view --flatten > "$env:USERPROFILE\.kube\merged-config"
+    Move-Item -Force "$env:USERPROFILE\.kube\merged-config" "$HOME\.kube\config"
+    $env:KUBECONFIG = $null
+    ```
+
+=== "Linux"
+
+    ```bash
+    # Backup existing kubeconfig
+    cp ~/.kube/config ~/.kube/config.backup
+
+    # Merge
+    KUBECONFIG=~/.kube/config:~/.kube/iknite-config \
+      kubectl config view --flatten > /tmp/merged-config
+
+    mv /tmp/merged-config ~/.kube/config
+    ```
 
 Then switch contexts:
 
@@ -189,10 +184,11 @@ kubectl config get-contexts
 kubectl config use-context iknite
 ```
 
-## Domain Name Access (WSL2)
+## Domain Name Access (WSL2 and Incus)
 
-In WSL2, Iknite registers `iknite.local` (or the configured domain name) via
-mDNS. From Windows, you can access the Kubernetes API at:
+In WSL2 and Incus environments, Iknite registers `iknite.local` (or the
+configured domain name) via mDNS. From the host, you can access the Kubernetes
+API at:
 
 ```
 https://iknite.local:6443
@@ -204,32 +200,3 @@ The kubeconfig is already configured to use this domain name.
 
     Windows supports mDNS natively. The domain `iknite.local` should resolve
     automatically. If it doesn't, try using the IP address `192.168.99.2` directly.
-
-## Accessing Services via LoadBalancer
-
-Kube-VIP provides `LoadBalancer` service support. Services with type
-`LoadBalancer` receive an IP from the address pool configured for Kube-VIP
-(default: `192.168.99.100–192.168.99.200`).
-
-```yaml
-apiVersion: v1
-kind: Service
-metadata:
-  name: my-service
-spec:
-  type: LoadBalancer
-  ports:
-    - port: 80
-  selector:
-    app: my-app
-```
-
-After applying, the service gets an external IP:
-
-```bash
-kubectl get service my-service
-# NAME         TYPE           CLUSTER-IP      EXTERNAL-IP       PORT(S)   AGE
-# my-service   LoadBalancer   10.96.1.100     192.168.99.100    80/TCP    1m
-```
-
-Access it directly at `http://192.168.99.100` from your Windows host.
