@@ -53,6 +53,7 @@
     "Debugf",
     "deepcopy",
     "Distros",
+    "doas",
     "DRYRUN",
     "dupl",
     "fieldtype",

@@ -13,7 +13,7 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository_owner }}/iknite-dev-container
+  IMAGE_NAME: ${{ github.repository_owner }}/iknite-devcontainer
 
 jobs:
   build:

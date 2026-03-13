@@ -3,10 +3,11 @@
 # cSpell: words moby oras hyperv keygen nistp gomplate
 SHELL := /bin/sh
 
+# Main variables
 ROOT_DIR := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
 ARCH ?= $(shell uname -m)
-KUBERNETES_VERSION ?= $(shell grep 'k8s.io/kubernetes' "$(ROOT_DIR)/go.mod" | awk '{gsub(/^v/,"",$$2); print $$2;}')
-export KUBERNETES_VERSION
+DIST_DIR := dist
+BUILD_DIR := build
 KEY_NAME ?= kaweezle-devel@kaweezle.com-c9d89864.rsa
 CONTAINERD_NAMESPACE ?= k8s.io
 REGISTRY ?= ghcr.io
@@ -14,8 +15,27 @@ IMAGE_NAME ?= kaweezle/iknite
 export CONTAINERD_NAMESPACE
 CACHE_FLAG ?= "" # --no-cache
 
+########
+# VERSIONS
+########
+# Get current git tag if we are on a tag, else empty string. Define to force a release
+IKNITE_RELEASE_TAG := $(shell git describe --exact-match --tags --match="v[0-9]*" 2>/dev/null || echo "")
+# If we are on a version tag, return it, else last version tag + 1 patch, with -devel suffix (e.g. v0.1.0 -> v0.1.1-devel)
+IKNITE_VERSION_TAG := $(or $(IKNITE_RELEASE_TAG),$(shell git describe --abbrev=0 --tags --match="v[0-9]*" | awk -F'.' '{ printf "%s.%s.%s-devel",$$1,$$2,$$3+1;}'))
+export IKNITE_VERSION_TAG
+# The version is the version tag without the leading 'v'
+IKNITE_VERSION := $(IKNITE_VERSION_TAG:v%=%)
+export IKNITE_VERSION
+# Extract Kubernetes version from go.mod file, by looking for the k8s.io/kubernetes dependency and removing the leading 'v' from the version
+KUBERNETES_VERSION ?= $(shell grep 'k8s.io/kubernetes' "$(ROOT_DIR)/go.mod" | awk '{gsub(/^v/,"",$$2); print $$2;}')
+export KUBERNETES_VERSION
+
+# Get latest karmafun version from GitHub API
+KARMAFUN_LATEST_VERSION := $(shell curl --silent https://api.github.com/repos/karmafun/karmafun/releases/latest | jq -r .tag_name)
+
+
 #######
-# BEGIN: COMMANDS
+# COMMANDS
 #######
 NERDCTL_CMD := $(shell command -v nerdctl 2>/dev/null)
 DOCKER_CMD := $(shell command -v docker 2>/dev/null)
@@ -36,49 +56,36 @@ SUDO_CMD := $(shell \
 		echo ""; \
 	fi)
 
-ifeq ($(DOCKER_CMD),)
-	HAS_WORKING_DOCKER := ""
-else
-	HAS_WORKING_DOCKER := $(if $(filter null,$(shell docker version --format json 2>/dev/null | jq -c .Server)),,true)
-endif
+# ROOTFULL is true if the current user is root
+ROOTFULL := $(shell if [ "`id -u 2>/dev/null`" == "0" ]; then echo true; fi)
+# ROOT_CMD is the prefix to run commands as root
+ROOT_CMD := $(if $(ROOTFULL),,$(SUDO_CMD))
 
-ifeq ($(BUILDX_CMD),)
-	HAS_WORKING_BUILDX := ""
-else
-	HAS_WORKING_BUILDX := $(shell $(BUILDX_CMD) inspect | grep -q '^Error' >/dev/null 2>&1 && echo '' || echo 'true')
-endif
+# In the following we check for each command that we have found if it is actually working by running a simple command
+# and checking the output.
+# Each HAS_WORKING_XXX variable is set to "true" if the command is working, and empty otherwise.
+HAS_WORKING_DOCKER := $(if $(DOCKER_CMD),$(if $(filter null,$(shell docker version --format json 2>/dev/null | jq -c .Server)),,true),)
+HAS_WORKING_BUILDX := $(if $(BUILDX_CMD),$(shell $(BUILDX_CMD) inspect | grep -q '^Error' >/dev/null 2>&1 && echo '' || echo 'true'),)
 
-# If we have both docker and buildx, let's create a buildx builder instance that
-# buildctl will catch and use
+# If we have both docker and buildx, let's create a buildx builder instance that buildctl will catch and use
 ifneq ($(and $(HAS_WORKING_DOCKER),$(HAS_WORKING_BUILDX)),)
 	BUILDX_BUILDER := $(shell $(BUILDX_CMD) use iknite >/dev/null 2>&1 && echo iknite || $(BUILDX_CMD) create --name iknite --use --driver docker-container --buildkitd-flags '--allow-insecure-entitlement security.insecure'  --driver-opt "image=moby/buildkit:master" --bootstrap 2>/dev/null)
 	export BUILDKIT_HOST := docker-container://buildx_buildkit_$(BUILDX_BUILDER)0
 endif
 
+ifdef NERDCTL_CMD
 # 'null' as output means not working
-ifeq ($(NERDCTL_CMD),)
-	HAS_WORKING_ROOTLESS_NERDCTL := ""
-	HAS_WORKING_ROOTFULL_NERDCTL := ""
-else
-	HAS_WORKING_ROOTLESS_NERDCTL := $(if $(filter null,$(shell nerdctl version --format '{{json .}}' 2>/dev/null | jq -c .Server)),,true)
-	HAS_WORKING_ROOTFULL_NERDCTL := $(if $(filter null,$(shell $(SUDO_CMD) nerdctl version --format '{{json .}}' 2>/dev/null | jq -c .Server)),,true)
+HAS_WORKING_ROOTLESS_NERDCTL := $(if $(filter null,$(shell nerdctl version --format '{{json .}}' 2>/dev/null | jq -c .Server)),,true)
+HAS_WORKING_ROOTFULL_NERDCTL := $(if $(filter null,$(shell $(SUDO_CMD) nerdctl version --format '{{json .}}' 2>/dev/null | jq -c .Server)),,true)
 endif
 
-ifeq ($(BUILDCTL_CMD),)
-	HAS_WORKING_ROOTLESS_BUILDCTL := ""
-	HAS_WORKING_ROOTFULL_BUILDCTL := ""
-else
-	HAS_WORKING_ROOTLESS_BUILDCTL := $(if $(BUILDKIT_HOST),true,$(shell buildctl debug workers >/dev/null 2>&1 && echo 'true' || echo ''))
-	HAS_WORKING_ROOTFULL_BUILDCTL := $(shell $(SUDO_CMD) buildctl debug workers >/dev/null 2>&1 && echo 'true' || echo '')
+ifdef BUILDCTL_CMD
+HAS_WORKING_ROOTLESS_BUILDCTL := $(if $(BUILDKIT_HOST),true,$(shell buildctl debug workers >/dev/null 2>&1 && echo 'true' || echo ''))
+HAS_WORKING_ROOTFULL_BUILDCTL := $(shell $(SUDO_CMD) buildctl debug workers >/dev/null 2>&1 && echo 'true' || echo '')
 endif
 
 RUN_CONTAINER_CMD := $(if $(HAS_WORKING_DOCKER),$(DOCKER_CMD),$(if $(HAS_WORKING_ROOTLESS_NERDCTL),$(NERDCTL_CMD),$(if $(HAS_WORKING_ROOTFULL_NERDCTL),$(SUDO_CMD) $(NERDCTL_CMD),":")))
 BUILD_CONTAINER_CMD := $(if $(HAS_WORKING_ROOTLESS_BUILDCTL),$(BUILDCTL_CMD),$(if $(HAS_WORKING_ROOTFULL_BUILDCTL),$(SUDO_CMD) $(BUILDCTL_CMD),":"))
-
-BUILD_CONTAINER_CACHE_FROM_PATH := /tmp/.buildx-cache
-BUILD_CONTAINER_CACHE_TO_PATH := /tmp/.buildx-cache-new
-BUILD_CONTAINER_CACHE_FROM ?= type=local,src=$(BUILD_CONTAINER_CACHE_FROM_PATH)
-BUILD_CONTAINER_CACHE_TO ?= type=local,dest=$(BUILD_CONTAINER_CACHE_TO_PATH)
 
 SOPS_DECRYPT_CMD := sops --decrypt --input-type yaml --output-type json
 
@@ -86,30 +93,11 @@ SOPS_DECRYPT_CMD := sops --decrypt --input-type yaml --output-type json
 # END: COMMANDS
 #######
 
-ifneq ($(RUN_CONTAINER_CMD),$(SUDO_CMD) $(NERDCTL_CMD))
-	ROOTLESS := true
-else
-	ROOTLESS := false
-endif
-
-ROOTFULL := $(shell if [ "`id -u 2>/dev/null`" == "0" ]; then echo true; fi)
-ROOT_CMD := $(if $(ROOTFULL),,$(SUDO_CMD))
-
-DIST_DIR := dist
-BUILD_DIR := build
-KARMAFUN_LATEST_VERSION := $(shell curl --silent https://api.github.com/repos/karmafun/karmafun/releases/latest | jq -r .tag_name)
-# Exact tag match of current version + 1 patch, with -devel suffix (e.g. v0.1.0 -> v0.1.1-devel)
-IKNITE_VERSION_TAG := $(shell git describe --exact-match --tags --match="v[0-9]*" 2>/dev/null || (git describe --abbrev=0 --tags --match="v[0-9]*" | awk -F'.' '{ printf "%s.%s.%s-devel",$$1,$$2,$$3+1;}'))
-export IKNITE_VERSION_TAG
-IKNITE_VERSION := $(IKNITE_VERSION_TAG:v%=%)
-export IKNITE_VERSION
-# test if IKNITE_VERSION_TAG contains -devel suffix, if so use test repo name, otherwise use iknite repo name
-IKNITE_REPO_NAME ?= $(shell \
-	if git describe --exact-match --tags --match="v[0-9]*" >/dev/null 2>&1; then \
-		echo "release"; \
-	else \
-		echo "test"; \
-	fi)
+# Build cache configuration for container builds. Used in GHA
+BUILD_CONTAINER_CACHE_FROM_PATH := /tmp/.buildx-cache
+BUILD_CONTAINER_CACHE_TO_PATH := /tmp/.buildx-cache-new
+BUILD_CONTAINER_CACHE_FROM ?= type=local,src=$(BUILD_CONTAINER_CACHE_FROM_PATH)
+BUILD_CONTAINER_CACHE_TO ?= type=local,dest=$(BUILD_CONTAINER_CACHE_TO_PATH)
 
 # Variables for APK index builder image
 APK_INDEX_BUILDER_IMAGE := apk-index-builder:latest
@@ -127,14 +115,23 @@ IKNITE_ROOTFS_IMAGE := $(REGISTRY)/$(IMAGE_NAME):$(IKNITE_VERSION_TAG)-$(KUBERNE
 IKNITE_ROOTFS_IMAGE_MARKER = $(DIST_DIR)/iknite_$(IKNITE_VERSION_TAG)-$(KUBERNETES_VERSION).marker
 IKNITE_ROOTFS_SOURCES := $(wildcard $(ROOT_DIR)/packaging/rootfs/with-images/*)
 
-ifeq ($(IKNITE_REPO_NAME),release)
-	PUSH_IMAGES := true
-	IKNITE_ROOTFS_IMAGE_ADDITIONAL_TAG := $(IKNITE_ROOTFS_IMAGE):latest
-	SNAPSHOT := ""
+# Dev container
+IKNITE_DEVCONTAINER_IMAGE_NAME := $(IMAGE_NAME)-devcontainer
+IKNITE_DEVCONTAINER_IMAGE := $(REGISTRY)/$(IKNITE_DEVCONTAINER_IMAGE_NAME):$(IKNITE_VERSION_TAG)
+IKNITE_DEVCONTAINER_IMAGE_MARKER := $(DIST_DIR)/iknite-devcontainer_$(IKNITE_VERSION_TAG).marker
+IKNITE_DEVCONTAINER_DIR := $(ROOT_DIR)/hack/devcontainer
+IKNITE_DEVCONTAINER_SOURCES := $(wildcard $(IKNITE_DEVCONTAINER_DIR)/*)
+
+ifdef IKNITE_RELEASE_TAG
+PUSH_IMAGES := true
+IKNITE_ROOTFS_IMAGE_ADDITIONAL_TAG := $(IKNITE_ROOTFS_IMAGE):latest
+IKNITE_DEVCONTAINER_IMAGE_ADDITIONAL_TAG := $(IKNITE_DEVCONTAINER_IMAGE):latest
+# SNAPSHOT =
+IKNITE_REPO_NAME := release
 else
-	PUSH_IMAGES := false
-	IKNITE_ROOTFS_IMAGE_ADDITIONAL_TAG :=
-	SNAPSHOT := --snapshot
+PUSH_IMAGES := false
+SNAPSHOT := --snapshot
+IKNITE_REPO_NAME := test
 endif
 
 ROOTFS_NAME := iknite-$(IKNITE_VERSION)-$(KUBERNETES_VERSION).rootfs.tar.gz
@@ -145,6 +142,7 @@ KARMAFUN_PACKAGE := karmafun-$(patsubst v%,%,$(KARMAFUN_LATEST_VERSION)).$(ARCH)
 IKNITE_PACKAGE := iknite-$(IKNITE_VERSION).$(ARCH).apk
 IKNITE_IMAGES_PACKAGE := iknite-images-$(KUBERNETES_VERSION).$(ARCH).apk
 
+# Incus Agent
 INCUS_AGENT_VERSION := 6.22
 INCUS_AGENT_PACKAGE := incus-agent-$(INCUS_AGENT_VERSION).$(ARCH).apk
 INCUS_AGENT_SOURCE_DIR := packaging/apk/incus-agent
@@ -157,23 +155,27 @@ APK_INDEX_FILE = $(DIST_DIR)/repo/$(ARCH)/APKINDEX.tar.gz
 
 IKNITE_ROOTFS_CONTAINER_MARKER = $(DIST_DIR)/iknite-rootfs-container_$(IKNITE_VERSION_TAG)-$(KUBERNETES_VERSION).marker
 
+# Images file names and paths
 IKNITE_VM_IMAGE_QCOW2_BASENAME = iknite-vm.$(IKNITE_VERSION)-$(KUBERNETES_VERSION).qcow2
+IKNITE_VM_IMAGE_VHDX_BASENAME = $(IKNITE_VM_IMAGE_QCOW2_BASENAME:.qcow2=.vhdx)
 IKNITE_VM_IMAGE_QCOW2 = $(DIST_DIR)/images/$(IKNITE_VM_IMAGE_QCOW2_BASENAME)
-IKNITE_VM_IMAGE_QCOW2_CONTAINER_MARKER = $(DIST_DIR)/images/$(IKNITE_VM_IMAGE_QCOW2_BASENAME)-container.marker
-IKNITE_VM_IMAGE_VHDX_BASENAME = iknite-vm.$(IKNITE_VERSION)-$(KUBERNETES_VERSION).vhdx
 IKNITE_VM_IMAGE_VHDX = $(DIST_DIR)/images/$(IKNITE_VM_IMAGE_VHDX_BASENAME)
-IKNITE_VM_IMAGE_VHDX_CONTAINER_MARKER = $(DIST_DIR)/images/$(IKNITE_VM_IMAGE_VHDX_BASENAME)-container.marker
+IKNITE_VM_IMAGE_QCOW2_CONTAINER_MARKER = $(IKNITE_VM_IMAGE_QCOW2)-container.marker
+IKNITE_VM_IMAGE_VHDX_CONTAINER_MARKER = $(IKNITE_VM_IMAGE_VHDX)-container.marker
 
+# Incus metadata
 INCUS_METADATA := $(DIST_DIR)/images/incus.tar.xz
 VM_PACKAGING_DIR := $(ROOT_DIR)/packaging/vm
 VM_PACKAGING_SOURCES := $(shell find $(VM_PACKAGING_DIR) -type f)
 IKNITE_ROOTFS_IMAGE_INCUS_ATTACHMENT_MARKER = $(DIST_DIR)/iknite_$(IKNITE_VERSION_TAG)-$(KUBERNETES_VERSION)-incus.marker
 
+# List of images ID in order to clean
 IMAGES_ID = $(shell $(RUN_CONTAINER_CMD) image ls -q --filter "label=org.opencontainers.image.source=https://github.com/kaweezle/iknite.git" | sort -u)
 
+# Scripts for building VM images from rootfs
 BUILD_VM_IMAGE_SCRIPTS = $(ROOT_DIR)/packaging/scripts/build-vm-image.sh $(ROOT_DIR)/packaging/scripts/configure-vm-image.sh
 
-SECRETS_FILE := $(ROOT_DIR)/deploy/k8s/secrets/secrets.sops.yaml
+SECRETS_FILE := $(ROOT_DIR)/deploy/k8s/argocd/secrets/secrets.sops.yaml
 SSH_KNOWN_HOSTS_FILE := $(ROOT_DIR)/hack/devcontainer/iknite_known_hosts
 
 .PHONY: help
@@ -181,6 +183,7 @@ help: # ignore checkmake
 	@echo "Iknite build targets"
 	@echo ""
 	@echo "Step targets:"
+	@echo "  make info                           Show build configuration information"
 	@echo "  make extract-key                    Extract signing key from sops file"
 	@echo "  make goreleaser                     Build iknite package (goreleaser)"
 	@echo "  make fetch-karmafun                 Download latest karmafun APK into dist/"
@@ -208,6 +211,7 @@ help: # ignore checkmake
 	@echo "  make e2e-tg-destroy                 Destroy E2E test VM with terragrunt"
 	@echo "  make e2e-check-argocd               Check ArgoCD application status for E2E test cluster"
 	@echo "  make release-files                  Generate SHA256SUMS file for release artifacts"
+	@echo "  make devcontainer                   Build dev container image"
 	@echo ""
 	@echo "File targets (examples):"
 	@echo "  make dist/iknite-<version>.$(ARCH).apk"
@@ -218,11 +222,24 @@ help: # ignore checkmake
 	@echo "Common variables (override with VAR=value):"
 	@echo "  ARCH=$(ARCH)"
 	@echo "  KUBERNETES_VERSION=$(KUBERNETES_VERSION)"
+	@echo "  IKNITE_RELEASE_TAG=$(IKNITE_RELEASE_TAG)"
+	@echo "  IKNITE_VERSION=$(IKNITE_VERSION)"
 	@echo "  IKNITE_REPO_NAME=$(IKNITE_REPO_NAME)"
-	@echo "  ROOTLESS=$(ROOTLESS)"
 	@echo "  CACHE_FLAG=$(CACHE_FLAG)"
 	@echo "  SNAPSHOT=$(SNAPSHOT)"
+	@echo "  PUSH_IMAGES=$(PUSH_IMAGES)"
 
+.PHONY: info
+info:
+	@echo "Is Release:            $(if $(IKNITE_RELEASE_TAG),yes,no)"
+	@echo "Iknite version:        $(IKNITE_VERSION)"
+	@echo "Kubernetes version:    $(KUBERNETES_VERSION)"
+	@echo "Architecture:          $(ARCH)"
+	@echo "Container runner cmd:  $(RUN_CONTAINER_CMD)"
+	@echo "Container builder cmd: $(BUILD_CONTAINER_CMD)"
+	@echo "Using build cache:     $(if $(filter --no-cache,$(CACHE_FLAG)),no,yes)"
+	@echo "Pushing images:        $(PUSH_IMAGES)"
+	@echo "Root:                  $(if $(ROOTFULL),yes,no)"
 
 .PHONY: all
 all: extract-key goreleaser fetch-karmafun images-apk incus-agent-apk apk-repo rootfs-base-image rootfs-container rootfs rootfs-image vm-image incus-metadata vm-container-images rootfs-image-incus-attachment
@@ -648,3 +665,26 @@ rotate-cache:
 	if [ -d "$(BUILD_CONTAINER_CACHE_TO_PATH)" ]; then \
 		mv "$(BUILD_CONTAINER_CACHE_TO_PATH)" "$(BUILD_CONTAINER_CACHE_FROM_PATH)"; \
 	fi
+
+$(IKNITE_DEVCONTAINER_IMAGE_MARKER): $(IKNITE_DEVCONTAINER_SOURCES) | check-prerequisites container-login
+	$(BUILD_CONTAINER_CMD) build \
+		--frontend dockerfile.v0 \
+		--import-cache=$(BUILD_CONTAINER_CACHE_FROM) \
+		--export-cache=$(BUILD_CONTAINER_CACHE_TO) \
+		--local "context=$(IKNITE_DEVCONTAINER_DIR)" \
+		--local "dockerfile=$(IKNITE_DEVCONTAINER_DIR)" \
+		--opt "build-arg:IKNITE_REPO_URL=https://static.iknite.app/$(IKNITE_REPO_NAME)/" \
+		--opt "build-arg:IKNITE_VERSION=$(IKNITE_VERSION)" \
+		$(CACHE_FLAG) \
+		--output "type=docker,dest=-,name=$(IKNITE_DEVCONTAINER_IMAGE),push=false" | $(RUN_CONTAINER_CMD) load
+	if [ "$(PUSH_IMAGES)" = "true" ]; then \
+		$(RUN_CONTAINER_CMD) push "$(IKNITE_DEVCONTAINER_IMAGE)"; \
+		if [ -n "$(IKNITE_DEVCONTAINER_IMAGE_ADDITIONAL_TAG)" ]; then \
+			$(RUN_CONTAINER_CMD) tag "$(IKNITE_DEVCONTAINER_IMAGE)" "$(IKNITE_DEVCONTAINER_IMAGE_ADDITIONAL_TAG)"; \
+			$(RUN_CONTAINER_CMD) push "$(IKNITE_DEVCONTAINER_IMAGE_ADDITIONAL_TAG)"; \
+		fi; \
+	fi
+	@touch "$@"
+
+.PHONY: devcontainer
+devcontainer: $(IKNITE_DEVCONTAINER_IMAGE_MARKER)

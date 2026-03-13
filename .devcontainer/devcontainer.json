@@ -1,6 +1,6 @@
 {
   "name": "iknite",
-  "image": "ghcr.io/kaweezle/iknite-dev-container:latest",
+  "image": "ghcr.io/kaweezle/iknite-devcontainer:latest",
   "features": {},
   // More info: https://aka.ms/dev-containers-non-root.
   "remoteUser": "alpine",
