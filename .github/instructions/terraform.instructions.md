@@ -15,13 +15,12 @@ these guidelines to ensure consistency, maintainability, and security.
 
 ### General Principles
 
-- Use Terragrunt with Terraform to provision and manage infrastructure
+- Use Terragrunt with opentofu to provision and manage infrastructure
 - Use version control for all configurations
 - Prioritize readability, clarity, and maintainability
-- Use a shared plugin cache directory to avoid provider duplication:
-  ```bash
-  export TF_PLUGIN_CACHE_DIR="$HOME/.cache/terraform/plugin-cache"
-  ```
+- As we use opentofu >= 1.11, we use the automatic provider cache dir feature of
+  terragrunt which means that all providers are stored in the
+  `~/.cache/terragrunt/providers` directory.
 - All credentials information (S3 state backend, OVH, Openstack, etc.) is stored
   in the SOPS-encrypted file
   [deploy/iac/iknite/secrets.sops.yaml](../../deploy/iac/iknite/secrets.sops.yaml)
