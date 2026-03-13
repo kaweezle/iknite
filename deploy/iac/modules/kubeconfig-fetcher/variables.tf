@@ -16,7 +16,7 @@ variable "private_key" {
 
 variable "kubeconfig_path" {
   type        = string
-  default     = "/etc/kubernetes/admin.conf"
+  default     = "/root/.kube/config"
   description = "The path to the kubeconfig file on the remote host"
 }
 

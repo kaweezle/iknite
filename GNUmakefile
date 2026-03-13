@@ -14,6 +14,8 @@ REGISTRY ?= ghcr.io
 IMAGE_NAME ?= kaweezle/iknite
 export CONTAINERD_NAMESPACE
 CACHE_FLAG ?= "" # --no-cache
+VM_TYPE := iknite
+export VM_TYPE
 
 ########
 # VERSIONS
@@ -32,7 +34,7 @@ export KUBERNETES_VERSION
 
 # Get latest karmafun version from GitHub API
 KARMAFUN_LATEST_VERSION := $(shell curl --silent https://api.github.com/repos/karmafun/karmafun/releases/latest | jq -r .tag_name)
-
+KARMAFUN_VERSION := $(if $(filter null,$(KARMAFUN_LATEST_VERSION)),v0.5.0,$(KARMAFUN_LATEST_VERSION))
 
 #######
 # COMMANDS
@@ -122,10 +124,18 @@ IKNITE_DEVCONTAINER_IMAGE_MARKER := $(DIST_DIR)/iknite-devcontainer_$(IKNITE_VER
 IKNITE_DEVCONTAINER_DIR := $(ROOT_DIR)/hack/devcontainer
 IKNITE_DEVCONTAINER_SOURCES := $(wildcard $(IKNITE_DEVCONTAINER_DIR)/*)
 
+# CI Container
+IKNITE_CICONTAINER_IMAGE_NAME := $(IMAGE_NAME)-cicontainer
+IKNITE_CICONTAINER_IMAGE := $(REGISTRY)/$(IKNITE_CICONTAINER_IMAGE_NAME):$(IKNITE_VERSION_TAG)
+IKNITE_CICONTAINER_IMAGE_MARKER := $(DIST_DIR)/iknite-cicontainer_$(IKNITE_VERSION_TAG).marker
+IKNITE_CICONTAINER_DIR := $(ROOT_DIR)/hack/cicontainer
+IKNITE_CICONTAINER_SOURCES := $(wildcard $(IKNITE_CICONTAINER_DIR)/*)
+
 ifdef IKNITE_RELEASE_TAG
 PUSH_IMAGES := true
 IKNITE_ROOTFS_IMAGE_ADDITIONAL_TAG := $(IKNITE_ROOTFS_IMAGE):latest
 IKNITE_DEVCONTAINER_IMAGE_ADDITIONAL_TAG := $(IKNITE_DEVCONTAINER_IMAGE):latest
+IKNITE_CICONTAINER_IMAGE_ADDITIONAL_TAG := $(IKNITE_CICONTAINER_IMAGE):latest
 # SNAPSHOT =
 IKNITE_REPO_NAME := release
 else
@@ -138,7 +148,7 @@ ROOTFS_NAME := iknite-$(IKNITE_VERSION)-$(KUBERNETES_VERSION).rootfs.tar.gz
 ROOTFS_PATH := $(DIST_DIR)/$(ROOTFS_NAME)
 
 # Package file names
-KARMAFUN_PACKAGE := karmafun-$(patsubst v%,%,$(KARMAFUN_LATEST_VERSION)).$(ARCH).apk
+KARMAFUN_PACKAGE := karmafun-$(patsubst v%,%,$(KARMAFUN_VERSION)).$(ARCH).apk
 IKNITE_PACKAGE := iknite-$(IKNITE_VERSION).$(ARCH).apk
 IKNITE_IMAGES_PACKAGE := iknite-images-$(KUBERNETES_VERSION).$(ARCH).apk
 
@@ -290,8 +300,8 @@ goreleaser: $(DIST_DIR)/$(IKNITE_PACKAGE) $(DIST_DIR)/metadata.json $(DIST_DIR)/
 
 # Download latest karmafun release from GitHub
 $(DIST_DIR)/$(KARMAFUN_PACKAGE): | check-prerequisites
-	@echo "Latest karmafun version is $(KARMAFUN_LATEST_VERSION)"
-	curl -o $@ -L "https://github.com/karmafun/karmafun/releases/download/$(KARMAFUN_LATEST_VERSION)/$(KARMAFUN_PACKAGE)"
+	@echo "Latest karmafun version is $(KARMAFUN_VERSION)"
+	curl -o $@ -L "https://github.com/karmafun/karmafun/releases/download/$(KARMAFUN_VERSION)/$(KARMAFUN_PACKAGE)"
 
 .PHONY: fetch-karmafun
 fetch-karmafun: $(DIST_DIR)/$(KARMAFUN_PACKAGE)
@@ -524,28 +534,28 @@ publish-vm-images: $(IKNITE_VM_IMAGE_QCOW2_CONTAINER_MARKER) $(IKNITE_VM_IMAGE_V
 	terragrunt run --graph --non-interactive apply -- -auto-approve
 
 .PHONY: e2e-tg-init
-e2e-tg-init:
-	cd "$(ROOT_DIR)/deploy/iac/iknite/iknite-image"; \
+e2e-tg-init: $(IKNITE_VM_IMAGE_QCOW2) $(INCUS_METADATA)
+	cd "$(ROOT_DIR)/deploy/iac/iknite/$(VM_TYPE)-image"; \
 	terragrunt run --graph init
 
 .PHONY: e2e-tg-refresh
 e2e-tg-refresh:
-	cd "$(ROOT_DIR)/deploy/iac/iknite/iknite-image"; \
+	cd "$(ROOT_DIR)/deploy/iac/iknite/$(VM_TYPE)-image"; \
 	terragrunt run --graph apply --non-interactive -- -auto-approve -refresh-only
 
 .PHONY: e2e-tg-apply
 e2e-tg-apply:
-	cd "$(ROOT_DIR)/deploy/iac/iknite/iknite-image"; \
+	cd "$(ROOT_DIR)/deploy/iac/iknite/$(VM_TYPE)-image"; \
 	terragrunt run --graph apply --non-interactive -- -auto-approve
 
 .PHONY: e2e-tg-apply-vm
 e2e-tg-apply-vm:
-	cd "$(ROOT_DIR)/deploy/iac/iknite/iknite-vm"; \
+	cd "$(ROOT_DIR)/deploy/iac/iknite/$(VM_TYPE)-vm"; \
 	terragrunt run --graph apply --non-interactive -- -auto-approve
 
 .PHONY: e2e-tg-destroy
 e2e-tg-destroy:
-	cd "$(ROOT_DIR)/deploy/iac/iknite/iknite-vm"; \
+	cd "$(ROOT_DIR)/deploy/iac/iknite/$(VM_TYPE)-vm"; \
 	terragrunt run --graph destroy --non-interactive -- -auto-approve
 
 .PHONY: e2e-check-argocd
@@ -688,3 +698,37 @@ $(IKNITE_DEVCONTAINER_IMAGE_MARKER): $(IKNITE_DEVCONTAINER_SOURCES) | check-prer
 
 .PHONY: devcontainer
 devcontainer: $(IKNITE_DEVCONTAINER_IMAGE_MARKER)
+
+$(IKNITE_CICONTAINER_IMAGE_MARKER): $(IKNITE_CICONTAINER_SOURCES) | check-prerequisites container-login
+	$(BUILD_CONTAINER_CMD) build \
+		--frontend dockerfile.v0 \
+		--import-cache=$(BUILD_CONTAINER_CACHE_FROM) \
+		--export-cache=$(BUILD_CONTAINER_CACHE_TO) \
+		--local "context=$(IKNITE_CICONTAINER_DIR)" \
+		--local "dockerfile=$(IKNITE_CICONTAINER_DIR)" \
+		--opt "build-arg:IKNITE_REPO_URL=https://static.iknite.app/$(IKNITE_REPO_NAME)/" \
+		--opt "build-arg:IKNITE_VERSION=$(IKNITE_VERSION)" \
+		$(CACHE_FLAG) \
+		--output "type=docker,dest=-,name=$(IKNITE_CICONTAINER_IMAGE),push=false" | $(RUN_CONTAINER_CMD) load
+	if [ "$(PUSH_IMAGES)" = "true" ]; then \
+		$(RUN_CONTAINER_CMD) push "$(IKNITE_CICONTAINER_IMAGE)"; \
+		if [ -n "$(IKNITE_CICONTAINER_IMAGE_ADDITIONAL_TAG)" ]; then \
+			$(RUN_CONTAINER_CMD) tag "$(IKNITE_CICONTAINER_IMAGE)" "$(IKNITE_CICONTAINER_IMAGE_ADDITIONAL_TAG)"; \
+			$(RUN_CONTAINER_CMD) push "$(IKNITE_CICONTAINER_IMAGE_ADDITIONAL_TAG)"; \
+		fi; \
+	fi
+	@touch "$@"
+
+.PHONY: cicontainer
+cicontainer: $(IKNITE_CICONTAINER_IMAGE_MARKER)
+
+.PHONY: check-argocd
+check-argocd: $(IKNITE_CICONTAINER_IMAGE_MARKER) | check-prerequisites
+	@echo "Checking ArgoCD application status using $(IKNITE_CICONTAINER_IMAGE) container..."
+	$(RUN_CONTAINER_CMD) run --rm \
+		-v "$(ROOT_DIR):/workspace" \
+		-v "$(HOME)/.config/sops:/root/.config/sops:ro" \
+		-v "$(HOME)/.config/incus:/root/.config/incus:ro" \
+		-e "VM_TYPE=$(VM_TYPE)" \
+		$(IKNITE_CICONTAINER_IMAGE) \
+		/workspace/test/e2e/argocd-checker.sh

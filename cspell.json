@@ -42,6 +42,7 @@
     "buildkit",
     "buildkitd",
     "checkmake",
+    "cicontainer",
     "clientset",
     "codegen",
     "configmap",

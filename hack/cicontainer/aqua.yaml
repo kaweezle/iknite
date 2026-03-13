@@ -1,0 +1,26 @@
+---
+# yaml-language-server: $schema=https://raw.githubusercontent.com/aquaproj/aqua/main/json-schema/aqua-yaml.json
+# cSpell: words aquaproj filosottile FairwindsOps yannh jpillora ahmetb hairyhenderson itchyny
+# aqua - Declarative CLI Version Manager
+# https://aquaproj.github.io/
+# checksum:
+#   enabled: true
+#   require_checksum: true
+#   supported_envs:
+#   - all
+# cSpell: words getsops oras
+registries:
+  - type: standard
+    ref: v4.476.0 # renovate: depName=aquaproj/aqua-registry
+packages:
+  # - name: helm/helm@v3.19.0
+  # - name: helmfile/helmfile@v1.3.2
+  # - name: kubernetes-sigs/kustomize@kustomize/v5.8.1
+  # Installed on the system
+  # - name: itchyny/gojq@v0.12.18
+  - name: getsops/sops@v3.12.1
+  - name: opentofu/opentofu@v1.11.5
+  - name: gruntwork-io/terragrunt@v0.99.4
+  - name: FiloSottile/age@v1.3.1
+  - name: argoproj/argo-cd@v3.3.2
+  - name: oras-project/oras@v1.3.0
