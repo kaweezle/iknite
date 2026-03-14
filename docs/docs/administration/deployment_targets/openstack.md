@@ -1,3 +1,5 @@
+<!-- cSpell: words runcmd -->
+
 !!! wip "Work in progress"
 
     This documentation is in draft form and may change frequently.
@@ -104,9 +106,9 @@ WSL2). Disable IP creation and mDNS:
 
 ```yaml
 # /etc/iknite.d/iknite.yaml
-createIp: false         # Use the DHCP-assigned IP
-enableMDNS: false       # No mDNS needed
-domainName: ""          # Use actual IP or configure DNS separately
+createIp: false # Use the DHCP-assigned IP
+enableMDNS: false # No mDNS needed
+domainName: "" # Use actual IP or configure DNS separately
 clusterName: "my-cluster"
 useEtcd: false
 ```

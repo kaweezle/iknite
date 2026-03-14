@@ -1,3 +1,5 @@
+<!-- cSpell: words netdev hostfwd nographic netfilter nftables veth -->
+
 !!! wip "Work in progress"
 
     This documentation is in draft form and may change frequently.
@@ -5,8 +7,8 @@
 # Other / Rootless Environments
 
 This page covers deploying Iknite in environments not specifically listed
-elsewhere, including other Linux distributions, rootless containers, and
-minimal VM setups.
+elsewhere, including other Linux distributions, rootless containers, and minimal
+VM setups.
 
 ## Alpine Linux (Direct Installation)
 
@@ -60,10 +62,9 @@ openrc default
 
 ## Rootless Environments
 
-!!! warning "Limited support"
-    Kubernetes requires several Linux capabilities and kernel features that may
-    not be available in all rootless environments. Rootless support is
-    experimental.
+!!! warning "Limited support" Kubernetes requires several Linux capabilities and
+kernel features that may not be available in all rootless environments. Rootless
+support is experimental.
 
 ### Requirements for Rootless Operation
 
@@ -140,9 +141,9 @@ When deploying in environments where the host IP is stable (VMs, bare metal):
 
 ```yaml
 # /etc/iknite.d/iknite.yaml
-createIp: false        # Don't create a secondary IP
-enableMDNS: false      # No mDNS needed
-domainName: ""         # Use the actual host IP
+createIp: false # Don't create a secondary IP
+enableMDNS: false # No mDNS needed
+domainName: "" # Use the actual host IP
 clusterName: "my-cluster"
 useEtcd: false
 ```
@@ -166,14 +167,14 @@ docker run \
 
 Regardless of the deployment target, the host kernel must support:
 
-| Feature | Required For |
-|---------|-------------|
-| `overlay` filesystem | containerd layer storage |
-| `br_netfilter` | Kubernetes networking |
-| `ip_tables` / `nftables` | Pod networking (Flannel) |
-| User namespaces | containerd rootless mode |
-| cgroups v2 | Kubelet resource management |
-| `veth` devices | Pod virtual network interfaces |
+| Feature                  | Required For                   |
+| ------------------------ | ------------------------------ |
+| `overlay` filesystem     | containerd layer storage       |
+| `br_netfilter`           | Kubernetes networking          |
+| `ip_tables` / `nftables` | Pod networking (Flannel)       |
+| User namespaces          | containerd rootless mode       |
+| cgroups v2               | Kubelet resource management    |
+| `veth` devices           | Pod virtual network interfaces |
 
 ```bash
 # Check required kernel modules
