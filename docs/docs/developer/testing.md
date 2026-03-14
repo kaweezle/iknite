@@ -1,3 +1,5 @@
+<!-- cSpell: words covermode coverprofile stretchr testutils -->
+
 !!! wip "Work in progress"
 
     This documentation is in draft form and may change frequently.
@@ -42,7 +44,8 @@ go test -run TestPreventKubeletServiceFromStarting ./pkg/k8s/...
 go test -race ./...
 ```
 
-Race detection is always enabled in CI. Use it locally to catch concurrency issues.
+Race detection is always enabled in CI. Use it locally to catch concurrency
+issues.
 
 ## Test Structure
 
@@ -226,9 +229,11 @@ defer func() { utils.FS = oldFS }()
 
 When adding a new function or command:
 
-1. **Create a test file** next to the implementation: `pkg/cmd/your_command_test.go`
+1. **Create a test file** next to the implementation:
+   `pkg/cmd/your_command_test.go`
 
 2. **Test the happy path**:
+
    ```go
    func TestYourCommand_Success(t *testing.T) {
        // Set up mocks
@@ -238,6 +243,7 @@ When adding a new function or command:
    ```
 
 3. **Test error paths**:
+
    ```go
    func TestYourCommand_WhenXFails(t *testing.T) {
        // Set up mocks to return errors

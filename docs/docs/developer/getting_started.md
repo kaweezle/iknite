@@ -1,11 +1,13 @@
+<!-- cSpell: words libstdc socat skopeo tenv rootlesskit slirp devenv testutils -->
+
 !!! wip "Work in progress"
 
     This documentation is in draft form and may change frequently.
 
 # Developer Getting Started
 
-This page explains how to set up a development environment for contributing
-to Iknite.
+This page explains how to set up a development environment for contributing to
+Iknite.
 
 ## Prerequisites
 
@@ -63,12 +65,14 @@ The easiest setup path is using the provided VS Code devcontainer:
 ### Open in Devcontainer
 
 1. Clone the repository:
+
    ```bash
    git clone https://github.com/kaweezle/iknite.git
    cd iknite
    ```
 
 2. Open in VS Code:
+
    ```bash
    code .
    ```
@@ -81,6 +85,7 @@ automatically.
 ### Devcontainer Features
 
 The devcontainer (`.devcontainer/`) includes:
+
 - Go development environment
 - All required Alpine packages
 - Pre-commit hooks
@@ -115,11 +120,11 @@ pre-commit install
 
 ### 4. Configure the Signing Key (for APK builds)
 
-APK package builds require a signing key. Contact the maintainers to get
-the signing key, or use a development key:
+APK package builds require a signing key. Contact the maintainers to get the
+signing key, or use a development key:
 
 ```bash
-go run hack/iknitedev/ install signing-key deploy/iac/iknite/secrets.sops.yaml .
+go run hack/iknitedev/ install signing-key secrets.sops.yaml .
 ```
 
 ### 5. Configure SOPS (for encrypted secrets)

@@ -1,3 +1,5 @@
+<!-- cSpell: words sirupsen iface gofmt mycommand -->
+
 !!! wip "Work in progress"
 
     This documentation is in draft form and may change frequently.
@@ -102,6 +104,7 @@ log.WithFields(log.Fields{
 ```
 
 **Log level guidelines:**
+
 - `Debug`: Detailed technical information for debugging
 - `Info`: Normal operational messages
 - `Warn`: Unexpected but recoverable situations
@@ -192,7 +195,8 @@ func process(data interface{}) { ... }
 
 ## Generics
 
-Use generics with type constraints when a function works on multiple related types:
+Use generics with type constraints when a function works on multiple related
+types:
 
 ```go
 // ✅ Good
@@ -236,6 +240,7 @@ golangci-lint run --fix
 ```
 
 Common lint rules enforced:
+
 - `gofmt` – Code formatting
 - `govet` – Suspicious constructs
 - `errcheck` – Unchecked errors
@@ -245,8 +250,8 @@ Common lint rules enforced:
 
 ## Spell Checking
 
-The project uses [CSpell](https://cspell.org/) for spell checking via
-pre-commit hooks. To suppress false positives:
+The project uses [CSpell](https://cspell.org/) for spell checking via pre-commit
+hooks. To suppress false positives:
 
 ```go
 // Add unknown words to the local dictionary
@@ -270,7 +275,8 @@ Use [gitmoji](https://gitmoji.dev/) for commit messages:
 ✅ add tests for certificate generation
 ```
 
-Keep the first line under 50 characters when possible. Reference issues with `#`:
+Keep the first line under 50 characters when possible. Reference issues with
+`#`:
 
 ```
 🐛 fix race condition in workload watcher (#42)

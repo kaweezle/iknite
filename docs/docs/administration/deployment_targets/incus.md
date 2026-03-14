@@ -1,12 +1,14 @@
+<!-- cSpell: words nictype incusbr netfilter -->
+
 !!! wip "Work in progress"
 
     This documentation is in draft form and may change frequently.
 
 # Incus Deployment
 
-[Incus](https://linuxcontainers.org/incus/) is an open-source container and
-VM manager, the community fork of LXD. Iknite runs well in Incus containers
-with `security.nesting` enabled.
+[Incus](https://linuxcontainers.org/incus/) is an open-source container and VM
+manager, the community fork of LXD. Iknite runs well in Incus containers with
+`security.nesting` enabled.
 
 ## Prerequisites
 
@@ -41,7 +43,8 @@ incus image import iknite-rootfs.tar.gz --alias iknite
 
 ### 3. Create a Container Profile
 
-Create an Incus profile for Iknite containers with the required security settings:
+Create an Incus profile for Iknite containers with the required security
+settings:
 
 ```bash
 incus profile create iknite
