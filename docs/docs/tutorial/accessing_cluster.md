@@ -35,14 +35,14 @@ the Iknite environment.
 === "Incus"
 
     ```bash
-    incus file pull my-cluster/root/.kube/config ~/.kube/iknite-config
+    incus file pull iknite/root/.kube/config ~/.kube/iknite-config
     export KUBECONFIG=~/.kube/iknite-config
     ```
 
 === "Hyper-V / SSH"
 
     ```bash
-    scp root@<vm-ip>:/root/.kube/config ~/.kube/iknite-config
+    scp -i iknite-ssh-key root@<vm-ip>:/root/.kube/config ~/.kube/iknite-config
     export KUBECONFIG=~/.kube/iknite-config
     ```
 
@@ -66,18 +66,18 @@ kubectl get pods -A
 Expected output:
 
 ```
-NAMESPACE            NAME                                       READY   STATUS    RESTARTS   AGE
-kube-flannel         kube-flannel-ds-xxxxx                      1/1     Running   0          5m
-kube-system          coredns-xxxxxxxxxx-xxxxx                   1/1     Running   0          5m
-kube-system          coredns-xxxxxxxxxx-yyyyy                   1/1     Running   0          5m
-kube-system          etcd-iknite.local                        1/1     Running   0          5m
-kube-system          kube-apiserver-iknite.local              1/1     Running   0          5m
-kube-system          kube-controller-manager-iknite.local     1/1     Running   0          5m
-kube-system          kube-proxy-xxxxx                           1/1     Running   0          5m
-kube-system          kube-scheduler-iknite.local              1/1     Running   0          5m
-kube-system          metrics-server-xxxxxxxxx-xxxxx             1/1     Running   0          5m
-kube-system          kube-vip-iknite.local                    1/1     Running   0          5m
-local-path-storage   local-path-provisioner-xxxxxxxxx-xxxxx     1/1     Running   0          5m
+NAMESPACE            NAME                                               READY   STATUS    RESTARTS   AGE
+kube-flannel         kube-flannel-ds-z9nqd                              1/1     Running   0          5m
+kube-system          coredns-5d76cfcbd5-6cfxk                           1/1     Running   0          5m
+kube-system          kine-iknite-container-cluster                      1/1     Running   0          5m
+kube-system          kube-apiserver-iknite-container-cluster            1/1     Running   0          5m
+kube-system          kube-controller-manager-iknite-container-cluster   1/1     Running   0          5m
+kube-system          kube-proxy-cpt8n                                   1/1     Running   0          5m
+kube-system          kube-scheduler-iknite-container-cluster            1/1     Running   0          5m
+kube-system          kube-vip-cloud-provider-77d556c789-8k9ft           1/1     Running   0          5m
+kube-system          kube-vip-iknite-container-cluster                  1/1     Running   0          5m
+kube-system          metrics-server-7447bdcdc7-27k27                    1/1     Running   0          5m
+local-path-storage   local-path-provisioner-7d4d469b6-4546f             1/1     Running   0          5m
 ```
 
 ## Using kubectl
