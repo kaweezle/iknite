@@ -122,16 +122,17 @@ func performStart(ikniteConfig *v1alpha1.IkniteClusterSpec) {
 	cobra.CheckErr(alpine.EnsureOpenRC("default"))
 
 	ctx := context.Background()
+	pollInterval := time.Second * time.Duration(2)
 	if timeout > 0 {
 		err = wait.PollUntilContextTimeout(
 			ctx,
-			time.Second*time.Duration(2),
-			time.Duration(timeout),
+			pollInterval,
+			time.Second*time.Duration(timeout),
 			true,
 			IsIkniteReady,
 		)
 	} else {
-		err = wait.PollUntilContextCancel(ctx, time.Second*time.Duration(2), true, IsIkniteReady)
+		err = wait.PollUntilContextCancel(ctx, pollInterval, true, IsIkniteReady)
 	}
 
 	cobra.CheckErr(err)

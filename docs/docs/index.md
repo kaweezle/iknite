@@ -7,8 +7,8 @@
 # Iknite
 
 **Iknite** is a flexible Golang CLI that simplifies creating a Kubernetes
-development cluster in an Alpine Linux–based VM, LXC container, or WSL2
-environment.
+cluster for development or integration in an Alpine Linux–based VM, Incus
+container, or WSL2 environment.
 
 As opposed to other tools, Iknite encapsulates `kubeadm` in order to simplify
 the process of creating a development cluster.
@@ -35,10 +35,11 @@ worker node, then applies a **bootstrapping
 appropriate tools and configs.
 
 A WSL2 distribution is available for quickly spinning up clusters on Windows
-without relying on Docker.
+without relying on Docker. On Linux, an Incus container image is provided as
+well as a VM image.
 
-**Iknite** is best suited for development. It is not intended for production
-use.
+**Iknite** is best suited for development or integration. It is not intended for
+production use.
 
 ## Similar tools
 
