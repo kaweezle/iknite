@@ -1,3 +1,5 @@
+<!-- cSpell: words kubectx kubens syscalls setxattr kmsg conntrack hashsize incusbr userprofile runlevel netfilter -->
+
 !!! wip "Work in progress"
 
     This documentation is in draft form and may change frequently.
@@ -11,10 +13,10 @@ This page covers installation of Iknite on all supported platforms.
 ### Hardware Requirements
 
 | Resource | Minimum | Recommended |
-|----------|---------|-------------|
-| CPU | 2 cores | 4+ cores |
-| RAM | 4 GB | 8 GB |
-| Disk | 10 GB | 20+ GB |
+| -------- | ------- | ----------- |
+| CPU      | 2 cores | 4+ cores    |
+| RAM      | 4 GB    | 8 GB        |
+| Disk     | 10 GB   | 20+ GB      |
 
 ### Software Requirements
 
@@ -62,7 +64,7 @@ scoop install kubectl k9s kubectx kubens
     Invoke-RestMethod -Uri https://github.com/kaweezle/iknite/releases/latest/download/Get-Iknite.ps1 | Invoke-Expression
     ```
 
-    The script creates a WSL distribution named `iknite` (customisable via
+    The script creates a WSL distribution named `iknite` (customizable via
     `$env:IKNITE_NAME`) and imports the root filesystem automatically.
 
 === "Manual"
@@ -80,17 +82,18 @@ scoop install kubectl k9s kubectx kubens
     wsl --import iknite $installDir "$installDir\rootfs.tar.gz"
     ```
 
-### Step 4: First Start
+### Step 4: Start the Cluster
 
 ```powershell
 wsl -d iknite --user root iknite start
 ```
 
 !!! tip "First-boot time"
+
     The first boot typically takes about **one minute** because all Kubernetes
     component images are already bundled in the root filesystem.
 
-### Step 5: Verify the Installation
+### Step 5: Access the Cluster
 
 ```powershell
 $env:KUBECONFIG = "\\wsl.localhost\iknite\root\.kube\config"
@@ -100,8 +103,8 @@ kubectl get pods -A
 
 ## Incus Installation
 
-[Incus](https://linuxcontainers.org/incus/) is an open-source alternative to
-LXD for running containers and VMs on Linux.
+[Incus](https://linuxcontainers.org/incus/) is an open-source alternative to LXD
+for running containers and VMs on Linux.
 
 ### Step 1: Install Incus
 
@@ -113,73 +116,95 @@ curl https://pkgs.zabbly.com/get/incus-stable | sudo sh -s
 sudo incus admin init --minimal
 ```
 
+??? warning "The `br_netfilter` module should be started"
+
+    The `br_netfilter` module is required by kubernetes. You can enable it with
+    the following command:
+
+    ```bash
+    sudo modprobe br_netfilter
+    ```
+
+    To load it automatically on boot, add it to `/etc/modules-load.d/iknite.conf` (as root):
+
+    ```bash
+    sudo sh -c 'echo "br_netfilter" >> /etc/modules-load.d/iknite.conf'
+    ```
+
 ### Step 2: Install Iknite
 
-The easiest way is the automated installation script, which downloads the image
-from GitHub Container Registry and creates an Incus container with the correct
-security profile:
+=== "Install Script"
+
+    The easiest way is the automated installation script, which downloads the image
+    from GitHub Container Registry and creates an Incus container with the correct
+    security profile:
+
+    ```bash
+    bash <(curl -fsSL https://raw.githubusercontent.com/kaweezle/iknite/refs/heads/main/get-iknite.sh)
+    ```
+
+    The script creates an Incus profile named `iknite-k8s` with all required kernel and
+    security settings, then launches a container named `iknite`.
+
+=== "Manual"
+
+    For a manual installation, create the profile and container yourself:
+
+    ```bash
+    # Create the Iknite profile with the necessary security settings
+    incus profile create iknite-k8s
+    incus profile edit iknite-k8s <<'EOF'
+    config:
+      security.privileged: "true"
+      security.nesting: "true"
+      security.syscalls.intercept.bpf: "true"
+      security.syscalls.intercept.bpf.devices: "true"
+      security.syscalls.intercept.mknod: "true"
+      security.syscalls.intercept.setxattr: "true"
+      raw.lxc: |-
+        lxc.apparmor.profile=unconfined
+        lxc.sysctl.net.ipv4.ip_forward=1
+        lxc.sysctl.net.bridge.bridge-nf-call-iptables=1
+        lxc.sysctl.net.bridge.bridge-nf-call-ip6tables=1
+        lxc.cgroup2.devices.allow=a
+        lxc.mount.auto=proc:rw sys:rw
+        lxc.hook.start=/root/prepare.sh
+    devices:
+      conntrack_hashsize:
+        path: /sys/module/nf_conntrack/parameters/hashsize
+        source: /sys/module/nf_conntrack/parameters/hashsize
+        type: disk
+      kmsg:
+        path: /dev/kmsg
+        source: /dev/kmsg
+        type: unix-char
+      eth0:
+        network: incusbr0
+        type: nic
+      root:
+        path: /
+        pool: default
+        type: disk
+    EOF
+
+    # Download the rootfs and metadata and import as an image
+    curl -sLO "https://github.com/kaweezle/iknite/releases/download/latest/iknite-0.6.5-1.35.2.rootfs.tar.gz"
+    curl -sLO "https://github.com/kaweezle/iknite/releases/download/latest/incus.tar.xz"
+
+    incus image import --alias iknite-container incus.tar.xz iknite.0.6.5-1.35.2.qcow2 --reuse
+
+    # Launch the container with the iknite profile
+    incus launch iknite-container iknite --profile iknite-k8s --profile default
+    ```
+
+The Kubernetes cluster is automatically started when the container is launched
+and is initialized on first boot. You can check the status of the cluster with:
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/kaweezle/iknite/refs/heads/main/get-iknite.sh)
+incus exec iknite -- /sbin/iknite status
 ```
 
-The script creates an Incus profile named `iknite` with all required kernel and
-security settings, then launches a container named `iknite`.
-
-For a manual installation, create the profile and container yourself:
-
-```bash
-# Create the Iknite profile with the necessary security settings
-incus profile create iknite
-incus profile edit iknite <<'EOF'
-config:
-  security.privileged: "true"
-  security.nesting: "true"
-  security.syscalls.intercept.bpf: "true"
-  security.syscalls.intercept.bpf.devices: "true"
-  security.syscalls.intercept.mknod: "true"
-  security.syscalls.intercept.setxattr: "true"
-  raw.lxc: |-
-    lxc.apparmor.profile=unconfined
-    lxc.sysctl.net.ipv4.ip_forward=1
-    lxc.sysctl.net.bridge.bridge-nf-call-iptables=1
-    lxc.sysctl.net.bridge.bridge-nf-call-ip6tables=1
-    lxc.cgroup2.devices.allow=a
-    lxc.mount.auto=proc:rw sys:rw
-    lxc.mount.entry = /dev/kmsg dev/kmsg none defaults,bind,create=file
-devices:
-  conntrack_hashsize:
-    path: /sys/module/nf_conntrack/parameters/hashsize
-    source: /sys/module/nf_conntrack/parameters/hashsize
-    type: disk
-  kmsg:
-    path: /dev/kmsg
-    source: /dev/kmsg
-    type: unix-char
-  eth0:
-    network: incusbr0
-    type: nic
-  root:
-    path: /
-    pool: default
-    type: disk
-EOF
-
-# Download the rootfs and metadata and import as an image
-curl -sLO "https://github.com/kaweezle/iknite/releases/latest/download/iknite-rootfs.tar.gz"
-incus image import iknite-rootfs.tar.gz --alias iknite
-
-# Launch the container with the iknite profile
-incus launch iknite my-cluster --profile iknite --profile default
-```
-
-### Step 3: Start the Cluster
-
-```bash
-incus exec iknite -- iknite start
-```
-
-### Step 4: Access the Cluster
+### Step 3: Access the Cluster
 
 ```bash
 # Copy the kubeconfig
@@ -200,9 +225,9 @@ Enable-WindowsOptionalFeature -Online -FeatureName Microsoft-Hyper-V -All
 
 ### Step 2: Install the Iknite VM
 
-The easiest way is the automated PowerShell script. It downloads the VHDX
-image, creates a Hyper-V VM, generates SSH keys, attaches a cloud-init ISO, and
-starts the VM:
+The easiest way is the automated PowerShell script. It downloads the VHDX image,
+creates a Hyper-V VM, generates SSH keys, attaches a cloud-init ISO, and starts
+the VM:
 
 ```powershell
 Set-ExecutionPolicy RemoteSigned -Scope CurrentUser
@@ -211,25 +236,31 @@ Invoke-RestMethod -Uri https://github.com/kaweezle/iknite/releases/latest/downlo
 
 When the script finishes it prints the VM's IP address for SSH access.
 
-### Step 3: Connect via SSH and Start the Cluster
+### Step 3: Connect via SSH and Access the cluster
+
+When running in a VM, The cluster is automatically started as part of the boot
+process.
 
 ```powershell
 # Connect to the VM (the script printed the IP)
-ssh root@<vm-ip>
+ssh -i iknite-ssh-key root@<vm-ip>
 
-# Inside the VM – start the cluster
-iknite start
+# Inside the VM – Get the cluster status
+iknite status
+
+# Get the running pods
+kubectl get pods -A
 ```
 
 ### Step 4: Access the Cluster from Windows
 
 ```powershell
 # Copy kubeconfig
-scp root@<vm-ip>:/root/.kube/config "$env:USERPROFILE\.kube\iknite-config"
+scp -i iknite-ssh-key root@<vm-ip>:/root/.kube/config "$env:USERPROFILE\.kube\iknite-config"
 
 # Use kubectl
 $env:KUBECONFIG = "$env:USERPROFILE\.kube\iknite-config"
-kubectl get nodes
+kubectl get pds -A
 ```
 
 ## Docker Installation
@@ -301,8 +332,8 @@ openrc default
 
 ### WSL: "Error 0x80370102"
 
-This error indicates virtualization is not enabled in BIOS. Enable
-Intel VT-x or AMD-V in your BIOS settings.
+This error indicates virtualization is not enabled in BIOS. Enable Intel VT-x or
+AMD-V in your BIOS settings.
 
 ### WSL: Distribution import fails
 
@@ -310,10 +341,5 @@ Ensure you have at least 10 GB of free disk space in the target directory.
 
 ### Container fails to start
 
-Ensure `--privileged` is set for Docker/Incus containers, as Kubernetes
-requires several Linux capabilities.
-
-### First boot takes very long
-
-Install the `iknite-images` APK package to pre-pull container images, or
-ensure you have a fast internet connection for the first boot.
+Ensure `--privileged` is set for Docker/Incus containers, as Kubernetes requires
+several Linux capabilities.
