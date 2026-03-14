@@ -17,7 +17,7 @@
 #  "argocd-server" in the "argocd" namespace.
 # - Check that the URL responds over HTTPS with a 200 status code.
 # - Download the ArgoCD CLI.
-# - Get the admin password from the deploy/k8s/secrets/secrets.sops.yaml file,
+# - Get the admin password from the secrets.sops.yaml file,
 #   decrypting it with helm-secrets and extracting the value of the key
 #   data.argocd.admin_password
 # - Log in to the ArgoCD server using the CLI and the retrieved password.
@@ -37,11 +37,13 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 : "${VM_STACK=openstack}"
 
+ROOT_DIR="$(realpath "${SCRIPT_DIR}/../..")"
+
 # Terragrunt directory
-TERRAGRUNT_DIR=$(realpath "${SCRIPT_DIR}/../../deploy/iac/iknite")
+TERRAGRUNT_DIR="${ROOT_DIR}/deploy/iac/iknite"
 
 # Secrets file
-SECRETS_FILE=$(realpath "${SCRIPT_DIR}/../../deploy/k8s/argocd/secrets/secrets.sops.yaml")
+SECRETS_FILE="${ROOT_DIR}/secrets.sops.yaml"
 
 # Temporary kubeconfig file
 KUBECONFIG_FILE=""

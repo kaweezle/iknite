@@ -11,7 +11,7 @@ terraform {
 // Import main variables from the root module
 locals {
   domain_suffix         = include.root.locals.domain_suffix
-  cloudflare_account_id = include.root.locals.cloudflare_account_id
+  cloudflare_account_id = include.root.locals.values.cloudflare.account_id
   dns                   = include.root.locals.secret.cloudflare.dns
 }
 

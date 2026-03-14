@@ -9,6 +9,7 @@ data:
     label: Iknite
     slug: iknite
     email: antoine@mrtn.fr
+    state_bucket: kwzltfstate
     git:
       # The main Git repository for the platform.
       repoURL: git@github.com:kaweezle/iknite.git
@@ -25,3 +26,5 @@ data:
     repo_url: git@github.com:kaweezle/iknite.git
     repo_target_revision: main
     application_path: deploy/k8s/argocd/e2e/appstages/appstage-00-bootstrap/application.yaml
+  cloudflare:
+    account_id: a54f6b2557d54a9bff5eef36482b7fe6

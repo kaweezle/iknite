@@ -2,9 +2,9 @@
 environments:
   default:
     secrets:
-      - ../../secrets/secrets.sops.yaml
+      - "{{ coalesce (env "IKNITE_STACK_PREFIX") "../../../../.." }}/secrets.sops.yaml"
     values:
-      - ../../values/values.yaml
+      - "{{ coalesce (env "IKNITE_STACK_PREFIX") "../../../../.." }}/values.yaml"
 ---
 repositories:
   - name: traefik

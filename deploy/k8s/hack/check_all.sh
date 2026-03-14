@@ -63,10 +63,10 @@ find "$APPS_DIR" -type f -name "application.yaml" -print0 | while IFS= read -r -
     if [[ -f "$application_dir/kustomization.yaml" ]]; then
         info "Directory $application_dir contains a kustomization.yaml file"
         kustomize build --enable-exec --enable-alpha-plugins --enable-helm --load-restrictor LoadRestrictionsNone "$application_dir" | eval "$KUBE_CONFORM_CMD"
-    elif [[ -f "$application_dir/helmfile.yaml" ]]; then
-        info "Directory $application_dir contains a helmfile.yaml file"
-        helmfile template  --skip-tests --args='--skip-crds' -f "$application_dir/helmfile.yaml" | eval "$KUBE_CONFORM_CMD"
-        if ! helmfile template  --skip-tests --args='--skip-crds' -f "$application_dir/helmfile.yaml" | eval "$KUBE_CONFORM_CMD"; then
+    elif [[ -f "$application_dir/helmfile.yaml" || -f "$application_dir/helmfile.yaml.gotmpl" ]]; then
+        file=$(find "$application_dir" '(' -name helmfile.yaml -o -name helmfile.yaml.gotmpl ')'  | head -n 1)
+        info "Directory $application_dir contains a $(basename "$file") file"
+        if ! helmfile template  --skip-tests --args='--skip-crds' -f "$file" | eval "$KUBE_CONFORM_CMD"; then
             error "Helmfile template command failed for $application_dir"
         else
             ok "Helmfile template command succeeded for $application_dir"
