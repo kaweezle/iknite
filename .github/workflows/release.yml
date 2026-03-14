@@ -58,7 +58,7 @@ jobs:
         name: Install image building dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends libarchive-tools
+          sudo apt-get install -y --no-install-recommends qemu-utils qemu-guest-agent genisoimage libarchive-tools
           # Install buildctl
           BUILDKIT_VERSION=0.28.0
           curl -L -o buildkit.tar.gz https://github.com/moby/buildkit/releases/download/v${BUILDKIT_VERSION}/buildkit-v${BUILDKIT_VERSION}.linux-amd64.tar.gz
@@ -140,11 +140,6 @@ jobs:
         run: |
           rm -rf /tmp/.buildx-cache
           mv /tmp/.buildx-cache-new /tmp/.buildx-cache
-      -
-        name: Install VM image building dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends qemu-utils qemu-guest-agent genisoimage libarchive-tools
       -
         name: Build VM images
         run: |

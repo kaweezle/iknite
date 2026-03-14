@@ -535,7 +535,7 @@ publish-vm-images: $(IKNITE_VM_IMAGE_QCOW2_CONTAINER_MARKER) $(IKNITE_VM_IMAGE_V
 	terragrunt run --graph --non-interactive apply -- -auto-approve
 
 .PHONY: e2e-tg-init
-e2e-tg-init: $(IKNITE_VM_IMAGE_QCOW2) $(INCUS_METADATA)
+e2e-tg-init:
 	cd "$(ROOT_DIR)/deploy/iac/iknite/$(VM_STACK)/iknite-image"; \
 	terragrunt run --graph init
 
@@ -545,7 +545,7 @@ e2e-tg-refresh:
 	terragrunt run --graph apply --non-interactive -- -auto-approve -refresh-only
 
 .PHONY: e2e-tg-apply
-e2e-tg-apply:
+e2e-tg-apply: $(IKNITE_VM_IMAGE_QCOW2) $(INCUS_METADATA)
 	cd "$(ROOT_DIR)/deploy/iac/iknite/$(VM_STACK)/iknite-image"; \
 	terragrunt run --graph apply --non-interactive -- -auto-approve
 

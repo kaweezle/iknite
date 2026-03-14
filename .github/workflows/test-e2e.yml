@@ -74,7 +74,7 @@ jobs:
       -
         name: Checking argocd deployment
         run: |
-          cd deploy/k8s/components/argocd
+          cd deploy/k8s/argocd/common/argocd-server
           echo "############################################################"
           echo "Release list..."
           helmfile list --output json | jq .
