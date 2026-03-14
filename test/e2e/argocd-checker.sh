@@ -35,7 +35,7 @@ NC='\033[0m' # No Color
 # Script directory
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-: "${VM_TYPE="iknite"}"
+: "${VM_STACK=openstack}"
 
 # Terragrunt directory
 TERRAGRUNT_DIR=$(realpath "${SCRIPT_DIR}/../../deploy/iac/iknite")
@@ -411,8 +411,8 @@ main() {
     check_command "gojq"
 
     # Execute verification steps
-    initialize_terragrunt "${TERRAGRUNT_DIR}/${VM_TYPE}-image"
-    retrieve_kubeconfig "${TERRAGRUNT_DIR}/${VM_TYPE}-kubeconfig-fetcher"
+    initialize_terragrunt "${TERRAGRUNT_DIR}/${VM_STACK}/iknite-image"
+    retrieve_kubeconfig "${TERRAGRUNT_DIR}/${VM_STACK}/iknite-kubeconfig-fetcher"
     check_namespace
     check_argocd_components
     check_ingressroute

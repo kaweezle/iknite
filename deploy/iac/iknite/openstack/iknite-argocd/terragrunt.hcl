@@ -8,7 +8,7 @@ terraform {
 }
 
 dependency "kubeconfig" {
-  config_path = "${get_parent_terragrunt_dir("root")}/incus-kubernetes-state"
+  config_path = "${get_parent_terragrunt_dir("root")}/openstack/iknite-kubernetes-state"
 
   mock_outputs = {
     kubeconfig_content = "apiVersion: v1\nkind: Config\nclusters: []\ncontexts: []\ncurrent-context: ''\nusers: []"

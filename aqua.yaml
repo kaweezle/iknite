@@ -1,6 +1,6 @@
 ---
 # yaml-language-server: $schema=https://raw.githubusercontent.com/aquaproj/aqua/main/json-schema/aqua-yaml.json
-# cSpell: words aquaproj filosottile FairwindsOps yannh jpillora ahmetb hairyhenderson
+# cSpell: words aquaproj filosottile FairwindsOps yannh jpillora ahmetb hairyhenderson rclone
 # aqua - Declarative CLI Version Manager
 # https://aquaproj.github.io/
 # checksum:
@@ -30,3 +30,4 @@ packages:
   - name: ahmetb/kubectx@v0.9.5
   - name: oras-project/oras@v1.3.0
   - name: hairyhenderson/gomplate@v5.0.0
+  - name: rclone/rclone@v1.73.2

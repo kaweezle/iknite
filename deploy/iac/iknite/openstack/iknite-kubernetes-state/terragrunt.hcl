@@ -8,7 +8,7 @@ terraform {
 }
 
 dependency "kubeconfig_fetcher" {
-  config_path = "${get_parent_terragrunt_dir("root")}/incus-kubeconfig-fetcher"
+  config_path = "${get_parent_terragrunt_dir("root")}/openstack/iknite-kubeconfig-fetcher"
 
   mock_outputs = {
     kubeconfig = "apiVersion: v1\nkind: Config\nclusters: []\ncontexts: []\ncurrent-context: ''\nusers: []"

@@ -8,12 +8,18 @@ terraform {
 }
 
 dependency "vm" {
-  config_path = "${get_parent_terragrunt_dir("root")}/iknite-vm"
+  config_path = "${get_parent_terragrunt_dir("root")}/incus/iknite-vm"
 
   mock_outputs = {
     instances = {
-      "iknite-vm-instance" = {
-        access_ip_v4 = "192.168.1.100"
+      "iknite-vm" = {
+        "description" = "Iknite VM image"
+        "ipv4"        = "10.253.141.182"
+        "ipv6"        = "fd42:86db:d3cd:b7ac:1266:6aff:fe32:ce96"
+        "name"        = "iknite-vm"
+        "project"     = "default"
+        "remote"      = null
+        "status"      = "Running"
       }
     }
   }
@@ -24,7 +30,7 @@ locals {
 }
 
 inputs = {
-  host                = try(dependency.vm.outputs.instances["iknite-vm-instance"].access_ip_v4, "")
+  host                = try(dependency.vm.outputs.instances["iknite-vm"].ipv4, "")
   username            = "root"
   private_key         = local.iknite_vm.ssh_private_key
   ssh_host_public_key = local.iknite_vm.ssh_host_ecdsa_public

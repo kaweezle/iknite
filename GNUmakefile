@@ -14,8 +14,8 @@ REGISTRY ?= ghcr.io
 IMAGE_NAME ?= kaweezle/iknite
 export CONTAINERD_NAMESPACE
 CACHE_FLAG ?= "" # --no-cache
-VM_TYPE := iknite
-export VM_TYPE
+VM_STACK := openstack
+export VM_STACK
 
 ########
 # VERSIONS
@@ -236,6 +236,7 @@ help: # ignore checkmake
 	@echo "  IKNITE_VERSION=$(IKNITE_VERSION)"
 	@echo "  IKNITE_REPO_NAME=$(IKNITE_REPO_NAME)"
 	@echo "  CACHE_FLAG=$(CACHE_FLAG)"
+	@echo "  VM_STACK=$(VM_STACK)"
 	@echo "  SNAPSHOT=$(SNAPSHOT)"
 	@echo "  PUSH_IMAGES=$(PUSH_IMAGES)"
 
@@ -535,27 +536,27 @@ publish-vm-images: $(IKNITE_VM_IMAGE_QCOW2_CONTAINER_MARKER) $(IKNITE_VM_IMAGE_V
 
 .PHONY: e2e-tg-init
 e2e-tg-init: $(IKNITE_VM_IMAGE_QCOW2) $(INCUS_METADATA)
-	cd "$(ROOT_DIR)/deploy/iac/iknite/$(VM_TYPE)-image"; \
+	cd "$(ROOT_DIR)/deploy/iac/iknite/$(VM_STACK)/iknite-image"; \
 	terragrunt run --graph init
 
 .PHONY: e2e-tg-refresh
 e2e-tg-refresh:
-	cd "$(ROOT_DIR)/deploy/iac/iknite/$(VM_TYPE)-image"; \
+	cd "$(ROOT_DIR)/deploy/iac/iknite/$(VM_STACK)/iknite-image"; \
 	terragrunt run --graph apply --non-interactive -- -auto-approve -refresh-only
 
 .PHONY: e2e-tg-apply
 e2e-tg-apply:
-	cd "$(ROOT_DIR)/deploy/iac/iknite/$(VM_TYPE)-image"; \
+	cd "$(ROOT_DIR)/deploy/iac/iknite/$(VM_STACK)/iknite-image"; \
 	terragrunt run --graph apply --non-interactive -- -auto-approve
 
 .PHONY: e2e-tg-apply-vm
 e2e-tg-apply-vm:
-	cd "$(ROOT_DIR)/deploy/iac/iknite/$(VM_TYPE)-vm"; \
+	cd "$(ROOT_DIR)/deploy/iac/iknite/$(VM_STACK)/iknite-vm"; \
 	terragrunt run --graph apply --non-interactive -- -auto-approve
 
 .PHONY: e2e-tg-destroy
 e2e-tg-destroy:
-	cd "$(ROOT_DIR)/deploy/iac/iknite/$(VM_TYPE)-vm"; \
+	cd "$(ROOT_DIR)/deploy/iac/iknite/$(VM_STACK)/iknite-vm"; \
 	terragrunt run --graph destroy --non-interactive -- -auto-approve
 
 .PHONY: e2e-check-argocd
@@ -658,7 +659,7 @@ generate-vm-host-keys: ## Generate new fixed SSH host keys for iknite VMs and up
 
 .PHONY: vm-ssh
 vm-ssh: $(HOME)/.ssh/iknite $(HOME)/.ssh/iknite_known_hosts ## Connect to the E2E test VM using the fixed host key
-	@VM_IP=$$(cd "$(ROOT_DIR)/deploy/iac/iknite/iknite-vm" && terragrunt output --raw --non-interactive instances 2>/dev/null | jq -r '."iknite-vm-instance".access_ip_v4' 2>/dev/null || echo ""); \
+	@VM_IP=$$(cd "$(ROOT_DIR)/deploy/iac/iknite/$(VM_STACK)/iknite-vm" && terragrunt output --raw --non-interactive instances 2>/dev/null | jq -r '."iknite-vm-instance".access_ip_v4' 2>/dev/null || echo ""); \
 	if [ -z "$$VM_IP" ]; then \
 		echo "Error: Could not determine VM IP. Run 'make e2e-tg-apply' first."; \
 		exit 1; \
@@ -729,6 +730,6 @@ check-argocd: $(IKNITE_CICONTAINER_IMAGE_MARKER) | check-prerequisites
 		-v "$(ROOT_DIR):/workspace" \
 		-v "$(HOME)/.config/sops:/root/.config/sops:ro" \
 		-v "$(HOME)/.config/incus:/root/.config/incus:ro" \
-		-e "VM_TYPE=$(VM_TYPE)" \
+		-e "VM_STACK=$(VM_STACK)" \
 		$(IKNITE_CICONTAINER_IMAGE) \
 		/workspace/test/e2e/argocd-checker.sh

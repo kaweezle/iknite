@@ -16,7 +16,7 @@ locals {
 }
 
 dependency "vm" {
-  config_path = "${get_parent_terragrunt_dir("root")}/iknite-vm"
+  config_path = "${get_parent_terragrunt_dir("root")}/openstack/iknite-vm"
   mock_outputs = {
     instances = {
       "iknite-vm-instance" = {

@@ -9,7 +9,7 @@ terraform {
 }
 
 dependency "images" {
-  config_path = "${get_parent_terragrunt_dir("root")}/incus-image"
+  config_path = "${get_parent_terragrunt_dir("root")}/incus/iknite-image"
 
   mock_outputs = {
     images = {
@@ -24,7 +24,7 @@ dependency "images" {
 }
 
 dependency "profiles" {
-  config_path = "${get_parent_terragrunt_dir("root")}/incus-profiles"
+  config_path = "${get_parent_terragrunt_dir("root")}/incus/iknite-profiles"
 
   mock_outputs = {
     profiles = {

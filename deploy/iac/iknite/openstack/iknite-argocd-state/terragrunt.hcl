@@ -8,7 +8,7 @@ terraform {
 }
 
 dependency "argocd" {
-  config_path = "${get_parent_terragrunt_dir("root")}/iknite-argocd"
+  config_path = "${get_parent_terragrunt_dir("root")}/openstack/iknite-argocd"
 
   mock_outputs = {
     kubeconfig_content = "apiVersion: v1\nkind: Config\nclusters: []\ncontexts: []\ncurrent-context: ''\nusers: []"

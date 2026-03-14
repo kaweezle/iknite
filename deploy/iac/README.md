@@ -129,8 +129,21 @@ deploy/iac/
 │   ├── .tflint.hcl             # TFLint configuration
 │   ├── apkrepo/                # APK repository static site
 │   ├── dns_iknite_app/         # DNS configuration for iknite.app
-│   ├── iknite-image/           # OpenStack image management
-│   ├── iknite-vm/              # VM deployment for testing
+│   ├── openstack/              # OpenStack Terragrunt units (iknite-*)
+│   │   ├── iknite-image/
+│   │   ├── iknite-vm/
+│   │   ├── iknite-kubeconfig-fetcher/
+│   │   ├── iknite-kubernetes-state/
+│   │   ├── iknite-argocd/
+│   │   └── iknite-argocd-state/
+│   ├── incus/                  # Incus Terragrunt units (iknite-*)
+│   │   ├── iknite-image/
+│   │   ├── iknite-vm/
+│   │   ├── iknite-profiles/
+│   │   ├── iknite-kubeconfig-fetcher/
+│   │   ├── iknite-kubernetes-state/
+│   │   ├── iknite-argocd/
+│   │   └── iknite-argocd-state/
 │   ├── releaserepo/            # Production APK repository
 │   └── testrepo/               # Testing APK repository
 └── modules/                     # Reusable Terraform modules
@@ -284,8 +297,21 @@ Every module must have:
 
 - Remote state stored in OVH S3-compatible object storage
 - Bucket: `kwzltfstate`
-- State file path: `iknite/<unit-name>/terraform.tfstate`
+- State file path: `iknite/<stack>/<unit-name>/terraform.tfstate`
 - Access credentials configured in `root.hcl`
+
+### Migrating State Keys After Unit Moves
+
+When Terragrunt units are moved to a different path, backend keys change because
+they are derived from `path_relative_to_include()`. Use the helper script to
+copy existing state files to their new keys:
+
+```bash
+./deploy/iac/hack/migrate-state-keys.sh --apply
+```
+
+The script runs in dry-run mode by default. Add `--delete-source` to remove old
+keys after successful copy.
 
 #### Security
 

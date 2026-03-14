@@ -9,7 +9,7 @@ terraform {
 }
 
 dependency "image" {
-  config_path = "${get_parent_terragrunt_dir("root")}/iknite-image"
+  config_path = "${get_parent_terragrunt_dir("root")}/openstack/iknite-image"
 
   mock_outputs = {
     images = {

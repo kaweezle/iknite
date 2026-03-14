@@ -85,13 +85,13 @@ jobs:
         name: Create OpenStack image and test VM deployment
         id: create-and-test-openstack-image
         run: |
-          make e2e-tg-init
-          make e2e-tg-refresh
-          make e2e-tg-apply-vm
-          make e2e-check-argocd
+          make e2e-tg-init VM_STACK=openstack
+          make e2e-tg-refresh VM_STACK=openstack
+          make e2e-tg-apply-vm VM_STACK=openstack
+          make e2e-check-argocd VM_STACK=openstack
       -
         name: Clean OpenStack image
         id: clean-openstack-image
         if: ${{ contains(github.event.pull_request.labels.*.name, 'clean-e2e') }}
         run: |
-          make e2e-tg-destroy
+          make e2e-tg-destroy VM_STACK=openstack

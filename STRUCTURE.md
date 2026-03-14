@@ -133,13 +133,9 @@ Current `deploy/iac/iknite/` subdirectories include:
 - `apkrepo/` - APK repository publishing setup
 - `dns_iknite_app/` - DNS configuration for the iknite domain
 - `github-configuration/` - GitHub repository automation/config
-- `iknite-argocd/` - Argo CD deployment stack
-- `iknite-argocd-state/` - Argo CD state storage/config
-- `iknite-image/` - image publishing or image metadata stack
-- `iknite-kubeconfig-fetcher/` - kubeconfig retrieval stack
-- `iknite-kubernetes-state/` - Kubernetes state storage/config
+- `openstack/` - OpenStack stack units (`iknite-*`)
+- `incus/` - Incus stack units (`iknite-*`)
 - `iknite-public-images/` - public image publication stack
-- `iknite-vm/` - VM deployment stack
 - `releaserepo/` - release repository publication
 - `testrepo/` - test repository publication
 - `root.hcl` - shared Terragrunt root configuration
