@@ -42,6 +42,7 @@ The project provides five main deliverables:
    - Single-layer Docker image
      ([Dockerfile](../packaging/rootfs/with-images/Dockerfile)) for container
      registries
+
 5. **VM images** (built with
    [packaging/scripts/build-vm-image.sh](../packaging/scripts/build-vm-image.sh))
    - QCOW2 format for QEMU/KVM/OpenStack
@@ -56,14 +57,12 @@ The project provides five main deliverables:
   releases
 - **[Pre-commit](../.pre-commit-config.yaml)**: Code quality (gofmt,
   golangci-lint, shellcheck, cspell)
-- **[packaging/scripts/build-helper.sh](../packaging/scripts/build-helper.sh)**:
-  Developer-friendly build script (full pipeline locally)
+- **[GNUmakefile](../GNUmakefile)**: All build and development commands
 - **[Devcontainer](../hack/devcontainer/Dockerfile)**: Alpine-based development
   environment with all dependencies
-- **[Terraform/Terragrunt](../deploy/iac/)**: APK repository hosting
-  (Cloudflare) and VM testing (OpenStack) - see
-  [IaC README](../deploy/iac/README.md) for detailed conventions and getting
-  started guide
+- **[Terragrunt/Opentofu](../deploy/iac/)**: APK repository hosting (Cloudflare)
+  and VM testing (OpenStack, Incus) - see [IaC README](../deploy/iac/README.md)
+  for detailed conventions and getting started guide
 
 ## Golang CLI (iknite)
 
@@ -110,24 +109,61 @@ The project provides five main deliverables:
 2. **OpenRC coordination**: Kubelet prevented from auto-starting via rc.conf
    patches (see ` pkg/k8s/runtime_environment.go`)
 3. **State tracking**: Custom `IkniteCluster` CR persisted as JSON to track
-   initialization phases and workload readiness
+   initialization phases and workload readiness. HTTPs server with mTLS on port
+   11443 for status queries (see `pkg/server/server.go`).
 
 ### Development Workflows
 
 #### Build & Test
 
+Results of `make help` in the project root:
+
 ```bash
-# Local build (single target)
-goreleaser build --auto-snapshot --clean # Or use VS Code "goreleaser-build" task
+make help
+Iknite build targets
 
-# Build iknite package
-goreleaser build --snapshot --skip=publish --clean # Or use VS Code "goreleaser" task
+Step targets:
+  make extract-key                    Extract signing key from sops file
+  make goreleaser                     Build iknite package (goreleaser)
+  make fetch-karmafun                 Download latest karmafun APK into dist/
+  make images-apk                     Build iknite-images APK
+  make incus-agent-apk                Build incus-agent APK
+  make apk-repo                       Create APK repository in dist/repo
+  make upload-apk-repo                Upload APK repository with terragrunt
+  make rootfs-base-image              Build rootfs base image
+  make rootfs-container               Add preloaded images into rootfs container
+  make rootfs                         Build rootfs
+  make rootfs-image                   Build final rootfs image
+  make vm-image                       Build VM images (qcow2, vhdx)
+  make incus-metadata                 Build Incus metadata tarball (dist/images/incus.tar.xz)
+  make rootfs-image-incus-attachment  Attach Incus metadata to rootfs image in container registry with oras
+  make vm-container-images            Build VM images as container images
+  make clean                          Remove build artifacts and temp container
+  make all                            Run full pipeline
+  make ssh-key                        Extract SSH key for iknite VMs from sops file
+  make vm-known-hosts                 Extract VM SSH host public key to ~/.ssh/iknite_known_hosts
+  make generate-vm-host-keys          Generate new fixed SSH host keys for iknite VMs
+  make vm-ssh                         Connect to the E2E test VM using the fixed host key
+  make e2e-tg-init                    Initialize terragrunt E2E test configuration
+  make e2e-tg-refresh                 Refresh terragrunt E2E test state without applying changes
+  make e2e-tg-apply                   Apply terragrunt E2E test configuration to create E2E test VM
+  make e2e-tg-destroy                 Destroy E2E test VM with terragrunt
+  make e2e-check-argocd               Check ArgoCD application status for E2E test cluster
+  make release-files                  Generate SHA256SUMS file for release artifacts
 
-# Full test with coverage
-go test -v -race -covermode=atomic -coverprofile=coverage.out ./... # Or use VS Code "test with coverage" task
+File targets (examples):
+  make dist/iknite-<version>.x86_64.apk
+  make dist/iknite-images-<k8s-version>.x86_64.apk
+  make dist/karmafun-<version>.x86_64.apk
+  make dist/SHA256SUMS
 
-# Lint & format
-pre-commit run --all-files
+Common variables (override with VAR=value):
+  ARCH=x86_64
+  KUBERNETES_VERSION=1.35.2
+  IKNITE_REPO_NAME=test
+  CACHE_FLAG=
+  SNAPSHOT=--snapshot
+  PUSH_IMAGES=false
 ```
 
 #### Testing Patterns
@@ -207,15 +243,15 @@ environments. A file `/run/openrc/softlevel` is also created to allow OpenRC to
 run as non init process.
 
 `iknite` is installed via the iknite APK package, along with its dependencies
-(see `.goreleaser.yaml`). On first run, the iknite
-OpenRC service ([/etc/init.d/iknite](../packaging/apk/iknite/init.d/iknite)) is
-started which in turn runs `iknite init` to initialize the cluster. The service
-depends on `containerd` service to ensure container runtime is running before
-starting the cluster. It _wants_ the `buildkitd` service in order to provide
-container image building capabilities inside the cluster. `iknite` will launch
-and manage the `kubelet` command as part of its workflow. In consequence the
-`kubelet` service is disabled in `/etc/rc.conf` to prevent the kubeadm included
-auto-start logic from interfering with iknite.
+(see `.goreleaser.yaml`). On first run, the iknite OpenRC service
+([/etc/init.d/iknite](../packaging/apk/iknite/init.d/iknite)) is started which
+in turn runs `iknite init` to initialize the cluster. The service depends on
+`containerd` service to ensure container runtime is running before starting the
+cluster. It _wants_ the `buildkitd` service in order to provide container image
+building capabilities inside the cluster. `iknite` will launch and manage the
+`kubelet` command as part of its workflow. In consequence the `kubelet` service
+is disabled in `/etc/rc.conf` to prevent the kubeadm included auto-start logic
+from interfering with iknite.
 
 As part of the startup process, iknite will apply the default kustomization
 present in
@@ -237,7 +273,8 @@ to this IP from the Windows host.
 Iknite persists cluster state in `/run/iknite/status.json` using the
 [`IkniteCluster`](../pkg/apis/iknite/v1alpha1/types.go) custom resource format.
 This allows tracking initialization phases and workload readiness across
-restarts.
+restarts. It launches an HTTPS server with mTLS on port 11443 to allow querying
+cluster status from external tools.
 
 Iknite makes the following modifications to the kubeadm initialization process
 (in [pkg/cmd/init.go](../pkg/cmd/init.go)):
@@ -250,7 +287,7 @@ Iknite makes the following modifications to the kubeadm initialization process
   This allows better control over the kubelet lifecycle.
 - Disable the node taint to allow scheduling workloads on the control plane
   node.
-- Launch the MDNS responder on WSL2 environments.
+- Launch the MDNS responder on WSL2 or Incus environments.
 - Perform the Kustomization when the control plane is ready.
 - Wait for all iknite managed workloads to be ready before marking the cluster
   as ready.
@@ -293,61 +330,28 @@ a QCOW2 image for QEMU/KVM and converts it into a VHDX image for Hyper-V.
 
 ### Development Workflows
 
-The main script to build the iknite images is
-[packaging/scripts/build-helper.sh](../packaging/scripts/build-helper.sh). It is
-a developer friendly version of the
-[release workflow](../.github/workflows/release.yml) that can be run locally.
+The project build and release process is controlled by a central Makefile
+([GNUmakefile](../GNUmakefile)) that defines all the necessary targets to build
+the APK packages, the root filesystem image and the VM images. The Makefile also
+defines targets to extract signing keys, manage the APK repository and run the
+end-to-end tests with terragrunt. The targets are obtained by running
+`make help`.
 
-It performs the following steps:
+It is used in the release workflow defined in
+[.github/workflows/release.yml](../.github/workflows/release.yml) and can be
+used locally to run the different steps of the build process.
 
-```bash
-STEPS:
-    goreleaser          Build Iknite package with goreleaser
-    build               Build Iknite rootfs base image
-    images              Build iknite-images APK package
-    add-images          Add images to rootfs container
-    export              Export rootfs tarball
-    rootfs-image        Build final rootfs image
-    fetch-karmafun  Fetch karmafun APKs
-    make-apk-repo       Create APK repository in dist/repo
-    upload-repo         Upload APK repository to https://static.iknite.app/<repo>/
-    vm-image            Build VM images (qcow2, vhdx)
-    clean               Cleanup temporary files
-```
-
-A single step can be run:
-
-```bash
-./packaging/scripts/build-helper.sh --only-goreleaser # Several other --only-<step> can be added
-```
-
-Or one or more steps can be skipped:
-
-```bash
-./packaging/scripts/build-helper.sh --skip-images
-```
-
-The `--with-cache` flag can be used to speed up docker builds by reusing
-previous layers.
-
-In general, the full build can be run with:
-
-```bash
-./packaging/scripts/build-helper.sh --with-cache --skip-clean
-```
-
-And the the focus on one specific step by skipping all the others:
-
-```bash
-./packaging/scripts/build-helper.sh --only-build --skip-clean --with-cache
-```
-
-The script assumes a Linux host with Docker or Containerd (preferred) installed.
-The main development environment is an Alpine based devcontainer or WSL2
-distribution with Alpine installed via the rootfs image. The
-[hack/make-rootfs-devenv.sh](../hack/make-rootfs-devenv.sh) script adds the
-appropriate packages to the rootfs image to make it suitable as a development
-environment.
+The build process needs a container runtime and an image builder. For the
+container runtime, Docker or Containerd can be used. For the image builder, only
+buildkit is supported and is used via the `buildctl` command. The makefile
+detects which container runtime is available and sets the appropriate variables
+to use it, using either the `docker` command or `nerdctl`. If containerd is
+available, the makefile checks if root permissions are needed. If so, it uses
+`sudo` or `doas` to run the necessary commands. When docker is used, the
+makefile creates a buildx builder named `iknite` and enables its use through
+buildctl by exporting the appropriate `BUILDKIT_HOST="docker-container://..."`
+variable. These settings allow the makefile to run both inside the devcontainer
+and in the GitHub Actions runners without modification.
 
 ## General Project Guidelines
 
@@ -404,7 +408,8 @@ folder:
 - **Configuration**: `docs/mkdocs.yaml` - MkDocs configuration
 - **Content**: `docs/docs/` - Markdown documentation files
 - **Navigation**: `docs/docs/.nav.yml` - Manual navigation overrides
-- **Dependencies**: `docs/pyproject.toml` - Python dependencies managed with `uv`
+- **Dependencies**: `docs/pyproject.toml` - Python dependencies managed with
+  `uv`
 
 ### Documentation Commands
 
@@ -446,8 +451,7 @@ configuration.
 | Run iknite locally       | `go run cmd/iknite/iknite.go start -v debug`                          |
 | Run all tests            | `go test ./...`                                                       |
 | Run tests with coverage  | `go test -v -race -covermode=atomic -coverprofile=coverage.out ./...` |
-| Build single target APK  | `goreleaser build --single-target --snapshot`                         |
-| Build all APKs           | `goreleaser build --snapshot --skip=publish --clean`                  |
+| Build single target APK  | `goreleaser build --single-target --snapshot` or `make goreleaser`    |
 | Update generated code    | `./hack/update-codegen.sh`                                            |
 | Verify code generation   | `./hack/verify-codegen.sh`                                            |
 | Run linters              | `golangci-lint run --fix`                                             |
@@ -455,20 +459,15 @@ configuration.
 
 ### Image Building
 
-| Task                     | Command                                                          |
-| ------------------------ | ---------------------------------------------------------------- |
-| Full image build (local) | `./packaging/scripts/build-helper.sh --with-cache`               |
-| Build only APK packages  | `./packaging/scripts/build-helper.sh --only-goreleaser`          |
-| Build rootfs base image  | `./packaging/scripts/build-helper.sh --only-build --with-cache`  |
-| Build iknite-images APK  | `./packaging/scripts/build-helper.sh --only-images`              |
-| Build rootfs tarball     | `./packaging/scripts/build-helper.sh --only-export`              |
-| Build VM images          | `./packaging/scripts/build-vm-image.sh`                          |
-| Skip specific step       | `./packaging/scripts/build-helper.sh --skip-<step> --with-cache` |
-| Build APK repository     | `./packaging/scripts/build-helper.sh --only-make-apk-repo`       |
-
-Available steps: `goreleaser`, `build`, `images`, `add-images`, `export`,
-`rootfs-image`, `fetch-karmafun`, `make-apk-repo`, `upload-repo`,
-`vm-image`, `clean`
+| Task                     | Command                  |
+| ------------------------ | ------------------------ |
+| Full image build (local) | `make all`               |
+| Build only APK packages  | `make apk-repo`          |
+| Build rootfs base image  | `make rootfs-base-image` |
+| Build iknite-images APK  | `make images-apk`        |
+| Build rootfs tarball     | `make rootfs`            |
+| Build VM images          | `make vm-image`          |
+| Upload APK repository    | `make upload-apk-repo`   |
 
 ### Documentation
 
@@ -480,11 +479,11 @@ Available steps: `goreleaser`, `build`, `images`, `add-images`, `export`,
 
 ### Cluster Management
 
-| Task                  | Command/Path                                                                                                      |
-| --------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| View cluster state    | `cat /run/iknite/status.json`                                                                                     |
-| View kubeconfig       | `cat /root/.kube/config`                                                                                          |
-| Check service status  | `rc-status`                                                                                                       |
-| View service logs     | `cat /var/log/iknite.log`                                                                                         |
-| APK dependencies      | `.goreleaser.yaml`                                                                                                |
-| Default kustomization | `packaging/apk/iknite/iknite.d/base/kustomization.yaml`                                                           |
+| Task                  | Command/Path                                            |
+| --------------------- | ------------------------------------------------------- |
+| View cluster state    | `cat /run/iknite/status.json`                           |
+| View kubeconfig       | `cat /root/.kube/config`                                |
+| Check service status  | `rc-status`                                             |
+| View service logs     | `cat /var/log/iknite.log`                               |
+| APK dependencies      | `.goreleaser.yaml`                                      |
+| Default kustomization | `packaging/apk/iknite/iknite.d/base/kustomization.yaml` |

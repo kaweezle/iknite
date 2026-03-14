@@ -1,5 +1,5 @@
 #!/bin/bash
-# cspell:ignore statefulset ingressroute
+# cspell:ignore statefulset ingressroute gojq
 # Test script to verify ArgoCD deployment in a Kubernetes cluster.
 # This script is run after argocd and traefik have been deployed via Terragrunt.
 # Normally, the deployments are settled (checked via the kubernetes-state module),
@@ -35,17 +35,24 @@ NC='\033[0m' # No Color
 # Script directory
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+: "${VM_STACK=openstack}"
+
 # Terragrunt directory
-TERRAGRUNT_DIR="${SCRIPT_DIR}/../../deploy/iac/iknite/iknite-kubeconfig-fetcher"
+TERRAGRUNT_DIR=$(realpath "${SCRIPT_DIR}/../../deploy/iac/iknite")
 
 # Secrets file
-SECRETS_FILE="${SCRIPT_DIR}/../../deploy/k8s/secrets/secrets.sops.yaml"
+SECRETS_FILE=$(realpath "${SCRIPT_DIR}/../../deploy/k8s/argocd/secrets/secrets.sops.yaml")
 
 # Temporary kubeconfig file
 KUBECONFIG_FILE=""
 
 # ArgoCD CLI binary
 ARGOCD_CLI=""
+
+HOSTS_GUARD_LINE="# Inserted by argocd-checker.sh"
+HOSTS_FILE="/etc/hosts"
+ROOT_CMD=$(command -v sudo 2>/dev/null || command -v doas 2>/dev/null || echo "")
+
 
 # Cleanup function
 cleanup() {
@@ -54,9 +61,19 @@ cleanup() {
         echo -e "${YELLOW}Cleaning up temporary kubeconfig file...${NC}"
         rm -f "${KUBECONFIG_FILE}"
     fi
-    if [[ -n "${ARGOCD_CLI}" && -f "${ARGOCD_CLI}" ]]; then
+    if [[ -n "${ARGOCD_CLI}" && -f "${ARGOCD_CLI}" && "${ARGOCD_CLI}" == /tmp/* ]]; then
         echo -e "${YELLOW}Cleaning up ArgoCD CLI...${NC}"
         rm -f "${ARGOCD_CLI}"
+    fi
+    # Remove hosts entry
+    if grep -q "${HOSTS_GUARD_LINE}" "${HOSTS_FILE}"; then
+        # Remove the block of lines added by this script
+        echo -e "${YELLOW}Cleaning up /etc/hosts entries...${NC}"
+        # Use sed to delete the block of lines between the guard line and the next blank line
+        new_hosts_content=$(sed -e "/${HOSTS_GUARD_LINE}/,/^$/d" "${HOSTS_FILE}")
+        # Write the new content back to the hosts file
+        echo "${new_hosts_content}" | ${ROOT_CMD} tee "${HOSTS_FILE}" > /dev/null
+        log_info "Entries added by argocd-checker.sh removed from ${HOSTS_FILE}"
     fi
     exit "${exit_code}"
 }
@@ -84,16 +101,36 @@ check_command() {
     fi
 }
 
-# Step 1: Retrieve kubeconfig from Terragrunt output
-retrieve_kubeconfig() {
-    log_info "Retrieving kubeconfig from Terragrunt output..."
+# Initialize Terragrunt
+initialize_terragrunt() {
+    local base_dir=$1
 
-    if [[ ! -d "${TERRAGRUNT_DIR}" ]]; then
-        log_error "Terragrunt directory not found: ${TERRAGRUNT_DIR}"
+    log_info "Initializing Terragrunt in ${base_dir}..."
+    if [[ -d "${base_dir}" ]]; then
+        cd "${base_dir}"
+        if ! terragrunt run --graph init &> /dev/null; then
+            log_error "Terragrunt init failed in ${base_dir}"
+            exit 1
+        fi
+        log_info "Terragrunt initialized successfully"
+    else
+        log_error "Terragrunt directory not found: ${base_dir}"
+        exit 1
+    fi
+}
+
+
+# Retrieve kubeconfig from Terragrunt output
+retrieve_kubeconfig() {
+    local terragrunt_dir="$1"
+    log_info "Retrieving kubeconfig from Terragrunt output in ${terragrunt_dir}..."
+
+    if [[ ! -d "${terragrunt_dir}" ]]; then
+        log_error "Terragrunt directory not found: ${terragrunt_dir}"
         exit 1
     fi
 
-    cd "${TERRAGRUNT_DIR}"
+    cd "${terragrunt_dir}"
     terragrunt apply -refresh-only -auto-approve &> /dev/null
 
     local kubeconfig_content
@@ -113,7 +150,7 @@ retrieve_kubeconfig() {
     log_info "Kubeconfig saved to temporary file: ${KUBECONFIG_FILE}"
 }
 
-# Step 2: Check that argocd namespace exists
+# Check that argocd namespace exists
 check_namespace() {
     log_info "Checking if 'argocd' namespace exists..."
 
@@ -125,7 +162,7 @@ check_namespace() {
     fi
 }
 
-# Step 3: Check ArgoCD components
+# Check ArgoCD components
 check_argocd_components() {
     log_info "Checking ArgoCD components..."
 
@@ -188,7 +225,7 @@ check_argocd_components() {
     fi
 }
 
-# Step 4: Check Ingress resource
+# Check Ingress resource
 check_ingress() {
     log_info "Checking Ingress resource for ArgoCD server..."
 
@@ -212,7 +249,7 @@ check_ingress() {
     fi
 }
 
-# Step 4: Check IngressRoute (traefik) resource
+# Check IngressRoute (traefik) resource
 check_ingressroute() {
     log_info "Checking IngressRoute resource for ArgoCD server..."
 
@@ -227,7 +264,6 @@ check_ingressroute() {
 
         if [[ -n "${ingress_host}" ]]; then
             log_info "Ingress host: ${ingress_host}"
-            echo "${ingress_host}"
         else
             log_error "Ingress host not found"
             exit 1
@@ -238,7 +274,7 @@ check_ingressroute() {
     fi
 }
 
-# Step 5: Check URL responds with HTTPS
+# Check URL responds with HTTPS
 check_url() {
     local host=$1
     local ip_address=$2
@@ -263,7 +299,7 @@ check_url() {
     exit 1
 }
 
-# Step 6: Download ArgoCD CLI
+# Download ArgoCD CLI
 download_argocd_cli() {
     log_info "Downloading ArgoCD CLI..."
 
@@ -272,6 +308,11 @@ download_argocd_cli() {
     local arch="amd64"
     local download_url="https://github.com/argoproj/argo-cd/releases/download/${version}/argocd-${os}-${arch}"
 
+    ARGOCD_CLI="$(command -v argocd 2>/dev/null)"
+    if [[ -n "${ARGOCD_CLI}" ]]; then
+        log_info "ArgoCD CLI already installed at ${ARGOCD_CLI}"
+        return
+    fi
     ARGOCD_CLI=$(mktemp /tmp/argocd.XXXXXX)
 
     if curl -sSL -o "${ARGOCD_CLI}" "${download_url}"; then
@@ -283,11 +324,11 @@ download_argocd_cli() {
     fi
 }
 
-# Step 7: Get admin password
+# Get admin password
 get_admin_password() {
 
     local password
-    password=$(helm secrets decrypt "${SECRETS_FILE}" | yq '.data.argocd.admin_password')
+    password=$(sops --decrypt "${SECRETS_FILE}" | gojq --yaml-input -r '.data.argocd.admin_password')
 
     if [[ -n "${password}" ]]; then
         echo "${password}"
@@ -297,14 +338,33 @@ get_admin_password() {
     fi
 }
 
-# Step 8: Log in to ArgoCD
+# Check that the ArgoCD host resolve to the correct IP address and if this is not the case modify /etc/hosts
+# to add an entry for the host pointing to the correct IP address
+check_hosts_entry() {
+    local host=$1
+    local ip_address=$2
+
+    resolved_ip=$(getent hosts "${host}" | awk '{ print $1 }')
+
+    if [[ "${resolved_ip}" != "${ip_address}" ]]; then
+        log_warning "Host ${host} does not resolve to ${ip_address}. Adding entry to ${HOSTS_FILE}..."
+        ${ROOT_CMD} /bin/bash -c "echo \"# Inserted by argocd-checker.sh\" >> \"${HOSTS_FILE}\""
+        ${ROOT_CMD} /bin/bash -c "echo \"${ip_address} ${host}\" | tee -a \"${HOSTS_FILE}\" > /dev/null"
+        ${ROOT_CMD} /bin/bash -c "echo \"\" >> \"${HOSTS_FILE}\""
+        log_info "Entry added to ${HOSTS_FILE}: ${ip_address} ${host}"
+    else
+        log_info "Host ${host} already resolves to ${ip_address}"
+    fi
+}
+
+# Log in to ArgoCD
 login_argocd() {
     local host=$1
     local password=$2
 
-    log_info "Logging in to ArgoCD server ${host}..."
+    log_info "Logging in to ArgoCD server ${host} with username admin..."
 
-    if "${ARGOCD_CLI}" login "${host}" --username admin --password "${password}" --insecure; then
+    if "${ARGOCD_CLI}" login "${host}" --username admin --password "${password}" --insecure &>/dev/null ; then
         log_info "Successfully logged in to ArgoCD"
     else
         log_error "Failed to log in to ArgoCD"
@@ -312,7 +372,7 @@ login_argocd() {
     fi
 }
 
-# Step 9: List and verify applications
+# List and verify applications
 verify_applications() {
     log_info "Verifying ArgoCD applications..."
 
@@ -347,11 +407,12 @@ main() {
     check_command "kubectl"
     check_command "terragrunt"
     check_command "curl"
-    check_command "yq"
-    check_command "helm"
+    check_command "sops"
+    check_command "gojq"
 
     # Execute verification steps
-    retrieve_kubeconfig
+    initialize_terragrunt "${TERRAGRUNT_DIR}/${VM_STACK}/iknite-image"
+    retrieve_kubeconfig "${TERRAGRUNT_DIR}/${VM_STACK}/iknite-kubeconfig-fetcher"
     check_namespace
     check_argocd_components
     check_ingressroute
@@ -364,6 +425,7 @@ main() {
 
     local admin_password
     admin_password=$(get_admin_password)
+    check_hosts_entry "${ingress_host}" "${ip_address}"
     login_argocd "${ingress_host}" "${admin_password}"
     verify_applications
 

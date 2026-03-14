@@ -34,7 +34,7 @@
     "ms-kubernetes-tools.vscode-kubernetes-tools",
     "golang.Go",
     "DrBlury.protobuf-vsc",
-    "HashiCorp.terraform",
+    "OpenTofu.vscode-opentofu",
     "HashiCorp.HCL",
     "fredwangwang.vscode-hcl-format",
     "bmalehorn.shell-syntax",

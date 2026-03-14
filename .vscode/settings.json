@@ -3,7 +3,7 @@
     "editor.detectIndentation": false,
     "editor.insertSpaces": true,
     "editor.tabSize": 2,
-    "editor.defaultFormatter": "hashicorp.terraform",
+    "editor.defaultFormatter": "opentofu.vscode-opentofu",
     "editor.formatOnSave": true
   },
   "[hcl]": {

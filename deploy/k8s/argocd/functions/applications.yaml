@@ -1,0 +1,49 @@
+apiVersion: karmafun.kaweezle.com/v1alpha1
+kind: ReplacementTransformer
+metadata:
+  name: argocd-secrets-replacements
+  annotations:
+    config.kubernetes.io/function: |
+      exec:
+        path: karmafun
+source: ./values
+replacements:
+  - source:
+      name: iknite-values
+      fieldPath: data.project.git.repoURL
+    targets:
+      - select:
+          kind: Application
+          annotationSelector: "autocloud/local-application=true"
+        fieldPaths:
+          - spec.source.repoURL
+          - spec.source.helm.parameters.[name=common.repoURL].value
+          - spec.sources.[path=.+].repoURL
+      - select:
+          kind: ApplicationSet
+        fieldPaths:
+          - spec.generators.*.git.repoURL
+  - source:
+      name: iknite-values
+      fieldPath: data.project.git.targetRevision
+    targets:
+      - select:
+          kind: Application
+          annotationSelector: "autocloud/local-application=true"
+        fieldPaths:
+          - spec.source.targetRevision
+          - spec.source.helm.parameters.[name=common.targetRevision].value
+          - spec.sources.[path=.+].targetRevision
+      - select:
+          kind: ApplicationSet
+        fieldPaths:
+          - spec.generators.*.git.revision
+  - source:
+      name: iknite-values
+      fieldPath: data.project.git.basePath
+    targets:
+      - select:
+          kind: Application
+          annotationSelector: "autocloud/local-application=true,autocloud/custom-path=true"
+        fieldPaths:
+          - spec.source.path.!!regex.^(deploy/k8s/argocd)/(\.*)$.1
