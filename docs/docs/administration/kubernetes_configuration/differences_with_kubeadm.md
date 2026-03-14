@@ -69,7 +69,7 @@ kubeadm init
 
 ```
 iknite init
-  → writes kubelet config  
+  → writes kubelet config
   → exec.Command("kubelet", flags...)
   → kubelet runs as a child process of iknite
   → on iknite stop: kubelet is sent SIGTERM

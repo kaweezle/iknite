@@ -1,4 +1,4 @@
-<!-- cSpell: words vhdx kwsl syscalls setxattr conntrack hashsize incusbr kmsg -->
+<!-- cSpell: words vhdx kwsl syscalls setxattr conntrack hashsize incusbr kmsg netfilter -->
 
 !!! wip "Work in progress"
 
