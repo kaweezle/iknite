@@ -106,6 +106,21 @@ See [Accessing the cluster](tutorial/accessing_cluster.md) for more details.
 
 ## Incus Quick Start
 
+??? warning "The `br_netfilter` module should be started"
+
+    The `br_netfilter` module is required by kubernetes. You can enable it with
+    the following command:
+
+    ```bash
+    sudo modprobe br_netfilter
+    ```
+
+    To load it automatically on boot, add it to `/etc/modules-load.d/iknite.conf` (as root):
+
+    ```bash
+    sudo sh -c 'echo "br_netfilter" >> /etc/modules-load.d/iknite.conf'
+    ```
+
 On Linux with Incus installed, use the automated installation script or perform
 a manual install:
 
@@ -138,6 +153,7 @@ a manual install:
         lxc.sysctl.net.bridge.bridge-nf-call-ip6tables=1
         lxc.cgroup2.devices.allow=a
         lxc.mount.auto=proc:rw sys:rw
+        lxc.hook.start=/root/prepare.sh
       security.nesting: "true"
       security.privileged: "true"
       security.syscalls.intercept.mknod: "true"
@@ -163,10 +179,11 @@ a manual install:
     )
     ```
 
-You can then start the cluster:
+The Kubernetes cluster is automatically started when the container is launched
+and is initialized on first boot. You can check the status of the cluster with:
 
 ```bash
-incus exec iknite -- /sbin/iknite start
+incus exec iknite -- /sbin/iknite status
 ```
 
 Once started, you can retrieve the kubeconfig file and start using the cluster:
