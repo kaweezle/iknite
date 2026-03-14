@@ -1,3 +1,5 @@
+<!-- cSpell: words kwsl -->
+
 !!! wip "Work in progress"
 
     This documentation is in draft form and may change frequently.
@@ -17,7 +19,8 @@ The recommended way to start the cluster is via OpenRC:
 rc-service iknite start
 ```
 
-Or start the entire default runlevel (which starts all services including iknite):
+Or start the entire default runlevel (which starts all services including
+iknite):
 
 ```bash
 openrc default
@@ -122,14 +125,14 @@ wsl --terminate kwsl
 3. iknite exits
 4. containerd remains running (it is a separate OpenRC service)
 
-!!! note "Containerd remains running"
-    Stopping the iknite service does NOT stop containerd or buildkitd.
-    These are separate OpenRC services that must be stopped independently
-    if you want to fully stop all Kubernetes-related processes.
+!!! note "Containerd remains running" Stopping the iknite service does NOT stop
+containerd or buildkitd. These are separate OpenRC services that must be stopped
+independently if you want to fully stop all Kubernetes-related processes.
 
 ## Cluster State After Stop
 
 After stopping, the following state persists on disk:
+
 - `/etc/kubernetes/` – All certificates and configuration
 - `/var/lib/kubelet/` – Kubelet configuration
 - `/var/lib/kine/kine.db` – All Kubernetes API objects
@@ -141,6 +144,7 @@ shutdown.
 ## Restart Behavior
 
 After a clean stop and restart, the cluster resumes where it left off:
+
 - All Kubernetes objects (pods, services, etc.) are restored from the kine
   database
 - PersistentVolumes are automatically mounted
@@ -171,6 +175,7 @@ boot
 ```
 
 The `iknite` service is configured with:
+
 - `need containerd` – containerd must be running before iknite starts
 - `use buildkitd` – buildkitd is started if available
 

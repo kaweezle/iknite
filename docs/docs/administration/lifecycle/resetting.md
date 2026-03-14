@@ -1,3 +1,5 @@
+<!-- cSpell: words kwsl -->
+
 !!! wip "Work in progress"
 
     This documentation is in draft form and may change frequently.
@@ -9,12 +11,12 @@ This page explains how to reset an Iknite cluster to a clean state using
 
 ## Reset Methods
 
-| Method | Command | Scope | Preserves Data |
-|--------|---------|-------|----------------|
-| Soft clean | `iknite clean` | Containers, CNI, iptables | Yes |
-| Full reset | `iknite clean --clean-all` | Everything | No |
-| kubeadm reset | `iknite reset` | Kubernetes config & certs | No |
-| Distribution reset | WSL/Docker | Entire filesystem | No |
+| Method             | Command                    | Scope                     | Preserves Data |
+| ------------------ | -------------------------- | ------------------------- | -------------- |
+| Soft clean         | `iknite clean`             | Containers, CNI, iptables | Yes            |
+| Full reset         | `iknite clean --clean-all` | Everything                | No             |
+| kubeadm reset      | `iknite reset`             | Kubernetes config & certs | No             |
+| Distribution reset | WSL/Docker                 | Entire filesystem         | No             |
 
 ## `iknite clean`
 
@@ -28,6 +30,7 @@ iknite clean
 ```
 
 By default, `clean` performs:
+
 1. Stops the iknite service (if running in state `Running`)
 2. Stops all running containers (`containerd` tasks)
 3. Unmounts leftover kubelet bind mounts
@@ -95,12 +98,10 @@ This performs everything `clean` does by default, plus:
 After `--clean-all`, the next `iknite start` triggers a complete
 re-initialization.
 
-!!! danger "Data loss warning"
-    `--clean-all` permanently removes:
-    - All Kubernetes API objects (namespaces, pods, services, secrets, etc.)
-    - PersistentVolumeClaim bindings
-    - The Kine/etcd database
-    - All cluster certificates
+!!! danger "Data loss warning" `--clean-all` permanently removes: - All
+Kubernetes API objects (namespaces, pods, services, secrets, etc.) -
+PersistentVolumeClaim bindings - The Kine/etcd database - All cluster
+certificates
 
     Data in `/opt/local-path-provisioner/` is **not** automatically removed
     (PV data persists until manually cleaned).
@@ -120,8 +121,8 @@ kubeadm reset --force
 iknite clean --clean-cluster-config
 ```
 
-Use `iknite reset` when you want to re-initialize from scratch while
-preserving the `kine.db` or etcd data (unusual case).
+Use `iknite reset` when you want to re-initialize from scratch while preserving
+the `kine.db` or etcd data (unusual case).
 
 ## Resetting containerd
 
@@ -131,7 +132,7 @@ Sometimes containerd accumulates stale images or containers. Clean them up:
 # Remove unused images
 nerdctl image prune -a
 
-# Remove stopped containers  
+# Remove stopped containers
 nerdctl container prune
 
 # Check disk usage
@@ -159,8 +160,8 @@ rm -rf /opt/local-path-provisioner/<namespace>-<pvc>-<pv>/
 rm -rf /opt/local-path-provisioner/
 ```
 
-!!! warning
-    Removing PV data is irreversible. Ensure you have backups before proceeding.
+!!! warning Removing PV data is irreversible. Ensure you have backups before
+proceeding.
 
 ## WSL2: Complete Distribution Reset
 

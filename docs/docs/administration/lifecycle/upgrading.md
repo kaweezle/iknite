@@ -1,3 +1,5 @@
+<!-- cSpell: words kwsl userprofile velero myapp -->
+
 !!! wip "Work in progress"
 
     This documentation is in draft form and may change frequently.
@@ -8,10 +10,9 @@ This page explains how to upgrade Iknite and the underlying Kubernetes version.
 
 ## Current Upgrade Status
 
-!!! warning "In-place upgrades not yet supported"
-    Iknite does not currently support in-place Kubernetes version upgrades.
-    The recommended upgrade path is a **re-deployment** with backup and restore
-    of critical data.
+!!! warning "In-place upgrades not yet supported" Iknite does not currently
+support in-place Kubernetes version upgrades. The recommended upgrade path is a
+**re-deployment** with backup and restore of critical data.
 
     In-place upgrades are planned for a future release.
 
@@ -191,13 +192,12 @@ iknite info versions
 
 ## Downgrading
 
-!!! warning "Not recommended"
-    Kubernetes API versions may change between releases. Downgrading after
-    resources have been created with a newer Kubernetes version may cause
-    compatibility issues.
+!!! warning "Not recommended" Kubernetes API versions may change between
+releases. Downgrading after resources have been created with a newer Kubernetes
+version may cause compatibility issues.
 
-If downgrading is required, follow the same backup/reset/restore procedure
-as the upgrade path.
+If downgrading is required, follow the same backup/reset/restore procedure as
+the upgrade path.
 
 ## Future: In-Place Upgrades
 

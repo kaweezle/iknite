@@ -1,3 +1,5 @@
+<!-- cSpell: words finalizers syncpolicy bitnami storageclass -->
+
 !!! wip "Work in progress"
 
     This documentation is in draft form and may change frequently.
@@ -21,8 +23,8 @@ kubectl get deployments
 kubectl get svc nginx
 ```
 
-The `LoadBalancer` service type is fully supported by Kube-VIP and gives you
-an external IP immediately.
+The `LoadBalancer` service type is fully supported by Kube-VIP and gives you an
+external IP immediately.
 
 ## The App-of-Apps Pattern
 
@@ -192,8 +194,8 @@ host filesystem.
 
 ## Ingress with Traefik
 
-With Kube-VIP providing a LoadBalancer IP, Traefik can be deployed as an
-ingress controller:
+With Kube-VIP providing a LoadBalancer IP, Traefik can be deployed as an ingress
+controller:
 
 ### Install Traefik
 
@@ -240,7 +242,8 @@ Add the host to your Windows `hosts` file:
 2. **Use namespaces**: Separate applications by namespace for isolation
 3. **Resource limits**: Always set CPU/memory limits for production workloads
 4. **Health checks**: Add readiness and liveness probes
-5. **Use the app-of-apps pattern** for managing multiple applications consistently
+5. **Use the app-of-apps pattern** for managing multiple applications
+   consistently
 
 ## Next Steps
 

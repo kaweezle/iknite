@@ -1,3 +1,5 @@
+<!-- cSpell: words mirrord kwsl -->
+
 !!! wip "Work in progress"
 
     This documentation is in draft form and may change frequently.
@@ -5,18 +7,18 @@
 # Developing in the Cluster
 
 Iknite is designed as a development environment. This page explains how to
-leverage it for efficient development workflows — from running your code
-inside the cluster to using VS Code Remote Containers.
+leverage it for efficient development workflows — from running your code inside
+the cluster to using VS Code Remote Containers.
 
 ## Development Approaches
 
-| Approach | Description | Best For |
-|----------|-------------|---------|
-| VS Code Remote Containers | Run VS Code connected to a pod | Full IDE experience inside the cluster |
-| mirrord | Run local binary as if it were in the cluster | Fast iteration without deploying |
-| Skaffold | Auto-build and deploy on code changes | Automated dev cycle |
-| BuildKit | Build images directly inside the cluster | Avoid Docker Desktop |
-| Git hooks | Auto-deploy on commit | GitOps-style development |
+| Approach                  | Description                                   | Best For                               |
+| ------------------------- | --------------------------------------------- | -------------------------------------- |
+| VS Code Remote Containers | Run VS Code connected to a pod                | Full IDE experience inside the cluster |
+| mirrord                   | Run local binary as if it were in the cluster | Fast iteration without deploying       |
+| Skaffold                  | Auto-build and deploy on code changes         | Automated dev cycle                    |
+| BuildKit                  | Build images directly inside the cluster      | Avoid Docker Desktop                   |
+| Git hooks                 | Auto-deploy on commit                         | GitOps-style development               |
 
 ## VS Code Remote Containers (Dev Containers)
 
@@ -25,7 +27,8 @@ let you run VS Code connected to a container running inside the cluster.
 
 ### Prerequisites
 
-- VS Code with [Remote - Containers extension](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers)
+- VS Code with
+  [Remote - Containers extension](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers)
 - `kubectl` configured for your Iknite cluster
 
 ### Step 1: Define a Dev Container
@@ -40,9 +43,7 @@ Add a `.devcontainer/devcontainer.json` to your project:
     "ghcr.io/devcontainers/features/kubectl-helm-minikube:1": {},
     "ghcr.io/devcontainers/features/go:1": {}
   },
-  "mounts": [
-    "source=${localEnv:HOME}/.kube,target=/root/.kube,type=bind"
-  ],
+  "mounts": ["source=${localEnv:HOME}/.kube,target=/root/.kube,type=bind"],
   "postCreateCommand": "go mod download"
 }
 ```
@@ -124,8 +125,8 @@ buildctl build \
 
 ### Importing Images into Kubernetes
 
-After building, the image is available in containerd and can be used directly
-by Kubernetes pods:
+After building, the image is available in containerd and can be used directly by
+Kubernetes pods:
 
 ```bash
 # Verify the image is available
@@ -220,14 +221,14 @@ spec:
       containers:
         - name: my-app
           image: my-app:dev
-          command: ["go", "run", "./..."]  # or nodemon, air, etc.
+          command: ["go", "run", "./..."] # or nodemon, air, etc.
           volumeMounts:
             - name: source-code
               mountPath: /app
       volumes:
         - name: source-code
           hostPath:
-            path: /root/workspace/my-app  # Path inside WSL/VM
+            path: /root/workspace/my-app # Path inside WSL/VM
             type: Directory
 ```
 

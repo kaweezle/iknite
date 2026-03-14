@@ -1,3 +1,5 @@
+<!-- cSpell: words covermode coverprofile gofmt  -->
+
 !!! wip "Work in progress"
 
     This documentation is in draft form and may change frequently.
@@ -9,17 +11,17 @@ testing, and deploying changes.
 
 ## Quick Reference
 
-| Task | Command |
-|------|---------|
-| Build binary | `goreleaser build --single-target --auto-snapshot --clean` |
-| Build APK | `goreleaser build --snapshot --skip=publish --clean` |
-| Run tests | `go test ./...` |
+| Task                    | Command                                                               |
+| ----------------------- | --------------------------------------------------------------------- |
+| Build binary            | `goreleaser build --single-target --auto-snapshot --clean`            |
+| Build APK               | `goreleaser build --snapshot --skip=publish --clean`                  |
+| Run tests               | `go test ./...`                                                       |
 | Run tests with coverage | `go test -v -race -covermode=atomic -coverprofile=coverage.out ./...` |
-| Lint | `golangci-lint run --fix` |
-| Format | `golangci-lint fmt` |
-| Pre-commit checks | `pre-commit run --all-files` |
-| Full image build | `./packaging/scripts/build-helper.sh --with-cache` |
-| Build rootfs | `./packaging/scripts/build-helper.sh --only-build --with-cache` |
+| Lint                    | `golangci-lint run --fix`                                             |
+| Format                  | `golangci-lint fmt`                                                   |
+| Pre-commit checks       | `pre-commit run --all-files`                                          |
+| Full image build        | `./packaging/scripts/build-helper.sh --with-cache`                    |
+| Build rootfs            | `./packaging/scripts/build-helper.sh --only-build --with-cache`       |
 
 ## Building
 
@@ -60,6 +62,7 @@ ls ./dist/*.apk
 ```
 
 Available pipeline steps:
+
 - `goreleaser` – Build APK packages
 - `build` – Build rootfs base image
 - `images` – Build iknite-images APK
@@ -132,6 +135,7 @@ pre-commit run cspell --all-files
 ```
 
 Configured hooks (`.pre-commit-config.yaml`):
+
 - `gofmt` – Go code formatting
 - `golangci-lint` – Go linting
 - `shellcheck` – Shell script linting
@@ -141,15 +145,15 @@ Configured hooks (`.pre-commit-config.yaml`):
 
 The project includes VS Code tasks in `.vscode/tasks.json`:
 
-| Task | Shortcut | Description |
-|------|---------|-------------|
-| `goreleaser-build` | `Ctrl+Shift+B` | Build single target binary |
-| `goreleaser` | — | Build all APK packages |
-| `golangci-lint` | — | Lint with auto-fix |
-| `golangci-fmt` | — | Format code |
-| `go mod tidy` | — | Tidy Go modules |
-| `pre-commit` | — | Run all pre-commit checks |
-| `test with coverage` | — | Run tests with coverage report |
+| Task                 | Shortcut       | Description                    |
+| -------------------- | -------------- | ------------------------------ |
+| `goreleaser-build`   | `Ctrl+Shift+B` | Build single target binary     |
+| `goreleaser`         | —              | Build all APK packages         |
+| `golangci-lint`      | —              | Lint with auto-fix             |
+| `golangci-fmt`       | —              | Format code                    |
+| `go mod tidy`        | —              | Tidy Go modules                |
+| `pre-commit`         | —              | Run all pre-commit checks      |
+| `test with coverage` | —              | Run tests with coverage report |
 
 ## Making Changes
 
@@ -222,6 +226,7 @@ git push origin v1.2.3
 ```
 
 This triggers the GitHub Actions release workflow which:
+
 1. Builds APK packages with goreleaser
 2. Builds rootfs base image
 3. Adds pre-pulled images

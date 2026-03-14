@@ -1,3 +1,5 @@
+<!-- cSpell: words kwsl etcdctl -->
+
 !!! wip "Work in progress"
 
     This documentation is in draft form and may change frequently.
@@ -21,20 +23,19 @@ You might want to reset the cluster when:
 
 Iknite provides two levels of reset:
 
-| Level | Command | What it removes |
-|-------|---------|----------------|
-| Soft clean | `iknite clean` | Running containers, CNI state, iptables |
+| Level      | Command                    | What it removes                         |
+| ---------- | -------------------------- | --------------------------------------- |
+| Soft clean | `iknite clean`             | Running containers, CNI state, iptables |
 | Full reset | `iknite clean --clean-all` | Everything (certs, manifests, data, IP) |
 
-!!! warning "Data loss"
-    A full reset (`--clean-all`) removes all cluster data including persistent
-    volumes stored in `/opt/local-path-provisioner`. Back up any important data
-    before running a full reset.
+!!! warning "Data loss" A full reset (`--clean-all`) removes all cluster data
+including persistent volumes stored in `/opt/local-path-provisioner`. Back up
+any important data before running a full reset.
 
 ## Soft Clean
 
-Use `iknite clean` to clean up the containerd runtime state without removing
-the cluster configuration. This is useful when the cluster is in a dirty state
+Use `iknite clean` to clean up the containerd runtime state without removing the
+cluster configuration. This is useful when the cluster is in a dirty state
 (e.g., after an unclean shutdown) but you want to restart without losing
 certificates and configuration.
 
@@ -43,6 +44,7 @@ iknite clean
 ```
 
 This performs:
+
 - Stop all running containers (pods)
 - Unmount leftover kubelet mounts
 - Reset CNI network interfaces
@@ -60,6 +62,7 @@ iknite clean --clean-all
 ```
 
 This performs everything in the soft clean, plus:
+
 - Stop containerd
 - Remove API backend data (`/var/lib/kine/kine.db` or `/var/lib/etcd/`)
 - Remove cluster configuration (`/etc/kubernetes/`)
@@ -164,11 +167,13 @@ tar czf /tmp/kube-backup.tar.gz \
 After a full reset and re-initialization:
 
 1. Restore PersistentVolume data:
+
    ```bash
    tar xzf /tmp/pv-backup.tar.gz -C /
    ```
 
 2. Re-apply any custom kustomizations:
+
    ```bash
    kubectl apply -k /etc/iknite.d/
    ```
@@ -191,6 +196,5 @@ wsl --import kwsl $env:LOCALAPPDATA\kwsl rootfs.tar.gz
 wsl -d kwsl /sbin/iknite start -t 120
 ```
 
-!!! tip
-    Keep the original rootfs tarball so you can always start fresh without
-    re-downloading.
+!!! tip Keep the original rootfs tarball so you can always start fresh without
+re-downloading.

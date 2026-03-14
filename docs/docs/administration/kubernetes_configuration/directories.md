@@ -1,3 +1,5 @@
+<!-- cSpell: words addresspool overlayfs softlevel runlevels runlevel tmpfs -->
+
 !!! wip "Work in progress"
 
     This documentation is in draft form and may change frequently.
@@ -43,8 +45,8 @@ OpenRC init script that starts/stops the `iknite init` process.
 
 Runtime state directory (volatile, cleared on reboot):
 
-| File | Purpose |
-|------|---------|
+| File          | Purpose                                    |
+| ------------- | ------------------------------------------ |
 | `status.json` | Current cluster state (`IkniteCluster` CR) |
 
 ## Kubernetes Directories
@@ -87,9 +89,9 @@ Kubernetes configuration directory, managed by kubeadm:
 
 User kubeconfig directory:
 
-| File | Purpose |
-|------|---------|
-| `config` | Admin kubeconfig (copy of admin.conf) |
+| File          | Purpose                                |
+| ------------- | -------------------------------------- |
+| `config`      | Admin kubeconfig (copy of admin.conf)  |
 | `iknite.conf` | Iknite status server client kubeconfig |
 
 ### `/var/lib/kubelet/`
@@ -110,8 +112,8 @@ Kubelet data directory:
 
 Kine database directory:
 
-| File | Purpose |
-|------|---------|
+| File      | Purpose                                     |
+| --------- | ------------------------------------------- |
 | `kine.db` | SQLite database with all Kubernetes objects |
 
 ### `/var/lib/etcd/` (when `useEtcd: true`)
@@ -140,25 +142,24 @@ Main containerd data directory:
 └── io.containerd.runtime.v2.task/     ← Running container tasks
 ```
 
-!!! note "Disk usage"
-    This directory can grow large over time. Use `nerdctl image prune -a` to
-    clean up unused images.
+!!! note "Disk usage" This directory can grow large over time. Use
+`nerdctl image prune -a` to clean up unused images.
 
 ### `/run/containerd/`
 
 Runtime state (volatile):
 
-| Path | Purpose |
-|------|---------|
+| Path              | Purpose                |
+| ----------------- | ---------------------- |
 | `containerd.sock` | containerd gRPC socket |
-| `containerd.pid` | containerd PID file |
+| `containerd.pid`  | containerd PID file    |
 
 ### `/etc/containerd/`
 
 containerd configuration:
 
-| File | Purpose |
-|------|---------|
+| File          | Purpose                  |
+| ------------- | ------------------------ |
 | `config.toml` | containerd configuration |
 
 ### `/etc/crictl.yaml`
@@ -184,9 +185,8 @@ Default storage root for PersistentVolumes:
     └── <data files>
 ```
 
-!!! warning "Persistence"
-    This directory persists across cluster restarts but is **not** backed up
-    automatically. Consider setting up regular backups.
+!!! warning "Persistence" This directory persists across cluster restarts but is
+**not** backed up automatically. Consider setting up regular backups.
 
 ## BuildKit Directories
 
@@ -198,8 +198,8 @@ BuildKit cache and metadata directory.
 
 Runtime state:
 
-| Path | Purpose |
-|------|---------|
+| Path             | Purpose              |
+| ---------------- | -------------------- |
 | `buildkitd.sock` | BuildKit gRPC socket |
 
 ## OpenRC Directories
@@ -208,8 +208,8 @@ Runtime state:
 
 OpenRC runtime state:
 
-| Path | Purpose |
-|------|---------|
+| Path        | Purpose                                      |
+| ----------- | -------------------------------------------- |
 | `softlevel` | Marks OpenRC as initialized (file existence) |
 
 ### `/etc/runlevels/`
@@ -236,15 +236,15 @@ rc_keyword="-start" kubelet
 
 ## Summary Table
 
-| Directory | Purpose | Persistent? |
-|-----------|---------|------------|
-| `/etc/iknite.d/` | Iknite configuration | Yes |
-| `/run/iknite/` | Runtime state | No (tmpfs) |
-| `/etc/kubernetes/` | Kubernetes config & certs | Yes |
-| `/var/lib/kubelet/` | Kubelet data | Yes |
-| `/var/lib/kine/` | Kine database | Yes |
-| `/var/lib/etcd/` | etcd data | Yes |
-| `/var/lib/containerd/` | Container images & data | Yes |
-| `/run/containerd/` | containerd runtime | No (tmpfs) |
-| `/opt/local-path-provisioner/` | PV storage | Yes |
-| `/var/lib/buildkit/` | BuildKit cache | Yes |
+| Directory                      | Purpose                   | Persistent? |
+| ------------------------------ | ------------------------- | ----------- |
+| `/etc/iknite.d/`               | Iknite configuration      | Yes         |
+| `/run/iknite/`                 | Runtime state             | No (tmpfs)  |
+| `/etc/kubernetes/`             | Kubernetes config & certs | Yes         |
+| `/var/lib/kubelet/`            | Kubelet data              | Yes         |
+| `/var/lib/kine/`               | Kine database             | Yes         |
+| `/var/lib/etcd/`               | etcd data                 | Yes         |
+| `/var/lib/containerd/`         | Container images & data   | Yes         |
+| `/run/containerd/`             | containerd runtime        | No (tmpfs)  |
+| `/opt/local-path-provisioner/` | PV storage                | Yes         |
+| `/var/lib/buildkit/`           | BuildKit cache            | Yes         |

@@ -1,3 +1,5 @@
+<!-- cSpell: words userprofile iface -->
+
 !!! wip "Work in progress"
 
     This documentation is in draft form and may change frequently.
@@ -32,8 +34,10 @@ The script will automatically:
 - Download the Hyper-V VHDX image from GitHub Container Registry
 - Create a new Hyper-V VM named `iknite` with the downloaded image
 - Create a pair of SSH keys for VM access
-- Create a cloud-init ISO with default user configuration and attach it to the VM
-- Start the VM and wait for it to be ready, printing the VM IP address for SSH access
+- Create a cloud-init ISO with default user configuration and attach it to the
+  VM
+- Start the VM and wait for it to be ready, printing the VM IP address for SSH
+  access
 
 ### Manual Installation
 

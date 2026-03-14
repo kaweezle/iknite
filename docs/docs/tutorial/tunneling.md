@@ -1,3 +1,5 @@
+<!-- cSpell: words authkey mirrord winget telepresence kwsl -->
+
 !!! wip "Work in progress"
 
     This documentation is in draft form and may change frequently.
@@ -123,11 +125,13 @@ mirrord exec --target deployment/my-app -- ./my-local-binary
 ```
 
 Your local process can now:
+
 - Receive traffic mirrored from the cluster
 - Access cluster-internal services by name (e.g., `http://my-db:5432`)
 - Use cluster environment variables
 
-**Best for**: Debugging and developing services that interact with other cluster services.
+**Best for**: Debugging and developing services that interact with other cluster
+services.
 
 ## Telepresence
 
@@ -170,14 +174,14 @@ wsl -d kwsl -- ssh -L 8080:localhost:80 -N root@localhost
 
 ## Comparing Tunneling Solutions
 
-| Solution | Use Case | Complexity | Persistent |
-|----------|----------|------------|-----------|
-| LoadBalancer (Kube-VIP) | Production-like access | Low | Yes |
-| kubectl port-forward | Quick debugging | Very Low | No |
-| Tailscale | Team access, remote | Medium | Yes |
-| mirrord | Develop without deploying | Medium | No |
-| Telepresence | Replace running service | High | No |
-| SSH tunnel | Ad-hoc access | Low | No |
+| Solution                | Use Case                  | Complexity | Persistent |
+| ----------------------- | ------------------------- | ---------- | ---------- |
+| LoadBalancer (Kube-VIP) | Production-like access    | Low        | Yes        |
+| kubectl port-forward    | Quick debugging           | Very Low   | No         |
+| Tailscale               | Team access, remote       | Medium     | Yes        |
+| mirrord                 | Develop without deploying | Medium     | No         |
+| Telepresence            | Replace running service   | High       | No         |
+| SSH tunnel              | Ad-hoc access             | Low        | No         |
 
 ## WSL2-Specific Access
 
@@ -192,6 +196,6 @@ wsl -d kwsl -- kubectl port-forward svc/my-service 8080:80 &
 # Then access http://localhost:8080 from Windows
 ```
 
-!!! note "Windows Firewall"
-    If you cannot access services from Windows, check that the Windows Firewall
-    is not blocking connections from the WSL2 virtual network adapter.
+!!! note "Windows Firewall" If you cannot access services from Windows, check
+that the Windows Firewall is not blocking connections from the WSL2 virtual
+network adapter.
