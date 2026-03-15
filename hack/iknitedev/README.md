@@ -43,10 +43,10 @@ iknitedev install signing-key [secrets-file] [destination-directory] [flags]
 
 ```bash
 # Install to current directory
-go run hack/iknitedev/main.go install signing-key deploy/iac/iknite/secrets.sops.yaml .
+go run hack/iknitedev/main.go install signing-key secrets.sops.yaml .
 
 # Install to specific directory
-go run hack/iknitedev/main.go install signing-key --key apk_signing_key deploy/iac/iknite/secrets.sops.yaml /path/to/dest
+go run hack/iknitedev/main.go install signing-key --key apk_signing_key secrets.sops.yaml /path/to/dest
 ```
 
 **Flags:**

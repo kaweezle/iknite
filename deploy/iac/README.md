@@ -125,7 +125,6 @@ deploy/iac/
 ├── README.md                    # This file
 ├── iknite/                      # Terragrunt units (infrastructure definitions)
 │   ├── root.hcl                 # Root Terragrunt configuration
-│   ├── secrets.sops.yaml        # Encrypted secrets (SOPS)
 │   ├── .tflint.hcl             # TFLint configuration
 │   ├── apkrepo/                # APK repository static site
 │   ├── dns_iknite_app/         # DNS configuration for iknite.app
@@ -196,7 +195,7 @@ Modules are referenced by Terragrunt units using repository-relative paths.
 
 3. **Configure credentials:**
 
-   The project uses SOPS-encrypted secrets stored in `iknite/secrets.sops.yaml`.
+   The project uses SOPS-encrypted secrets stored in `../../secrets.sops.yaml`.
    Ensure you have the decryption key configured (see step 4 in Prerequisites).
 
    Credentials include:
@@ -400,7 +399,7 @@ inputs = {
 
 ```bash
 # Edit secrets
-sops iknite/secrets.sops.yaml
+sops secrets.sops.yaml
 
 # The file will open in your editor
 # Save and exit - SOPS will re-encrypt automatically
@@ -421,7 +420,7 @@ for easier editing.
 **Solution:**
 
 1. Verify age key exists: `test -f ~/.config/sops/age/keys.txt`
-2. Try decrypting secrets manually: `sops -d iknite/secrets.sops.yaml`
+2. Try decrypting secrets manually: `sops -d secrets.sops.yaml`
 3. Ensure `root.hcl` can access the secrets
 
 #### "Error acquiring the state lock"

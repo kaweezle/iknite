@@ -21,4 +21,7 @@
   "shellcheck.exclude": ["3043"],
   "makefile.makefilePath": "GNUmakefile",
   "makefile.configureOnOpen": false,
+  "files.associations": {
+    "*.gotmpl": "helm"
+  }
 }

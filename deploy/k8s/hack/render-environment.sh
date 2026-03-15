@@ -42,9 +42,10 @@ render_application_source() {
 		return
 	fi
 
-	if [[ -f "$app_dir/helmfile.yaml" ]]; then
+	if [[ -f "$app_dir/helmfile.yaml" || -f "$app_dir/helmfile.yaml.gotmpl" ]]; then
 		mkdir -p "$output_dir"
-		helmfile template --skip-tests --args='--skip-crds' -f "$app_dir/helmfile.yaml" \
+        file=$(find "$app_dir" '(' -name helmfile.yaml -o -name helmfile.yaml.gotmpl ')'  | head -n 1)
+		helmfile template --skip-tests --args='--skip-crds' -f "$file" \
 			| (cd "$output_dir" && yq --split-exp '.kind + "-" + .metadata.name + ".yaml"' --no-doc)
 		return
 	fi

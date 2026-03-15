@@ -1,9 +1,10 @@
 # cSpell: words adminapi gpgkeys statusbadge restrictor websecure serviceaccount
+{{ $domain := printf "%s.%s" .Values.data.argocd.domain_prefix .Values.data.domain_suffix }}
 ## Globally shared configuration
 global:
   # -- Default domain used by all components
   ## Used for ingresses, certificates, SSO, notifications, etc.
-  domain: {{ .Values.data.argocd.domain }}
+  domain: {{ $domain }}
 
   # -- Toggle and define pod-level security context.
   # @default -- `{}` (See [values.yaml])
@@ -37,7 +38,7 @@ configs:
           clientID: {{ .Values.data.argocd.github_oauth_client_id | quote }}
           clientSecret: {{ .Values.data.argocd.github_oauth_client_secret | quote }}
           orgs:
-          - name: {{ .Values.data.argocd.github.organization | quote }}
+          - name: {{ .Values.data.project.github.organization | quote }}
           teamNameField: slug
           useLoginAsId: true
 
@@ -46,7 +47,7 @@ configs:
       - id: argo-workflows-sso
         name: Argo Workflows
         redirectURIs:
-        - https://{{ .Values.data.argo_workflows.domain }}/oauth2/callback
+        - https://{{ $domain }}/oauth2/callback
         secretEnv: ARGO_WORKFLOWS_SSO_CLIENT_SECRET
       {{ end }}
 
@@ -57,7 +58,7 @@ configs:
     policy.default: role:readonly
     # Put the users in the admin team in order to give them admin rights
     policy.csv: |
-      g, {{ .Values.data.argocd.github.organization }}:admin,role:admin
+      g, {{ .Values.data.project.github.organization }}:{{ .Values.data.project.github.team }},role:admin
       p, role:org-admin, applications, *, */*, allow
       p, role:org-admin, clusters, *, *, allow
       p, role:org-admin, repositories, *, *, allow
@@ -73,7 +74,7 @@ configs:
 
   credentialTemplates:
     ssh-creds:
-      url: {{ .Values.data.argocd.github.base_url }}
+      url: {{ with  .Values.data.project.github }}git@github.com:{{ .organization }}{{ end }}
       sshPrivateKey: {{ .Values.data.argocd.ssh_private_key | quote }}
 
   secret:
@@ -108,7 +109,7 @@ server:
 
   ingress:
     enabled: false # Created by the ingress package
-    hostname: {{ .Values.data.argocd.domain }}
+    hostname: {{ $domain }}
     controller: generic
     ingressClassName: traefik
     tls: true
@@ -119,10 +120,10 @@ repoServer:
   image:
     # -- Repository to use for the repo server
     # @default -- `""` (defaults to global.image.repository)
-    repository: {{ .Values.data.argocd.repo_server_image_name }}
+    repository: {{ .Values.data.argocd.repo_server.image_name }}
     # -- Tag to use for the repo server
     # @default -- `""` (defaults to global.image.tag)
-    tag: {{ .Values.data.argocd.repo_server_image_tag }}
+    tag: {{ .Values.data.argocd.repo_server.image_tag }}
     # -- Image pull policy for the repo server
     # @default -- `""` (defaults to global.image.imagePullPolicy)
     imagePullPolicy: ""
@@ -169,7 +170,7 @@ repoServer:
 
   extraContainers:
   - name: helmfile-plugin
-    image: {{ .Values.data.argocd.repo_server_image_name }}:{{ .Values.data.argocd.repo_server_image_tag }}
+    image: {{ .Values.data.argocd.repo_server.image_name }}:{{ .Values.data.argocd.repo_server.image_tag }}
     command: [/var/run/argocd/argocd-cmp-server]
     env:
     - name: SOPS_AGE_KEY_FILE
@@ -252,7 +253,7 @@ extraObjects:
         - websecure
       routes:
         - kind: Rule
-          match: Host(`{{ .Values.data.argocd.domain }}`)
+          match: Host(`{{ $domain }}`)
           priority: 10
           services:
             - kind: Service
@@ -261,7 +262,7 @@ extraObjects:
               port: http
               passHostHeader: true
         - kind: Rule
-          match: Host(`{{ .Values.data.argocd.domain }}`) && Header(`Content-Type`, `application/grpc`)
+          match: Host(`{{ $domain }}`) && Header(`Content-Type`, `application/grpc`)
           priority: 11
           services:
             - kind: Service
@@ -273,7 +274,7 @@ extraObjects:
       tls:
         secretName: argocd-server-tls
         domains:
-          - main: {{ .Values.data.argocd.domain }}
+          - main: {{ $domain }}
   -
     apiVersion: traefik.io/v1alpha1
     kind: IngressRoute
@@ -285,7 +286,7 @@ extraObjects:
         - web
       routes:
         - kind: Rule
-          match: Host(`{{ .Values.data.argocd.domain }}`)
+          match: Host(`{{ $domain }}`)
           priority: 10
           services:
             - kind: Service
@@ -294,7 +295,7 @@ extraObjects:
               port: http
               passHostHeader: true
         - kind: Rule
-          match: Host(`{{ .Values.data.argocd.domain }}`) && Header(`Content-Type`, `application/grpc`)
+          match: Host(`{{ $domain }}`) && Header(`Content-Type`, `application/grpc`)
           priority: 11
           services:
             - kind: Service
@@ -326,9 +327,9 @@ extraObjects:
     # The dot (.) character cannot be used as separator here as names are going to be
     # used as environment variables.
     data:
-      autocloud_target_revision: {{ .Values.data.bootstrap.repo_target_revision | quote }}
-      autocloud_repo_url: {{ .Values.data.bootstrap.repo_url | quote }}
-      autocloud_bootstrap_application_path: {{ .Values.data.bootstrap.application_path | quote }}
+      autocloud_target_revision: {{ .Values.data.project.github.targetRevision | quote }}
+      autocloud_repo_url: {{ .Values.data.project.github.repoURL | quote }}
+      autocloud_bootstrap_application_path: "{{ .Values.data.argocd.base_path }}/appstages/{{ .Values.data.argocd.bootstrap_application }}/application.yaml"
   -
     apiVersion: v1
     kind: ServiceAccount
@@ -381,7 +382,7 @@ extraObjects:
                     path: id_rsa
           containers:
             - name: create-bootstrap-application
-              image: {{ .Values.data.argocd.repo_server_image_name }}:{{ .Values.data.argocd.repo_server_image_tag }}
+              image: {{ .Values.data.argocd.repo_server.image_name }}:{{ .Values.data.argocd.repo_server.image_tag }}
               imagePullPolicy: IfNotPresent
               envFrom:
                 - configMapRef:

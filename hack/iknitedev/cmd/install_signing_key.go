@@ -60,8 +60,8 @@ signing key, and writes it to the specified destination directory with appropria
 permissions (0400).
 
 Example:
-  iknitedev install signing-key deploy/k8s/secrets/secrets.sops.yaml .
-  iknitedev install signing-key --key data.apk_signing_key deploy/k8s/secrets/secrets.sops.yaml /path/to/dest`,
+  iknitedev install signing-key secrets.sops.yaml .
+  iknitedev install signing-key --key data.apk_signing_key secrets.sops.yaml /path/to/dest`,
 		Args: cobra.ExactArgs(2),
 		RunE: func(_ *cobra.Command, args []string) error {
 			opts.SecretsFile = args[0]
