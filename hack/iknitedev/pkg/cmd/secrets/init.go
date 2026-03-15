@@ -31,12 +31,12 @@ func createSecretsInitCmd(opts *pkgSecrets.Options) *cobra.Command {
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			result, err := pkgSecrets.InitSecrets(opts)
 			if err != nil {
-				return err
+				return fmt.Errorf("failed to initialize secrets: %w", err)
 			}
 
 			for _, message := range result.Messages {
 				if _, writeErr := fmt.Fprintln(cmd.OutOrStdout(), message); writeErr != nil {
-					return writeErr
+					return fmt.Errorf("error while outputting result: %w", writeErr)
 				}
 			}
 

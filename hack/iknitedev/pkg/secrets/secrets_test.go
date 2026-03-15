@@ -32,13 +32,17 @@ import (
 	"github.com/kaweezle/iknite/hack/iknitedev/pkg/secrets"
 )
 
+const (
+	secretsPath = "/test/secrets.sops.yaml"
+)
+
 func TestGetSecret(t *testing.T) {
 	// Cannot use t.Parallel because this test sets process env for SOPS decryption.
 	t.Setenv("SOPS_AGE_KEY", testSecretsAgeKey)
 
 	testFs := afero.NewMemMapFs()
-	secretsPath := "/test/secrets.sops.yaml"
-	if err := afero.WriteFile(testFs, secretsPath, []byte(testSecretsEncryptedWithData), 0o644); err != nil {
+
+	if err := afero.WriteFile(testFs, secretsPath, []byte(testSecretsEncryptedWithData), 0o600); err != nil {
 		t.Fatalf("failed to write test secrets file: %v", err)
 	}
 
@@ -58,8 +62,7 @@ func TestGetSecretMissingPath(t *testing.T) {
 	t.Setenv("SOPS_AGE_KEY", testSecretsAgeKey)
 
 	testFs := afero.NewMemMapFs()
-	secretsPath := "/test/secrets.sops.yaml"
-	if err := afero.WriteFile(testFs, secretsPath, []byte(testSecretsEncryptedWithData), 0o644); err != nil {
+	if err := afero.WriteFile(testFs, secretsPath, []byte(testSecretsEncryptedWithData), 0o600); err != nil {
 		t.Fatalf("failed to write test secrets file: %v", err)
 	}
 
@@ -78,8 +81,7 @@ func TestSetSecret(t *testing.T) {
 	t.Setenv("SOPS_AGE_KEY", testSecretsAgeKey)
 
 	testFs := afero.NewMemMapFs()
-	secretsPath := "/test/secrets.sops.yaml"
-	if err := afero.WriteFile(testFs, secretsPath, []byte(testSecretsEncryptedWithData), 0o644); err != nil {
+	if err := afero.WriteFile(testFs, secretsPath, []byte(testSecretsEncryptedWithData), 0o600); err != nil {
 		t.Fatalf("failed to write test secrets file: %v", err)
 	}
 
@@ -96,8 +98,7 @@ func TestRemoveSecret(t *testing.T) {
 	t.Setenv("SOPS_AGE_KEY", testSecretsAgeKey)
 
 	testFs := afero.NewMemMapFs()
-	secretsPath := "/test/secrets.sops.yaml"
-	if err := afero.WriteFile(testFs, secretsPath, []byte(testSecretsEncryptedWithData), 0o644); err != nil {
+	if err := afero.WriteFile(testFs, secretsPath, []byte(testSecretsEncryptedWithData), 0o600); err != nil {
 		t.Fatalf("failed to write test secrets file: %v", err)
 	}
 
@@ -114,8 +115,7 @@ func TestRemoveSecretMissingPath(t *testing.T) {
 	t.Setenv("SOPS_AGE_KEY", testSecretsAgeKey)
 
 	testFs := afero.NewMemMapFs()
-	secretsPath := "/test/secrets.sops.yaml"
-	if err := afero.WriteFile(testFs, secretsPath, []byte(testSecretsEncryptedWithData), 0o644); err != nil {
+	if err := afero.WriteFile(testFs, secretsPath, []byte(testSecretsEncryptedWithData), 0o600); err != nil {
 		t.Fatalf("failed to write test secrets file: %v", err)
 	}
 
@@ -134,13 +134,13 @@ func TestInitSecrets(t *testing.T) {
 	tempDir := t.TempDir()
 	homeDir := filepath.Join(tempDir, "home")
 	workspaceDir := filepath.Join(tempDir, "workspace")
-	secretsPath := filepath.Join(workspaceDir, "secrets.sops.yaml")
+	secretsPath := filepath.Join(workspaceDir, secrets.DefaultSecretsFile)
 	keyPath := filepath.Join(homeDir, ".ssh", "id_ed25519")
 
-	if err := os.MkdirAll(homeDir, 0o755); err != nil {
+	if err := os.MkdirAll(homeDir, 0o750); err != nil {
 		t.Fatalf("failed to create temp home: %v", err)
 	}
-	if err := os.MkdirAll(workspaceDir, 0o755); err != nil {
+	if err := os.MkdirAll(workspaceDir, 0o750); err != nil {
 		t.Fatalf("failed to create workspace dir: %v", err)
 	}
 
@@ -184,19 +184,20 @@ func TestInitSecrets(t *testing.T) {
 }
 
 func TestInitSecretsDoesNotOverwriteExistingFiles(t *testing.T) {
+	t.Parallel()
 	fs := afero.NewOsFs()
 	tempDir := t.TempDir()
 	workspaceDir := filepath.Join(tempDir, "workspace")
-	secretsPath := filepath.Join(workspaceDir, "secrets.sops.yaml")
+	secretsPath := filepath.Join(workspaceDir, secrets.DefaultSecretsFile)
 	sopsConfigPath := filepath.Join(workspaceDir, ".sops.yaml")
 
-	if err := os.MkdirAll(workspaceDir, 0o755); err != nil {
+	if err := os.MkdirAll(workspaceDir, 0o750); err != nil {
 		t.Fatalf("failed to create workspace dir: %v", err)
 	}
-	if err := os.WriteFile(sopsConfigPath, []byte("existing config\n"), 0o644); err != nil {
+	if err := os.WriteFile(sopsConfigPath, []byte("existing config\n"), 0o600); err != nil {
 		t.Fatalf("failed to seed .sops.yaml: %v", err)
 	}
-	if err := os.WriteFile(secretsPath, []byte("existing secrets\n"), 0o644); err != nil {
+	if err := os.WriteFile(secretsPath, []byte("existing secrets\n"), 0o600); err != nil {
 		t.Fatalf("failed to seed secrets file: %v", err)
 	}
 
@@ -206,7 +207,7 @@ func TestInitSecretsDoesNotOverwriteExistingFiles(t *testing.T) {
 		t.Fatalf("InitSecrets failed: %v", err)
 	}
 
-	configBytes, err := os.ReadFile(sopsConfigPath)
+	configBytes, err := os.ReadFile(sopsConfigPath) //nolint:gosec // temp file read in test
 	if err != nil {
 		t.Fatalf("failed to read .sops.yaml: %v", err)
 	}
@@ -214,7 +215,7 @@ func TestInitSecretsDoesNotOverwriteExistingFiles(t *testing.T) {
 		t.Fatalf("expected existing .sops.yaml to be preserved, got: %s", string(configBytes))
 	}
 
-	secretBytes, err := os.ReadFile(secretsPath)
+	secretBytes, err := os.ReadFile(secretsPath) //nolint:gosec // temp file read in test
 	if err != nil {
 		t.Fatalf("failed to read secrets.sops.yaml: %v", err)
 	}
@@ -235,13 +236,14 @@ func TestInitSecretsDoesNotOverwriteExistingFiles(t *testing.T) {
 }
 
 func TestInitSecretsWithCustomKeyFile(t *testing.T) {
+	t.Parallel()
 	fs := afero.NewOsFs()
 	tempDir := t.TempDir()
 	workspaceDir := filepath.Join(tempDir, "workspace")
-	secretsPath := filepath.Join(workspaceDir, "secrets.sops.yaml")
+	secretsPath := filepath.Join(workspaceDir, secrets.DefaultSecretsFile)
 	keyPath := filepath.Join(tempDir, "keys", "custom_ed25519")
 
-	if err := os.MkdirAll(workspaceDir, 0o755); err != nil {
+	if err := os.MkdirAll(workspaceDir, 0o750); err != nil {
 		t.Fatalf("failed to create workspace dir: %v", err)
 	}
 
@@ -275,7 +277,7 @@ func assertFileExists(t *testing.T, fs afero.Fs, path string) {
 	}
 }
 
-func assertSecretValue(t *testing.T, fs afero.Fs, secretsPath string, path string, want string) {
+func assertSecretValue(t *testing.T, fs afero.Fs, secretsPath, path, want string) {
 	t.Helper()
 
 	encrypted, err := afero.ReadFile(fs, secretsPath)
@@ -291,10 +293,10 @@ func assertSecretValue(t *testing.T, fs afero.Fs, secretsPath string, path strin
 	assertSecretValueFromCleartext(t, encrypted, cleartext, path, want)
 }
 
-func assertSecretValueFromOSFile(t *testing.T, secretsPath string, path string, wantContains string) {
+func assertSecretValueFromOSFile(t *testing.T, secretsPath, path, wantContains string) {
 	t.Helper()
 
-	encrypted, err := os.ReadFile(secretsPath)
+	encrypted, err := os.ReadFile(secretsPath) //nolint:gosec // temp file read in test
 	if err != nil {
 		t.Fatalf("failed to read secrets file: %v", err)
 	}
@@ -307,7 +309,7 @@ func assertSecretValueFromOSFile(t *testing.T, secretsPath string, path string, 
 	assertSecretValueFromCleartextContains(t, cleartext, path, wantContains)
 }
 
-func assertSecretValueFromCleartext(t *testing.T, encrypted []byte, cleartext []byte, path string, want string) {
+func assertSecretValueFromCleartext(t *testing.T, encrypted, cleartext []byte, path, want string) {
 	t.Helper()
 
 	var data map[string]any
@@ -334,7 +336,7 @@ func assertSecretValueFromCleartext(t *testing.T, encrypted []byte, cleartext []
 	}
 }
 
-func assertSecretValueFromCleartextContains(t *testing.T, cleartext []byte, path string, wantContains string) {
+func assertSecretValueFromCleartextContains(t *testing.T, cleartext []byte, path, wantContains string) {
 	t.Helper()
 
 	var data map[string]any
@@ -357,7 +359,7 @@ func assertSecretValueFromCleartextContains(t *testing.T, cleartext []byte, path
 	}
 }
 
-func assertSecretPathMissing(t *testing.T, fs afero.Fs, secretsPath string, path string) {
+func assertSecretPathMissing(t *testing.T, fs afero.Fs, secretsPath, path string) {
 	t.Helper()
 
 	encrypted, err := afero.ReadFile(fs, secretsPath)
@@ -398,7 +400,9 @@ func getMapValue(root map[string]any, parts []string) (any, error) {
 
 // cSpell: disable
 // Regenerate fixture with:
-// sops --config <(echo "creation_rules:\n  - encrypted_regex: ^data\$") -e -a 'age1mjrhxft836jdjm6jem37ue788za2ngk6xaegayst0thf9amc55uqzxtn87' plain.yaml | cat
+// sops --config <(echo "creation_rules:\n  - encrypted_regex: ^data\$") -e -a 'age1mjrhxft836jdjm6jem37ue788za2ngk6xaegayst0thf9amc55uqzxtn87' plain.yaml | cat.
+//
+//nolint:lll // static fixture with long encrypted values
 const testSecretsEncryptedWithData = `apiVersion: autocloud.config.kaweezle.com/v1alpha1
 kind: SopsGenerator
 data:

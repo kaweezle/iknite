@@ -39,7 +39,7 @@ func CreateSecretsCmd(fs afero.Fs, opts *pkgSecrets.Options) *cobra.Command {
 		}
 	}
 	if opts.SecretsFile == "" {
-		opts.SecretsFile = "secrets.sops.yaml"
+		opts.SecretsFile = pkgSecrets.DefaultSecretsFile
 	}
 
 	defaultSecretsFile := opts.SecretsFile

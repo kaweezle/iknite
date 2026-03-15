@@ -17,6 +17,7 @@ package cmd
 
 import (
 	"fmt"
+	"io"
 	"os"
 
 	"github.com/spf13/afero"
@@ -29,6 +30,7 @@ import (
 // RootOptions contains configuration for the root command.
 type RootOptions struct {
 	Fs      afero.Fs
+	out     io.Writer
 	CfgFile string
 }
 
@@ -36,7 +38,8 @@ type RootOptions struct {
 func CreateRootCmd(opts *RootOptions) *cobra.Command {
 	if opts == nil {
 		opts = &RootOptions{
-			Fs: afero.NewOsFs(),
+			Fs:  afero.NewOsFs(),
+			out: os.Stdout,
 		}
 	}
 
@@ -56,7 +59,7 @@ development tasks that are not part of the main iknite binary.`,
 
 	// Add subcommands
 	rootCmd.AddCommand(CreateInstallCmd(opts.Fs))
-	rootCmd.AddCommand(CreateKustomizeCmd(opts.Fs))
+	rootCmd.AddCommand(CreateKustomizeCmd(opts.Fs, opts.out))
 	rootCmd.AddCommand(secrets.CreateSecretsCmd(opts.Fs, nil))
 
 	return rootCmd

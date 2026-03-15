@@ -35,28 +35,28 @@ func TestCreateSecretsCmd(t *testing.T) {
 	t.Parallel()
 
 	fs := afero.NewMemMapFs()
-	secretsCmd := secretsCmd.CreateSecretsCmd(fs, nil)
-	if secretsCmd == nil {
+	cmd := secretsCmd.CreateSecretsCmd(fs, nil)
+	if cmd == nil {
 		t.Fatal("CreateSecretsCmd returned nil")
 	}
 
-	if secretsCmd.Use != "secrets" {
-		t.Errorf("expected Use to be secrets, got %q", secretsCmd.Use)
+	if cmd.Use != "secrets" {
+		t.Errorf("expected Use to be secrets, got %q", cmd.Use)
 	}
 
-	flag := secretsCmd.PersistentFlags().Lookup("secrets-file")
+	flag := cmd.PersistentFlags().Lookup("secrets-file")
 	if flag == nil {
 		t.Fatal("expected --secrets-file flag to exist")
 	}
 	if flag.Shorthand != "s" {
 		t.Errorf("expected --secrets-file shorthand to be s, got %q", flag.Shorthand)
 	}
-	if flag.DefValue != "secrets.sops.yaml" {
-		t.Errorf("expected --secrets-file default to be secrets.sops.yaml, got %q", flag.DefValue)
+	if flag.DefValue != secrets.DefaultSecretsFile {
+		t.Errorf("expected --secrets-file default to be %q, got %q", secrets.DefaultSecretsFile, flag.DefValue)
 	}
 
-	if len(secretsCmd.Commands()) != 4 {
-		t.Fatalf("expected secrets command to have 4 subcommands, got %d", len(secretsCmd.Commands()))
+	if len(cmd.Commands()) != 4 {
+		t.Fatalf("expected secrets command to have 4 subcommands, got %d", len(cmd.Commands()))
 	}
 }
 
@@ -71,18 +71,18 @@ func TestSecretsSetCommandFromStdin(t *testing.T) {
 	}
 
 	opts := &secrets.Options{Fs: testFs}
-	secretsCmd := secretsCmd.CreateSecretsCmd(testFs, opts)
-	secretsCmd.SetIn(strings.NewReader("new-token-from-stdin\n"))
-	secretsCmd.SetArgs([]string{"--secrets-file", secretsPath, "set", "github.api_token"})
+	cmd := secretsCmd.CreateSecretsCmd(testFs, opts)
+	cmd.SetIn(strings.NewReader("new-token-from-stdin\n"))
+	cmd.SetArgs([]string{"--secrets-file", secretsPath, "set", "github.api_token"})
 
-	if err := secretsCmd.Execute(); err != nil {
+	if err := cmd.Execute(); err != nil {
 		t.Fatalf("secrets set from stdin failed: %v", err)
 	}
 
 	assertSecretValue(t, testFs, secretsPath, "data.github.api_token", "new-token-from-stdin")
 }
 
-func assertSecretValue(t *testing.T, fs afero.Fs, secretsPath string, path string, want string) {
+func assertSecretValue(t *testing.T, fs afero.Fs, secretsPath, path, want string) {
 	t.Helper()
 
 	encrypted, err := afero.ReadFile(fs, secretsPath)
@@ -96,7 +96,7 @@ func assertSecretValue(t *testing.T, fs afero.Fs, secretsPath string, path strin
 	}
 
 	var data map[string]any
-	if err := yaml.Unmarshal(cleartext, &data); err != nil {
+	if err = yaml.Unmarshal(cleartext, &data); err != nil {
 		t.Fatalf("failed to unmarshal cleartext yaml: %v", err)
 	}
 
@@ -137,7 +137,9 @@ func getMapValue(root map[string]any, parts []string) (any, error) {
 
 // cSpell: disable
 // Regenerate fixture with:
-// sops --config <(echo "creation_rules:\n  - encrypted_regex: ^data\$") -e -a 'age1mjrhxft836jdjm6jem37ue788za2ngk6xaegayst0thf9amc55uqzxtn87' plain.yaml | cat
+// sops --config <(echo "creation_rules:\n  - encrypted_regex: ^data\$") -e -a 'age1mjrhxft836jdjm6jem37ue788za2ngk6xaegayst0thf9amc55uqzxtn87' plain.yaml | cat.
+//
+//nolint:lll // Test data
 const testSecretsEncryptedWithData = `apiVersion: autocloud.config.kaweezle.com/v1alpha1
 kind: SopsGenerator
 data:

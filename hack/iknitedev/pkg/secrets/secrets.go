@@ -37,6 +37,10 @@ import (
 	"sigs.k8s.io/yaml"
 )
 
+const (
+	DefaultSecretsFile = "secrets.sops.yaml" //nolint:gosec // Just a filename, not a credential
+)
+
 // Options contains configuration for secrets operations.
 type Options struct {
 	Fs          afero.Fs
@@ -53,7 +57,7 @@ type InitResult struct {
 
 // GetSecret retrieves a secret from the SOPS file for a dot-notated path.
 func GetSecret(opts *Options, path string) (string, error) {
-	_, tree, _, _, err := loadAndDecryptSecrets(opts)
+	fileSecrets, err := loadAndDecryptSecrets(opts)
 	if err != nil {
 		return "", err
 	}
@@ -62,6 +66,8 @@ func GetSecret(opts *Options, path string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+
+	tree := fileSecrets.Tree
 
 	if len(tree.Branches) == 0 {
 		return "", fmt.Errorf("secrets file has no data")
@@ -85,8 +91,8 @@ func GetSecret(opts *Options, path string) (string, error) {
 }
 
 // SetSecret sets a secret in the SOPS file for a dot-notated path.
-func SetSecret(opts *Options, path string, value string) error {
-	store, tree, dataKey, mode, err := loadAndDecryptSecrets(opts)
+func SetSecret(opts *Options, path, value string) error {
+	fileSecrets, err := loadAndDecryptSecrets(opts)
 	if err != nil {
 		return err
 	}
@@ -96,24 +102,26 @@ func SetSecret(opts *Options, path string, value string) error {
 		return err
 	}
 
+	tree := fileSecrets.Tree
+
 	if len(tree.Branches) == 0 {
 		tree.Branches = sops.TreeBranches{{}}
 	}
 
 	tree.Branches[0], _ = tree.Branches[0].Set(fullPath, value)
 
-	if err := common.EncryptTree(
-		common.EncryptTreeOpts{Tree: tree, Cipher: aes.NewCipher(), DataKey: dataKey},
+	if err = common.EncryptTree(
+		common.EncryptTreeOpts{Tree: tree, Cipher: aes.NewCipher(), DataKey: fileSecrets.DataKey},
 	); err != nil {
 		return fmt.Errorf("failed to encrypt updated secrets: %w", err)
 	}
 
-	encryptedData, err := store.EmitEncryptedFile(*tree)
+	encryptedData, err := fileSecrets.Store.EmitEncryptedFile(*tree)
 	if err != nil {
 		return fmt.Errorf("failed to encode encrypted secrets: %w", err)
 	}
 
-	if writeErr := afero.WriteFile(opts.Fs, opts.SecretsFile, encryptedData, mode); writeErr != nil {
+	if writeErr := afero.WriteFile(opts.Fs, opts.SecretsFile, encryptedData, fileSecrets.Mode); writeErr != nil {
 		return fmt.Errorf("failed to write secrets file: %w", writeErr)
 	}
 
@@ -122,7 +130,7 @@ func SetSecret(opts *Options, path string, value string) error {
 
 // RemoveSecret removes a secret from the SOPS file for a dot-notated path.
 func RemoveSecret(opts *Options, path string) error {
-	store, tree, dataKey, mode, err := loadAndDecryptSecrets(opts)
+	fileSecrets, err := loadAndDecryptSecrets(opts)
 	if err != nil {
 		return err
 	}
@@ -131,6 +139,8 @@ func RemoveSecret(opts *Options, path string) error {
 	if err != nil {
 		return err
 	}
+
+	tree := fileSecrets.Tree
 
 	if len(tree.Branches) == 0 {
 		return fmt.Errorf("secret path %q not found", path)
@@ -142,21 +152,42 @@ func RemoveSecret(opts *Options, path string) error {
 	}
 	tree.Branches[0] = updatedBranch
 
-	if err := common.EncryptTree(
-		common.EncryptTreeOpts{Tree: tree, Cipher: aes.NewCipher(), DataKey: dataKey},
+	if err = common.EncryptTree(
+		common.EncryptTreeOpts{Tree: tree, Cipher: aes.NewCipher(), DataKey: fileSecrets.DataKey},
 	); err != nil {
 		return fmt.Errorf("failed to encrypt updated secrets: %w", err)
 	}
 
-	encryptedData, err := store.EmitEncryptedFile(*tree)
+	encryptedData, err := fileSecrets.Store.EmitEncryptedFile(*tree)
 	if err != nil {
 		return fmt.Errorf("failed to encode encrypted secrets: %w", err)
 	}
 
-	if writeErr := afero.WriteFile(opts.Fs, opts.SecretsFile, encryptedData, mode); writeErr != nil {
+	if writeErr := afero.WriteFile(opts.Fs, opts.SecretsFile, encryptedData, fileSecrets.Mode); writeErr != nil {
 		return fmt.Errorf("failed to write secrets file: %w", writeErr)
 	}
 
+	return nil
+}
+
+func checkSecretsFilesExists(opts *Options, paths *secretsInitPaths, result *InitResult) error {
+	if exists, existsErr := afero.Exists(opts.Fs, paths.sopsConfigFile); existsErr != nil {
+		return fmt.Errorf("failed to check .sops.yaml: %w", existsErr)
+	} else if exists {
+		result.Messages = append(
+			result.Messages,
+			fmt.Sprintf("%s already exists, not overwriting", paths.sopsConfigFile),
+		)
+	}
+
+	if exists, existsErr := afero.Exists(opts.Fs, paths.secretsFile); existsErr != nil {
+		return fmt.Errorf("failed to check secrets file: %w", existsErr)
+	} else if exists {
+		result.Messages = append(
+			result.Messages,
+			fmt.Sprintf("%s already exists, not overwriting", paths.secretsFile),
+		)
+	}
 	return nil
 }
 
@@ -170,24 +201,9 @@ func InitSecrets(opts *Options) (*InitResult, error) {
 	}
 
 	if !opts.Force {
-		if exists, existsErr := afero.Exists(opts.Fs, paths.sopsConfigFile); existsErr != nil {
-			return nil, fmt.Errorf("failed to check .sops.yaml: %w", existsErr)
-		} else if exists {
-			result.Messages = append(
-				result.Messages,
-				fmt.Sprintf("%s already exists, not overwriting", paths.sopsConfigFile),
-			)
+		if err = checkSecretsFilesExists(opts, paths, result); err != nil {
+			return nil, fmt.Errorf("failed to check existing secrets files: %w", err)
 		}
-
-		if exists, existsErr := afero.Exists(opts.Fs, paths.secretsFile); existsErr != nil {
-			return nil, fmt.Errorf("failed to check secrets file: %w", existsErr)
-		} else if exists {
-			result.Messages = append(
-				result.Messages,
-				fmt.Sprintf("%s already exists, not overwriting", paths.secretsFile),
-			)
-		}
-
 		if len(result.Messages) > 0 {
 			return result, nil
 		}
@@ -228,51 +244,63 @@ func InitSecrets(opts *Options) (*InitResult, error) {
 	return result, nil
 }
 
-func loadAndDecryptSecrets(opts *Options) (common.Store, *sops.Tree, []byte, os.FileMode, error) {
+type FileSecrets struct {
+	Store   common.Store
+	Tree    *sops.Tree
+	DataKey []byte
+	Mode    os.FileMode
+}
+
+func loadAndDecryptSecrets(opts *Options) (*FileSecrets, error) {
 	exists, err := afero.Exists(opts.Fs, opts.SecretsFile)
 	if err != nil {
-		return nil, nil, nil, 0, fmt.Errorf("failed to check secrets file: %w", err)
+		return nil, fmt.Errorf("failed to check secrets file: %w", err)
 	}
 	if !exists {
-		return nil, nil, nil, 0, fmt.Errorf("secrets file not found: %s", opts.SecretsFile)
+		return nil, fmt.Errorf("secrets file not found: %s", opts.SecretsFile)
 	}
 
 	fileInfo, err := opts.Fs.Stat(opts.SecretsFile)
 	if err != nil {
-		return nil, nil, nil, 0, fmt.Errorf("failed to stat secrets file: %w", err)
+		return nil, fmt.Errorf("failed to stat secrets file: %w", err)
 	}
 
 	encryptedData, err := afero.ReadFile(opts.Fs, opts.SecretsFile)
 	if err != nil {
-		return nil, nil, nil, 0, fmt.Errorf("failed to read secrets file: %w", err)
+		return nil, fmt.Errorf("failed to read secrets file: %w", err)
 	}
 
 	format := formats.FormatForPathOrString(opts.SecretsFile, "")
 	store := common.StoreForFormat(format, config.NewStoresConfig())
 	tree, err := store.LoadEncryptedFile(encryptedData)
 	if err != nil {
-		return nil, nil, nil, 0, fmt.Errorf("failed to parse encrypted secrets: %w", err)
+		return nil, fmt.Errorf("failed to parse encrypted secrets: %w", err)
 	}
 
 	dataKey, err := tree.Metadata.GetDataKey()
 	if err != nil {
-		return nil, nil, nil, 0, fmt.Errorf("failed to retrieve data key: %w", err)
+		return nil, fmt.Errorf("failed to retrieve data key: %w", err)
 	}
 
 	if _, err := tree.Decrypt(dataKey, aes.NewCipher()); err != nil {
-		return nil, nil, nil, 0, fmt.Errorf("failed to decrypt secrets file: %w", err)
+		return nil, fmt.Errorf("failed to decrypt secrets file: %w", err)
 	}
 
-	return store, &tree, dataKey, fileInfo.Mode().Perm(), nil
+	return &FileSecrets{
+		Store:   store,
+		Tree:    &tree,
+		DataKey: dataKey,
+		Mode:    fileInfo.Mode().Perm(),
+	}, nil
 }
 
-func buildSecretsPath(path string) ([]interface{}, error) {
+func buildSecretsPath(path string) ([]any, error) {
 	parts := strings.Split(path, ".")
 	if len(parts) == 0 {
 		return nil, fmt.Errorf("secret path cannot be empty")
 	}
 
-	fullPath := make([]interface{}, 0, len(parts)+1)
+	fullPath := make([]any, 0, len(parts)+1)
 	fullPath = append(fullPath, "data")
 	for _, part := range parts {
 		trimmed := strings.TrimSpace(part)
@@ -303,7 +331,7 @@ type sshKeyInfo struct {
 func resolveSecretsInitPaths(opts *Options) (*secretsInitPaths, error) {
 	secretsFile := opts.SecretsFile
 	if secretsFile == "" {
-		secretsFile = "secrets.sops.yaml"
+		secretsFile = DefaultSecretsFile
 	}
 
 	secretsDir := filepath.Dir(secretsFile)
@@ -332,7 +360,39 @@ func resolveSecretsInitPaths(opts *Options) (*secretsInitPaths, error) {
 	}, nil
 }
 
-func ensureSSHKeyPair(fs afero.Fs, keyFile string, publicKeyFile string) (*sshKeyInfo, error) {
+func sshAuthorizedKeyFromPrivateKey(privateKeyBytes []byte, comment string) (string, error) {
+	rawPrivateKey, parseErr := ssh.ParseRawPrivateKey(privateKeyBytes)
+	if parseErr != nil {
+		return "", fmt.Errorf("failed to parse private key file: %w", parseErr)
+	}
+
+	sshPublicKey, convErr := sshPublicKeyFromPrivateKey(rawPrivateKey)
+	if convErr != nil {
+		return "", convErr
+	}
+
+	return marshalAuthorizedKey(sshPublicKey, comment), nil
+}
+
+func readAuthorizedKeyFromPublicKeyFile(fs afero.Fs, publicKeyFile string) (string, error) {
+	publicKeyBytes, readErr := afero.ReadFile(fs, publicKeyFile)
+	if readErr != nil {
+		return "", fmt.Errorf("failed to read public key file: %w", readErr)
+	}
+	parsedKey, parsedComment, _, _, parseErr := ssh.ParseAuthorizedKey(publicKeyBytes)
+	if parseErr != nil {
+		return "", fmt.Errorf("failed to parse public key file: %w", parseErr)
+	}
+	if parsedComment != "" {
+		return marshalAuthorizedKey(parsedKey, parsedComment), nil
+	}
+	return marshalAuthorizedKey(parsedKey, filepath.Base(publicKeyFile)), nil
+}
+
+// ensureSSHKeyPair checks for the existence of the SSH key pair and generates it if necessary.
+//
+//nolint:gocyclo // This function is complex but it's mostly error handling and branching logic.
+func ensureSSHKeyPair(fs afero.Fs, keyFile, publicKeyFile string) (*sshKeyInfo, error) {
 	privateExists, err := afero.Exists(fs, keyFile)
 	if err != nil {
 		return nil, fmt.Errorf("failed to check key file: %w", err)
@@ -342,49 +402,41 @@ func ensureSSHKeyPair(fs afero.Fs, keyFile string, publicKeyFile string) (*sshKe
 		return nil, fmt.Errorf("failed to check public key file: %w", err)
 	}
 
+	if publicExists && !privateExists {
+		return nil, fmt.Errorf("public key file %s exists but private key file %s does not", publicKeyFile, keyFile)
+	}
+
 	comment := filepath.Base(keyFile)
-	var authorizedKey string
-	var privateKeyPEM string
+	result := &sshKeyInfo{Generated: false}
+
+	if publicExists {
+		result.AuthorizedKey, err = readAuthorizedKeyFromPublicKeyFile(fs, publicKeyFile)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read authorized key from public key file: %w", err)
+		}
+	}
 
 	if privateExists {
 		privateKeyBytes, readErr := afero.ReadFile(fs, keyFile)
 		if readErr != nil {
 			return nil, fmt.Errorf("failed to read key file: %w", readErr)
 		}
-		privateKeyPEM = strings.TrimRight(string(privateKeyBytes), "\n")
+		result.PrivateKeyPEM = strings.TrimRight(string(privateKeyBytes), "\n")
 
 		if publicExists {
-			publicKeyBytes, readErr := afero.ReadFile(fs, publicKeyFile)
-			if readErr != nil {
-				return nil, fmt.Errorf("failed to read public key file: %w", readErr)
-			}
-			parsedKey, parsedComment, _, _, parseErr := ssh.ParseAuthorizedKey(publicKeyBytes)
-			if parseErr != nil {
-				return nil, fmt.Errorf("failed to parse public key file: %w", parseErr)
-			}
-			if parsedComment != "" {
-				comment = parsedComment
-			}
-			authorizedKey = marshalAuthorizedKey(parsedKey, comment)
-			return &sshKeyInfo{AuthorizedKey: authorizedKey, PrivateKeyPEM: privateKeyPEM}, nil
+			return result, nil
 		}
 
-		rawPrivateKey, parseErr := ssh.ParseRawPrivateKey(privateKeyBytes)
-		if parseErr != nil {
-			return nil, fmt.Errorf("failed to parse private key file %s: %w", keyFile, parseErr)
+		result.AuthorizedKey, err = sshAuthorizedKeyFromPrivateKey(privateKeyBytes, comment)
+		if err != nil {
+			return nil, fmt.Errorf("failed to derive public key from private key: %w", err)
 		}
 
-		sshPublicKey, convErr := sshPublicKeyFromPrivateKey(rawPrivateKey)
-		if convErr != nil {
-			return nil, convErr
-		}
-
-		authorizedKey = marshalAuthorizedKey(sshPublicKey, comment)
-		if writeErr := writePublicKeyFile(fs, publicKeyFile, authorizedKey); writeErr != nil {
+		if writeErr := writePublicKeyFile(fs, publicKeyFile, result.AuthorizedKey); writeErr != nil {
 			return nil, writeErr
 		}
 
-		return &sshKeyInfo{AuthorizedKey: authorizedKey, PrivateKeyPEM: privateKeyPEM}, nil
+		return result, nil
 	}
 
 	if mkdirErr := fs.MkdirAll(filepath.Dir(keyFile), 0o700); mkdirErr != nil {
@@ -406,18 +458,18 @@ func ensureSSHKeyPair(fs afero.Fs, keyFile string, publicKeyFile string) (*sshKe
 		return nil, fmt.Errorf("failed to marshal private key: %w", marshalErr)
 	}
 	privateKeyBytes := pem.EncodeToMemory(privateKeyBlock)
-	privateKeyPEM = strings.TrimRight(string(privateKeyBytes), "\n")
+	result.PrivateKeyPEM = strings.TrimRight(string(privateKeyBytes), "\n")
 
 	if writeErr := afero.WriteFile(fs, keyFile, privateKeyBytes, 0o600); writeErr != nil {
 		return nil, fmt.Errorf("failed to write private key file: %w", writeErr)
 	}
 
-	authorizedKey = marshalAuthorizedKey(sshPublicKey, comment)
-	if writeErr := writePublicKeyFile(fs, publicKeyFile, authorizedKey); writeErr != nil {
+	result.AuthorizedKey = marshalAuthorizedKey(sshPublicKey, comment)
+	if writeErr := writePublicKeyFile(fs, publicKeyFile, result.AuthorizedKey); writeErr != nil {
 		return nil, writeErr
 	}
 
-	return &sshKeyInfo{AuthorizedKey: authorizedKey, PrivateKeyPEM: privateKeyPEM, Generated: true}, nil
+	return &sshKeyInfo{AuthorizedKey: result.AuthorizedKey, PrivateKeyPEM: result.PrivateKeyPEM, Generated: true}, nil
 }
 
 func sshPublicKeyFromPrivateKey(privateKey any) (ssh.PublicKey, error) {
@@ -439,7 +491,7 @@ func sshPublicKeyFromPrivateKey(privateKey any) (ssh.PublicKey, error) {
 	}
 }
 
-func writePublicKeyFile(fs afero.Fs, publicKeyFile string, authorizedKey string) error {
+func writePublicKeyFile(fs afero.Fs, publicKeyFile, authorizedKey string) error {
 	if writeErr := afero.WriteFile(fs, publicKeyFile, []byte(authorizedKey+"\n"), 0o644); writeErr != nil {
 		return fmt.Errorf("failed to write public key file: %w", writeErr)
 	}
@@ -454,7 +506,7 @@ func marshalAuthorizedKey(publicKey ssh.PublicKey, comment string) string {
 	return trimmed + " " + comment
 }
 
-func renderSOPSConfig(displayPublicKeyPath string, recipient string) string {
+func renderSOPSConfig(displayPublicKeyPath, recipient string) string {
 	return fmt.Sprintf(`creation_rules:
   - path_regex: .*\.sops\.yaml$
     encrypted_regex: "^data$"
@@ -490,9 +542,9 @@ func renderPlainSecretsFile(
 	builder.WriteString("        path: karmafun\n")
 	builder.WriteString("data:\n")
 	builder.WriteString("  secrets:\n")
-	builder.WriteString(fmt.Sprintf("    # %s\n", displayPublicKeyPath))
-	builder.WriteString(fmt.Sprintf("    public_key: &ed25519_public_key %s\n", authorizedKey))
-	builder.WriteString(fmt.Sprintf("    # %s\n", displayPrivateKeyPath))
+	fmt.Fprintf(&builder, "    # %s\n", displayPublicKeyPath)
+	fmt.Fprintf(&builder, "    public_key: &ed25519_public_key %s\n", authorizedKey)
+	fmt.Fprintf(&builder, "    # %s\n", displayPrivateKeyPath)
 	builder.WriteString("    private_key: &ed25519_private_key |\n")
 	for _, line := range strings.Split(privateKeyPEM, "\n") {
 		builder.WriteString("      ")
@@ -536,7 +588,7 @@ func encryptSecretsPlaintext(secretsFile string, plaintext []byte, recipient str
 		return nil, fmt.Errorf("failed to generate data key: %v", errs)
 	}
 
-	if err := common.EncryptTree(
+	if err = common.EncryptTree(
 		common.EncryptTreeOpts{Tree: &tree, Cipher: aes.NewCipher(), DataKey: dataKey},
 	); err != nil {
 		return nil, fmt.Errorf("failed to encrypt initial secrets file: %w", err)
@@ -550,7 +602,7 @@ func encryptSecretsPlaintext(secretsFile string, plaintext []byte, recipient str
 	return encryptedData, nil
 }
 
-func expandHomePath(homeDir string, path string) string {
+func expandHomePath(homeDir, path string) string {
 	if homeDir == "" {
 		return path
 	}
@@ -563,7 +615,7 @@ func expandHomePath(homeDir string, path string) string {
 	return path
 }
 
-func displayPath(homeDir string, path string) string {
+func displayPath(homeDir, path string) string {
 	if homeDir == "" {
 		return path
 	}

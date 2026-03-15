@@ -34,6 +34,38 @@
       }
     },
     {
+      "label": "golangci-lint-iknitedev",
+      "type": "shell",
+      "command": "golangci-lint",
+      //"args": ["run", "--enable-only", "godot"],
+      "args": ["run", "--fix", "hack/iknitedev/..."],
+      "group": {
+        "kind": "test",
+        "isDefault": false
+      },
+      // "problemMatcher": ["$go"],
+      "problemMatcher": {
+        "owner": "golangci-lint",
+        "fileLocation": ["relative", "${workspaceFolder}"],
+        "pattern": {
+          "regexp": "^(.*):(\\d+):(\\d+): (.*)$",
+          "file": 1,
+          "line": 2,
+          "column": 3,
+          "message": 4
+        }
+      },
+      "detail": "Run golangci-lint for iknitedev",
+      "presentation": {
+        "echo": true,
+        "reveal": "never",
+        "focus": false,
+        "panel": "shared",
+        "showReuseMessage": true,
+        "clear": true
+      }
+    },
+    {
       "label": "golangci-fmt",
       "type": "shell",
       "command": "golangci-lint",

@@ -31,11 +31,14 @@ func createSecretsGetCmd(opts *pkgSecrets.Options) *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			value, err := pkgSecrets.GetSecret(opts, args[0])
 			if err != nil {
-				return err
+				return fmt.Errorf("failed to get secret: %w", err)
 			}
 
 			_, err = fmt.Fprintln(cmd.OutOrStdout(), value)
-			return err
+			if err != nil {
+				return fmt.Errorf("error while outputting result: %w", err)
+			}
+			return nil
 		},
 	}
 }

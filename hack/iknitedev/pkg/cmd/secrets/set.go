@@ -34,7 +34,7 @@ func createSecretsSetCmd(opts *pkgSecrets.Options) *cobra.Command {
 When value is omitted, it is read from stdin.`,
 		Args: cobra.RangeArgs(1, 2),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			value := ""
+			var value string
 			if len(args) == 2 {
 				value = args[1]
 			} else {
