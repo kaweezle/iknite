@@ -10,7 +10,7 @@ source: ./values
 replacements:
   - source:
       name: iknite-values
-      fieldPath: data.project.git.repoURL
+      fieldPath: data.project.github.repoURL
     targets:
       - select:
           kind: Application
@@ -25,7 +25,7 @@ replacements:
           - spec.generators.*.git.repoURL
   - source:
       name: iknite-values
-      fieldPath: data.project.git.targetRevision
+      fieldPath: data.project.github.targetRevision
     targets:
       - select:
           kind: Application
@@ -40,7 +40,7 @@ replacements:
           - spec.generators.*.git.revision
   - source:
       name: iknite-values
-      fieldPath: data.project.git.basePath
+      fieldPath: data.argocd.base_path
     targets:
       - select:
           kind: Application

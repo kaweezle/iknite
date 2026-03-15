@@ -6,25 +6,24 @@ data:
   domain_suffix: iknite.app
   project:
     name: Iknite
-    label: Iknite
     slug: iknite
     email: antoine@mrtn.fr
-    state_bucket: kwzltfstate
-    git:
-      # The main Git repository for the platform.
+    github:
+      organization: kaweezle
+      repo: iknite
+      team: admin
       repoURL: git@github.com:kaweezle/iknite.git
       targetRevision: main
-      basePath: iknite
+      basePath: deploy/k8s/argocd/e2e
   argocd:
-    domain: argocd-e2e.iknite.app
-    repo_server_image_name: ghcr.io/kaweezle/argocd-helmfile
-    repo_server_image_tag: v3.3.2-1.3.2-1
-    github:
-      base_url: git@github.com:kaweezle
-      organization: kaweezle
-  bootstrap:
-    repo_url: git@github.com:kaweezle/iknite.git
-    repo_target_revision: main
-    application_path: deploy/k8s/argocd/e2e/appstages/appstage-00-bootstrap/application.yaml
+    domain_prefix: argocd-e2e
+    repo_server:
+      image_name: ghcr.io/kaweezle/argocd-helmfile
+      image_tag: v3.3.2-1.3.2-1
+    base_path: deploy/k8s/argocd/e2e
+    bootstrap_application: appstage-00-bootstrap
   cloudflare:
     account_id: a54f6b2557d54a9bff5eef36482b7fe6
+  iac:
+    state_bucket: kwzltfstate
+    storage_provider: cloudflare

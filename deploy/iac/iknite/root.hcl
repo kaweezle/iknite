@@ -54,17 +54,16 @@ EOF
 locals {
   values = yamldecode(file("${get_repo_root()}/values.yaml")).data
   # Project information
-  label               = local.values.project.label
   slug                = local.values.project.slug
   domain_suffix       = local.values.domain_suffix
-  github_organization = split("/", split(":", local.values.project.git.repoURL)[1])[0]
-  state_bucket        = local.values.project.state_bucket
+  github_organization = local.values.project.github.organization
+  state_bucket        = local.values.iac.state_bucket
   email               = local.values.project.email
 
   # Retrieve secrets from the SOPS encrypted file
   secret = yamldecode(sops_decrypt_file("${get_repo_root()}/secrets.sops.yaml")).data
   # Change this to the appropriate storage configuration for your environment
-  state_storage = local.secret.cloudflare.storage
+  state_storage = local.secret[local.values.iac.storage_provider].storage
 
   kubernetes_version = get_env("KUBERNETES_VERSION", "1.35.2")
   iknite_version     = get_env("IKNITE_VERSION", try(jsondecode(file("${get_repo_root()}/dist/metadata.json")).version, "0.6.1-devel"))

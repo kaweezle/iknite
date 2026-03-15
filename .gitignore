@@ -40,3 +40,4 @@ packages/
 *.log
 docs/site/
 release/
+.decrypted~*
