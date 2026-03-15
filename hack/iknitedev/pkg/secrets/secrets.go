@@ -1,3 +1,4 @@
+// cSpell: words getsops sopsage
 /*
 Copyright © 2025 Antoine Martin <antoine@openance.com>
 
@@ -13,13 +14,12 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-package cmd
+package secrets
 
 import (
 	"crypto/rand"
 	"encoding/pem"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -32,157 +32,27 @@ import (
 	"github.com/getsops/sops/v3/config"
 	"github.com/getsops/sops/v3/version"
 	"github.com/spf13/afero"
-	"github.com/spf13/cobra"
 	"golang.org/x/crypto/ed25519"
 	"golang.org/x/crypto/ssh"
 	"sigs.k8s.io/yaml"
 )
 
-// SecretsOptions contains configuration for the secrets command.
-type SecretsOptions struct {
+// Options contains configuration for secrets operations.
+type Options struct {
 	Fs          afero.Fs
 	SecretsFile string
-	In          io.Reader
 	HomeDir     string
 	KeyFile     string
 	Force       bool
 }
 
-// SecretsInitResult contains messages produced during secrets init.
-type SecretsInitResult struct {
+// InitResult contains messages produced during secrets init.
+type InitResult struct {
 	Messages []string
 }
 
-// CreateSecretsCmd creates the secrets command.
-func CreateSecretsCmd(fs afero.Fs, opts *SecretsOptions) *cobra.Command {
-	if opts == nil {
-		opts = &SecretsOptions{}
-	}
-	if opts.Fs == nil {
-		opts.Fs = fs
-	}
-	if opts.In == nil {
-		opts.In = os.Stdin
-	}
-	if opts.HomeDir == "" {
-		homeDir, err := os.UserHomeDir()
-		if err == nil {
-			opts.HomeDir = homeDir
-		}
-	}
-	if opts.SecretsFile == "" {
-		opts.SecretsFile = "secrets.sops.yaml"
-	}
-
-	defaultSecretsFile := opts.SecretsFile
-
-	secretsCmd := &cobra.Command{
-		Use:   "secrets",
-		Short: "Read and modify values in a SOPS secrets file",
-		Long: `Read and modify values in a SOPS encrypted secrets file.
-
-Paths are specified in dot notation under the data key.
-For example, github.api_token targets data.github.api_token.`,
-	}
-
-	secretsCmd.PersistentFlags().StringVarP(
-		&opts.SecretsFile,
-		"secrets-file",
-		"s",
-		defaultSecretsFile,
-		"Path to the SOPS secrets file",
-	)
-
-	secretsCmd.AddCommand(createSecretsGetCmd(opts))
-	secretsCmd.AddCommand(createSecretsSetCmd(opts))
-	secretsCmd.AddCommand(createSecretsRemoveCmd(opts))
-	secretsCmd.AddCommand(createSecretsInitCmd(opts))
-
-	return secretsCmd
-}
-
-func createSecretsGetCmd(opts *SecretsOptions) *cobra.Command {
-	return &cobra.Command{
-		Use:   "get <path>",
-		Short: "Get a secret value from the secrets file",
-		Args:  cobra.ExactArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			value, err := GetSecret(opts, args[0])
-			if err != nil {
-				return err
-			}
-
-			_, err = fmt.Fprintln(cmd.OutOrStdout(), value)
-			return err
-		},
-	}
-}
-
-func createSecretsSetCmd(opts *SecretsOptions) *cobra.Command {
-	return &cobra.Command{
-		Use:   "set <path> [value]",
-		Short: "Set a secret value in the secrets file",
-		Long: `Set a secret value in the secrets file.
-
-When value is omitted, it is read from stdin.`,
-		Args: cobra.RangeArgs(1, 2),
-		RunE: func(_ *cobra.Command, args []string) error {
-			value := ""
-			if len(args) == 2 {
-				value = args[1]
-			} else {
-				data, err := io.ReadAll(opts.In)
-				if err != nil {
-					return fmt.Errorf("failed to read value from stdin: %w", err)
-				}
-				value = strings.TrimRight(string(data), "\r\n")
-			}
-
-			return SetSecret(opts, args[0], value)
-		},
-	}
-}
-
-func createSecretsRemoveCmd(opts *SecretsOptions) *cobra.Command {
-	return &cobra.Command{
-		Use:   "remove <path>",
-		Short: "Remove a secret key from the secrets file",
-		Args:  cobra.ExactArgs(1),
-		RunE: func(_ *cobra.Command, args []string) error {
-			return RemoveSecret(opts, args[0])
-		},
-	}
-}
-
-func createSecretsInitCmd(opts *SecretsOptions) *cobra.Command {
-	defaultKeyFile := opts.KeyFile
-	cmd := &cobra.Command{
-		Use:   "init",
-		Short: "Initialize .sops.yaml, secrets.sops.yaml, and an SSH key pair",
-		RunE: func(cmd *cobra.Command, _ []string) error {
-			result, err := InitSecrets(opts)
-			if err != nil {
-				return err
-			}
-
-			for _, message := range result.Messages {
-				if _, writeErr := fmt.Fprintln(cmd.OutOrStdout(), message); writeErr != nil {
-					return writeErr
-				}
-			}
-
-			return nil
-		},
-	}
-
-	cmd.Flags().BoolVarP(&opts.Force, "force", "f", false, "Overwrite existing generated files")
-	cmd.Flags().StringVarP(&opts.KeyFile, "key-file", "k", defaultKeyFile, "SSH private key file to use or generate")
-
-	return cmd
-}
-
 // GetSecret retrieves a secret from the SOPS file for a dot-notated path.
-func GetSecret(opts *SecretsOptions, path string) (string, error) {
+func GetSecret(opts *Options, path string) (string, error) {
 	_, tree, _, _, err := loadAndDecryptSecrets(opts)
 	if err != nil {
 		return "", err
@@ -215,7 +85,7 @@ func GetSecret(opts *SecretsOptions, path string) (string, error) {
 }
 
 // SetSecret sets a secret in the SOPS file for a dot-notated path.
-func SetSecret(opts *SecretsOptions, path string, value string) error {
+func SetSecret(opts *Options, path string, value string) error {
 	store, tree, dataKey, mode, err := loadAndDecryptSecrets(opts)
 	if err != nil {
 		return err
@@ -232,7 +102,9 @@ func SetSecret(opts *SecretsOptions, path string, value string) error {
 
 	tree.Branches[0], _ = tree.Branches[0].Set(fullPath, value)
 
-	if err := common.EncryptTree(common.EncryptTreeOpts{Tree: tree, Cipher: aes.NewCipher(), DataKey: dataKey}); err != nil {
+	if err := common.EncryptTree(
+		common.EncryptTreeOpts{Tree: tree, Cipher: aes.NewCipher(), DataKey: dataKey},
+	); err != nil {
 		return fmt.Errorf("failed to encrypt updated secrets: %w", err)
 	}
 
@@ -249,7 +121,7 @@ func SetSecret(opts *SecretsOptions, path string, value string) error {
 }
 
 // RemoveSecret removes a secret from the SOPS file for a dot-notated path.
-func RemoveSecret(opts *SecretsOptions, path string) error {
+func RemoveSecret(opts *Options, path string) error {
 	store, tree, dataKey, mode, err := loadAndDecryptSecrets(opts)
 	if err != nil {
 		return err
@@ -270,7 +142,9 @@ func RemoveSecret(opts *SecretsOptions, path string) error {
 	}
 	tree.Branches[0] = updatedBranch
 
-	if err := common.EncryptTree(common.EncryptTreeOpts{Tree: tree, Cipher: aes.NewCipher(), DataKey: dataKey}); err != nil {
+	if err := common.EncryptTree(
+		common.EncryptTreeOpts{Tree: tree, Cipher: aes.NewCipher(), DataKey: dataKey},
+	); err != nil {
 		return fmt.Errorf("failed to encrypt updated secrets: %w", err)
 	}
 
@@ -287,8 +161,8 @@ func RemoveSecret(opts *SecretsOptions, path string) error {
 }
 
 // InitSecrets initializes SOPS config, encrypted secrets, and an SSH key pair.
-func InitSecrets(opts *SecretsOptions) (*SecretsInitResult, error) {
-	result := &SecretsInitResult{}
+func InitSecrets(opts *Options) (*InitResult, error) {
+	result := &InitResult{}
 
 	paths, err := resolveSecretsInitPaths(opts)
 	if err != nil {
@@ -299,13 +173,19 @@ func InitSecrets(opts *SecretsOptions) (*SecretsInitResult, error) {
 		if exists, existsErr := afero.Exists(opts.Fs, paths.sopsConfigFile); existsErr != nil {
 			return nil, fmt.Errorf("failed to check .sops.yaml: %w", existsErr)
 		} else if exists {
-			result.Messages = append(result.Messages, fmt.Sprintf("%s already exists, not overwriting", paths.sopsConfigFile))
+			result.Messages = append(
+				result.Messages,
+				fmt.Sprintf("%s already exists, not overwriting", paths.sopsConfigFile),
+			)
 		}
 
 		if exists, existsErr := afero.Exists(opts.Fs, paths.secretsFile); existsErr != nil {
 			return nil, fmt.Errorf("failed to check secrets file: %w", existsErr)
 		} else if exists {
-			result.Messages = append(result.Messages, fmt.Sprintf("%s already exists, not overwriting", paths.secretsFile))
+			result.Messages = append(
+				result.Messages,
+				fmt.Sprintf("%s already exists, not overwriting", paths.secretsFile),
+			)
 		}
 
 		if len(result.Messages) > 0 {
@@ -324,7 +204,12 @@ func InitSecrets(opts *SecretsOptions) (*SecretsInitResult, error) {
 	}
 	result.Messages = append(result.Messages, fmt.Sprintf("Wrote %s", paths.sopsConfigFile))
 
-	plaintextSecrets := renderPlainSecretsFile(paths.displayPublicKeyFile, paths.displayKeyFile, keyInfo.AuthorizedKey, keyInfo.PrivateKeyPEM)
+	plaintextSecrets := renderPlainSecretsFile(
+		paths.displayPublicKeyFile,
+		paths.displayKeyFile,
+		keyInfo.AuthorizedKey,
+		keyInfo.PrivateKeyPEM,
+	)
 	encryptedSecrets, err := encryptSecretsPlaintext(paths.secretsFile, []byte(plaintextSecrets), keyInfo.AuthorizedKey)
 	if err != nil {
 		return nil, err
@@ -343,7 +228,7 @@ func InitSecrets(opts *SecretsOptions) (*SecretsInitResult, error) {
 	return result, nil
 }
 
-func loadAndDecryptSecrets(opts *SecretsOptions) (common.Store, *sops.Tree, []byte, os.FileMode, error) {
+func loadAndDecryptSecrets(opts *Options) (common.Store, *sops.Tree, []byte, os.FileMode, error) {
 	exists, err := afero.Exists(opts.Fs, opts.SecretsFile)
 	if err != nil {
 		return nil, nil, nil, 0, fmt.Errorf("failed to check secrets file: %w", err)
@@ -415,7 +300,7 @@ type sshKeyInfo struct {
 	Generated     bool
 }
 
-func resolveSecretsInitPaths(opts *SecretsOptions) (*secretsInitPaths, error) {
+func resolveSecretsInitPaths(opts *Options) (*secretsInitPaths, error) {
 	secretsFile := opts.SecretsFile
 	if secretsFile == "" {
 		secretsFile = "secrets.sops.yaml"
@@ -586,7 +471,12 @@ stores:
 `, displayPublicKeyPath, recipient)
 }
 
-func renderPlainSecretsFile(displayPublicKeyPath string, displayPrivateKeyPath string, authorizedKey string, privateKeyPEM string) string {
+func renderPlainSecretsFile(
+	displayPublicKeyPath string,
+	displayPrivateKeyPath string,
+	authorizedKey string,
+	privateKeyPEM string,
+) string {
 	var builder strings.Builder
 	builder.WriteString("# cspell: disable\n")
 	builder.WriteString("apiVersion: config.karmafun.dev/v1alpha1\n")
@@ -646,7 +536,9 @@ func encryptSecretsPlaintext(secretsFile string, plaintext []byte, recipient str
 		return nil, fmt.Errorf("failed to generate data key: %v", errs)
 	}
 
-	if err := common.EncryptTree(common.EncryptTreeOpts{Tree: &tree, Cipher: aes.NewCipher(), DataKey: dataKey}); err != nil {
+	if err := common.EncryptTree(
+		common.EncryptTreeOpts{Tree: &tree, Cipher: aes.NewCipher(), DataKey: dataKey},
+	); err != nil {
 		return nil, fmt.Errorf("failed to encrypt initial secrets file: %w", err)
 	}
 
@@ -676,7 +568,8 @@ func displayPath(homeDir string, path string) string {
 		return path
 	}
 	relativeToHome, err := filepath.Rel(homeDir, path)
-	if err == nil && relativeToHome != "." && relativeToHome != ".." && !strings.HasPrefix(relativeToHome, ".."+string(filepath.Separator)) {
+	if err == nil && relativeToHome != "." && relativeToHome != ".." &&
+		!strings.HasPrefix(relativeToHome, ".."+string(filepath.Separator)) {
 		return filepath.Join("~", relativeToHome)
 	}
 	if path == homeDir {

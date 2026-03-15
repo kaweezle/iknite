@@ -1,3 +1,4 @@
+// cSpell: words getsops
 /*
 Copyright © 2025 Antoine Martin <antoine@openance.com>
 
@@ -13,7 +14,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-package cmd_test
+package secrets_test
 
 import (
 	"bytes"
@@ -28,39 +29,107 @@ import (
 	"github.com/spf13/afero"
 	"sigs.k8s.io/yaml"
 
-	"github.com/kaweezle/iknite/hack/iknitedev/cmd"
+	"github.com/kaweezle/iknite/hack/iknitedev/pkg/secrets"
 )
 
-func TestCreateSecretsCmd(t *testing.T) {
-	t.Parallel()
+func TestGetSecret(t *testing.T) {
+	// Cannot use t.Parallel because this test sets process env for SOPS decryption.
+	t.Setenv("SOPS_AGE_KEY", testSecretsAgeKey)
 
-	fs := afero.NewMemMapFs()
-	secretsCmd := cmd.CreateSecretsCmd(fs, nil)
-	if secretsCmd == nil {
-		t.Fatal("CreateSecretsCmd returned nil")
-	}
-
-	if secretsCmd.Use != "secrets" {
-		t.Errorf("expected Use to be secrets, got %q", secretsCmd.Use)
+	testFs := afero.NewMemMapFs()
+	secretsPath := "/test/secrets.sops.yaml"
+	if err := afero.WriteFile(testFs, secretsPath, []byte(testSecretsEncryptedWithData), 0o644); err != nil {
+		t.Fatalf("failed to write test secrets file: %v", err)
 	}
 
-	flag := secretsCmd.PersistentFlags().Lookup("secrets-file")
-	if flag == nil {
-		t.Fatal("expected --secrets-file flag to exist")
-	}
-	if flag.Shorthand != "s" {
-		t.Errorf("expected --secrets-file shorthand to be s, got %q", flag.Shorthand)
-	}
-	if flag.DefValue != "secrets.sops.yaml" {
-		t.Errorf("expected --secrets-file default to be secrets.sops.yaml, got %q", flag.DefValue)
+	opts := &secrets.Options{Fs: testFs, SecretsFile: secretsPath}
+	value, err := secrets.GetSecret(opts, "github.api_token")
+	if err != nil {
+		t.Fatalf("GetSecret failed: %v", err)
 	}
 
-	if len(secretsCmd.Commands()) != 4 {
-		t.Fatalf("expected secrets command to have 4 subcommands, got %d", len(secretsCmd.Commands()))
+	if value != "ghp-test-api-token" {
+		t.Fatalf("unexpected get output: %q", value)
 	}
 }
 
-func TestSecretsInitCommand(t *testing.T) {
+func TestGetSecretMissingPath(t *testing.T) {
+	// Cannot use t.Parallel because this test sets process env for SOPS decryption.
+	t.Setenv("SOPS_AGE_KEY", testSecretsAgeKey)
+
+	testFs := afero.NewMemMapFs()
+	secretsPath := "/test/secrets.sops.yaml"
+	if err := afero.WriteFile(testFs, secretsPath, []byte(testSecretsEncryptedWithData), 0o644); err != nil {
+		t.Fatalf("failed to write test secrets file: %v", err)
+	}
+
+	opts := &secrets.Options{Fs: testFs, SecretsFile: secretsPath}
+	_, err := secrets.GetSecret(opts, "github.missing")
+	if err == nil {
+		t.Fatal("expected error for missing path, got nil")
+	}
+	if !strings.Contains(err.Error(), "not found") {
+		t.Fatalf("expected not found error, got: %v", err)
+	}
+}
+
+func TestSetSecret(t *testing.T) {
+	// Cannot use t.Parallel because this test sets process env for SOPS decryption.
+	t.Setenv("SOPS_AGE_KEY", testSecretsAgeKey)
+
+	testFs := afero.NewMemMapFs()
+	secretsPath := "/test/secrets.sops.yaml"
+	if err := afero.WriteFile(testFs, secretsPath, []byte(testSecretsEncryptedWithData), 0o644); err != nil {
+		t.Fatalf("failed to write test secrets file: %v", err)
+	}
+
+	opts := &secrets.Options{Fs: testFs, SecretsFile: secretsPath}
+	if err := secrets.SetSecret(opts, "github.api_token", "new-token-value"); err != nil {
+		t.Fatalf("SetSecret failed: %v", err)
+	}
+
+	assertSecretValue(t, testFs, secretsPath, "data.github.api_token", "new-token-value")
+}
+
+func TestRemoveSecret(t *testing.T) {
+	// Cannot use t.Parallel because this test sets process env for SOPS decryption.
+	t.Setenv("SOPS_AGE_KEY", testSecretsAgeKey)
+
+	testFs := afero.NewMemMapFs()
+	secretsPath := "/test/secrets.sops.yaml"
+	if err := afero.WriteFile(testFs, secretsPath, []byte(testSecretsEncryptedWithData), 0o644); err != nil {
+		t.Fatalf("failed to write test secrets file: %v", err)
+	}
+
+	opts := &secrets.Options{Fs: testFs, SecretsFile: secretsPath}
+	if err := secrets.RemoveSecret(opts, "github.api_token"); err != nil {
+		t.Fatalf("RemoveSecret failed: %v", err)
+	}
+
+	assertSecretPathMissing(t, testFs, secretsPath, "data.github.api_token")
+}
+
+func TestRemoveSecretMissingPath(t *testing.T) {
+	// Cannot use t.Parallel because this test sets process env for SOPS decryption.
+	t.Setenv("SOPS_AGE_KEY", testSecretsAgeKey)
+
+	testFs := afero.NewMemMapFs()
+	secretsPath := "/test/secrets.sops.yaml"
+	if err := afero.WriteFile(testFs, secretsPath, []byte(testSecretsEncryptedWithData), 0o644); err != nil {
+		t.Fatalf("failed to write test secrets file: %v", err)
+	}
+
+	opts := &secrets.Options{Fs: testFs, SecretsFile: secretsPath}
+	err := secrets.RemoveSecret(opts, "github.missing")
+	if err == nil {
+		t.Fatal("expected error for missing path, got nil")
+	}
+	if !strings.Contains(err.Error(), "not found") {
+		t.Fatalf("expected not found error, got: %v", err)
+	}
+}
+
+func TestInitSecrets(t *testing.T) {
 	fs := afero.NewOsFs()
 	tempDir := t.TempDir()
 	homeDir := filepath.Join(tempDir, "home")
@@ -75,15 +144,10 @@ func TestSecretsInitCommand(t *testing.T) {
 		t.Fatalf("failed to create workspace dir: %v", err)
 	}
 
-	opts := &cmd.SecretsOptions{Fs: fs, SecretsFile: secretsPath, HomeDir: homeDir, In: strings.NewReader("")}
-	secretsCmd := cmd.CreateSecretsCmd(fs, opts)
-
-	var stdout bytes.Buffer
-	secretsCmd.SetOut(&stdout)
-	secretsCmd.SetArgs([]string{"init"})
-
-	if err := secretsCmd.Execute(); err != nil {
-		t.Fatalf("secrets init failed: %v", err)
+	opts := &secrets.Options{Fs: fs, SecretsFile: secretsPath, HomeDir: homeDir}
+	result, err := secrets.InitSecrets(opts)
+	if err != nil {
+		t.Fatalf("InitSecrets failed: %v", err)
 	}
 
 	assertFileExists(t, fs, filepath.Join(workspaceDir, ".sops.yaml"))
@@ -107,13 +171,19 @@ func TestSecretsInitCommand(t *testing.T) {
 	assertSecretValueFromOSFile(t, secretsPath, "data.secrets.public_key", "ssh-ed25519 ")
 	assertSecretValueFromOSFile(t, secretsPath, "data.secrets.private_key", "-----BEGIN OPENSSH PRIVATE KEY-----")
 
-	output := stdout.String()
-	if !strings.Contains(output, "Wrote ") {
-		t.Fatalf("expected init output to mention written files, got: %s", output)
+	hasWrote := false
+	for _, msg := range result.Messages {
+		if strings.Contains(msg, "Wrote ") {
+			hasWrote = true
+			break
+		}
+	}
+	if !hasWrote {
+		t.Fatalf("expected init result to contain 'Wrote ' messages, got: %v", result.Messages)
 	}
 }
 
-func TestSecretsInitCommandDoesNotOverwriteExistingFiles(t *testing.T) {
+func TestInitSecretsDoesNotOverwriteExistingFiles(t *testing.T) {
 	fs := afero.NewOsFs()
 	tempDir := t.TempDir()
 	workspaceDir := filepath.Join(tempDir, "workspace")
@@ -130,15 +200,10 @@ func TestSecretsInitCommandDoesNotOverwriteExistingFiles(t *testing.T) {
 		t.Fatalf("failed to seed secrets file: %v", err)
 	}
 
-	opts := &cmd.SecretsOptions{Fs: fs, SecretsFile: secretsPath, HomeDir: tempDir, In: strings.NewReader("")}
-	secretsCmd := cmd.CreateSecretsCmd(fs, opts)
-
-	var stdout bytes.Buffer
-	secretsCmd.SetOut(&stdout)
-	secretsCmd.SetArgs([]string{"init"})
-
-	if err := secretsCmd.Execute(); err != nil {
-		t.Fatalf("secrets init failed: %v", err)
+	opts := &secrets.Options{Fs: fs, SecretsFile: secretsPath, HomeDir: tempDir}
+	result, err := secrets.InitSecrets(opts)
+	if err != nil {
+		t.Fatalf("InitSecrets failed: %v", err)
 	}
 
 	configBytes, err := os.ReadFile(sopsConfigPath)
@@ -157,13 +222,19 @@ func TestSecretsInitCommandDoesNotOverwriteExistingFiles(t *testing.T) {
 		t.Fatalf("expected existing secrets.sops.yaml to be preserved, got: %s", string(secretBytes))
 	}
 
-	output := stdout.String()
-	if !strings.Contains(output, "already exists") {
-		t.Fatalf("expected init output to mention existing files, got: %s", output)
+	hasAlreadyExists := false
+	for _, msg := range result.Messages {
+		if strings.Contains(msg, "already exists") {
+			hasAlreadyExists = true
+			break
+		}
+	}
+	if !hasAlreadyExists {
+		t.Fatalf("expected init result to mention existing files, got: %v", result.Messages)
 	}
 }
 
-func TestSecretsInitCommandWithCustomKeyFile(t *testing.T) {
+func TestInitSecretsWithCustomKeyFile(t *testing.T) {
 	fs := afero.NewOsFs()
 	tempDir := t.TempDir()
 	workspaceDir := filepath.Join(tempDir, "workspace")
@@ -174,155 +245,21 @@ func TestSecretsInitCommandWithCustomKeyFile(t *testing.T) {
 		t.Fatalf("failed to create workspace dir: %v", err)
 	}
 
-	opts := &cmd.SecretsOptions{Fs: fs, SecretsFile: secretsPath, HomeDir: tempDir, In: strings.NewReader("")}
-	secretsCmd := cmd.CreateSecretsCmd(fs, opts)
-
-	var stdout bytes.Buffer
-	secretsCmd.SetOut(&stdout)
-	secretsCmd.SetArgs([]string{"init", "--key-file", keyPath})
-
-	if err := secretsCmd.Execute(); err != nil {
-		t.Fatalf("secrets init with custom key failed: %v", err)
+	opts := &secrets.Options{Fs: fs, SecretsFile: secretsPath, HomeDir: tempDir, KeyFile: keyPath}
+	result, err := secrets.InitSecrets(opts)
+	if err != nil {
+		t.Fatalf("InitSecrets with custom key failed: %v", err)
 	}
 
-	output := stdout.String()
-	if !strings.Contains(output, "SOPS_AGE_SSH_PRIVATE_KEY_FILE=") || !strings.Contains(output, keyPath) {
-		t.Fatalf("expected output to contain SSH key env var guidance, got: %s", output)
+	hasCfgTip := false
+	for _, msg := range result.Messages {
+		if strings.Contains(msg, "SOPS_AGE_SSH_PRIVATE_KEY_FILE=") && strings.Contains(msg, keyPath) {
+			hasCfgTip = true
+			break
+		}
 	}
-}
-
-func TestSecretsGetCommand(t *testing.T) {
-	// Cannot use t.Parallel because this test sets process env for SOPS decryption.
-	t.Setenv("SOPS_AGE_KEY", testSecretsAgeKey)
-
-	testFs := afero.NewMemMapFs()
-	secretsPath := "/test/secrets.sops.yaml"
-	if err := afero.WriteFile(testFs, secretsPath, []byte(testSecretsEncryptedWithData), 0o644); err != nil {
-		t.Fatalf("failed to write test secrets file: %v", err)
-	}
-
-	opts := &cmd.SecretsOptions{Fs: testFs, In: strings.NewReader("")}
-	secretsCmd := cmd.CreateSecretsCmd(testFs, opts)
-
-	var stdout bytes.Buffer
-	secretsCmd.SetOut(&stdout)
-	secretsCmd.SetArgs([]string{"-s", secretsPath, "get", "github.api_token"})
-
-	if err := secretsCmd.Execute(); err != nil {
-		t.Fatalf("secrets get failed: %v", err)
-	}
-
-	if got := strings.TrimSpace(stdout.String()); got != "ghp-test-api-token" {
-		t.Fatalf("unexpected get output: %q", got)
-	}
-}
-
-func TestSecretsGetCommandMissingPath(t *testing.T) {
-	// Cannot use t.Parallel because this test sets process env for SOPS decryption.
-	t.Setenv("SOPS_AGE_KEY", testSecretsAgeKey)
-
-	testFs := afero.NewMemMapFs()
-	secretsPath := "/test/secrets.sops.yaml"
-	if err := afero.WriteFile(testFs, secretsPath, []byte(testSecretsEncryptedWithData), 0o644); err != nil {
-		t.Fatalf("failed to write test secrets file: %v", err)
-	}
-
-	opts := &cmd.SecretsOptions{Fs: testFs, In: strings.NewReader("")}
-	secretsCmd := cmd.CreateSecretsCmd(testFs, opts)
-	secretsCmd.SetArgs([]string{"--secrets-file", secretsPath, "get", "github.missing"})
-
-	err := secretsCmd.Execute()
-	if err == nil {
-		t.Fatal("expected error for missing path, got nil")
-	}
-	if !strings.Contains(err.Error(), "not found") {
-		t.Fatalf("expected not found error, got: %v", err)
-	}
-}
-
-func TestSecretsSetCommandWithValueArg(t *testing.T) {
-	// Cannot use t.Parallel because this test sets process env for SOPS decryption.
-	t.Setenv("SOPS_AGE_KEY", testSecretsAgeKey)
-
-	testFs := afero.NewMemMapFs()
-	secretsPath := "/test/secrets.sops.yaml"
-	if err := afero.WriteFile(testFs, secretsPath, []byte(testSecretsEncryptedWithData), 0o644); err != nil {
-		t.Fatalf("failed to write test secrets file: %v", err)
-	}
-
-	opts := &cmd.SecretsOptions{Fs: testFs, In: strings.NewReader("")}
-	secretsCmd := cmd.CreateSecretsCmd(testFs, opts)
-	secretsCmd.SetArgs([]string{"--secrets-file", secretsPath, "set", "github.api_token", "new-token-from-arg"})
-
-	if err := secretsCmd.Execute(); err != nil {
-		t.Fatalf("secrets set failed: %v", err)
-	}
-
-	assertSecretValue(t, testFs, secretsPath, "data.github.api_token", "new-token-from-arg")
-}
-
-func TestSecretsSetCommandFromStdin(t *testing.T) {
-	// Cannot use t.Parallel because this test sets process env for SOPS decryption.
-	t.Setenv("SOPS_AGE_KEY", testSecretsAgeKey)
-
-	testFs := afero.NewMemMapFs()
-	secretsPath := "/test/secrets.sops.yaml"
-	if err := afero.WriteFile(testFs, secretsPath, []byte(testSecretsEncryptedWithData), 0o644); err != nil {
-		t.Fatalf("failed to write test secrets file: %v", err)
-	}
-
-	opts := &cmd.SecretsOptions{Fs: testFs, In: strings.NewReader("new-token-from-stdin\n")}
-	secretsCmd := cmd.CreateSecretsCmd(testFs, opts)
-	secretsCmd.SetArgs([]string{"--secrets-file", secretsPath, "set", "github.api_token"})
-
-	if err := secretsCmd.Execute(); err != nil {
-		t.Fatalf("secrets set from stdin failed: %v", err)
-	}
-
-	assertSecretValue(t, testFs, secretsPath, "data.github.api_token", "new-token-from-stdin")
-}
-
-func TestSecretsRemoveCommand(t *testing.T) {
-	// Cannot use t.Parallel because this test sets process env for SOPS decryption.
-	t.Setenv("SOPS_AGE_KEY", testSecretsAgeKey)
-
-	testFs := afero.NewMemMapFs()
-	secretsPath := "/test/secrets.sops.yaml"
-	if err := afero.WriteFile(testFs, secretsPath, []byte(testSecretsEncryptedWithData), 0o644); err != nil {
-		t.Fatalf("failed to write test secrets file: %v", err)
-	}
-
-	opts := &cmd.SecretsOptions{Fs: testFs, In: strings.NewReader("")}
-	secretsCmd := cmd.CreateSecretsCmd(testFs, opts)
-	secretsCmd.SetArgs([]string{"--secrets-file", secretsPath, "remove", "github.api_token"})
-
-	if err := secretsCmd.Execute(); err != nil {
-		t.Fatalf("secrets remove failed: %v", err)
-	}
-
-	assertSecretPathMissing(t, testFs, secretsPath, "data.github.api_token")
-}
-
-func TestSecretsRemoveCommandMissingPath(t *testing.T) {
-	// Cannot use t.Parallel because this test sets process env for SOPS decryption.
-	t.Setenv("SOPS_AGE_KEY", testSecretsAgeKey)
-
-	testFs := afero.NewMemMapFs()
-	secretsPath := "/test/secrets.sops.yaml"
-	if err := afero.WriteFile(testFs, secretsPath, []byte(testSecretsEncryptedWithData), 0o644); err != nil {
-		t.Fatalf("failed to write test secrets file: %v", err)
-	}
-
-	opts := &cmd.SecretsOptions{Fs: testFs, In: strings.NewReader("")}
-	secretsCmd := cmd.CreateSecretsCmd(testFs, opts)
-	secretsCmd.SetArgs([]string{"--secrets-file", secretsPath, "remove", "github.missing"})
-
-	err := secretsCmd.Execute()
-	if err == nil {
-		t.Fatal("expected error for missing path, got nil")
-	}
-	if !strings.Contains(err.Error(), "not found") {
-		t.Fatalf("expected not found error, got: %v", err)
+	if !hasCfgTip {
+		t.Fatalf("expected result to contain SSH key env var guidance, got: %v", result.Messages)
 	}
 }
 

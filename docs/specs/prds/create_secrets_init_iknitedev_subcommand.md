@@ -49,7 +49,6 @@ data:
     public_key: &ed25519_public_key ssh-ed25519 <public_key> <comment>
     #  ~/.ssh/id_ed25519
     private_key: &ed25519_private_key |
-      -----BEGIN OPENSSH PRIVATE KEY-----
       <private_key>
 ```
 

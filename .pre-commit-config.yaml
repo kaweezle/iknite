@@ -31,7 +31,8 @@ repos:
       - id: detect-private-key
         exclude: |
           (?x)^(
-              hack/iknitedev/cmd/install_signing_key_test\.go
+              hack/iknitedev/cmd/install_signing_key_test\.go |
+              hack/iknitedev/pkg/secrets/secrets_test\.go
           )$
       - id: check-added-large-files
         args: ["--maxkb=10240"] # 10 MB
