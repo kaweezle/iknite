@@ -5,6 +5,10 @@ updates:
     directory: "/"
     schedule:
       interval: "daily"
+    groups:
+      "github-actions":
+        patterns:
+          - "*" # Group all GitHub Actions dependencies together
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
@@ -16,10 +20,20 @@ updates:
   - package-ecosystem: "docker"
     directories:
       - /packaging/rootfs/base
+      - /hack/cicontainer
+      - /hack/devcontainer
     schedule:
       interval: "daily"
+    groups:
+      "github-actions":
+        patterns:
+          - "*" # Group all GitHub Actions dependencies together
   - package-ecosystem: "opentofu"
     directories:
       - "/deploy/iac/modules/*"
     schedule:
       interval: "daily"
+    groups:
+      "github-actions":
+        patterns:
+          - "*" # Group all GitHub Actions dependencies together
