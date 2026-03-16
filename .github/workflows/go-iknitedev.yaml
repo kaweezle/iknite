@@ -1,5 +1,5 @@
 # cSpell: words covermode coverprofile unittests
-name: "Iknite: Build and test with Go"
+name: "Iknitedev: Build and test with Go"
 
 on:
   push:
@@ -9,11 +9,9 @@ on:
     branches:
       - main
     paths:
-      - "cmd/**"
-      - "pkg/**"
-      - "go.mod"
-      - "go.sum"
-      - ".github/workflows/go.yaml"
+      - "hack/iknitedev/**"
+      - ".github/workflows/go-iknitedev.yaml"
+
 
 jobs:
   build:
@@ -26,20 +24,24 @@ jobs:
       - uses: actions/checkout@v6
       - uses: actions/setup-go@v6
         with:
-          go-version-file: go.mod
+          go-version-file: hack/iknitedev/go.mod
           check-latest: true
           cache: true
         id: go
 
       - name: Build
-        run: go build -v cmd/iknite/iknite.go
+        working-directory: hack/iknitedev
+        run: go build -v -o iknitedev
 
       - name: Test
+        working-directory: hack/iknitedev
         run: go test -v -race -covermode=atomic -coverprofile=coverage.out ./...
 
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@v5
         if: ${{ !cancelled() }}
         with:
+          directory: hack/iknitedev
+          name: iknitedev
           token: ${{ secrets.CODECOV_TOKEN }}
           flags: unittests
