@@ -4,6 +4,7 @@ go 1.25.0
 
 require (
 	github.com/getsops/sops/v3 v3.12.1
+	github.com/go-task/slim-sprig/v3 v3.0.0
 	github.com/spf13/afero v1.15.0
 	github.com/spf13/cobra v1.9.1
 	github.com/spf13/viper v1.19.0

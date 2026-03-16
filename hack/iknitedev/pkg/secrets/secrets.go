@@ -17,8 +17,6 @@ limitations under the License.
 package secrets
 
 import (
-	"crypto/rand"
-	"encoding/pem"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -32,8 +30,6 @@ import (
 	"github.com/getsops/sops/v3/config"
 	"github.com/getsops/sops/v3/version"
 	"github.com/spf13/afero"
-	"golang.org/x/crypto/ed25519"
-	"golang.org/x/crypto/ssh"
 	"sigs.k8s.io/yaml"
 )
 
@@ -213,19 +209,52 @@ func InitSecrets(opts *Options) (*InitResult, error) {
 	if err != nil {
 		return nil, err
 	}
+	if keyInfo.Generated {
+		result.Messages = append(
+			result.Messages,
+			fmt.Sprintf("Generated new SSH key pair at %s and %s", paths.displayKeyFile, paths.displayPublicKeyFile),
+		)
+	} else if keyInfo.AuthorizedKeyDerived {
+		result.Messages = append(
+			result.Messages,
+			fmt.Sprintf(
+				"Derived public key from existing private key at %s and wrote to %s",
+				paths.displayKeyFile,
+				paths.displayPublicKeyFile,
+			),
+		)
+	} else {
+		result.Messages = append(
+			result.Messages,
+			fmt.Sprintf("Using existing SSH key pair at %s and %s", paths.displayKeyFile, paths.displayPublicKeyFile),
+		)
+	}
 
-	sopsConfig := renderSOPSConfig(paths.displayPublicKeyFile, keyInfo.AuthorizedKey)
+	templateData := &TemplateData{
+		Values: map[string]any{
+			"publicKeyPath":  paths.displayPublicKeyFile,
+			"publicKey":      keyInfo.AuthorizedKey,
+			"privateKeyPath": paths.displayKeyFile,
+			"privateKey":     keyInfo.PrivateKeyPEM,
+		},
+	}
+
+	var sopsConfig string
+	sopsConfig, err = renderTemplate(SopsConfigTemplateName, templateData)
+	if err != nil {
+		return nil, fmt.Errorf("failed to render SOPS config template: %w", err)
+	}
 	if writeErr := afero.WriteFile(opts.Fs, paths.sopsConfigFile, []byte(sopsConfig), 0o644); writeErr != nil {
 		return nil, fmt.Errorf("failed to write %s: %w", paths.sopsConfigFile, writeErr)
 	}
 	result.Messages = append(result.Messages, fmt.Sprintf("Wrote %s", paths.sopsConfigFile))
 
-	plaintextSecrets := renderPlainSecretsFile(
-		paths.displayPublicKeyFile,
-		paths.displayKeyFile,
-		keyInfo.AuthorizedKey,
-		keyInfo.PrivateKeyPEM,
-	)
+	var plaintextSecrets string
+	plaintextSecrets, err = renderTemplate(SecretsTemplateName, templateData)
+	if err != nil {
+		return nil, fmt.Errorf("failed to render secrets template: %w", err)
+	}
+
 	encryptedSecrets, err := encryptSecretsPlaintext(paths.secretsFile, []byte(plaintextSecrets), keyInfo.AuthorizedKey)
 	if err != nil {
 		return nil, err
@@ -322,12 +351,6 @@ type secretsInitPaths struct {
 	displayPublicKeyFile string
 }
 
-type sshKeyInfo struct {
-	AuthorizedKey string
-	PrivateKeyPEM string
-	Generated     bool
-}
-
 func resolveSecretsInitPaths(opts *Options) (*secretsInitPaths, error) {
 	secretsFile := opts.SecretsFile
 	if secretsFile == "" {
@@ -358,200 +381,6 @@ func resolveSecretsInitPaths(opts *Options) (*secretsInitPaths, error) {
 		displayKeyFile:       displayPath(opts.HomeDir, keyFile),
 		displayPublicKeyFile: displayPath(opts.HomeDir, publicKeyFile),
 	}, nil
-}
-
-func sshAuthorizedKeyFromPrivateKey(privateKeyBytes []byte, comment string) (string, error) {
-	rawPrivateKey, parseErr := ssh.ParseRawPrivateKey(privateKeyBytes)
-	if parseErr != nil {
-		return "", fmt.Errorf("failed to parse private key file: %w", parseErr)
-	}
-
-	sshPublicKey, convErr := sshPublicKeyFromPrivateKey(rawPrivateKey)
-	if convErr != nil {
-		return "", convErr
-	}
-
-	return marshalAuthorizedKey(sshPublicKey, comment), nil
-}
-
-func readAuthorizedKeyFromPublicKeyFile(fs afero.Fs, publicKeyFile string) (string, error) {
-	publicKeyBytes, readErr := afero.ReadFile(fs, publicKeyFile)
-	if readErr != nil {
-		return "", fmt.Errorf("failed to read public key file: %w", readErr)
-	}
-	parsedKey, parsedComment, _, _, parseErr := ssh.ParseAuthorizedKey(publicKeyBytes)
-	if parseErr != nil {
-		return "", fmt.Errorf("failed to parse public key file: %w", parseErr)
-	}
-	if parsedComment != "" {
-		return marshalAuthorizedKey(parsedKey, parsedComment), nil
-	}
-	return marshalAuthorizedKey(parsedKey, filepath.Base(publicKeyFile)), nil
-}
-
-// ensureSSHKeyPair checks for the existence of the SSH key pair and generates it if necessary.
-//
-//nolint:gocyclo // This function is complex but it's mostly error handling and branching logic.
-func ensureSSHKeyPair(fs afero.Fs, keyFile, publicKeyFile string) (*sshKeyInfo, error) {
-	privateExists, err := afero.Exists(fs, keyFile)
-	if err != nil {
-		return nil, fmt.Errorf("failed to check key file: %w", err)
-	}
-	publicExists, err := afero.Exists(fs, publicKeyFile)
-	if err != nil {
-		return nil, fmt.Errorf("failed to check public key file: %w", err)
-	}
-
-	if publicExists && !privateExists {
-		return nil, fmt.Errorf("public key file %s exists but private key file %s does not", publicKeyFile, keyFile)
-	}
-
-	comment := filepath.Base(keyFile)
-	result := &sshKeyInfo{Generated: false}
-
-	if publicExists {
-		result.AuthorizedKey, err = readAuthorizedKeyFromPublicKeyFile(fs, publicKeyFile)
-		if err != nil {
-			return nil, fmt.Errorf("failed to read authorized key from public key file: %w", err)
-		}
-	}
-
-	if privateExists {
-		privateKeyBytes, readErr := afero.ReadFile(fs, keyFile)
-		if readErr != nil {
-			return nil, fmt.Errorf("failed to read key file: %w", readErr)
-		}
-		result.PrivateKeyPEM = strings.TrimRight(string(privateKeyBytes), "\n")
-
-		if publicExists {
-			return result, nil
-		}
-
-		result.AuthorizedKey, err = sshAuthorizedKeyFromPrivateKey(privateKeyBytes, comment)
-		if err != nil {
-			return nil, fmt.Errorf("failed to derive public key from private key: %w", err)
-		}
-
-		if writeErr := writePublicKeyFile(fs, publicKeyFile, result.AuthorizedKey); writeErr != nil {
-			return nil, writeErr
-		}
-
-		return result, nil
-	}
-
-	if mkdirErr := fs.MkdirAll(filepath.Dir(keyFile), 0o700); mkdirErr != nil {
-		return nil, fmt.Errorf("failed to create key directory: %w", mkdirErr)
-	}
-
-	publicKey, privateKey, genErr := ed25519.GenerateKey(rand.Reader)
-	if genErr != nil {
-		return nil, fmt.Errorf("failed to generate ed25519 key pair: %w", genErr)
-	}
-
-	sshPublicKey, convErr := ssh.NewPublicKey(publicKey)
-	if convErr != nil {
-		return nil, fmt.Errorf("failed to convert public key to SSH format: %w", convErr)
-	}
-
-	privateKeyBlock, marshalErr := ssh.MarshalPrivateKey(privateKey, comment)
-	if marshalErr != nil {
-		return nil, fmt.Errorf("failed to marshal private key: %w", marshalErr)
-	}
-	privateKeyBytes := pem.EncodeToMemory(privateKeyBlock)
-	result.PrivateKeyPEM = strings.TrimRight(string(privateKeyBytes), "\n")
-
-	if writeErr := afero.WriteFile(fs, keyFile, privateKeyBytes, 0o600); writeErr != nil {
-		return nil, fmt.Errorf("failed to write private key file: %w", writeErr)
-	}
-
-	result.AuthorizedKey = marshalAuthorizedKey(sshPublicKey, comment)
-	if writeErr := writePublicKeyFile(fs, publicKeyFile, result.AuthorizedKey); writeErr != nil {
-		return nil, writeErr
-	}
-
-	return &sshKeyInfo{AuthorizedKey: result.AuthorizedKey, PrivateKeyPEM: result.PrivateKeyPEM, Generated: true}, nil
-}
-
-func sshPublicKeyFromPrivateKey(privateKey any) (ssh.PublicKey, error) {
-	switch typed := privateKey.(type) {
-	case ed25519.PrivateKey:
-		publicKey, err := ssh.NewPublicKey(typed.Public())
-		if err != nil {
-			return nil, fmt.Errorf("failed to convert ed25519 public key to SSH format: %w", err)
-		}
-		return publicKey, nil
-	case *ed25519.PrivateKey:
-		publicKey, err := ssh.NewPublicKey(typed.Public())
-		if err != nil {
-			return nil, fmt.Errorf("failed to convert ed25519 public key to SSH format: %w", err)
-		}
-		return publicKey, nil
-	default:
-		return nil, fmt.Errorf("unsupported private key type %T", privateKey)
-	}
-}
-
-func writePublicKeyFile(fs afero.Fs, publicKeyFile, authorizedKey string) error {
-	if writeErr := afero.WriteFile(fs, publicKeyFile, []byte(authorizedKey+"\n"), 0o644); writeErr != nil {
-		return fmt.Errorf("failed to write public key file: %w", writeErr)
-	}
-	return nil
-}
-
-func marshalAuthorizedKey(publicKey ssh.PublicKey, comment string) string {
-	trimmed := strings.TrimSpace(string(ssh.MarshalAuthorizedKey(publicKey)))
-	if comment == "" {
-		return trimmed
-	}
-	return trimmed + " " + comment
-}
-
-func renderSOPSConfig(displayPublicKeyPath, recipient string) string {
-	return fmt.Sprintf(`creation_rules:
-  - path_regex: .*\.sops\.yaml$
-    encrypted_regex: "^data$"
-    # This is the %s public key, but you can replace it with your own public key
-    age: >-
-      %s
-stores:
-  json:
-    indent: 2
-  json_binary:
-    indent: 2
-  yaml:
-    indent: 2
-`, displayPublicKeyPath, recipient)
-}
-
-func renderPlainSecretsFile(
-	displayPublicKeyPath string,
-	displayPrivateKeyPath string,
-	authorizedKey string,
-	privateKeyPEM string,
-) string {
-	var builder strings.Builder
-	builder.WriteString("# cspell: disable\n")
-	builder.WriteString("apiVersion: config.karmafun.dev/v1alpha1\n")
-	builder.WriteString("kind: SopsGenerator\n")
-	builder.WriteString("metadata:\n")
-	builder.WriteString("  name: iknite-secrets\n")
-	builder.WriteString("  annotations:\n")
-	builder.WriteString("    config.kaweezle.com/local-config: \"true\"\n")
-	builder.WriteString("    config.kubernetes.io/function: |\n")
-	builder.WriteString("      exec:\n")
-	builder.WriteString("        path: karmafun\n")
-	builder.WriteString("data:\n")
-	builder.WriteString("  secrets:\n")
-	fmt.Fprintf(&builder, "    # %s\n", displayPublicKeyPath)
-	fmt.Fprintf(&builder, "    public_key: &ed25519_public_key %s\n", authorizedKey)
-	fmt.Fprintf(&builder, "    # %s\n", displayPrivateKeyPath)
-	builder.WriteString("    private_key: &ed25519_private_key |\n")
-	for _, line := range strings.Split(privateKeyPEM, "\n") {
-		builder.WriteString("      ")
-		builder.WriteString(line)
-		builder.WriteString("\n")
-	}
-	return builder.String()
 }
 
 func encryptSecretsPlaintext(secretsFile string, plaintext []byte, recipient string) ([]byte, error) {
