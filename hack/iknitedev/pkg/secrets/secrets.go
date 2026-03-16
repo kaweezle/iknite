@@ -209,12 +209,13 @@ func InitSecrets(opts *Options) (*InitResult, error) {
 	if err != nil {
 		return nil, err
 	}
-	if keyInfo.Generated {
+	switch {
+	case keyInfo.Generated:
 		result.Messages = append(
 			result.Messages,
 			fmt.Sprintf("Generated new SSH key pair at %s and %s", paths.displayKeyFile, paths.displayPublicKeyFile),
 		)
-	} else if keyInfo.AuthorizedKeyDerived {
+	case keyInfo.AuthorizedKeyDerived:
 		result.Messages = append(
 			result.Messages,
 			fmt.Sprintf(
@@ -223,7 +224,7 @@ func InitSecrets(opts *Options) (*InitResult, error) {
 				paths.displayPublicKeyFile,
 			),
 		)
-	} else {
+	default:
 		result.Messages = append(
 			result.Messages,
 			fmt.Sprintf("Using existing SSH key pair at %s and %s", paths.displayKeyFile, paths.displayPublicKeyFile),
