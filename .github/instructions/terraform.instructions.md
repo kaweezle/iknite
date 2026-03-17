@@ -5,13 +5,13 @@ applyTo: 'deploy/iac/**/*'
 
 <!-- cSpell: words kwzltfstate earlyvalue2 tftest -->
 
-# Terraform and Terragrunt Conventions
+# Opentofu (terraform) and Terragrunt Conventions
 
 ## Overview
 
-This document defines conventions and best practices for Terraform modules and
-Terragrunt configurations in this project. All configurations should adhere to
-these guidelines to ensure consistency, maintainability, and security.
+This document defines conventions and best practices for Opentofu (Terraform)
+modules and Terragrunt configurations in this project. All configurations should
+adhere to these guidelines to ensure consistency, maintainability, and security.
 
 ### General Principles
 

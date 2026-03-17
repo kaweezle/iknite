@@ -2,12 +2,39 @@
 
 # Iknite Development Guide for AI Agents
 
+## General Guidelines
+
+- UPDATE THIS FILE WITH NEW LEARNINGS.
+- Be concise. Focus on key information and avoid unnecessary details, especially
+  in code comments and documentation.
+- When a task is finished, add the added or modified files to the git staging
+  area and run `pre-commit run`. If any issues are found, fix them and repeat
+  until all checks pass.
+- The project uses cSpell. When `pre-commit` report cSpell errors, the preferred
+  way to fix them is to add the missing words in a `cSpell: words` comment at
+  the beginning of the offending file. Example:
+
+  ```go
+  // cSpell: words chainguard vhdx gofmt softlevel covermode cover
+  ```
+
+  ```md
+  <!-- cSpell: words devenv mkdocs livereload -->
+  ```
+
+  When terms are found to be used across multiple files, they can be added to
+  the global `cspell.json` file in the project root.
+
+- When more than 10 files are modified, or when the modified files are in more
+  than 3 different directories, it's recommended to run
+  `pre-commit run --all-files` to ensure all changes are properly checked.
+
 ## Project Overview
 
 Iknite is a Go-based cluster orchestrator that manages initialization and
-startup of a single-node Kubernetes cluster on Alpine Linux (WSL2/VM). It wraps
-`kubeadm` and `kubelet` with Alpine-specific integration (OpenRC services) and
-pre-provisions essential cluster components.
+startup of a single-node Kubernetes cluster on Alpine Linux (WSL2/VM/Incus
+Container). It wraps `kubeadm` and `kubelet` with Alpine-specific integration
+(OpenRC services) and pre-provisions essential cluster components.
 
 ### Core Workflow
 
@@ -16,7 +43,7 @@ kustomizations → wait for workloads
 
 ### Project Components
 
-The project provides five main deliverables:
+The project provides the following deliverables:
 
 1. **Iknite CLI tool** (`cmd/iknite/iknite.go`)
    - Cobra-based commands: `start`, `init`, `reset`, `status`, `clean`, `info`
@@ -25,7 +52,7 @@ The project provides five main deliverables:
 2. **Iknite APK package** (built with [goreleaser](../.goreleaser.yaml))
    - Installs `iknite` binary to `/sbin/iknite`
    - Includes Alpine service files (`/etc/init.d/iknite`, `/etc/conf.d/iknite`)
-   - Default kustomizations in `/etc/iknite.d/`
+   - Default kustomization in `/etc/iknite.d/`
    - Depends on: kubelet, kubeadm, kubectl, containerd, cni-plugins, buildkit
 
 3. **Iknite-images APK package** (built with
