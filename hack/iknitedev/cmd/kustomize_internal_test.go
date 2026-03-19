@@ -27,10 +27,21 @@ import (
 	"github.com/spf13/afero"
 )
 
+const (
+	configMapContent = `apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: test-config
+data:
+  key: value
+`
+)
+
 func TestCreateKustomizeCmd(t *testing.T) {
 	t.Parallel()
 	fs := afero.NewMemMapFs()
-	cmd := CreateKustomizeCmd(fs)
+	out := &bytes.Buffer{}
+	cmd := CreateKustomizeCmd(fs, out)
 
 	if cmd == nil {
 		t.Fatal("CreateKustomizeCmd returned nil")
@@ -44,8 +55,8 @@ func TestCreateKustomizeCmd(t *testing.T) {
 func TestRunKustomize_MissingDirectory(t *testing.T) {
 	t.Parallel()
 	fs := afero.NewMemMapFs()
-
-	err := runKustomize(fs, []string{"/nonexistent"})
+	var out bytes.Buffer
+	err := runKustomize(fs, &out, []string{"/nonexistent"})
 	if err == nil {
 		t.Error("expected error for nonexistent directory, got nil")
 	}
@@ -61,7 +72,8 @@ func TestRunKustomize_MissingKustomizationFile(t *testing.T) {
 		t.Fatalf("failed to create test directory: %v", err)
 	}
 
-	err = runKustomize(fs, []string{"/test"})
+	var out bytes.Buffer
+	err = runKustomize(fs, &out, []string{"/test"})
 	if err == nil {
 		t.Error("expected error for missing kustomization.yaml, got nil")
 	}
@@ -84,31 +96,23 @@ kind: Kustomization
 resources:
 - configmap.yaml
 `
-
-	configMapContent := `apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: test-config
-data:
-  key: value
-`
-
 	// Write files
 	if err := os.WriteFile(
 		filepath.Join(tmpDir, "kustomization.yaml"),
 		[]byte(kustomizationContent),
-		0o644,
+		0o600,
 	); err != nil {
 		t.Fatalf("failed to write kustomization.yaml: %v", err)
 	}
 
-	if err := os.WriteFile(filepath.Join(tmpDir, "configmap.yaml"), []byte(configMapContent), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(tmpDir, "configmap.yaml"), []byte(configMapContent), 0o600); err != nil {
 		t.Fatalf("failed to write configmap.yaml: %v", err)
 	}
 
 	// Test without destination (print to stdout)
 	fs := afero.NewOsFs()
-	err := runKustomize(fs, []string{tmpDir})
+	var out bytes.Buffer
+	err := runKustomize(fs, &out, []string{tmpDir})
 	if err != nil {
 		t.Errorf("runKustomize failed: %v", err)
 	}
@@ -131,14 +135,6 @@ kind: Kustomization
 resources:
 - configmap.yaml
 - deployment.yaml
-`
-
-	configMapContent := `apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: test-config
-data:
-  key: value
 `
 
 	deploymentContent := `apiVersion: apps/v1
@@ -164,22 +160,23 @@ spec:
 	if err := os.WriteFile(
 		filepath.Join(tmpDir, "kustomization.yaml"),
 		[]byte(kustomizationContent),
-		0o644,
+		0o600,
 	); err != nil {
 		t.Fatalf("failed to write kustomization.yaml: %v", err)
 	}
 
-	if err := os.WriteFile(filepath.Join(tmpDir, "configmap.yaml"), []byte(configMapContent), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(tmpDir, "configmap.yaml"), []byte(configMapContent), 0o600); err != nil {
 		t.Fatalf("failed to write configmap.yaml: %v", err)
 	}
 
-	if err := os.WriteFile(filepath.Join(tmpDir, "deployment.yaml"), []byte(deploymentContent), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(tmpDir, "deployment.yaml"), []byte(deploymentContent), 0o600); err != nil {
 		t.Fatalf("failed to write deployment.yaml: %v", err)
 	}
 
 	// Test with destination
 	fs := afero.NewOsFs()
-	err := runKustomize(fs, []string{tmpDir, destDir})
+	out := &bytes.Buffer{}
+	err := runKustomize(fs, out, []string{tmpDir, destDir})
 	if err != nil {
 		t.Fatalf("runKustomize failed: %v", err)
 	}
@@ -285,34 +282,24 @@ resources:
 - configmap.yaml
 `
 
-	configMapContent := `apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: test-config
-data:
-  key: value
-`
-
 	// Write files
 	if err := os.WriteFile(
 		filepath.Join(tmpDir, "kustomization.yaml"),
 		[]byte(kustomizationContent),
-		0o644,
+		0o600,
 	); err != nil {
 		t.Fatalf("failed to write kustomization.yaml: %v", err)
 	}
 
-	if err := os.WriteFile(filepath.Join(tmpDir, "configmap.yaml"), []byte(configMapContent), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(tmpDir, "configmap.yaml"), []byte(configMapContent), 0o600); err != nil {
 		t.Fatalf("failed to write configmap.yaml: %v", err)
 	}
 
 	// Create command and execute
 	fs := afero.NewOsFs()
-	cmd := CreateKustomizeCmd(fs)
-
 	// Capture output
 	var stdout bytes.Buffer
-	cmd.SetOut(&stdout)
+	cmd := CreateKustomizeCmd(fs, &stdout)
 
 	// Set args
 	cmd.SetArgs([]string{tmpDir})

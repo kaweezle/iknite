@@ -31,7 +31,9 @@ repos:
       - id: detect-private-key
         exclude: |
           (?x)^(
-              hack/iknitedev/cmd/install_signing_key_test\.go
+              hack/iknitedev/cmd/install_signing_key_test\.go |
+              hack/iknitedev/pkg/secrets/secrets_test\.go |
+              hack/iknitedev/pkg/secrets/templates_internal_test\.go
           )$
       - id: check-added-large-files
         args: ["--maxkb=10240"] # 10 MB
@@ -132,6 +134,43 @@ repos:
     hooks:
       # Use this hook to let pre-commit build checkmake in its sandbox
       - id: checkmake
+
+  # Local hooks for Kubernetes manifest validation
+  - repo: local
+    hooks:
+      - id: validate-application
+        name: Validate application.yaml
+        entry: deploy/k8s/hack/validate-application.sh
+        language: script
+        files: application\.yaml$
+        pass_filenames: true
+        exclude: |
+          (?x)^(
+              build/.*
+          )$
+      - id: validate-helmfile
+        name: Validate helmfile.yaml
+        entry: deploy/k8s/hack/validate-helmfile.sh
+        language: script
+        files: helmfile\.yaml(\.gotmpl)?$
+        pass_filenames: true
+        exclude: |
+          (?x)^(
+              build/.*
+          )$
+      - id: validate-kustomization
+        name: Validate kustomization.yaml
+        entry: deploy/k8s/hack/validate-kustomization.sh
+        language: script
+        files: kustomization\.yaml$
+        pass_filenames: true
+        exclude: |
+          (?x)^(
+              build/.*|
+              .*/templates/.*|
+              deploy/k8s/argocd/secrets/.*|
+              deploy/k8s/argocd/values/.*
+          )$
 
 # Global exclusions for all hooks
 exclude: |

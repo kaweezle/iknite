@@ -4,7 +4,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(realpath "${SCRIPT_DIR}/../../..")"
-SECRETS_FILE="${SECRETS_FILE:-${REPO_ROOT}/deploy/k8s/argocd/secrets/secrets.sops.yaml}"
+SECRETS_FILE="${SECRETS_FILE:-${REPO_ROOT}/secrets.sops.yaml}"
 STATE_BUCKET="${STATE_BUCKET:-kwzltfstate}"
 
 DRY_RUN=true

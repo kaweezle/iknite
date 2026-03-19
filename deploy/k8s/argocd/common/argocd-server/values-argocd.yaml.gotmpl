@@ -1,9 +1,10 @@
 # cSpell: words adminapi gpgkeys statusbadge restrictor websecure serviceaccount
+{{ $domain := printf "%s.%s" .Values.data.argocd.domain_prefix .Values.data.domain_suffix }}
 ## Globally shared configuration
 global:
   # -- Default domain used by all components
   ## Used for ingresses, certificates, SSO, notifications, etc.
-  domain: {{ .Values.data.argocd.domain }}
+  domain: {{ $domain }}
 
   # -- Toggle and define pod-level security context.
   # @default -- `{}` (See [values.yaml])
@@ -37,7 +38,7 @@ configs:
           clientID: {{ .Values.data.argocd.github_oauth_client_id | quote }}
           clientSecret: {{ .Values.data.argocd.github_oauth_client_secret | quote }}
           orgs:
-          - name: {{ .Values.data.argocd.github.organization | quote }}
+          - name: {{ .Values.data.project.github.organization | quote }}
           teamNameField: slug
           useLoginAsId: true
 
@@ -46,7 +47,7 @@ configs:
       - id: argo-workflows-sso
         name: Argo Workflows
         redirectURIs:
-        - https://{{ .Values.data.argo_workflows.domain }}/oauth2/callback
+        - https://{{ $domain }}/oauth2/callback
         secretEnv: ARGO_WORKFLOWS_SSO_CLIENT_SECRET
       {{ end }}
 
@@ -57,7 +58,7 @@ configs:
     policy.default: role:readonly
     # Put the users in the admin team in order to give them admin rights
     policy.csv: |
-      g, {{ .Values.data.argocd.github.organization }}:admin,role:admin
+      g, {{ .Values.data.project.github.organization }}:{{ .Values.data.project.github.team }},role:admin
       p, role:org-admin, applications, *, */*, allow
       p, role:org-admin, clusters, *, *, allow
       p, role:org-admin, repositories, *, *, allow
@@ -73,8 +74,8 @@ configs:
 
   credentialTemplates:
     ssh-creds:
-      url: {{ .Values.data.argocd.github.base_url }}
-      sshPrivateKey: {{ .Values.data.argocd.ssh_private_key | quote }}
+      url: {{ with  .Values.data.project.github }}git@github.com:{{ .organization }}{{ end }}
+      sshPrivateKey: {{ .Values.data.keys.main.private_key | quote }}
 
   secret:
     githubSecret: {{ .Values.data.github.webhook_secret | quote }}
@@ -108,7 +109,7 @@ server:
 
   ingress:
     enabled: false # Created by the ingress package
-    hostname: {{ .Values.data.argocd.domain }}
+    hostname: {{ $domain }}
     controller: generic
     ingressClassName: traefik
     tls: true
@@ -119,18 +120,18 @@ repoServer:
   image:
     # -- Repository to use for the repo server
     # @default -- `""` (defaults to global.image.repository)
-    repository: {{ .Values.data.argocd.repo_server_image_name }}
+    repository: {{ .Values.data.argocd.repo_server.image_name }}
     # -- Tag to use for the repo server
     # @default -- `""` (defaults to global.image.tag)
-    tag: {{ .Values.data.argocd.repo_server_image_tag }}
+    tag: {{ .Values.data.argocd.repo_server.image_tag }}
     # -- Image pull policy for the repo server
     # @default -- `""` (defaults to global.image.imagePullPolicy)
     imagePullPolicy: ""
 
   # -- Environment variables to pass to repo server
   env:
-    - name: SOPS_AGE_KEY_FILE
-      value: /sops-private-keys/age_key.txt
+    - name: SOPS_AGE_SSH_PRIVATE_KEY_FILE
+      value: /ssh-private-key/id_ed25519
     - name: HELM_PLUGINS
       value: /home/argocd/.local/share/helm/plugins/
     - name: HOST_IP
@@ -149,17 +150,19 @@ repoServer:
       value: "true"
     - name: HELM_SECRETS_DECRYPT_SECRETS_IN_TMP_DIR
       value: "true"
+    - name: IKNITE_ARGOCD
+      value: "true"
 
   # -- Additional volumeMounts to the repo server main container
   volumeMounts:
-    - name: argocd-sops-private-keys
-      mountPath: /sops-private-keys
+    - name: argocd-ssh-private-key
+      mountPath: /ssh-private-key
 
   # -- Additional volumes to the repo server pod
   volumes:
-    - name: argocd-sops-private-keys
+    - name: argocd-ssh-private-key
       secret:
-        secretName: argocd-sops-private-keys
+        secretName: argocd-ssh-private-key
         optional: true
         defaultMode: 420
     - name: helmfile-cmp-tmp
@@ -169,11 +172,11 @@ repoServer:
 
   extraContainers:
   - name: helmfile-plugin
-    image: {{ .Values.data.argocd.repo_server_image_name }}:{{ .Values.data.argocd.repo_server_image_tag }}
+    image: {{ .Values.data.argocd.repo_server.image_name }}:{{ .Values.data.argocd.repo_server.image_tag }}
     command: [/var/run/argocd/argocd-cmp-server]
     env:
-    - name: SOPS_AGE_KEY_FILE
-      value: /sops-private-keys/age_key.txt
+    - name: SOPS_AGE_SSH_PRIVATE_KEY_FILE
+      value: /ssh-private-key/id_ed25519
     - name: HELM_PLUGINS
       value: /home/argocd/.local/share/helm/plugins/
     - name: HOST_IP
@@ -194,12 +197,14 @@ repoServer:
       value: "true"
     - name: HELM_SECRETS_BACKEND
       value: "sops"
+    - name: IKNITE_ARGOCD
+      value: "true"
     securityContext:
       runAsNonRoot: true
       runAsUser: 999
     volumeMounts:
-      - name: argocd-sops-private-keys
-        mountPath: /sops-private-keys
+      - name: argocd-ssh-private-key
+        mountPath: /ssh-private-key
       - mountPath: /var/run/argocd
         name: var-files
       - mountPath: /tmp
@@ -214,12 +219,11 @@ extraObjects:
     apiVersion: v1
     kind: Secret
     metadata:
-      name: argocd-sops-private-keys
+      name: argocd-ssh-private-key
     type: Opaque
     data:
-      # The non transformed value is the content of sample_age_key.txt
-      age_key.txt: {{ .Values.data.secrets.age_key_b64 | quote }}
-  {{ if .Environment.Values.data | dig "argo_workflows" "client_secret" "" }}
+      id_ed25519: {{ .Values.data.keys.main.private_key | b64enc | quote }}
+  {{ if .Values.data | dig "argo_workflows" "client_secret" "" }}
   -
     apiVersion: v1
     kind: Secret
@@ -252,7 +256,7 @@ extraObjects:
         - websecure
       routes:
         - kind: Rule
-          match: Host(`{{ .Values.data.argocd.domain }}`)
+          match: Host(`{{ $domain }}`)
           priority: 10
           services:
             - kind: Service
@@ -261,7 +265,7 @@ extraObjects:
               port: http
               passHostHeader: true
         - kind: Rule
-          match: Host(`{{ .Values.data.argocd.domain }}`) && Header(`Content-Type`, `application/grpc`)
+          match: Host(`{{ $domain }}`) && Header(`Content-Type`, `application/grpc`)
           priority: 11
           services:
             - kind: Service
@@ -273,7 +277,7 @@ extraObjects:
       tls:
         secretName: argocd-server-tls
         domains:
-          - main: {{ .Values.data.argocd.domain }}
+          - main: {{ $domain }}
   -
     apiVersion: traefik.io/v1alpha1
     kind: IngressRoute
@@ -285,7 +289,7 @@ extraObjects:
         - web
       routes:
         - kind: Rule
-          match: Host(`{{ .Values.data.argocd.domain }}`)
+          match: Host(`{{ $domain }}`)
           priority: 10
           services:
             - kind: Service
@@ -294,7 +298,7 @@ extraObjects:
               port: http
               passHostHeader: true
         - kind: Rule
-          match: Host(`{{ .Values.data.argocd.domain }}`) && Header(`Content-Type`, `application/grpc`)
+          match: Host(`{{ $domain }}`) && Header(`Content-Type`, `application/grpc`)
           priority: 11
           services:
             - kind: Service
@@ -306,16 +310,7 @@ extraObjects:
   ####
   # Bootstrap application
   ####
-  -
-    apiVersion: v1
-    kind: Secret
-    metadata:
-      name: argocd-private-repo-ssh-key
-      annotations:
-        argocd.argoproj.io/hook: Skip
-    type: Opaque
-    data:
-      sshPrivateKey: {{ .Values.data.argocd.ssh_private_key | b64enc | quote }}
+  {{ if not (env "IKNITE_ARGOCD") }}
   -
     apiVersion: v1
     kind: ConfigMap
@@ -326,9 +321,9 @@ extraObjects:
     # The dot (.) character cannot be used as separator here as names are going to be
     # used as environment variables.
     data:
-      autocloud_target_revision: {{ .Values.data.bootstrap.repo_target_revision | quote }}
-      autocloud_repo_url: {{ .Values.data.bootstrap.repo_url | quote }}
-      autocloud_bootstrap_application_path: {{ .Values.data.bootstrap.application_path | quote }}
+      autocloud_target_revision: {{ .Values.data.project.github.targetRevision | quote }}
+      autocloud_repo_url: {{ .Values.data.project.github.repoURL | quote }}
+      autocloud_bootstrap_application_path: "{{ .Values.data.argocd.base_path }}/appstages/{{ .Values.data.argocd.bootstrap_application }}/application.yaml"
   -
     apiVersion: v1
     kind: ServiceAccount
@@ -375,13 +370,10 @@ extraObjects:
           volumes:
             - name: ssh-key-volume
               secret:
-                secretName: argocd-private-repo-ssh-key
-                items:
-                  - key: sshPrivateKey
-                    path: id_rsa
+                secretName: argocd-ssh-private-key
           containers:
             - name: create-bootstrap-application
-              image: {{ .Values.data.argocd.repo_server_image_name }}:{{ .Values.data.argocd.repo_server_image_tag }}
+              image: {{ .Values.data.argocd.repo_server.image_name }}:{{ .Values.data.argocd.repo_server.image_tag }}
               imagePullPolicy: IfNotPresent
               envFrom:
                 - configMapRef:
@@ -401,7 +393,7 @@ extraObjects:
                   mkdir ~/.ssh
                   chmod -R 777 ~/.ssh
                   cp /etc/ssh-key/* ~/.ssh
-                  eval $(ssh-agent) && ssh-add /etc/ssh-key/id_rsa
+                  eval $(ssh-agent) && ssh-add /etc/ssh-key/id_ed25519
                   ssh-keyscan -t rsa github.com >> ~/.ssh/known_hosts
 
                   sleep $ROLLOUT_INITIAL_DELAY
@@ -416,3 +408,4 @@ extraObjects:
               volumeMounts:
                 - mountPath: /etc/ssh-key
                   name: ssh-key-volume
+  {{ end }}

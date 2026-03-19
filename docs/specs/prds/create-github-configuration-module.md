@@ -63,7 +63,7 @@ The terragrunt unit will pass the following parameters to the terraform module:
   field.
 - oauth_permissions: `["read:user", "read:org", "repo"]`
 - deploy_key_public_key: Taken from the sops secret file in the
-  `iknite_vm.ssh_public_key` field.
+  `keys.main.public_key` field.
 
 # Test Plan
 

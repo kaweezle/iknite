@@ -1,3 +1,5 @@
+<!-- cSpell: words mycommand mysubcmd -->
+
 # iknitedev
 
 Development tools for the iknite project.
@@ -7,6 +9,21 @@ Development tools for the iknite project.
 `iknitedev` is a collection of development utilities for the iknite project. It
 provides commands for managing secrets, building artifacts, and other
 development tasks that are not part of the main iknite binary.
+
+## Architecture
+
+The project is organized into two layers:
+
+- **`pkg/<domain>/`** — Business logic packages containing the actual
+  implementation, options types, and exported functions (e.g. `pkg/secrets/`).
+- **`pkg/cmd/<command>/`** — Cobra command wrappers, one file per subcommand,
+  that delegate to the corresponding business logic package (e.g.
+  `pkg/cmd/secrets/`).
+- **`cmd/`** — Root and top-level command registration, wiring `pkg/cmd`
+  packages into the CLI.
+
+This separation keeps business logic independently testable without Cobra and
+allows the cobra layer to focus on flag parsing and I/O wiring.
 
 ## Installation
 
@@ -43,10 +60,10 @@ iknitedev install signing-key [secrets-file] [destination-directory] [flags]
 
 ```bash
 # Install to current directory
-go run hack/iknitedev/main.go install signing-key deploy/iac/iknite/secrets.sops.yaml .
+go run hack/iknitedev/main.go install signing-key secrets.sops.yaml .
 
 # Install to specific directory
-go run hack/iknitedev/main.go install signing-key --key apk_signing_key deploy/iac/iknite/secrets.sops.yaml /path/to/dest
+go run hack/iknitedev/main.go install signing-key --key apk_signing_key secrets.sops.yaml /path/to/dest
 ```
 
 **Flags:**
@@ -100,10 +117,41 @@ The tests demonstrate:
 
 ### Adding New Commands
 
-1. Create a new file in `cmd/` directory (e.g., `cmd/my_command.go`)
-2. Implement the command using Cobra patterns
-3. Register the command in the appropriate parent command's `init()` function
-4. Update this README with the new command documentation
+Follow the two-layer pattern used by the `secrets` command:
+
+**For a new top-level command (e.g. `iknitedev mycommand`):**
+
+1. Create `pkg/mycommand/mycommand.go` with the business logic, options struct,
+   and exported functions.
+2. Create `pkg/cmd/mycommand/mycommand.go` with `CreateMycommandCmd` that wires
+   options and calls the business logic functions.
+3. Register the command in `cmd/root.go`:
+
+```go
+import "github.com/kaweezle/iknite/hack/iknitedev/pkg/cmd/mycommand"
+// ...
+rootCmd.AddCommand(mycommand.CreateMycommandCmd(opts.Fs))
+```
+
+4. Add tests:
+
+- `pkg/mycommand/mycommand_test.go` — unit tests calling exported functions
+  directly.
+- `pkg/cmd/mycommand/mycommand_test.go` — tests for Cobra wiring (flags,
+  argument parsing, stdin handling).
+
+5. Update this README with the new command documentation.
+
+**For a new subcommand under an existing command (e.g.
+`iknitedev secrets mysubcmd`):**
+
+1. Add the business logic function to the relevant `pkg/<domain>/` package.
+2. Create `pkg/cmd/<command>/mysubcmd.go` with a `createMysubcmdCmd` function
+   that calls the business logic.
+3. Register it in `pkg/cmd/<command>/secrets.go` (or the parent command file)
+   with `secretsCmd.AddCommand(createMysubcmdCmd(opts))`.
+4. Add tests to `pkg/<domain>/<domain>_test.go` and/or
+   `pkg/cmd/<command>/<command>_test.go` as appropriate.
 
 ## Dependencies
 

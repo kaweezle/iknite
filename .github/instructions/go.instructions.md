@@ -1,6 +1,6 @@
 ---
 description: Instructions for writing Go code following idiomatic Go practices and community standards
-applyTo: "**/*.go,**/go.mod,**/go.sum"
+applyTo: "pkg/**/*, cmd/**/*, hack/iknidev/**/*"
 ---
 
 # Go Development Instructions
@@ -12,8 +12,17 @@ These instructions are based on [Effective Go](https://go.dev/doc/effective_go),
 
 ## General Instructions
 
-- Write simple, clear, and idiomatic Go code
 - Favor clarity and simplicity over cleverness
+- Write simple, clear, and idiomatic Go code
+- Cobra is the preferred CLI framework for this project; use it for all
+  command-line tools
+- Cobra commands go in `cmd/` directory; reusable packages go in `pkg/` (no
+  `internal/`).
+- Use `go mod` for dependency management; keep `go.mod` and `go.sum` tidy
+- Create well-structured packages with clear responsibilities; avoid monolithic
+  packages.
+- In a package, separate features into different files, but keep related code
+  together; avoid splitting a single feature across multiple files.
 - Follow the principle of least surprise
 - Keep the happy path left-aligned (minimize indentation)
 - Return early to reduce nesting
@@ -22,14 +31,24 @@ These instructions are based on [Effective Go](https://go.dev/doc/effective_go),
 - Make the zero value useful
 - Write self-documenting code with clear, descriptive names
 - Document exported types, functions, methods, and packages
-- Use Go modules for dependency management
 - Leverage the Go standard library instead of reinventing the wheel (e.g., use
   `strings.Builder` for string concatenation, `filepath.Join` for path
   construction)
 - Prefer standard library solutions over custom implementations when
   functionality exists
-- Write comments in English by default; translate only upon user request
+- Write comments in English by default;
 - Avoid using emoji in code and comments
+- Always check errors and handle them appropriately; don't ignore errors unless
+  you have a good reason (document why)
+- Always wrap errors with context when propagating them up the stack using
+  `fmt.Errorf` with `%w` verb.
+- When a task is finished, always run `golangci-lint run` to check for style
+  issues and potential bugs. Fix any issues until the linter reports no
+  problems. You can ignore specific linter warnings when justified:
+  //nolint:gosec, //nolint:lll. Provide justification with a comment.
+- When a task is finished, add the added or modified files to the git staging
+  area and launch `pre-commit run` to run pre-commit hooks. Fix any issues until
+  all hooks pass successfully.
 
 ## Naming Conventions
 
@@ -86,6 +105,7 @@ These instructions are based on [Effective Go](https://go.dev/doc/effective_go),
 - Use mixedCaps for unexported constants
 - Group related constants using `const` blocks
 - Consider using typed constants for better type safety
+- When a string is present more than once, define it as a constant.
 
 ## Code Style and Formatting
 
@@ -103,7 +123,7 @@ These instructions are based on [Effective Go](https://go.dev/doc/effective_go),
 - Write comments only when necessary to explain complex logic, business rules,
   or non-obvious behavior
 - Write comments in complete sentences in English by default
-- Translate comments to other languages only upon specific user request
+- Never translate comments to other languages
 - Start sentences with the name of the thing being described
 - Package comments should start with "Package [name]"
 - Use line comments (`//`) for most comments
@@ -127,8 +147,7 @@ These instructions are based on [Effective Go](https://go.dev/doc/effective_go),
 
 - Follow standard Go project layout conventions
 - Keep `main` packages in `cmd/` directory
-- Put reusable packages in `pkg/` or `internal/`
-- Use `internal/` for packages that shouldn't be imported by external projects
+- Put reusable packages in `pkg/` (no `internal/`)
 - Group related functionality into packages
 - Avoid circular dependencies
 
@@ -138,14 +157,14 @@ These instructions are based on [Effective Go](https://go.dev/doc/effective_go),
 - Keep dependencies minimal
 - Regularly update dependencies for security patches
 - Use `go mod tidy` to clean up unused dependencies
-- Vendor dependencies only when necessary
+- Do not vendor dependencies
 
 ## Type Safety and Language Features
 
 ### Type Definitions
 
 - Define types to add meaning and type safety
-- Use struct tags for JSON, XML, database mappings
+- Use struct tags for JSON, YAML, database mappings
 - Prefer explicit type conversions
 - Use type assertions carefully and check the second return value
 - Prefer generics over unconstrained types; when an unconstrained type is truly
@@ -337,8 +356,10 @@ These instructions are based on [Effective Go](https://go.dev/doc/effective_go),
 
 ### Test Organization
 
-- Keep tests in the same package (white-box testing)
-- Use `_test` package suffix for black-box testing
+- When testing private functions, keep tests in the same package (white-box
+  testing) but name test files with `_internal_test.go` suffix.
+- Use `_test` package suffix for black-box testing, i.e., testing only exported
+  functions.
 - Name test files with `_test.go` suffix
 - Place test files next to the code they test
 
@@ -347,6 +368,7 @@ These instructions are based on [Effective Go](https://go.dev/doc/effective_go),
 - Use table-driven tests for multiple test cases
 - Name tests descriptively using `Test_functionName_scenario`
 - Use subtests with `t.Run` for better organization
+- Use `t.Parallel()` for independent test cases to speed up test execution
 - Test both success and error cases
 - Consider using `testify` or similar libraries when they add value, but don't
   over-complicate simple tests
@@ -368,15 +390,6 @@ These instructions are based on [Effective Go](https://go.dev/doc/effective_go),
 - Be careful with file paths from user input
 - Validate and escape data for different contexts (HTML, SQL, shell)
 
-### Cryptography
-
-- Use standard library crypto packages
-- Don't implement your own cryptography
-- Use crypto/rand for random number generation
-- Store passwords using bcrypt, scrypt, or argon2 (consider golang.org/x/crypto
-  for additional options)
-- Use TLS for network communication
-
 ## Documentation
 
 ### Code Documentation
@@ -397,17 +410,6 @@ These instructions are based on [Effective Go](https://go.dev/doc/effective_go),
 - Provide usage examples
 - Document configuration options
 - Include troubleshooting section
-
-## Tools and Development Workflow
-
-### Essential Tools
-
-- `go fmt`: Format code
-- `go vet`: Find suspicious constructs
-- `golangci-lint`: Additional linting (golint is deprecated)
-- `go test`: Run tests
-- `go mod`: Manage dependencies
-- `go generate`: Code generation
 
 ### Development Practices
 

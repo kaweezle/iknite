@@ -299,7 +299,7 @@ inputs = {
   oauth_app_homepage_url = "https://argocd-e2e.iknite.app"
   webhook_url           = "https://argocd-e2e.iknite.app/api/webhook"
   webhook_secret        = local.secret.github.webhook_secret
-  deploy_key_public_key = local.secret.iknite_vm.ssh_public_key
+  deploy_key_public_key = local.secret.keys.main.public_key
 }
 ```
 

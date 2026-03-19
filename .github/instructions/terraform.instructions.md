@@ -5,13 +5,13 @@ applyTo: 'deploy/iac/**/*'
 
 <!-- cSpell: words kwzltfstate earlyvalue2 tftest -->
 
-# Terraform and Terragrunt Conventions
+# Opentofu (terraform) and Terragrunt Conventions
 
 ## Overview
 
-This document defines conventions and best practices for Terraform modules and
-Terragrunt configurations in this project. All configurations should adhere to
-these guidelines to ensure consistency, maintainability, and security.
+This document defines conventions and best practices for Opentofu (Terraform)
+modules and Terragrunt configurations in this project. All configurations should
+adhere to these guidelines to ensure consistency, maintainability, and security.
 
 ### General Principles
 
@@ -22,8 +22,7 @@ these guidelines to ensure consistency, maintainability, and security.
   terragrunt which means that all providers are stored in the
   `~/.cache/terragrunt/providers` directory.
 - All credentials information (S3 state backend, OVH, Openstack, etc.) is stored
-  in the SOPS-encrypted file
-  [deploy/iac/iknite/secrets.sops.yaml](../../deploy/iac/iknite/secrets.sops.yaml)
+  in the SOPS-encrypted file [secrets.sops.yaml](../../secrets.sops.yaml)
 
 ## Project Structure
 
@@ -261,8 +260,7 @@ variable "instances" {
   - Terraform state files
 - Use `.gitignore` to exclude sensitive files
 - Store sensitive information in SOPS-encrypted files:
-  - Format: YAML
-    ([deploy/iac/iknite/secrets.sops.yaml](../../deploy/iac/iknite/secrets.sops.yaml))
+  - Format: YAML ([secrets.sops.yaml](../../secrets.sops.yaml))
   - Use `sops` to encrypt/decrypt
   - Load in `root.hcl`:
     ```hcl

@@ -38,7 +38,7 @@ mkdir -p "$BUILD_DIR"
 render_app() {
 	local app_ref="$1"
 
-	if [[ "$app_ref" != */* ]] || [[ "$app_ref" != */appstages/* ]]; then
+	if [[ "$app_ref" != */* && "$app_ref" != */appstages/* ]]; then
 		error "Application must be in the form '<env>/<app>', got '$app_ref'"
 	fi
 
@@ -57,8 +57,9 @@ render_app() {
 		return
 	fi
 
-	if [[ -f "$app_dir/helmfile.yaml" ]]; then
-		helmfile template --skip-tests --args='--skip-crds' -f "$app_dir/helmfile.yaml" \
+	if [[ -f "$app_dir/helmfile.yaml" || -f "$app_dir/helmfile.yaml.gotmpl" ]]; then
+        file=$(find "$app_dir" '(' -name helmfile.yaml -o -name helmfile.yaml.gotmpl ')'  | head -n 1)
+		helmfile template --skip-tests --args='--skip-crds' -f "$file" \
 			| (cd "$BUILD_DIR" && yq --split-exp '.kind + "-" + .metadata.name + ".yaml"' --no-doc)
 		return
 	fi

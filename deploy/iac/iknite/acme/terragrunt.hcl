@@ -17,7 +17,7 @@ locals {
 
 inputs = {
   registration_email = local.dns.email
-  secret_file        = "${get_repo_root()}/deploy/k8s/secrets/secrets.sops.yaml"
+  secret_file        = "${get_repo_root()}/secrets.sops.yaml"
   base_key           = "data.dns.wildcard"
 
 

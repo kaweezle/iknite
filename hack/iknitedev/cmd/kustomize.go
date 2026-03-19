@@ -19,6 +19,7 @@ package cmd
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -33,7 +34,7 @@ import (
 )
 
 // CreateKustomizeCmd creates the kustomize command.
-func CreateKustomizeCmd(fs afero.Fs) *cobra.Command {
+func CreateKustomizeCmd(fs afero.Fs, out io.Writer) *cobra.Command {
 	kustomizeCmd := &cobra.Command{
 		Use:   "kustomize <directory> [destination]",
 		Short: "Run kustomize on a directory",
@@ -49,8 +50,8 @@ Examples:
   # Split resources into individual files
   iknitedev kustomize /path/to/kustomization /path/to/output`,
 		Args: cobra.RangeArgs(1, 2),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return runKustomizeWithCmd(cmd, fs, args)
+		RunE: func(_ *cobra.Command, args []string) error {
+			return runKustomize(fs, out, args)
 		},
 	}
 
@@ -69,62 +70,8 @@ func enablePlugins(opts *krusty.Options) *krusty.Options {
 	return opts
 }
 
-// runKustomizeWithCmd executes the kustomize operation with command output.
-func runKustomizeWithCmd(cmd *cobra.Command, fs afero.Fs, args []string) error {
-	kustomizationDir := args[0]
-	var destDir string
-	if len(args) > 1 {
-		destDir = args[1]
-	}
-
-	// Check if kustomization directory exists
-	exists, err := afero.DirExists(fs, kustomizationDir)
-	if err != nil {
-		return fmt.Errorf("failed to check kustomization directory: %w", err)
-	}
-	if !exists {
-		return fmt.Errorf("kustomization directory does not exist: %s", kustomizationDir)
-	}
-
-	// Check if kustomization.yaml exists
-	kustomizationFile := filepath.Join(kustomizationDir, "kustomization.yaml")
-	kustomizationExists, err := afero.Exists(fs, kustomizationFile)
-	if err != nil {
-		return fmt.Errorf("failed to check kustomization.yaml: %w", err)
-	}
-	if !kustomizationExists {
-		return fmt.Errorf("kustomization.yaml not found in: %s", kustomizationDir)
-	}
-
-	// Run kustomize
-	opts := enablePlugins(krusty.MakeDefaultOptions())
-	k := krusty.MakeKustomizer(opts)
-	resources, err := k.Run(filesys.MakeFsOnDisk(), kustomizationDir)
-	if err != nil {
-		return fmt.Errorf("failed to run kustomize: %w", err)
-	}
-
-	// If no destination directory, print to stdout
-	if destDir == "" {
-		out, err := resources.AsYaml()
-		if err != nil {
-			return fmt.Errorf("failed to convert resources to YAML: %w", err)
-		}
-		_, err = cmd.OutOrStdout().Write(out)
-		return err
-	}
-
-	// Create destination directory if it doesn't exist
-	if err := fs.MkdirAll(destDir, 0o755); err != nil {
-		return fmt.Errorf("failed to create destination directory: %w", err)
-	}
-
-	// Split resources directly from resmap (avoids double marshalling)
-	return splitResourcesFromResMap(fs, resources, destDir)
-}
-
 // runKustomize executes the kustomize operation (for backward compatibility).
-func runKustomize(fs afero.Fs, args []string) error {
+func runKustomize(fs afero.Fs, out io.Writer, args []string) error {
 	kustomizationDir := args[0]
 	var destDir string
 	if len(args) > 1 {
@@ -160,11 +107,14 @@ func runKustomize(fs afero.Fs, args []string) error {
 
 	// If no destination directory, print to stdout
 	if destDir == "" {
-		out, err := resources.AsYaml()
+		output, err := resources.AsYaml()
 		if err != nil {
 			return fmt.Errorf("failed to convert resources to YAML: %w", err)
 		}
-		fmt.Print(string(out))
+		_, err = out.Write(output)
+		if err != nil {
+			return fmt.Errorf("failed to write output: %w", err)
+		}
 		return nil
 	}
 
@@ -178,7 +128,7 @@ func runKustomize(fs afero.Fs, args []string) error {
 }
 
 // splitResourcesFromResMap splits resources from resmap into individual files.
-// This avoids double marshalling by working directly with the ResMap.
+// This avoids double marshaling by working directly with the ResMap.
 func splitResourcesFromResMap(fs afero.Fs, resources resmap.ResMap, destDir string) error {
 	// Iterate over resources in the ResMap
 	for _, resource := range resources.Resources() {
@@ -195,14 +145,14 @@ func splitResourcesFromResMap(fs afero.Fs, resources resmap.ResMap, destDir stri
 		// Create filename with CamelCase kind and underscore replacing colons
 		safeName := strings.ReplaceAll(name, ":", "_")
 		filename := fmt.Sprintf("%s-%s.yaml", kind, safeName)
-		filepath := filepath.Join(destDir, filename)
+		path := filepath.Join(destDir, filename)
 
 		// Write file
-		if err := afero.WriteFile(fs, filepath, yamlData, 0o644); err != nil {
-			return fmt.Errorf("failed to write file %s: %w", filepath, err)
+		if err := afero.WriteFile(fs, path, yamlData, 0o644); err != nil {
+			return fmt.Errorf("failed to write file %s: %w", path, err)
 		}
 
-		fmt.Fprintf(os.Stderr, "Created: %s\n", filepath)
+		fmt.Fprintf(os.Stderr, "Created: %s\n", path)
 	}
 
 	return nil
@@ -244,14 +194,14 @@ func splitResources(fs afero.Fs, yamlData []byte, destDir string) error {
 		// Create filename with CamelCase kind and underscore replacing colons
 		safeName := strings.ReplaceAll(name, ":", "_")
 		filename := fmt.Sprintf("%s-%s.yaml", kind, safeName)
-		filepath := filepath.Join(destDir, filename)
+		path := filepath.Join(destDir, filename)
 
 		// Write file
-		if err := afero.WriteFile(fs, filepath, []byte(doc), 0o644); err != nil {
-			return fmt.Errorf("failed to write file %s: %w", filepath, err)
+		if err := afero.WriteFile(fs, path, []byte(doc), 0o644); err != nil {
+			return fmt.Errorf("failed to write file %s: %w", path, err)
 		}
 
-		fmt.Fprintf(os.Stderr, "Created: %s\n", filepath)
+		fmt.Fprintf(os.Stderr, "Created: %s\n", path)
 	}
 
 	return nil

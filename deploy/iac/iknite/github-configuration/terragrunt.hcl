@@ -10,7 +10,7 @@ terraform {
 // Import main variables from the root module
 locals {
   webhook_secret      = include.root.locals.secret.github.webhook_secret
-  ssh_public_key      = include.root.locals.secret.iknite_vm.ssh_public_key
+  ssh_public_key      = include.root.locals.secret.keys.main.public_key
   api_token           = include.root.locals.secret.github.api_token
   github_organization = include.root.locals.github_organization
 }

@@ -9,7 +9,7 @@ terraform {
 }
 
 locals {
-  s3        = include.root.locals.secret.ovh.s3
+  s3        = include.root.locals.secret.ovh.storage
   openstack = include.root.locals.secret.ovh.openstack
   ovh       = include.root.locals.secret.ovh.ovh
 }

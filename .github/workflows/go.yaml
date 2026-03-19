@@ -1,4 +1,5 @@
-name: Build and test with Go
+# cSpell: words covermode coverprofile unittests
+name: "Iknite: Build and test with Go"
 
 on:
   push:
@@ -8,7 +9,8 @@ on:
     branches:
       - main
     paths:
-      - "**.go"
+      - "cmd/**"
+      - "pkg/**"
       - "go.mod"
       - "go.sum"
       - ".github/workflows/go.yaml"

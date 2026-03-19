@@ -185,7 +185,7 @@ IMAGES_ID = $(shell $(RUN_CONTAINER_CMD) image ls -q --filter "label=org.opencon
 # Scripts for building VM images from rootfs
 BUILD_VM_IMAGE_SCRIPTS = $(ROOT_DIR)/packaging/scripts/build-vm-image.sh $(ROOT_DIR)/packaging/scripts/configure-vm-image.sh
 
-SECRETS_FILE := $(ROOT_DIR)/deploy/k8s/argocd/secrets/secrets.sops.yaml
+SECRETS_FILE := $(ROOT_DIR)/secrets.sops.yaml
 SSH_KNOWN_HOSTS_FILE := $(ROOT_DIR)/hack/devcontainer/iknite_known_hosts
 
 .PHONY: help
@@ -611,13 +611,6 @@ clean:
 test: check-prerequisites
 	@echo "Running tests..."
 	go test -v -race -covermode=atomic -coverprofile=coverage.out ./...
-
-$(HOME)/.ssh/iknite: $(SECRETS_FILE) | check-prerequisites
-	@echo "Extracting SSH key for iknite from $<..."
-	mkdir -p "$(HOME)/.ssh"
-	chmod 700 "$(HOME)/.ssh"
-	$(SOPS_DECRYPT_CMD) $< | jq -r '.data.iknite_vm.ssh_private_key' > "$@"
-	chmod 600 "$@"
 
 .PHONY: ssh-key
 ssh-key: $(HOME)/.ssh/iknite

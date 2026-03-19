@@ -20,6 +20,6 @@ inputs = {
   kubeconfig_content = dependency.kubeconfig.outputs.kubeconfig_content
   kubeconfig_present = dependency.kubeconfig.outputs.kubeconfig_present
   releases = {
-    "argocd" = "${get_repo_root()}/deploy/k8s/argocd/common/argocd-server/helmfile.yaml"
+    "argocd" = "${get_repo_root()}/deploy/k8s/argocd/common/argocd-server/helmfile.yaml.gotmpl"
   }
 }
