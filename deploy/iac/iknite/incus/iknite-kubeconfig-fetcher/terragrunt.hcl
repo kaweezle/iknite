@@ -27,12 +27,13 @@ dependency "vm" {
 
 locals {
   iknite_vm = include.root.locals.secret.iknite_vm
+  ssh_key   = include.root.locals.secret.keys.main
 }
 
 inputs = {
   host                = try(dependency.vm.outputs.instances["iknite-vm"].ipv4, "")
   username            = "root"
-  private_key         = local.iknite_vm.ssh_private_key
+  private_key         = local.ssh_key.private_key
   ssh_host_public_key = local.iknite_vm.ssh_host_ecdsa_public
   ssh_port            = 22
   timeout             = 300

@@ -23,6 +23,7 @@ dependency "image" {
 locals {
   openstack          = include.root.locals.secret.ovh.openstack
   ovh                = include.root.locals.secret.ovh.ovh
+  ssh_key            = include.root.locals.secret.keys.main
   iknite_vm          = include.root.locals.secret.iknite_vm
   iknite_version     = include.root.locals.iknite_version
   kubernetes_version = include.root.locals.kubernetes_version
@@ -34,11 +35,11 @@ inputs = {
   keys = {
     "iknite" = {
       name       = "iknite"
-      public_key = local.iknite_vm.ssh_public_key
+      public_key = local.ssh_key.public_key
     }
   }
   private_keys = {
-    "iknite" = local.iknite_vm.ssh_private_key
+    "iknite" = local.ssh_key.private_key
   }
   # Fixed SSH host keys ensure the VM always presents the same host key across
   # recreations, enabling strict host key verification on SSH clients.

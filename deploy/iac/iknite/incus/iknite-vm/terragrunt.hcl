@@ -47,7 +47,7 @@ dependency "profiles" {
 locals {
   iknite_version     = include.root.locals.iknite_version
   kubernetes_version = include.root.locals.kubernetes_version
-  ssh_private_key    = include.root.locals.secret.iknite_vm.ssh_private_key
+  ssh_private_key    = include.root.locals.secret.keys.main.private_key
   ssh_host_public    = include.root.locals.secret.iknite_vm.ssh_host_ecdsa_public
 }
 

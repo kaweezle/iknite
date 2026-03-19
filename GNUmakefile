@@ -612,13 +612,6 @@ test: check-prerequisites
 	@echo "Running tests..."
 	go test -v -race -covermode=atomic -coverprofile=coverage.out ./...
 
-$(HOME)/.ssh/iknite: $(SECRETS_FILE) | check-prerequisites
-	@echo "Extracting SSH key for iknite from $<..."
-	mkdir -p "$(HOME)/.ssh"
-	chmod 700 "$(HOME)/.ssh"
-	$(SOPS_DECRYPT_CMD) $< | jq -r '.data.iknite_vm.ssh_private_key' > "$@"
-	chmod 600 "$@"
-
 .PHONY: ssh-key
 ssh-key: $(HOME)/.ssh/iknite
 

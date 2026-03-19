@@ -9,7 +9,7 @@ terraform {
 }
 
 locals {
-  public_key         = include.root.locals.secret.iknite_vm.ssh_public_key
+  public_key         = include.root.locals.secret.keys.main.public_key
   kubernetes_version = include.root.locals.kubernetes_version
   ssh_host_private   = include.root.locals.secret.iknite_vm.ssh_host_ecdsa_private
   ssh_host_public    = include.root.locals.secret.iknite_vm.ssh_host_ecdsa_public
