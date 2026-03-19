@@ -5,6 +5,7 @@ metadata:
   namespace: argocd
   annotations:
     autocloud/local-application: "true"
+    argocd.argoproj.io/compare-options: ServerSideDiff=true
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:

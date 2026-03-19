@@ -75,7 +75,7 @@ configs:
   credentialTemplates:
     ssh-creds:
       url: {{ with  .Values.data.project.github }}git@github.com:{{ .organization }}{{ end }}
-      sshPrivateKey: {{ .Values.data.argocd.ssh_private_key | quote }}
+      sshPrivateKey: {{ .Values.data.keys.main.private_key | quote }}
 
   secret:
     githubSecret: {{ .Values.data.github.webhook_secret | quote }}
@@ -130,8 +130,8 @@ repoServer:
 
   # -- Environment variables to pass to repo server
   env:
-    - name: SOPS_AGE_KEY_FILE
-      value: /sops-private-keys/age_key.txt
+    - name: SOPS_AGE_SSH_PRIVATE_KEY_FILE
+      value: /ssh-private-key/id_ed25519
     - name: HELM_PLUGINS
       value: /home/argocd/.local/share/helm/plugins/
     - name: HOST_IP
@@ -153,14 +153,14 @@ repoServer:
 
   # -- Additional volumeMounts to the repo server main container
   volumeMounts:
-    - name: argocd-sops-private-keys
-      mountPath: /sops-private-keys
+    - name: argocd-ssh-private-key
+      mountPath: /ssh-private-key
 
   # -- Additional volumes to the repo server pod
   volumes:
-    - name: argocd-sops-private-keys
+    - name: argocd-ssh-private-key
       secret:
-        secretName: argocd-sops-private-keys
+        secretName: argocd-ssh-private-key
         optional: true
         defaultMode: 420
     - name: helmfile-cmp-tmp
@@ -173,8 +173,8 @@ repoServer:
     image: {{ .Values.data.argocd.repo_server.image_name }}:{{ .Values.data.argocd.repo_server.image_tag }}
     command: [/var/run/argocd/argocd-cmp-server]
     env:
-    - name: SOPS_AGE_KEY_FILE
-      value: /sops-private-keys/age_key.txt
+    - name: SOPS_AGE_SSH_PRIVATE_KEY_FILE
+      value: /ssh-private-key/id_ed25519
     - name: HELM_PLUGINS
       value: /home/argocd/.local/share/helm/plugins/
     - name: HOST_IP
@@ -199,8 +199,8 @@ repoServer:
       runAsNonRoot: true
       runAsUser: 999
     volumeMounts:
-      - name: argocd-sops-private-keys
-        mountPath: /sops-private-keys
+      - name: argocd-ssh-private-key
+        mountPath: /ssh-private-key
       - mountPath: /var/run/argocd
         name: var-files
       - mountPath: /tmp
@@ -215,11 +215,10 @@ extraObjects:
     apiVersion: v1
     kind: Secret
     metadata:
-      name: argocd-sops-private-keys
+      name: argocd-ssh-private-key
     type: Opaque
     data:
-      # The non transformed value is the content of sample_age_key.txt
-      age_key.txt: {{ .Values.data.secrets.age_key_b64 | quote }}
+      id_ed25519: {{ .Values.data.keys.main.private_key | b64enc | quote }}
   {{ if .Environment.Values.data | dig "argo_workflows" "client_secret" "" }}
   -
     apiVersion: v1
@@ -307,17 +306,6 @@ extraObjects:
   ####
   # Bootstrap application
   ####
-  -
-    apiVersion: v1
-    kind: Secret
-    metadata:
-      name: argocd-private-repo-ssh-key
-      annotations:
-        argocd.argoproj.io/hook: Skip
-    type: Opaque
-    data:
-      sshPrivateKey: {{ .Values.data.argocd.ssh_private_key | b64enc | quote }}
-  -
     apiVersion: v1
     kind: ConfigMap
     metadata:
@@ -376,10 +364,7 @@ extraObjects:
           volumes:
             - name: ssh-key-volume
               secret:
-                secretName: argocd-private-repo-ssh-key
-                items:
-                  - key: sshPrivateKey
-                    path: id_rsa
+                secretName: argocd-ssh-private-key
           containers:
             - name: create-bootstrap-application
               image: {{ .Values.data.argocd.repo_server.image_name }}:{{ .Values.data.argocd.repo_server.image_tag }}
@@ -402,7 +387,7 @@ extraObjects:
                   mkdir ~/.ssh
                   chmod -R 777 ~/.ssh
                   cp /etc/ssh-key/* ~/.ssh
-                  eval $(ssh-agent) && ssh-add /etc/ssh-key/id_rsa
+                  eval $(ssh-agent) && ssh-add /etc/ssh-key/id_ed25519
                   ssh-keyscan -t rsa github.com >> ~/.ssh/known_hosts
 
                   sleep $ROLLOUT_INITIAL_DELAY
