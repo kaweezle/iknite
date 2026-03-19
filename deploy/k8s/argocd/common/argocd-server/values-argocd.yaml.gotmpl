@@ -150,6 +150,8 @@ repoServer:
       value: "true"
     - name: HELM_SECRETS_DECRYPT_SECRETS_IN_TMP_DIR
       value: "true"
+    - name: IKNITE_ARGOCD
+      value: "true"
 
   # -- Additional volumeMounts to the repo server main container
   volumeMounts:
@@ -195,6 +197,8 @@ repoServer:
       value: "true"
     - name: HELM_SECRETS_BACKEND
       value: "sops"
+    - name: IKNITE_ARGOCD
+      value: "true"
     securityContext:
       runAsNonRoot: true
       runAsUser: 999
@@ -219,7 +223,7 @@ extraObjects:
     type: Opaque
     data:
       id_ed25519: {{ .Values.data.keys.main.private_key | b64enc | quote }}
-  {{ if .Environment.Values.data | dig "argo_workflows" "client_secret" "" }}
+  {{ if .Values.data | dig "argo_workflows" "client_secret" "" }}
   -
     apiVersion: v1
     kind: Secret
@@ -306,6 +310,8 @@ extraObjects:
   ####
   # Bootstrap application
   ####
+  {{ if not (env "IKNITE_ARGOCD") }}
+  -
     apiVersion: v1
     kind: ConfigMap
     metadata:
@@ -402,3 +408,4 @@ extraObjects:
               volumeMounts:
                 - mountPath: /etc/ssh-key
                   name: ssh-key-volume
+  {{ end }}
