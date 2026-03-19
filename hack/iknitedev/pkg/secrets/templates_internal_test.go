@@ -24,10 +24,10 @@ func Test_renderTemplate_internal(t *testing.T) {
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-		if !bytes.Contains([]byte(output), []byte("public_key: &ed25519_public_key")) {
+		if !bytes.Contains([]byte(output), []byte("public_key: ")) {
 			t.Errorf("expected output to contain public key entry, got: %s", output)
 		}
-		if !bytes.Contains([]byte(output), []byte("private_key: &ed25519_private_key")) {
+		if !bytes.Contains([]byte(output), []byte("private_key: ")) {
 			t.Errorf("expected output to contain private key entry, got: %s", output)
 		}
 	})

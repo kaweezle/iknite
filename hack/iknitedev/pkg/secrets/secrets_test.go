@@ -168,8 +168,8 @@ func TestInitSecrets(t *testing.T) {
 	}
 
 	t.Setenv("SOPS_AGE_SSH_PRIVATE_KEY_FILE", keyPath)
-	assertSecretValueFromOSFile(t, secretsPath, "data.secrets.public_key", "ssh-ed25519 ")
-	assertSecretValueFromOSFile(t, secretsPath, "data.secrets.private_key", "-----BEGIN OPENSSH PRIVATE KEY-----")
+	assertSecretValueFromOSFile(t, secretsPath, "data.keys.main.public_key", "ssh-ed25519 ")
+	assertSecretValueFromOSFile(t, secretsPath, "data.keys.main.private_key", "-----BEGIN OPENSSH PRIVATE KEY-----")
 
 	hasWrote := false
 	for _, msg := range result.Messages {
