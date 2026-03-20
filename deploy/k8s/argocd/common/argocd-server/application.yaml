@@ -21,7 +21,7 @@ spec:
   source:
     path: deploy/k8s/argocd/common/argocd-server
     repoURL: git@github.com:kaweezle/iknite.git
-    targetRevision: feature/move-values-and-secrets-in-root-directory
+    targetRevision: main
     plugin:
       # Helmfile environment variables
       env:

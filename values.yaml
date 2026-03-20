@@ -13,7 +13,7 @@ data:
       repo: iknite
       team: admin
       repoURL: git@github.com:kaweezle/iknite.git
-      targetRevision: feature/move-values-and-secrets-in-root-directory
+      targetRevision: main
       basePath: deploy/k8s/argocd/e2e
   argocd:
     domain_prefix: argocd-e2e
