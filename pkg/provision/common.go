@@ -108,6 +108,7 @@ func applyResmap(resources resmap.ResMap) error {
 		context.TODO(),
 		constants.KubectlCmd,
 		"apply",
+		"--server-side",
 		"-f",
 		"-",
 	)

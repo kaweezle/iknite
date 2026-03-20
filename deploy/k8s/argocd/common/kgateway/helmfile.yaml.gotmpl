@@ -24,8 +24,17 @@ releases:
     createNamespace: true
     needs:
       - kgateway-crds
-    # values:
-    #   - values-kgateway.yaml.gotmpl
+    values:
+      - controller:
+          extraEnv:
+            KGW_ENABLE_GATEWAY_API_EXPERIMENTAL_FEATURES: "true"
+      - resources:
+          limits:
+            cpu: 500m
+            memory: 512Mi
+          requests:
+            cpu: 100m
+            memory: 128Mi
 
 helmDefaults:
   wait: true
