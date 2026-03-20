@@ -37,9 +37,8 @@ var content embed.FS
 // in the specified directory or if the directory is a URL.
 func IsBaseKustomizationAvailable(dirname string) (bool, error) {
 	var exists bool
-	var err error
-	_, err = url.Parse(dirname)
-	if err == nil {
+	kustomizationURl, err := url.Parse(dirname)
+	if err == nil && kustomizationURl.Scheme != "" && kustomizationURl.Host != "" {
 		exists = true
 	} else {
 		exists, err = utils.FS.Exists(path.Join(dirname, "kustomization.yaml"))
@@ -54,10 +53,14 @@ func IsBaseKustomizationAvailable(dirname string) (bool, error) {
 // directory if available, otherwise returns the embedded kustomizations.
 func ApplyBaseKustomizations(dirname string, data any) (resmap.ResMap, error) {
 	if ok, _ := IsBaseKustomizationAvailable(dirname); ok { //nolint:errcheck // ignore error here
-		log.WithField("directory", dirname).Info("Applying base kustomization...")
+		if data != nil {
+			log.WithField("directory", dirname).Info("Applying base kustomization...")
+		}
 		return ApplyLocalKustomizations(dirname)
 	} else {
-		log.Info("Apply embedded kustomization...")
+		if data != nil {
+			log.Info("Applying embedded kustomization...")
+		}
 
 		return ApplyEmbeddedKustomizations(&content, "base", data)
 	}

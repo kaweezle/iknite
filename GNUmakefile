@@ -314,8 +314,7 @@ $(DIST_DIR)/$(IKNITE_IMAGES_PACKAGE): $(DIST_DIR)/iknite_linux_amd64_v1/iknite $
 	rm -rf "$$BUILD_DIR"; \
 	mkdir -p "$$BUILD_DIR"; \
 	echo "KUBERNETES_VERSION: $(KUBERNETES_VERSION)" > "$$BUILD_DIR/.env"; \
-	"$(DIST_DIR)/iknite_linux_amd64_v1/iknite" kustomize -d "$(ROOT_DIR)/packaging/apk/iknite/iknite.d" print | grep image: | awk '{ print $$2; }' > "$$BUILD_DIR/image-list.txt"; \
-	"$(DIST_DIR)/iknite_linux_amd64_v1/iknite" info images >> "$$BUILD_DIR/image-list.txt"; \
+	"$(DIST_DIR)/iknite_linux_amd64_v1/iknite" info images > "$$BUILD_DIR/image-list.txt"; \
 	sort -u "$$BUILD_DIR/image-list.txt" -o "$$BUILD_DIR/image-list.txt"; \
 	$(RUN_CONTAINER_CMD) run --privileged --rm -v "$(ROOT_DIR):/work" cgr.dev/chainguard/melange \
 		build packaging/apk/iknite-images/iknite-images.yaml \
