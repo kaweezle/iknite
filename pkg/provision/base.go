@@ -23,7 +23,7 @@ import (
 	"path"
 
 	log "github.com/sirupsen/logrus"
-	"sigs.k8s.io/kustomize/kyaml/resid"
+	"sigs.k8s.io/kustomize/api/resmap"
 
 	"github.com/kaweezle/iknite/pkg/utils"
 )
@@ -51,8 +51,8 @@ func IsBaseKustomizationAvailable(dirname string) (bool, error) {
 }
 
 // ApplyBaseKustomizations applies the kustomizations located in the specified
-// directory if available, otherwise applies the embedded kustomizations.
-func ApplyBaseKustomizations(dirname string, data any) ([]resid.ResId, error) {
+// directory if available, otherwise returns the embedded kustomizations.
+func ApplyBaseKustomizations(dirname string, data any) (resmap.ResMap, error) {
 	if ok, _ := IsBaseKustomizationAvailable(dirname); ok { //nolint:errcheck // ignore error here
 		log.WithField("directory", dirname).Info("Applying base kustomization...")
 		return ApplyLocalKustomizations(dirname)
