@@ -187,41 +187,53 @@ BUILD_VM_IMAGE_SCRIPTS = $(ROOT_DIR)/packaging/scripts/build-vm-image.sh $(ROOT_
 
 SECRETS_FILE := $(ROOT_DIR)/secrets.sops.yaml
 SSH_KNOWN_HOSTS_FILE := $(ROOT_DIR)/hack/devcontainer/iknite_known_hosts
+IKNITE_KNOWN_HOSTS_FILE := $(HOME)/.ssh/iknite_known_hosts
+SSH_KEY_FILE ?= $(HOME)/.ssh/id_ed25519
 
 .PHONY: help
 help: # ignore checkmake
 	@echo "Iknite build targets"
 	@echo ""
 	@echo "Step targets:"
+	@echo "  make all                            Run full pipeline (extract key, build packages, rootfs, VM images, etc.)"
+	@echo "  make apk-iknite-build               Build iknite package (goreleaser)"
+	@echo "  make apk-images-build               Build iknite-images APK"
+	@echo "  make apk-incus-agent-build          Build incus-agent APK"
+	@echo "  make apk-karmafun-fetch             Fetch karmafun dependencies"
+	@echo "  make apk-repo-build                 Set up Alpine Linux package repository"
+	@echo "  make apk-repo-publish               Upload APK repository with terragrunt"
+	@echo "  make check-prerequisites            Verify all prerequisites are installed"
+	@echo "  make ci-cache-rotate                Rotate build cache"
+	@echo "  make ci-check-argocd                Validate ArgoCD configuration"
+	@echo "  make ci-extract-key                 Extract cryptographic keys"
+	@echo "  make ci-release-files               Prepare release files"
+	@echo "  make ci-vm-known-hosts              Extract VM SSH host public key to ~/.ssh/iknite_known_hosts"
+	@echo "  make ci-vm-ssh                      Connect to the E2E test VM using the fixed host key"
+	@echo "  make clean                          Remove build artifacts and temporary files"
+	@echo "  make container-ci-build             Build CI container image"
+	@echo "  make container-dev-build            Build development container"
+	@echo "  make container-login                Log in to container registry"
+	@echo "  make e2e                            Run end-to-end tests"
+	@echo "  make e2e-check-argocd               Check ArgoCD during e2e tests"
+	@echo "  make e2e-tg-apply                   Apply Terraform configuration for e2e tests"
+	@echo "  make e2e-tg-apply-vm                Apply VM Terraform configuration for e2e tests"
+	@echo "  make e2e-tg-destroy                 Destroy Terraform infrastructure for e2e tests"
+	@echo "  make e2e-tg-init                    Initialize Terraform for e2e tests"
+	@echo "  make e2e-tg-refresh                 Refresh Terraform state for e2e tests"
+	@echo "  make generate-vm-host-key           Generate VM SSH host key"
+	@echo "  make help                           Show this help message"
+	@echo "  make incus-metadata-build           Build Incus metadata tarball"
 	@echo "  make info                           Show build configuration information"
-	@echo "  make extract-key                    Extract signing key from sops file"
-	@echo "  make goreleaser                     Build iknite package (goreleaser)"
-	@echo "  make fetch-karmafun                 Download latest karmafun APK into dist/"
-	@echo "  make images-apk                     Build iknite-images APK"
-	@echo "  make incus-agent-apk                Build incus-agent APK"
-	@echo "  make apk-repo                       Create APK repository in dist/repo"
-	@echo "  make upload-apk-repo                Upload APK repository with terragrunt"
-	@echo "  make rootfs-base-image              Build rootfs base image"
-	@echo "  make rootfs-container               Add preloaded images into rootfs container"
 	@echo "  make rootfs                         Build rootfs"
-	@echo "  make rootfs-image                   Build final rootfs image"
-	@echo "  make vm-image                       Build VM images (qcow2, vhdx)"
-	@echo "  make incus-metadata                 Build Incus metadata tarball (dist/images/incus.tar.xz)"
+	@echo "  make rootfs-base-image              Build rootfs base image"
+	@echo "  make rootfs-container               Create rootfs container and add preloaded images to it"
+	@echo "  make rootfs-image                   Build final rootfs image from rootfs container"
 	@echo "  make rootfs-image-incus-attachment  Attach Incus metadata to rootfs image in container registry with oras"
-	@echo "  make vm-container-images            Build VM images as container images"
-	@echo "  make clean                          Remove build artifacts and temp container"
-	@echo "  make all                            Run full pipeline"
-	@echo "  make ssh-key                        Extract SSH key for iknite VMs from sops file"
-	@echo "  make vm-known-hosts                 Extract VM SSH host public key to ~/.ssh/iknite_known_hosts"
-	@echo "  make generate-vm-host-keys          Generate new fixed SSH host keys for iknite VMs"
-	@echo "  make vm-ssh                         Connect to the E2E test VM using the fixed host key"
-	@echo "  make e2e-tg-init                    Initialize terragrunt E2E test configuration"
-	@echo "  make e2e-tg-refresh                 Refresh terragrunt E2E test state without applying changes"
-	@echo "  make e2e-tg-apply                   Apply terragrunt E2E test configuration to create E2E test VM"
-	@echo "  make e2e-tg-destroy                 Destroy E2E test VM with terragrunt"
-	@echo "  make e2e-check-argocd               Check ArgoCD application status for E2E test cluster"
-	@echo "  make release-files                  Generate SHA256SUMS file for release artifacts"
-	@echo "  make devcontainer                   Build dev container image"
+	@echo "  make ssh-key                        Generate SSH key"
+	@echo "  make test                           Run go tests with coverage"
+	@echo "  make vm-images-build                Build VM images (qcow2, vhdx)"
+	@echo "  make vm-images-push                 Publish VM images to registry with oras"
+	@echo "  make vm-images-publish              Publish VM images to public static object storage"
 	@echo ""
 	@echo "File targets (examples):"
 	@echo "  make dist/iknite-<version>.$(ARCH).apk"
@@ -252,8 +264,17 @@ info:
 	@echo "Pushing images:        $(PUSH_IMAGES)"
 	@echo "Root:                  $(if $(ROOTFULL),yes,no)"
 
+# Define the main build target that depends on all the individual steps
+# First extract the signing key for signing the APK packages and the repo.
+ALL_DEPS := ci-extract-key
+# Build the APK packages (iknite, iknite-images, incus-agent) and fetch karmafun, then set up the APK repository with the built packages and signing key
+ALL_DEPS += apk-iknite-build apk-karmafun-fetch apk-images-build apk-incus-agent-build apk-repo-build
+# Build the rootfs base image, then the rootfs container with preloaded images, then the final rootfs image, and attach the Incus metadata to it in the registry
+ALL_DEPS += rootfs-base-image rootfs-container rootfs rootfs-image
+ALL_DEPS += vm-images-build incus-metadata-build vm-images-push rootfs-image-incus-attachment
+
 .PHONY: all
-all: extract-key goreleaser fetch-karmafun images-apk incus-agent-apk apk-repo rootfs-base-image rootfs-container rootfs rootfs-image vm-image incus-metadata vm-container-images rootfs-image-incus-attachment
+all: $(ALL_DEPS)
 
 print-% : ; $(info $* is a $(flavor $*) variable set to [$($*)]) @true
 
@@ -274,8 +295,8 @@ check-prerequisites:
 # Login to container registry using credentials from sops file or GitHub Actions secrets
 .PHONY: container-login
 container-login: $(SECRETS_FILE) | check-prerequisites
-	@echo "Logging into container registry $(REGISTRY)..."
-	if [ -n "$(GITHUB_TOKEN)" ] && [ -n "$(GITHUB_ACTOR)" ]; then \
+	@echo "Login into container registry $(REGISTRY)..."
+	@if [ -n "$(GITHUB_TOKEN)" ] && [ -n "$(GITHUB_ACTOR)" ]; then \
 		echo "$$GITHUB_TOKEN" | $(RUN_CONTAINER_CMD) login $(REGISTRY) --username $(shell echo "$$GITHUB_ACTOR" | sed 's/[^a-zA-Z0-9]/-/g') --password-stdin; \
 	else \
 		USERNAME=`$(SOPS_DECRYPT_CMD) $< | jq -r '.data.docker.registry.username'` ; \
@@ -289,23 +310,23 @@ $(ROOT_DIR)/$(KEY_NAME): $(SECRETS_FILE) | check-prerequisites
 	$(SOPS_DECRYPT_CMD) $< | jq -r '.data.apk_signing_key.private_key' > "$@"
 	chmod 600 "$@"
 
-.PHONY: extract-key
-extract-key: $(ROOT_DIR)/$(KEY_NAME)
+.PHONY: ci-extract-key
+ci-extract-key: $(ROOT_DIR)/$(KEY_NAME)
 
 # Goreleaser build
 $(DIST_DIR)/$(IKNITE_PACKAGE) $(DIST_DIR)/metadata.json $(DIST_DIR)/iknite_linux_amd64_v1/iknite &: $(GOLANG_FILES) $(APK_FILES) go.mod .goreleaser.yaml | check-prerequisites
 	goreleaser release --skip=publish $(SNAPSHOT) --clean
 
-.PHONY: goreleaser
-goreleaser: $(DIST_DIR)/$(IKNITE_PACKAGE) $(DIST_DIR)/metadata.json $(DIST_DIR)/iknite_linux_amd64_v1/iknite
+.PHONY: apk-iknite-build
+apk-iknite-build: $(DIST_DIR)/$(IKNITE_PACKAGE) $(DIST_DIR)/metadata.json $(DIST_DIR)/iknite_linux_amd64_v1/iknite
 
 # Download latest karmafun release from GitHub
 $(DIST_DIR)/$(KARMAFUN_PACKAGE): | check-prerequisites
 	@echo "Latest karmafun version is $(KARMAFUN_VERSION)"
 	curl -o $@ -L "https://github.com/karmafun/karmafun/releases/download/$(KARMAFUN_VERSION)/$(KARMAFUN_PACKAGE)"
 
-.PHONY: fetch-karmafun
-fetch-karmafun: $(DIST_DIR)/$(KARMAFUN_PACKAGE)
+.PHONY: apk-karmafun-fetch
+apk-karmafun-fetch: $(DIST_DIR)/$(KARMAFUN_PACKAGE)
 
 # Build iknite-images APK by extracting image list from kustomization and using melange in a container
 $(DIST_DIR)/$(IKNITE_IMAGES_PACKAGE): $(DIST_DIR)/iknite_linux_amd64_v1/iknite $(KUSTOMIZATION_FILES) $(ROOT_DIR)/$(KEY_NAME)| check-prerequisites
@@ -328,8 +349,8 @@ $(DIST_DIR)/$(IKNITE_IMAGES_PACKAGE): $(DIST_DIR)/iknite_linux_amd64_v1/iknite $
 	(cd "$(DIST_DIR)/$(ARCH)" && for f in *.apk; do mv "$$f" "../$$(echo "$$f" | sed 's/\-r0.apk$$//').$(ARCH).apk"; done); \
 	rmdir "$(DIST_DIR)/$(ARCH)/"
 
-.PHONY: images-apk
-images-apk: $(DIST_DIR)/$(IKNITE_IMAGES_PACKAGE)
+.PHONY: apk-images-build
+apk-images-build: $(DIST_DIR)/$(IKNITE_IMAGES_PACKAGE)
 
 # Build incus-agent APK using melange in a container
 $(DIST_DIR)/$(INCUS_AGENT_PACKAGE): $(INCUS_AGENT_SOURCES) $(ROOT_DIR)/$(KEY_NAME) | check-prerequisites
@@ -345,8 +366,8 @@ $(DIST_DIR)/$(INCUS_AGENT_PACKAGE): $(INCUS_AGENT_SOURCES) $(ROOT_DIR)/$(KEY_NAM
 	(cd "$(DIST_DIR)/$(ARCH)" && for f in *.apk; do mv "$$f" "../$$(echo "$$f" | sed 's/\-r0.apk$$//').$(ARCH).apk"; done); \
 	rmdir "$(DIST_DIR)/$(ARCH)/"
 
-.PHONY: incus-agent-apk
-incus-agent-apk: $(DIST_DIR)/$(INCUS_AGENT_PACKAGE)
+.PHONY: apk-incus-agent-build
+apk-incus-agent-build: $(DIST_DIR)/$(INCUS_AGENT_PACKAGE)
 
 $(APK_INDEX_BUILDER_IMAGE_MARKER): $(APK_INDEX_BUILDER_IMAGE_SOURCES) | check-prerequisites
 	$(BUILD_CONTAINER_CMD) build \
@@ -373,12 +394,12 @@ $(APK_INDEX_FILE): $(DIST_DIR)/$(KARMAFUN_PACKAGE) $(DIST_DIR)/$(IKNITE_PACKAGE)
 			$(APK_INDEX_BUILDER_IMAGE); \
 	$(ROOT_CMD) chown -R "$$(id -u):$$(id -g)" "$(DIST_DIR)/repo"
 
-.PHONY: apk-repo
-apk-repo: $(APK_INDEX_FILE)
+.PHONY: apk-repo-build
+apk-repo-build: $(APK_INDEX_FILE)
 
 # Upload APK repository with terragrunt by applying Terraform configuration in deploy/iac/iknite/$(IKNITE_REPO_NAME)repo
-.PHONY: upload-apk-repo
-upload-apk-repo: $(APK_INDEX_FILE) | check-prerequisites
+.PHONY: apk-repo-publish
+apk-repo-publish: $(APK_INDEX_FILE) | check-prerequisites
 	cd "$(ROOT_DIR)/deploy/iac/iknite/$(IKNITE_REPO_NAME)repo" && terragrunt init && terragrunt apply -auto-approve
 
 # Build rootfs base image
@@ -464,31 +485,37 @@ $(IKNITE_VM_IMAGE_QCOW2) $(IKNITE_VM_IMAGE_VHDX) &: $(ROOTFS_PATH) $(BUILD_VM_IM
 	$(ROOT_CMD) "$(ROOT_DIR)/packaging/scripts/build-vm-image.sh"
 	$(ROOT_CMD) chown -R "$$(id -u):$$(id -g)" "$(ROOT_DIR)/dist/images" || true
 
-.PHONY: vm-image
-vm-image: $(IKNITE_VM_IMAGE_QCOW2) $(IKNITE_VM_IMAGE_VHDX)
+.PHONY: vm-images-build
+vm-images-build: $(IKNITE_VM_IMAGE_QCOW2) $(IKNITE_VM_IMAGE_VHDX)
 
 # Build Incus metadata tarball (dist/images/incus.tar.xz) from gomplate template
-$(INCUS_METADATA): $(VM_PACKAGING_SOURCES) $(IKNITE_VM_IMAGE_QCOW2) | check-prerequisites
+$(INCUS_METADATA): $(VM_PACKAGING_SOURCES) $(ROOTFS_PATH) | check-prerequisites
 	BUILD_DIR_PATH="$(BUILD_DIR)/incus-metadata"; \
+	mkdir -p "$(dir $@)"; \
 	rm -rf "$$BUILD_DIR_PATH"; \
 	mkdir -p "$$BUILD_DIR_PATH"; \
 	KUBERNETES_VERSION="$(KUBERNETES_VERSION)" \
 	IKNITE_VERSION="$(IKNITE_VERSION)" \
 	IKNITE_VERSION_TAG="$(IKNITE_VERSION_TAG)" \
-	IMAGE=$(IKNITE_VM_IMAGE_QCOW2) \
+	IMAGE=$(ROOTFS_PATH) \
 		gomplate -f "$(VM_PACKAGING_DIR)/metadata.yaml.tmpl" -o "$${BUILD_DIR_PATH}/metadata.yaml"; \
 	cp -r "$(VM_PACKAGING_DIR)/templates" "$${BUILD_DIR_PATH}/templates"; \
-	cd "$${BUILD_DIR_PATH}" && bsdtar -cJf "$(shell realpath "$@")" *
+	cd "$${BUILD_DIR_PATH}" && bsdtar -cJf "$(ROOT_DIR)/$@" *
 
-.PHONY: incus-metadata
-incus-metadata: $(INCUS_METADATA)
+.PHONY: incus-metadata-build
+incus-metadata-build: $(INCUS_METADATA)
 
 # Attach the Incus metadata tarball to the rootfs image in the container registry using oras, so it can be consumed by Incus when pulling the image
 $(IKNITE_ROOTFS_IMAGE_INCUS_ATTACHMENT_MARKER): $(IKNITE_ROOTFS_IMAGE_MARKER) $(INCUS_METADATA) | check-prerequisites container-login
-	cd "$(ROOT_DIR)/dist/images"; \
-	oras attach "$(IKNITE_ROOTFS_IMAGE)" \
-	--artifact-type application/vnd.incus.metadata \
-	incus.tar.xz:application/x-xz
+	if [ "$(PUSH_IMAGES)" != "true" ]; then \
+		echo "Skipping Incus metadata attachment because PUSH_IMAGES is not true"; \
+	else \
+		echo "Attaching Incus metadata to rootfs image in container registry..."; \
+		cd "$(ROOT_DIR)/dist/images"; \
+		oras attach "$(IKNITE_ROOTFS_IMAGE)" \
+		--artifact-type application/vnd.incus.metadata \
+		$(notdir $(INCUS_METADATA)):application/x-xz; \
+	fi
 	touch "$@"
 
 .PHONY: rootfs-image-incus-attachment
@@ -518,17 +545,17 @@ $(IKNITE_VM_IMAGE_QCOW2_CONTAINER_MARKER): $(IKNITE_VM_IMAGE_QCOW2) $(INCUS_META
 	--annotation org.opencontainers.image.version="$(IKNITE_VERSION_TAG)" \
 	--annotation org.opencontainers.image.description="VM image for iknite $(IKNITE_VERSION) with Kubernetes $(KUBERNETES_VERSION)" \
 	$(IKNITE_VM_IMAGE_QCOW2_BASENAME):application/x-qcow2 \
-	incus.tar.xz:application/vnd.incus.metadata; \
+	$(notdir $(INCUS_METADATA)):application/vnd.incus.metadata; \
 	if [ "$(IKNITE_REPO_NAME)" = "release" ]; then \
 		oras tag "$$IMAGE_TAG" "$(REGISTRY)/$(IMAGE_NAME)-vm-qcow2:latest"; \
 	fi
 	touch "$@"
 
-.PHONY: vm-container-images
-vm-container-images: $(IKNITE_VM_IMAGE_QCOW2_CONTAINER_MARKER) $(IKNITE_VM_IMAGE_VHDX_CONTAINER_MARKER)
+.PHONY: vm-images-push
+vm-images-push: $(IKNITE_VM_IMAGE_QCOW2_CONTAINER_MARKER) $(IKNITE_VM_IMAGE_VHDX_CONTAINER_MARKER)
 
-.PHONY: publish-vm-images
-publish-vm-images: $(IKNITE_VM_IMAGE_QCOW2_CONTAINER_MARKER) $(IKNITE_VM_IMAGE_VHDX_CONTAINER_MARKER) | check-prerequisites
+.PHONY: vm-images-publish
+vm-images-publish: $(IKNITE_VM_IMAGE_QCOW2_CONTAINER_MARKER) $(IKNITE_VM_IMAGE_VHDX_CONTAINER_MARKER) | check-prerequisites
 	@echo "VM images have been pushed to the container registry. If this is a release build, they are also tagged as latest."
 	cd $(ROOT_DIR)/deploy/iac/iknite/iknite-public-images; \
 	terragrunt run --graph --non-interactive apply -- -auto-approve
@@ -596,7 +623,8 @@ $(RELEASE_DIR)/SHA256SUMS: $(RELEASE_LINKS) | $(RELEASE_DIR)
 	@echo "Generating SHA256SUMS file for release artifacts..."
 	cd "$(RELEASE_DIR)" && sha256sum $(notdir $(RELEASE_FILES)) > SHA256SUMS
 
-release-files: $(RELEASE_DIR)/SHA256SUMS
+.PHONY: ci-release-files
+ci-release-files: $(RELEASE_DIR)/SHA256SUMS
 
 .PHONY: clean
 clean:
@@ -611,21 +639,18 @@ test: check-prerequisites
 	@echo "Running tests..."
 	go test -v -race -covermode=atomic -coverprofile=coverage.out ./...
 
-.PHONY: ssh-key
-ssh-key: $(HOME)/.ssh/iknite
-
-$(HOME)/.ssh/iknite_known_hosts: $(SECRETS_FILE) | check-prerequisites
+$(IKNITE_KNOWN_HOSTS_FILE): $(SECRETS_FILE) | check-prerequisites
 	@echo "Extracting VM SSH host public key for known_hosts from $<..."
 	mkdir -p "$(HOME)/.ssh"
 	chmod 700 "$(HOME)/.ssh"
 	$(SOPS_DECRYPT_CMD) $< | jq -r '"* " + .data.iknite_vm.ssh_host_ecdsa_public' > "$@"
 	chmod 600 "$@"
 
-.PHONY: vm-known-hosts
-vm-known-hosts: $(HOME)/.ssh/iknite_known_hosts ## Extract VM SSH host public key to ~/.ssh/iknite_known_hosts
+.PHONY: ci-vm-known-hosts
+ci-vm-known-hosts: $(IKNITE_KNOWN_HOSTS_FILE) ## Extract VM SSH host public key to ~/.ssh/iknite_known_hosts
 
-.PHONY: generate-vm-host-keys
-generate-vm-host-keys: ## Generate new fixed SSH host keys for iknite VMs and update devcontainer known_hosts
+.PHONY: generate-vm-host-key
+generate-vm-host-key: ## Generate new fixed SSH host keys for iknite VMs and update devcontainer known_hosts
 	@echo "Generating new SSH host key pair for iknite VMs..."
 	@TMP_KEY=$$(mktemp) && \
 	echo "y" | ssh-keygen -t ecdsa-sha2-nistp256 -b 256 -C "iknite-vm-host-key" -f "$$TMP_KEY" -N "" -q && \
@@ -649,8 +674,8 @@ generate-vm-host-keys: ## Generate new fixed SSH host keys for iknite VMs and up
 	echo "  - $(SSH_KNOWN_HOSTS_FILE)" && \
 	echo "  - $(SECRETS_FILE)"
 
-.PHONY: vm-ssh
-vm-ssh: $(HOME)/.ssh/iknite $(HOME)/.ssh/iknite_known_hosts ## Connect to the E2E test VM using the fixed host key
+.PHONY: ci-vm-ssh
+ci-vm-ssh: $(SSH_KEY_FILE) $(IKNITE_KNOWN_HOSTS_FILE) ## Connect to the E2E test VM using the fixed host key
 	@VM_IP=$$(cd "$(ROOT_DIR)/deploy/iac/iknite/$(VM_STACK)/iknite-vm" && terragrunt output --raw --non-interactive instances 2>/dev/null | jq -r '."iknite-vm-instance".access_ip_v4' 2>/dev/null || echo ""); \
 	if [ -z "$$VM_IP" ]; then \
 		echo "Error: Could not determine VM IP. Run 'make e2e-tg-apply' first."; \
@@ -659,8 +684,8 @@ vm-ssh: $(HOME)/.ssh/iknite $(HOME)/.ssh/iknite_known_hosts ## Connect to the E2
 	echo "Connecting to iknite VM at $$VM_IP..."; \
 	ssh -o Hostname="$$VM_IP" iknite-vm
 
-.PHONY: rotate-cache
-rotate-cache:
+.PHONY: ci-cache-rotate
+ci-cache-rotate:
 	@echo "Rotating build container cache..."
 	if [ -d "$(BUILD_CONTAINER_CACHE_FROM_PATH)" ]; then \
 		rm -rf "$(BUILD_CONTAINER_CACHE_FROM_PATH)"; \
@@ -689,8 +714,8 @@ $(IKNITE_DEVCONTAINER_IMAGE_MARKER): $(IKNITE_DEVCONTAINER_SOURCES) | check-prer
 	fi
 	@touch "$@"
 
-.PHONY: devcontainer
-devcontainer: $(IKNITE_DEVCONTAINER_IMAGE_MARKER)
+.PHONY: container-dev-build
+container-dev-build: $(IKNITE_DEVCONTAINER_IMAGE_MARKER)
 
 $(IKNITE_CICONTAINER_IMAGE_MARKER): $(IKNITE_CICONTAINER_SOURCES) | check-prerequisites container-login
 	$(BUILD_CONTAINER_CMD) build \
@@ -712,15 +737,15 @@ $(IKNITE_CICONTAINER_IMAGE_MARKER): $(IKNITE_CICONTAINER_SOURCES) | check-prereq
 	fi
 	@touch "$@"
 
-.PHONY: cicontainer
-cicontainer: $(IKNITE_CICONTAINER_IMAGE_MARKER)
+.PHONY: container-ci-build
+container-ci-build: $(IKNITE_CICONTAINER_IMAGE_MARKER)
 
-.PHONY: check-argocd
-check-argocd: $(IKNITE_CICONTAINER_IMAGE_MARKER) | check-prerequisites
+.PHONY: ci-check-argocd
+ci-check-argocd: $(IKNITE_CICONTAINER_IMAGE_MARKER) | check-prerequisites
 	@echo "Checking ArgoCD application status using $(IKNITE_CICONTAINER_IMAGE) container..."
 	$(RUN_CONTAINER_CMD) run --rm \
 		-v "$(ROOT_DIR):/workspace" \
-		-v "$(HOME)/.config/sops:/root/.config/sops:ro" \
+		-v "$(SSH_KEY_FILE):/root/.ssh/id_ed25519:ro" \
 		-v "$(HOME)/.config/incus:/root/.config/incus:ro" \
 		-e "VM_STACK=$(VM_STACK)" \
 		$(IKNITE_CICONTAINER_IMAGE) \

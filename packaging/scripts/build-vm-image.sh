@@ -13,7 +13,7 @@ ROOT_DIR=$(cd "$(dirname "$0")/../../" && pwd)
 
 # Only run this specific step (empty means run all non-skipped steps)
 ONLY_CALLED=false
-IMAGE_SIZE="3G"
+IMAGE_SIZE="4G"
 SERIAL_PORT="ttyS0"
 KUBERNETES_VERSION=${KUBERNETES_VERSION:-$(grep k8s.io/kubernetes "$ROOT_DIR/go.mod" | awk '{gsub(/^v/,"",$2);print $2;}')}
 if [ -z "$IKNITE_VERSION" ]; then

@@ -51,13 +51,7 @@ jobs:
           curl -L -o buildkit.tar.gz https://github.com/moby/buildkit/releases/download/v${BUILDKIT_VERSION}/buildkit-v${BUILDKIT_VERSION}.linux-amd64.tar.gz
           tar -xzf buildkit.tar.gz -C /usr/local/bin --strip-components=1 bin/buildctl
           buildctl --version
-          make print-HAS_WORKING_DOCKER  || true
-          make print-BUILDX_BUILDER || true
-          make print-BUILDKIT_HOST || true
-          docker buildx ls || true
-          BUILDKIT_HOST=docker-container://buildx_buildkit_iknite0 buildctl debug workers || true
-          make print-HAS_WORKING_ROOTLESS_BUILDCTL || true
-          make print-BUILD_CONTAINER_CMD || true
+          make info
           helmfile init --force
           helm plugin install https://github.com/mumoshu/helm-x
       -
@@ -68,7 +62,7 @@ jobs:
           mkdir -p ~/.config/sops/age
           echo -e "$AGE_PRIVATE_KEY" > ~/.config/sops/age/keys.txt
           chmod 600 ~/.config/sops/age/keys.txt
-          make extract-key
+          make ci-extract-key
         env:
           AGE_PRIVATE_KEY: ${{ secrets.AGE_PRIVATE_KEY }}
       -
