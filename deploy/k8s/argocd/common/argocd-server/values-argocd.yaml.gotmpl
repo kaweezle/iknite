@@ -114,6 +114,10 @@ server:
     ingressClassName: traefik
     tls: true
 
+  service:
+    # Enable gRPC over HTTP/2
+    servicePortHttpsAppProtocol: kubernetes.io/h2c
+
 ## Repo Server
 repoServer:
   ## Repo server image
@@ -278,7 +282,8 @@ extraObjects:
     kind: HTTPRoute
     metadata:
       name: argocd-server
-      namespace: argocd
+      annotations:
+        kgateway.dev/route-weight: "10"
     spec:
       parentRefs:
         - name: argocd-gateway
@@ -291,13 +296,77 @@ extraObjects:
         - backendRefs:
             - name: argocd-server
               port: 80
-        - matches:
+        # Fixme: GRPC route below should be selected but actually this one taken
+        - backendRefs:
+            - name: argocd-server
+              port: 443
+          matches:
             - headers:
-                - name: Content-Type
-                  value: application/grpc
+                - name: content-type
+                  value: "^application/grpc.*$"
+                  type: RegularExpression
+  -
+    apiVersion: gateway.networking.k8s.io/v1
+    kind: GRPCRoute
+    metadata:
+      name: argocd-server-grpc
+      annotations:
+        # Higher weight for gRPC traffic in order to prefer it over the HTTP route when possible.
+        # This is required for the ArgoCD CLI to work properly.
+        kgateway.dev/route-weight: "20"
+    spec:
+      parentRefs:
+        - name: argocd-gateway
+          sectionName: websecure
+        - name: argocd-gateway
+          sectionName: web
+      hostnames:
+        - {{ $domain }}
+      rules:
+        - matches:
+            - method:
+                type: RegularExpression
+                service: ".*"
+            - headers:
+                - name: content-type
+                  value: "^application/grpc.*$"
+                  type: RegularExpression
           backendRefs:
             - name: argocd-server
-              port: 80
+              port: 443
+  # DEBUG: Use this to debug access logs
+  # -
+  #   apiVersion: gateway.kgateway.dev/v1alpha1
+  #   kind: HTTPListenerPolicy
+  #   metadata:
+  #     name: access-logs
+  #   spec:
+  #     accessLog:
+  #     - fileSink:
+  #         jsonFormat:
+  #           authority: '%REQ(:AUTHORITY)%'
+  #           backendCluster: '%UPSTREAM_CLUSTER%'
+  #           backendHost: '%UPSTREAM_HOST%'
+  #           bytes_received: '%BYTES_RECEIVED%'
+  #           bytes_sent: '%BYTES_SENT%'
+  #           contentType: '%REQ(Content-Type)%'
+  #           method: '%REQ(X-ENVOY-ORIGINAL-METHOD?:METHOD)%'
+  #           path: '%REQ(X-ENVOY-ORIGINAL-PATH?:PATH)%'
+  #           protocol: '%PROTOCOL%'
+  #           req_x_forwarded_for: '%REQ(X-FORWARDED-FOR)%'
+  #           request_id: '%REQ(X-REQUEST-ID)%'
+  #           resp_backend_service_time: '%RESP(X-ENVOY-UPSTREAM-SERVICE-TIME)%'
+  #           response_code: '%RESPONSE_CODE%'
+  #           response_flags: '%RESPONSE_FLAGS%'
+  #           routeName: '%ROUTE_NAME%'
+  #           start_time: '%START_TIME%'
+  #           total_duration: '%DURATION%'
+  #           user_agent: '%REQ(USER-AGENT)%'
+  #         path: /dev/stdout
+  #     targetRefs:
+  #     - group: gateway.networking.k8s.io
+  #       kind: Gateway
+  #       name: argocd-gateway
   ####
   # Bootstrap application
   ####

@@ -20212,6 +20212,8 @@ spec:
               value: "true"
             - name: KGW_GATEWAY_CLASS_PARAMETERS_REFS
               value: "{}"
+            - name: KGW_WEIGHTED_ROUTE_PRECEDENCE
+              value: "true"
             - name: POD_NAMESPACE
               valueFrom:
                 fieldRef:
