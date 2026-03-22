@@ -287,8 +287,6 @@ extraObjects:
     spec:
       parentRefs:
         - name: argocd-gateway
-          sectionName: web
-        - name: argocd-gateway
           sectionName: websecure
       hostnames:
         - {{ $domain }}
@@ -307,6 +305,25 @@ extraObjects:
                   type: RegularExpression
   -
     apiVersion: gateway.networking.k8s.io/v1
+    kind: HTTPRoute
+    metadata:
+      name: argocd-server-redirect
+      annotations:
+        kgateway.dev/route-weight: "10"
+    spec:
+      parentRefs:
+        - name: argocd-gateway
+          sectionName: web
+      hostnames:
+        - {{ $domain }}
+      rules:
+        - filters:
+          - type: RequestRedirect
+            requestRedirect:
+              scheme: https
+              statusCode: 301
+  -
+    apiVersion: gateway.networking.k8s.io/v1
     kind: GRPCRoute
     metadata:
       name: argocd-server-grpc
@@ -318,8 +335,6 @@ extraObjects:
       parentRefs:
         - name: argocd-gateway
           sectionName: websecure
-        - name: argocd-gateway
-          sectionName: web
       hostnames:
         - {{ $domain }}
       rules:
