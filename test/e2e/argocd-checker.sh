@@ -239,14 +239,14 @@ check_gateway() {
         ingress_host=$(kubectl get gateway argocd-gateway -n argocd -o jsonpath='{.spec.listeners[0].hostname}')
 
         if [[ -n "${ingress_host}" ]]; then
-            log_info "Ingress host: ${ingress_host}"
+            log_info "Gateway host: ${ingress_host}"
             echo "${ingress_host}"
         else
-            log_error "Ingress host not found"
+            log_error "Gateway host not found"
             exit 1
         fi
     else
-        log_error "Ingress 'argocd-gateway' not found in namespace 'argocd'"
+        log_error "Gateway 'argocd-gateway' not found in namespace 'argocd'"
         exit 1
     fi
 }
@@ -421,6 +421,7 @@ main() {
     # Execute verification steps
     check_namespace
     check_argocd_components
+    check_gateway
     check_httproute
     local ingress_host
     ingress_host=$(kubectl get httproute argocd-server -n argocd -o jsonpath='{.spec.hostnames[0]}')

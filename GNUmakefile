@@ -229,7 +229,6 @@ help: # ignore checkmake
 	@echo "  make rootfs-container               Create rootfs container and add preloaded images to it"
 	@echo "  make rootfs-image                   Build final rootfs image from rootfs container"
 	@echo "  make rootfs-image-incus-attachment  Attach Incus metadata to rootfs image in container registry with oras"
-	@echo "  make ssh-key                        Generate SSH key"
 	@echo "  make test                           Run go tests with coverage"
 	@echo "  make vm-images-build                Build VM images (qcow2, vhdx)"
 	@echo "  make vm-images-push                 Publish VM images to registry with oras"
@@ -675,8 +674,12 @@ generate-vm-host-key: ## Generate new fixed SSH host keys for iknite VMs and upd
 	echo "  - $(SECRETS_FILE)"
 
 .PHONY: ci-vm-ssh
-ci-vm-ssh: $(SSH_KEY_FILE) $(IKNITE_KNOWN_HOSTS_FILE) ## Connect to the E2E test VM using the fixed host key
-	@VM_IP=$$(cd "$(ROOT_DIR)/deploy/iac/iknite/$(VM_STACK)/iknite-vm" && terragrunt output --raw --non-interactive instances 2>/dev/null | jq -r '."iknite-vm-instance".access_ip_v4' 2>/dev/null || echo ""); \
+ci-vm-ssh: $(IKNITE_KNOWN_HOSTS_FILE) ## Connect to the E2E test VM using the fixed host key
+    @if [ ! -f "$(SSH_KEY_FILE)" ]; then \
+        echo "Error: SSH key file '$(SSH_KEY_FILE)' not found. Generate it with 'make ssh-key'."; \
+        exit 1; \
+    fi; \
+	VM_IP=$$(cd "$(ROOT_DIR)/deploy/iac/iknite/$(VM_STACK)/iknite-vm" && terragrunt output --raw --non-interactive instances 2>/dev/null | jq -r '."iknite-vm-instance".access_ip_v4' 2>/dev/null || echo ""); \
 	if [ -z "$$VM_IP" ]; then \
 		echo "Error: Could not determine VM IP. Run 'make e2e-tg-apply' first."; \
 		exit 1; \
