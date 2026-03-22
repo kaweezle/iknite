@@ -36,6 +36,8 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/clientcmd/api"
 	kubeadmConstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"sigs.k8s.io/kustomize/api/provider"
+	"sigs.k8s.io/kustomize/api/resmap"
 	"sigs.k8s.io/kustomize/kyaml/resid"
 
 	"github.com/kaweezle/iknite/pkg/provision"
@@ -273,17 +275,10 @@ func (config *Config) DoKustomization(
 	logContext := log.Fields{
 		"OutboundIP": ip,
 	}
-	var ids []resid.ResId
-	if kustomization == "" {
-		log.Warn("Empty kustomization.")
-	} else {
-		log.WithFields(log.Fields{
-			"kustomization": kustomization,
-		}).Info("Performing configuration")
 
-		if ids, err = provision.ApplyBaseKustomizations(kustomization, logContext); err != nil {
-			return fmt.Errorf("failed to apply base kustomizations: %w", err)
-		}
+	ids, err := config.applyKustomizationResources(config.RESTClient(), kustomization, logContext)
+	if err != nil {
+		return err
 	}
 
 	cm.Data["configured"] = "true"
@@ -308,6 +303,65 @@ func (config *Config) DoKustomization(
 	}
 
 	return nil
+}
+
+func (config *Config) applyKustomizationResources(
+	restClient *RESTClientGetter,
+	kustomization string,
+	logContext log.Fields,
+) ([]resid.ResId, error) {
+	if kustomization == "" {
+		log.Warn("Empty kustomization.")
+		return nil, nil
+	}
+
+	log.WithFields(log.Fields{
+		"kustomization": kustomization,
+	}).Info("Performing configuration")
+
+	resources, err := provision.ApplyBaseKustomizations(kustomization, logContext)
+	if err != nil {
+		return nil, fmt.Errorf("failed to apply base kustomizations: %w", err)
+	}
+
+	return applyResMapWithServerSideApply(restClient, resources)
+}
+
+func applyResMapWithServerSideApply(
+	restClient *RESTClientGetter,
+	resources resmap.ResMap,
+) ([]resid.ResId, error) {
+	ids := resources.AllIds()
+
+	clusterResources := resmap.NewFactory(provider.NewDefaultDepProvider().GetResourceFactory()).
+		FromResourceSlice(resources.ClusterScoped())
+	if clusterResources.Size() != 0 {
+		clusterInfos, err := restClient.ResourceInfosFromResMap(clusterResources)
+		if err != nil {
+			return nil, fmt.Errorf("failed to build cluster resource infos: %w", err)
+		}
+		if err = restClient.ApplyResourceInfosServerSide(clusterInfos); err != nil {
+			return nil, fmt.Errorf("failed to apply cluster resources: %w", err)
+		}
+
+		for _, curID := range clusterResources.AllIds() {
+			if err = resources.Remove(curID); err != nil {
+				return nil, fmt.Errorf("failed to remove cluster-scoped resource: %w", err)
+			}
+		}
+	}
+
+	if resources.Size() != 0 {
+		resourceInfos, err := restClient.ResourceInfosFromResMap(resources)
+		if err != nil {
+			return nil, fmt.Errorf("failed to build resource infos: %w", err)
+		}
+		if err = restClient.ApplyResourceInfosServerSide(resourceInfos); err != nil {
+			return nil, fmt.Errorf("failed to apply resources: %w", err)
+		}
+	}
+
+	return ids, nil
 }
 
 func GetIkniteConfigMap(client kubernetes.Interface) (*coreV1.ConfigMap, error) {

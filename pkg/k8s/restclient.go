@@ -3,7 +3,9 @@ package k8s
 // cSpell: words clientcmd clientconfig restconfig casttype metav1 polymorphichelpers restmapper
 // cSpell: disable
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"sort"
 	"strings"
@@ -15,6 +17,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	k8sTypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/discovery"
@@ -24,6 +27,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/kubectl/pkg/polymorphichelpers"
+	"sigs.k8s.io/kustomize/api/resmap"
 
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
 )
@@ -68,6 +72,55 @@ func (r *RESTClientGetter) ToRESTMapper() (meta.RESTMapper, error) {
 
 func (r *RESTClientGetter) ToRawKubeConfigLoader() clientcmd.ClientConfig {
 	return r.clientconfig
+}
+
+func (r *RESTClientGetter) ResourceInfosFromResMap(resources resmap.ResMap) ([]*resource.Info, error) {
+	rawResources, err := resources.AsYaml()
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert resources to YAML: %w", err)
+	}
+
+	result := resource.NewBuilder(r).
+		Unstructured().
+		ContinueOnError().
+		Stream(bytes.NewBufferString(string(rawResources)), "kustomize").
+		Flatten().
+		Do()
+
+	infos, err := result.Infos()
+	if err != nil {
+		return nil, fmt.Errorf("failed to build resource infos: %w", err)
+	}
+
+	return infos, nil
+}
+
+func (r *RESTClientGetter) ApplyResourceInfosServerSide(infos []*resource.Info) error {
+	force := true
+	for _, info := range infos {
+		unstructuredObj, err := runtime.DefaultUnstructuredConverter.ToUnstructured(info.Object)
+		if err != nil {
+			return fmt.Errorf("failed to convert resource %s to unstructured: %w", info.ObjectName(), err)
+		}
+
+		payload, err := json.Marshal(unstructuredObj)
+		if err != nil {
+			return fmt.Errorf("failed to marshal resource %s for apply: %w", info.ObjectName(), err)
+		}
+
+		helper := resource.NewHelper(info.Client, info.Mapping).WithFieldManager("iknite")
+		if _, err = helper.Patch(
+			info.Namespace,
+			info.Name,
+			k8sTypes.ApplyPatchType,
+			payload,
+			&metav1.PatchOptions{Force: &force, FieldManager: "iknite"},
+		); err != nil {
+			return fmt.Errorf("failed to server-side apply resource %s: %w", info.ObjectName(), err)
+		}
+	}
+
+	return nil
 }
 
 var ApplicationSchemaGroupVersionKind = schema.GroupVersionKind{

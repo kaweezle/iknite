@@ -21,5 +21,10 @@ inputs = {
       data_path     = "${get_repo_root()}/dist/images/iknite-vm.${local.iknite_version}-${local.kubernetes_version}.qcow2"
       metadata_path = "${get_repo_root()}/dist/images/incus.tar.xz"
     }
+    "iknite-container-image" = {
+      name          = "iknite-container/${local.iknite_version}-${local.kubernetes_version}"
+      data_path     = "${get_repo_root()}/dist/iknite-${local.iknite_version}-${local.kubernetes_version}.rootfs.tar.gz"
+      metadata_path = "${get_repo_root()}/dist/images/incus.tar.xz"
+    }
   }
 }

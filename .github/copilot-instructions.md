@@ -150,33 +150,45 @@ make help
 Iknite build targets
 
 Step targets:
-  make extract-key                    Extract signing key from sops file
-  make goreleaser                     Build iknite package (goreleaser)
-  make fetch-karmafun                 Download latest karmafun APK into dist/
-  make images-apk                     Build iknite-images APK
-  make incus-agent-apk                Build incus-agent APK
-  make apk-repo                       Create APK repository in dist/repo
-  make upload-apk-repo                Upload APK repository with terragrunt
-  make rootfs-base-image              Build rootfs base image
-  make rootfs-container               Add preloaded images into rootfs container
+  make all                            Run full pipeline (extract key, build packages, rootfs, VM images, etc.)
+  make apk-iknite-build               Build iknite package (goreleaser)
+  make apk-images-build               Build iknite-images APK
+  make apk-incus-agent-build          Build incus-agent APK
+  make apk-karmafun-fetch             Fetch karmafun dependencies
+  make apk-repo-build                 Set up Alpine Linux package repository
+  make apk-repo-publish               Upload APK repository with terragrunt
+  make check-prerequisites            Verify all prerequisites are installed
+  make ci-cache-rotate                Rotate build cache
+  make ci-check-argocd                Validate ArgoCD configuration
+  make ci-extract-key                 Extract cryptographic keys
+  make ci-release-files               Prepare release files
+  make ci-vm-known-hosts              Extract VM SSH host public key to ~/.ssh/iknite_known_hosts
+  make ci-vm-ssh                      Connect to the E2E test VM using the fixed host key
+  make clean                          Remove build artifacts and temporary files
+  make container-ci-build             Build CI container image
+  make container-dev-build            Build development container
+  make container-login                Log in to container registry
+  make e2e                            Run end-to-end tests
+  make e2e-check-argocd               Check ArgoCD during e2e tests
+  make e2e-tg-apply                   Apply Terraform configuration for e2e tests
+  make e2e-tg-apply-vm                Apply VM Terraform configuration for e2e tests
+  make e2e-tg-destroy                 Destroy Terraform infrastructure for e2e tests
+  make e2e-tg-init                    Initialize Terraform for e2e tests
+  make e2e-tg-refresh                 Refresh Terraform state for e2e tests
+  make generate-vm-host-key           Generate VM SSH host key
+  make help                           Show this help message
+  make incus-metadata-build           Build Incus metadata tarball
+  make info                           Show build configuration information
   make rootfs                         Build rootfs
-  make rootfs-image                   Build final rootfs image
-  make vm-image                       Build VM images (qcow2, vhdx)
-  make incus-metadata                 Build Incus metadata tarball (dist/images/incus.tar.xz)
+  make rootfs-base-image              Build rootfs base image
+  make rootfs-container               Create rootfs container and add preloaded images to it
+  make rootfs-image                   Build final rootfs image from rootfs container
   make rootfs-image-incus-attachment  Attach Incus metadata to rootfs image in container registry with oras
-  make vm-container-images            Build VM images as container images
-  make clean                          Remove build artifacts and temp container
-  make all                            Run full pipeline
-  make ssh-key                        Extract SSH key for iknite VMs from sops file
-  make vm-known-hosts                 Extract VM SSH host public key to ~/.ssh/iknite_known_hosts
-  make generate-vm-host-keys          Generate new fixed SSH host keys for iknite VMs
-  make vm-ssh                         Connect to the E2E test VM using the fixed host key
-  make e2e-tg-init                    Initialize terragrunt E2E test configuration
-  make e2e-tg-refresh                 Refresh terragrunt E2E test state without applying changes
-  make e2e-tg-apply                   Apply terragrunt E2E test configuration to create E2E test VM
-  make e2e-tg-destroy                 Destroy E2E test VM with terragrunt
-  make e2e-check-argocd               Check ArgoCD application status for E2E test cluster
-  make release-files                  Generate SHA256SUMS file for release artifacts
+  make ssh-key                        Generate SSH key
+  make test                           Run go tests with coverage
+  make vm-images-push                 Publish VM images to registry with oras
+  make vm-images-build                Build VM images (qcow2, vhdx)
+  make vm-images-publish              Publish VM images to public static object storage
 
 File targets (examples):
   make dist/iknite-<version>.x86_64.apk
@@ -187,8 +199,11 @@ File targets (examples):
 Common variables (override with VAR=value):
   ARCH=x86_64
   KUBERNETES_VERSION=1.35.2
+  IKNITE_RELEASE_TAG=
+  IKNITE_VERSION=0.6.4-devel
   IKNITE_REPO_NAME=test
   CACHE_FLAG=
+  VM_STACK=openstack
   SNAPSHOT=--snapshot
   PUSH_IMAGES=false
 ```
@@ -471,30 +486,21 @@ configuration.
 
 ## Quick Reference
 
+IMPORTANT: Always check `make help` for the most up-to-date commands and
+targets.
+
 ### Go Development
 
-| Task                     | Command                                                               |
-| ------------------------ | --------------------------------------------------------------------- |
-| Run iknite locally       | `go run cmd/iknite/iknite.go start -v debug`                          |
-| Run all tests            | `go test ./...`                                                       |
-| Run tests with coverage  | `go test -v -race -covermode=atomic -coverprofile=coverage.out ./...` |
-| Build single target APK  | `goreleaser build --single-target --snapshot` or `make goreleaser`    |
-| Update generated code    | `./hack/update-codegen.sh`                                            |
-| Verify code generation   | `./hack/verify-codegen.sh`                                            |
-| Run linters              | `golangci-lint run --fix`                                             |
-| Run all pre-commit hooks | `pre-commit run --all-files`                                          |
-
-### Image Building
-
-| Task                     | Command                  |
-| ------------------------ | ------------------------ |
-| Full image build (local) | `make all`               |
-| Build only APK packages  | `make apk-repo`          |
-| Build rootfs base image  | `make rootfs-base-image` |
-| Build iknite-images APK  | `make images-apk`        |
-| Build rootfs tarball     | `make rootfs`            |
-| Build VM images          | `make vm-image`          |
-| Upload APK repository    | `make upload-apk-repo`   |
+| Task                     | Command                                                                  |
+| ------------------------ | ------------------------------------------------------------------------ |
+| Run iknite locally       | `go run cmd/iknite/iknite.go start -v debug`                             |
+| Run all tests            | `go test ./...`                                                          |
+| Run tests with coverage  | `go test -v -race -covermode=atomic -coverprofile=coverage.out ./...`    |
+| Build single target APK  | `goreleaser build --single-target --snapshot` or `make apk-iknite-build` |
+| Update generated code    | `./hack/update-codegen.sh`                                               |
+| Verify code generation   | `./hack/verify-codegen.sh`                                               |
+| Run linters              | `golangci-lint run --fix`                                                |
+| Run all pre-commit hooks | `pre-commit run --all-files`                                             |
 
 ### Documentation
 

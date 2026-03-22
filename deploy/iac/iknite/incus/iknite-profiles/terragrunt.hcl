@@ -21,7 +21,7 @@ inputs = {
   profiles = {
     "iknite-vm" = {
       name        = "iknite-vm"
-      description = "Profile for the iKNIte VM image"
+      description = "Profile for the iknite VM image"
       config = {
         "limits.cpu"           = "2"
         "limits.memory"        = "8GB"
@@ -71,7 +71,7 @@ EOF
     }
     "iknite-container" = {
       name        = "iknite-container"
-      description = "Profile for iKNIte containers"
+      description = "Profile for iknite containers"
       config = {
         "security.privileged"                     = "true"
         "security.nesting"                        = "true"

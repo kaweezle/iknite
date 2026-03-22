@@ -94,6 +94,8 @@ nfpms:
         dst: /etc/iknite.d/base/kube-flannel.yaml
       - src: packaging/apk/iknite/iknite.d/base/coredns.yaml
         dst: /etc/iknite.d/base/coredns.yaml
+      - src: packaging/apk/iknite/iknite.d/base/kgateway.yaml
+        dst: /etc/iknite.d/base/kgateway.yaml
       - src: packaging/apk/iknite/init.d/iknite
         dst: /etc/init.d/iknite
       - src: packaging/apk/iknite/conf.d/iknite

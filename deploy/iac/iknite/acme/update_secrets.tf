@@ -12,7 +12,7 @@ variable "base_key" {
 locals {
   base_key = join("", [for item in split(".", var.base_key) : "[\"${replace(item, "~1", ".")}\"]"])
   secrets = { for k, v in var.certificates : k => {
-    crt    = join("\\n", split("\n", acme_certificate.this[k].certificate_pem))
+    crt    = "${join("\\n", split("\n", acme_certificate.this[k].certificate_pem))}${join("\\n", split("\n", acme_certificate.this[k].issuer_pem))}"
     key    = join("\\n", split("\n", acme_certificate.this[k].private_key_pem))
     suffix = v.dns_names[1]
   } }

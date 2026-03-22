@@ -19,23 +19,17 @@ package provision
 // cSpell: disable
 import (
 	"bytes"
-	"context"
 	"embed"
 	"fmt"
 	"html/template"
-	"os/exec"
 	"path/filepath"
 	"strings"
 
 	log "github.com/sirupsen/logrus"
 	"sigs.k8s.io/kustomize/api/krusty"
-	"sigs.k8s.io/kustomize/api/provider"
 	"sigs.k8s.io/kustomize/api/resmap"
 	"sigs.k8s.io/kustomize/api/types"
 	"sigs.k8s.io/kustomize/kyaml/filesys"
-	"sigs.k8s.io/kustomize/kyaml/resid"
-
-	"github.com/kaweezle/iknite/pkg/constants"
 )
 
 // cSpell: enable
@@ -94,72 +88,16 @@ func createTempKustomizeDirectory(
 	return nil
 }
 
-func applyResmap(resources resmap.ResMap) error {
-	var out []byte
-	var err error
-	if out, err = resources.AsYaml(); err != nil {
-		return fmt.Errorf("failed to convert resources to YAML: %w", err)
-	}
-
-	buffer := bytes.Buffer{}
-	buffer.Write(out)
-
-	cmd := exec.CommandContext( //nolint:gosec // Input is controlled
-		context.TODO(),
-		constants.KubectlCmd,
-		"apply",
-		"-f",
-		"-",
-	)
-	cmd.Env = append(cmd.Env, "KUBECONFIG=/root/.kube/config")
-	cmd.Stdin = &buffer
-	out, err = cmd.CombinedOutput()
-	log.Trace(string(out))
-	if err != nil {
-		log.WithFields(log.Fields{
-			"code": cmd.ProcessState.ExitCode(),
-		}).Error(string(out))
-		return fmt.Errorf("while applying templates: %w", err)
-	}
-	return nil
-}
-
-func ApplyKustomizations(fs filesys.FileSystem, dirname string) ([]resid.ResId, error) {
+func ApplyKustomizations(fs filesys.FileSystem, dirname string) (resmap.ResMap, error) {
 	resources, err := RunKustomizations(fs, dirname)
 	if err != nil {
-		err = fmt.Errorf("while building templates: %w", err)
-		return nil, err
+		return nil, fmt.Errorf("while building templates: %w", err)
 	}
 
-	ids := resources.AllIds()
-
-	// The set of resources may contain CRDs and CRs. If there are cluster wide
-	// resources (CRDs are cluster wide), we apply them first and then the rest.
-	// TODO: Don't apply CRDs twice
-	crds := resmap.NewFactory(provider.NewDefaultDepProvider().GetResourceFactory()).
-		FromResourceSlice(resources.ClusterScoped())
-
-	if crds.Size() != 0 {
-		crdIds := crds.AllIds()
-		log.WithField("resources", crdIds).Debug("Cluster resources")
-		if applyErr := applyResmap(crds); applyErr != nil {
-			return nil, applyErr
-		}
-		for _, curId := range crdIds {
-			if removeErr := resources.Remove(curId); removeErr != nil {
-				return nil, fmt.Errorf("failed to remove CRD resource: %w", removeErr)
-			}
-		}
-	}
-
-	log.WithField("resources", resources.AllIds()).Debug("Non Cluster resources")
-
-	err = applyResmap(resources)
-
-	return ids, err
+	return resources, nil
 }
 
-func ApplyLocalKustomizations(dirname string) ([]resid.ResId, error) {
+func ApplyLocalKustomizations(dirname string) (resmap.ResMap, error) {
 	return ApplyKustomizations(filesys.MakeFsOnDisk(), dirname)
 }
 
@@ -167,7 +105,7 @@ func ApplyEmbeddedKustomizations(
 	content *embed.FS,
 	dirname string,
 	data any,
-) ([]resid.ResId, error) {
+) (resmap.ResMap, error) {
 	fs := filesys.MakeFsInMemory()
 	if err := fs.MkdirAll(dirname); err != nil {
 		return nil, fmt.Errorf("failed to create directory in memory: %w", err)

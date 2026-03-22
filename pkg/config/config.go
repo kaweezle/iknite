@@ -13,7 +13,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-// cSpell:words forbidigo
+// cSpell:words forbidigo kyaml
 package config
 
 // cSpell: disable
@@ -23,6 +23,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 
 	"github.com/bitfield/script"
 	"github.com/mitchellh/mapstructure"
@@ -35,11 +36,16 @@ import (
 	koptions "k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/images"
 	configUtil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
+	"sigs.k8s.io/kustomize/api/provider"
+	"sigs.k8s.io/kustomize/api/resmap"
+	"sigs.k8s.io/kustomize/kyaml/resid"
+	kyaml "sigs.k8s.io/kustomize/kyaml/yaml"
 	"sigs.k8s.io/yaml"
 
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
 	"github.com/kaweezle/iknite/pkg/cmd/options"
 	"github.com/kaweezle/iknite/pkg/constants"
+	"github.com/kaweezle/iknite/pkg/provision"
 )
 
 // cSpell: enable
@@ -264,6 +270,133 @@ func GetKineImage() string {
 	return "ghcr.io/k3s-io/kine:v0.14.12"
 }
 
+func GetResourceImages(rn *kyaml.RNode) ([]string, error) {
+	var workloadImages []string
+
+	types := []string{"containers", "initContainers"}
+
+	for _, t := range types {
+		var containers *kyaml.RNode
+		var err error
+		if rn.GetKind() == "CronJob" {
+			// For CronJob, the path to containers is different
+			containers, err = rn.Pipe(kyaml.Lookup("spec", "jobTemplate", "spec", "template", "spec", t))
+		} else {
+			// For other workloads, the path is the same
+			containers, err = rn.Pipe(kyaml.Lookup("spec", "template", "spec", t))
+		}
+		if err != nil {
+			return nil, fmt.Errorf("failed to lookup %s: %w", t, err)
+		}
+		if containers != nil {
+			containerList, err := containers.Elements()
+			if err != nil {
+				return nil, fmt.Errorf("failed to get %s elements: %w", t, err)
+			}
+			for _, container := range containerList {
+				image, err := container.Pipe(kyaml.Lookup("image"))
+				if err != nil {
+					return nil, fmt.Errorf("failed to lookup image: %w", err)
+				}
+				if image != nil {
+					workloadImages = append(workloadImages, image.YNode().Value)
+				}
+			}
+		}
+	}
+	return workloadImages, nil
+}
+
+func GetContainerEnvVar(rn *kyaml.RNode, containerName, envVarName string) (string, error) {
+	envVar, err := rn.Pipe(
+		kyaml.Lookup(
+			"spec",
+			"template",
+			"spec",
+			"containers",
+			fmt.Sprintf("[name=%s]", containerName),
+			"env",
+			fmt.Sprintf("[name=%s]", envVarName),
+		),
+	)
+	if err != nil {
+		return "", fmt.Errorf("failed to get env var %s from container %s: %w", envVarName, containerName, err)
+	}
+	if envVar != nil {
+		value, err := envVar.Pipe(kyaml.Lookup("value"))
+		if err != nil {
+			return "", fmt.Errorf("failed to get value from env var %s: %w", envVarName, err)
+		}
+		if value != nil {
+			return value.YNode().Value, nil
+		}
+	}
+	return "", nil
+}
+
+func getKGatewayGatewayImage(rn *kyaml.RNode) (string, error) {
+	image := "ghcr.io/kgateway-dev/envoy-wrapper"
+
+	registry, err := GetContainerEnvVar(rn, "controller", "KGW_DEFAULT_IMAGE_REGISTRY")
+	if err != nil {
+		return "", fmt.Errorf("failed to get KGW_DEFAULT_IMAGE_REGISTRY env from kgateway controller: %w", err)
+	}
+
+	version, err := GetContainerEnvVar(rn, "controller", "KGW_DEFAULT_IMAGE_TAG")
+	if err != nil {
+		return "", fmt.Errorf("failed to get KGW_DEFAULT_IMAGE_TAG env from kgateway controller: %w", err)
+	}
+
+	if registry != "" && version != "" {
+		image = fmt.Sprintf("%s/envoy-wrapper:%s", registry, version)
+	}
+	return image, nil
+}
+
+var workloadKinds = []resid.Gvk{
+	{Group: "apps", Kind: "DaemonSet"},
+	{Group: "apps", Kind: "Deployment"},
+	{Group: "apps", Kind: "StatefulSet"},
+	{Group: "apps", Kind: "ReplicaSet"},
+	{Group: "apps", Kind: "ReplicationController"},
+	{Group: "batch", Kind: "Job"},
+	{Group: "batch", Kind: "CronJob"},
+}
+
+func getKustomizationImages(kustomization string) ([]string, error) {
+	var containerImages []string
+	resources, err := provision.ApplyBaseKustomizations(kustomization, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get resources from base kustomizations: %w", err)
+	}
+	// We want to get DaemonSets, Deployments, StatefulSets and Jobs as they may contain additional images to pull.
+	imageResources := resmap.NewFactory(provider.NewDefaultDepProvider().GetResourceFactory()).
+		FromResourceSlice(resources.GetMatchingResourcesByCurrentId(func(ri resid.ResId) bool {
+			for _, wk := range workloadKinds {
+				if ri.Group == wk.Group && ri.Kind == wk.Kind {
+					return true
+				}
+			}
+			return false
+		})).ToRNodeSlice()
+
+	for _, payload := range imageResources {
+		resourceImages, err := GetResourceImages(payload)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get images from resource: %w", err)
+		}
+		containerImages = append(containerImages, resourceImages...)
+		if payload.GetKind() == "Deployment" && payload.GetName() == "kgateway" {
+			gatewayImage, err := getKGatewayGatewayImage(payload)
+			if err != nil {
+				return nil, fmt.Errorf("failed to get kgateway gateway image: %w", err)
+			}
+			containerImages = append(containerImages, gatewayImage)
+		}
+	}
+	return containerImages, nil
+}
+
 // GetIkniteImages returns the list of container images used by iknite.
 func GetIkniteImages(ikniteConfig *v1alpha1.IkniteClusterSpec) ([]string, error) {
 	// Load default kubeadm configuration to get the list of control plane images
@@ -302,6 +435,15 @@ func GetIkniteImages(ikniteConfig *v1alpha1.IkniteClusterSpec) ([]string, error)
 			Reject("etcd:").
 			Slice()
 	}
-	containerImages = append(containerImages, "public.ecr.aws/docker/library/busybox:1.37.0")
-	return containerImages, nil
+
+	// Now let's perform the default kustomization to add images.
+	kustomizationImages, err := getKustomizationImages(ikniteConfig.Kustomization)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get images from kustomization: %w", err)
+	}
+	containerImages = append(containerImages, kustomizationImages...)
+
+	slices.Sort(containerImages)
+
+	return slices.Compact(containerImages), nil
 }

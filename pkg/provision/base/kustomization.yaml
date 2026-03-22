@@ -8,6 +8,8 @@ resources:
   - https://raw.githubusercontent.com/kube-vip/kube-vip-cloud-provider/main/manifest/kube-vip-cloud-controller.yaml
   - https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
   - ./kube-vip-addresspool.yaml
+  - https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.4.0/standard-install.yaml
+  - ./kgateway.yaml
 
 patches:
   - patch: |-

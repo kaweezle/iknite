@@ -1,0 +1,47 @@
+# cSpell: words crds
+environments:
+  default:
+    secrets:
+      - "{{ coalesce (env "IKNITE_STACK_PREFIX") "../../../../.." }}/secrets.sops.yaml"
+    values:
+      - "{{ coalesce (env "IKNITE_STACK_PREFIX") "../../../../.." }}/values.yaml"
+---
+repositories:
+  - name: kgateway
+    url: ghcr.io/kgateway-dev/charts
+    oci: true
+
+releases:
+  - name: kgateway-crds
+    namespace: kgateway-system
+    createNamespace: true
+    version: v2.2.2
+    chart: kgateway/kgateway-crds
+  - name: kgateway
+    namespace: kgateway-system
+    chart: kgateway/kgateway
+    version: v2.2.2
+    createNamespace: true
+    needs:
+      - kgateway-crds
+    values:
+      - controller:
+          extraEnv:
+            KGW_ENABLE_GATEWAY_API_EXPERIMENTAL_FEATURES: "true"
+            KGW_WEIGHTED_ROUTE_PRECEDENCE: "true"
+      - resources:
+          limits:
+            cpu: 500m
+            memory: 512Mi
+          requests:
+            cpu: 100m
+            memory: 128Mi
+
+helmDefaults:
+  wait: true
+  timeout: 600
+  recreatePods: false
+  force: false
+  atomic: true
+  cleanupOnFail: true
+  historyMax: 5
