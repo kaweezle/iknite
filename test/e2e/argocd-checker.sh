@@ -1,5 +1,5 @@
 #!/bin/bash
-# cspell:ignore statefulset ingressroute gojq
+# cspell:ignore statefulset httproute gojq hostnames
 # Test script to verify ArgoCD deployment in a Kubernetes cluster.
 # This script is run after argocd and traefik have been deployed via Terragrunt.
 # Normally, the deployments are settled (checked via the kubernetes-state module),
@@ -227,16 +227,16 @@ check_argocd_components() {
     fi
 }
 
-# Check Ingress resource
-check_ingress() {
-    log_info "Checking Ingress resource for ArgoCD server..."
+# Check Gateway API Ingress resource
+check_gateway() {
+    log_info "Checking API Gateway Ingress resource for ArgoCD server..."
 
-    if kubectl get ingress argocd-server -n argocd &> /dev/null; then
-        log_info "Ingress 'argocd-server' exists"
+    if kubectl get gateway argocd-gateway -n argocd &> /dev/null; then
+        log_info "Gateway 'argocd-gateway' exists"
 
         # Get the ingress host
         local ingress_host
-        ingress_host=$(kubectl get ingress argocd-server -n argocd -o jsonpath='{.spec.rules[0].host}')
+        ingress_host=$(kubectl get gateway argocd-gateway -n argocd -o jsonpath='{.spec.listeners[0].hostname}')
 
         if [[ -n "${ingress_host}" ]]; then
             log_info "Ingress host: ${ingress_host}"
@@ -246,23 +246,23 @@ check_ingress() {
             exit 1
         fi
     else
-        log_error "Ingress 'argocd-server' not found in namespace 'argocd'"
+        log_error "Ingress 'argocd-gateway' not found in namespace 'argocd'"
         exit 1
     fi
 }
 
-# Check IngressRoute (traefik) resource
-check_ingressroute() {
-    log_info "Checking IngressRoute resource for ArgoCD server..."
+# Check HTTPRoute resource
+check_httproute() {
+    log_info "Checking HTTPRoute resource for ArgoCD server..."
 
     local route_name="argocd-server"
 
-    if kubectl get ingressroute "${route_name}" -n argocd &> /dev/null; then
-        log_info "IngressRoute '${route_name}' exists"
+    if kubectl get httproute "${route_name}" -n argocd &> /dev/null; then
+        log_info "HTTPRoute '${route_name}' exists"
 
         # Get the ingress host
         local ingress_host
-        ingress_host=$(kubectl get ingressroute "${route_name}" -n argocd -o jsonpath='{.spec.tls.domains[0].main}')
+        ingress_host=$(kubectl get httproute "${route_name}" -n argocd -o jsonpath='{.spec.hostnames[0]}')
 
         if [[ -n "${ingress_host}" ]]; then
             log_info "Ingress host: ${ingress_host}"
@@ -271,7 +271,7 @@ check_ingressroute() {
             exit 1
         fi
     else
-        log_error "IngressRoute '${route_name}' not found in namespace 'argocd'"
+        log_error "HTTPRoute '${route_name}' not found in namespace 'argocd'"
         exit 1
     fi
 }
@@ -412,16 +412,20 @@ main() {
     check_command "sops"
     check_command "gojq"
 
+    # Retrieve kubeconfig if KUBECONFIG is not already set
+    if [[ -z "${KUBECONFIG:-}" ]]; then
+        initialize_terragrunt "${TERRAGRUNT_DIR}/${VM_STACK}/iknite-image"
+        retrieve_kubeconfig "${TERRAGRUNT_DIR}/${VM_STACK}/iknite-kubeconfig-fetcher"
+    fi
+
     # Execute verification steps
-    initialize_terragrunt "${TERRAGRUNT_DIR}/${VM_STACK}/iknite-image"
-    retrieve_kubeconfig "${TERRAGRUNT_DIR}/${VM_STACK}/iknite-kubeconfig-fetcher"
     check_namespace
     check_argocd_components
-    check_ingressroute
+    check_httproute
     local ingress_host
-    ingress_host=$(kubectl get ingressroute argocd-server -n argocd -o jsonpath='{.spec.tls.domains[0].main}')
+    ingress_host=$(kubectl get httproute argocd-server -n argocd -o jsonpath='{.spec.hostnames[0]}')
     local ip_address
-    ip_address=$(kubectl get service traefik -n traefik -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+    ip_address=$(kubectl get service argocd-gateway -n argocd -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
     check_url "${ingress_host}" "${ip_address}"
     download_argocd_cli
 
