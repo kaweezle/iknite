@@ -65,7 +65,7 @@ locals {
   # Change this to the appropriate storage configuration for your environment
   state_storage = local.secret[local.values.iac.storage_provider].storage
 
-  kubernetes_version = get_env("KUBERNETES_VERSION", "1.35.2")
+  kubernetes_version = get_env("KUBERNETES_VERSION", "1.35.3")
   iknite_version     = get_env("IKNITE_VERSION", try(jsondecode(file("${get_repo_root()}/dist/metadata.json")).version, "0.6.1-devel"))
 }
 

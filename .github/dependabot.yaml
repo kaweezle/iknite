@@ -6,9 +6,9 @@ updates:
     schedule:
       interval: "daily"
     groups:
-      "github-actions":
+      "go-modules":
         patterns:
-          - "*" # Group all GitHub Actions dependencies together
+          - "*" # Group all Go modules dependencies together
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
@@ -25,15 +25,15 @@ updates:
     schedule:
       interval: "daily"
     groups:
-      "github-actions":
+      "docker":
         patterns:
-          - "*" # Group all GitHub Actions dependencies together
+          - "*" # Group all Docker dependencies together
   - package-ecosystem: "opentofu"
     directories:
       - "/deploy/iac/modules/*"
     schedule:
       interval: "daily"
     groups:
-      "github-actions":
+      "opentofu":
         patterns:
-          - "*" # Group all GitHub Actions dependencies together
+          - "*" # Group all OpenTofu dependencies together
