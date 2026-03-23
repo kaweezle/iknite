@@ -63,6 +63,7 @@ jobs:
           BUILDKIT_VERSION=0.28.0
           curl -L -o buildkit.tar.gz https://github.com/moby/buildkit/releases/download/v${BUILDKIT_VERSION}/buildkit-v${BUILDKIT_VERSION}.linux-amd64.tar.gz
           tar -xzf buildkit.tar.gz -C /usr/local/bin --strip-components=1 bin/buildctl
+          rm buildkit.tar.gz
           buildctl --version
           make info
           helmfile init --force
