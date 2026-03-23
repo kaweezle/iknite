@@ -113,8 +113,9 @@ IKNITE_ROOTFS_BASE_MARKER = $(DIST_DIR)/iknite-rootfs-base_$(IKNITE_VERSION_TAG)
 IKNITE_ROOTFS_BASE_SOURCES := $(wildcard $(ROOT_DIR)/packaging/rootfs/base/*)
 
 # Final rootfs image with preloaded Kubernetes images
-IKNITE_ROOTFS_IMAGE := $(REGISTRY)/$(IMAGE_NAME):$(IKNITE_VERSION_TAG)-$(KUBERNETES_VERSION)
-IKNITE_ROOTFS_IMAGE_MARKER = $(DIST_DIR)/iknite_$(IKNITE_VERSION_TAG)-$(KUBERNETES_VERSION).marker
+IKNITE_AND_KUBERNETES_VERSION := $(IKNITE_VERSION_TAG)-$(KUBERNETES_VERSION)
+IKNITE_ROOTFS_IMAGE := $(REGISTRY)/$(IMAGE_NAME):$(IKNITE_AND_KUBERNETES_VERSION)
+IKNITE_ROOTFS_IMAGE_MARKER = $(DIST_DIR)/iknite_$(IKNITE_AND_KUBERNETES_VERSION).marker
 IKNITE_ROOTFS_SOURCES := $(wildcard $(ROOT_DIR)/packaging/rootfs/with-images/*)
 
 # Dev container
@@ -133,9 +134,9 @@ IKNITE_CICONTAINER_SOURCES := $(wildcard $(IKNITE_CICONTAINER_DIR)/*)
 
 ifdef IKNITE_RELEASE_TAG
 PUSH_IMAGES := true
-IKNITE_ROOTFS_IMAGE_ADDITIONAL_TAG := $(IKNITE_ROOTFS_IMAGE):latest
-IKNITE_DEVCONTAINER_IMAGE_ADDITIONAL_TAG := $(IKNITE_DEVCONTAINER_IMAGE):latest
-IKNITE_CICONTAINER_IMAGE_ADDITIONAL_TAG := $(IKNITE_CICONTAINER_IMAGE):latest
+IKNITE_ROOTFS_IMAGE_ADDITIONAL_TAG := $(IKNITE_ROOTFS_IMAGE:$(IKNITE_AND_KUBERNETES_VERSION)=latest)
+IKNITE_DEVCONTAINER_IMAGE_ADDITIONAL_TAG := $(IKNITE_DEVCONTAINER_IMAGE:$(IKNITE_VERSION_TAG)=latest)
+IKNITE_CICONTAINER_IMAGE_ADDITIONAL_TAG := $(IKNITE_CICONTAINER_IMAGE:$(IKNITE_VERSION_TAG)=latest)
 # SNAPSHOT =
 IKNITE_REPO_NAME := release
 else
@@ -163,7 +164,7 @@ GOLANG_FILES = $(shell find "$(ROOT_DIR)/cmd" "$(ROOT_DIR)/pkg" -type f -name '*
 APK_FILES = $(wildcard $(ROOT_DIR)/packaging/apk/iknite/**/*)
 APK_INDEX_FILE = $(DIST_DIR)/repo/$(ARCH)/APKINDEX.tar.gz
 
-IKNITE_ROOTFS_CONTAINER_MARKER = $(DIST_DIR)/iknite-rootfs-container_$(IKNITE_VERSION_TAG)-$(KUBERNETES_VERSION).marker
+IKNITE_ROOTFS_CONTAINER_MARKER = $(DIST_DIR)/iknite-rootfs-container_$(IKNITE_AND_KUBERNETES_VERSION).marker
 
 # Images file names and paths
 IKNITE_VM_IMAGE_QCOW2_BASENAME = iknite-vm.$(IKNITE_VERSION)-$(KUBERNETES_VERSION).qcow2
@@ -177,7 +178,7 @@ IKNITE_VM_IMAGE_VHDX_CONTAINER_MARKER = $(IKNITE_VM_IMAGE_VHDX)-container.marker
 INCUS_METADATA := $(DIST_DIR)/images/incus.tar.xz
 VM_PACKAGING_DIR := $(ROOT_DIR)/packaging/vm
 VM_PACKAGING_SOURCES := $(shell find $(VM_PACKAGING_DIR) -type f)
-IKNITE_ROOTFS_IMAGE_INCUS_ATTACHMENT_MARKER = $(DIST_DIR)/iknite_$(IKNITE_VERSION_TAG)-$(KUBERNETES_VERSION)-incus.marker
+IKNITE_ROOTFS_IMAGE_INCUS_ATTACHMENT_MARKER = $(DIST_DIR)/iknite_$(IKNITE_AND_KUBERNETES_VERSION)-incus.marker
 
 # List of images ID in order to clean
 IMAGES_ID = $(shell $(RUN_CONTAINER_CMD) image ls -q --filter "label=org.opencontainers.image.source=https://github.com/kaweezle/iknite.git" | sort -u)
@@ -523,10 +524,10 @@ rootfs-image-incus-attachment: $(IKNITE_ROOTFS_IMAGE_INCUS_ATTACHMENT_MARKER)
 # Push the VM images to the container registry using oras, with appropriate annotations and tags
 $(IKNITE_VM_IMAGE_VHDX_CONTAINER_MARKER): $(IKNITE_VM_IMAGE_VHDX) | check-prerequisites container-login
 	cd "$(ROOT_DIR)/dist/images"; \
-	IMAGE_TAG="$(REGISTRY)/$(IMAGE_NAME)-vm-vhdx:$(IKNITE_VERSION_TAG)-$(KUBERNETES_VERSION)"; \
+	IMAGE_TAG="$(REGISTRY)/$(IMAGE_NAME)-vm-vhdx:$(IKNITE_AND_KUBERNETES_VERSION)"; \
 	oras push $$IMAGE_TAG \
 	--artifact-type application/vnd.oci.image.layer.vhdx \
-	--annotation org.opencontainers.image.title="iknite-vm-$(IKNITE_VERSION_TAG)-$(KUBERNETES_VERSION).vhdx" \
+	--annotation org.opencontainers.image.title="iknite-vm-$(IKNITE_AND_KUBERNETES_VERSION).vhdx" \
 	--annotation org.opencontainers.image.version="$(IKNITE_VERSION_TAG)" \
 	--annotation org.opencontainers.image.description="VM image for iknite $(IKNITE_VERSION) with Kubernetes $(KUBERNETES_VERSION)" \
 	$(IKNITE_VM_IMAGE_VHDX_BASENAME):application/x-hyperv-disk; \
@@ -537,10 +538,10 @@ $(IKNITE_VM_IMAGE_VHDX_CONTAINER_MARKER): $(IKNITE_VM_IMAGE_VHDX) | check-prereq
 
 $(IKNITE_VM_IMAGE_QCOW2_CONTAINER_MARKER): $(IKNITE_VM_IMAGE_QCOW2) $(INCUS_METADATA) | check-prerequisites container-login
 	cd "$(ROOT_DIR)/dist/images"; \
-	IMAGE_TAG="$(REGISTRY)/$(IMAGE_NAME)-vm-qcow2:$(IKNITE_VERSION_TAG)-$(KUBERNETES_VERSION)"; \
+	IMAGE_TAG="$(REGISTRY)/$(IMAGE_NAME)-vm-qcow2:$(IKNITE_AND_KUBERNETES_VERSION)"; \
 	oras push $$IMAGE_TAG \
 	--artifact-type application/vnd.oci.image.layer.qcow2 \
-	--annotation org.opencontainers.image.title="iknite-vm-$(IKNITE_VERSION_TAG)-$(KUBERNETES_VERSION).qcow2" \
+	--annotation org.opencontainers.image.title="iknite-vm-$(IKNITE_AND_KUBERNETES_VERSION).qcow2" \
 	--annotation org.opencontainers.image.version="$(IKNITE_VERSION_TAG)" \
 	--annotation org.opencontainers.image.description="VM image for iknite $(IKNITE_VERSION) with Kubernetes $(KUBERNETES_VERSION)" \
 	$(IKNITE_VM_IMAGE_QCOW2_BASENAME):application/x-qcow2 \
