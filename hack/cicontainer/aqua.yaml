@@ -13,9 +13,9 @@ registries:
   - type: standard
     ref: v4.476.0 # renovate: depName=aquaproj/aqua-registry
 packages:
-  # - name: helm/helm@v3.19.0
-  # - name: helmfile/helmfile@v1.3.2
-  # - name: kubernetes-sigs/kustomize@kustomize/v5.8.1
+  - name: helm/helm@v3.19.0
+  - name: helmfile/helmfile@v1.4.2
+  - name: kubernetes-sigs/kustomize@kustomize/v5.8.1
   # Installed on the system
   # - name: itchyny/gojq@v0.12.18
   - name: getsops/sops@v3.12.1
