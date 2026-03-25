@@ -18,10 +18,9 @@ import (
 
 	"github.com/joho/godotenv"
 	log "github.com/sirupsen/logrus"
-	"github.com/spf13/viper"
 
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
-	"github.com/kaweezle/iknite/pkg/config"
+	"github.com/kaweezle/iknite/pkg/utils"
 )
 
 // cSpell: enable
@@ -224,7 +223,7 @@ func RemovePidFiles() {
 	}
 }
 
-func StartAndConfigureKubelet(kubeConfig *v1alpha1.IkniteClusterSpec) error {
+func StartAndConfigureKubelet(kubeConfig *v1alpha1.IkniteClusterSpec, kustomizeOptions *utils.KustomizeOptions) error {
 	cmd, err := StartKubelet()
 	if err != nil {
 		return fmt.Errorf("failed to start kubelet: %w", err)
@@ -239,16 +238,7 @@ func StartAndConfigureKubelet(kubeConfig *v1alpha1.IkniteClusterSpec) error {
 		cmdDone <- cmd.Wait()
 	}()
 
-	kubeletHealthz, apiServerHealthz, configErr := make(
-		chan error,
-		1,
-	), make(
-		chan error,
-		1,
-	), make(
-		chan error,
-		1,
-	)
+	kubeletHealthz, apiServerHealthz, configErr := make(chan error, 1), make(chan error, 1), make(chan error, 1)
 	go func() {
 		kubeletHealthz <- CheckKubeletRunning(10, 3, 1000)
 	}()
@@ -256,8 +246,12 @@ func StartAndConfigureKubelet(kubeConfig *v1alpha1.IkniteClusterSpec) error {
 	defer RemovePidFiles()
 
 	alive := true
+	// Cancellable context for kustomization
+	cancelCtx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	killKubelet := func() {
+		cancel()
 		err = cmd.Process.Signal(syscall.SIGTERM)
 		if err != nil {
 			log.Fatalf("Failed to stop subprocess: %v", err)
@@ -291,7 +285,7 @@ func StartAndConfigureKubelet(kubeConfig *v1alpha1.IkniteClusterSpec) error {
 					if err != nil {
 						apiServerHealthz <- err
 					} else {
-						apiServerHealthz <- apiConfig.CheckClusterRunning(30, 2, 1000)
+						apiServerHealthz <- apiConfig.CheckClusterRunning(cancelCtx, 30, 2, 10*time.Second)
 					}
 				}()
 			}
@@ -302,12 +296,17 @@ func StartAndConfigureKubelet(kubeConfig *v1alpha1.IkniteClusterSpec) error {
 			} else {
 				log.Info("API server is healthy")
 				go func() {
-					force_config := viper.GetBool(config.ForceConfig)
 					apiConfig, err := LoadFromDefault()
 					if err != nil {
 						configErr <- err
 					} else {
-						configErr <- apiConfig.DoKustomization(kubeConfig.Ip, kubeConfig.Kustomization, force_config, 0)
+						configErr <- apiConfig.DoKustomization(
+							cancelCtx,
+							kubeConfig.Ip,
+							kubeConfig.Kustomization,
+							kustomizeOptions.ForceConfig,
+							&kustomizeOptions.WaitOptions,
+						)
 					}
 				}()
 			}

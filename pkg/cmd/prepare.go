@@ -44,7 +44,7 @@ func NewPrepareCommand(ikniteConfig *v1alpha1.IkniteClusterSpec) *cobra.Command 
 	}
 	flags := prepareCmd.Flags()
 
-	config.ConfigureClusterCommand(flags, ikniteConfig)
+	config.AddIkniteClusterFlags(flags, ikniteConfig)
 
 	return prepareCmd
 }

@@ -24,6 +24,7 @@ import (
 	"github.com/kaweezle/iknite/pkg/alpine"
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
 	"github.com/kaweezle/iknite/pkg/constants"
+	"github.com/kaweezle/iknite/pkg/utils"
 )
 
 // cSpell: enable
@@ -246,30 +247,36 @@ func CheckApiServerHealth(
 	return true, "API Server is healthy", nil
 }
 
+//nolint:interfacebloat // Interface is used to pass data between check and printer functions
 type CheckWorkloadData interface {
 	IsOk() bool
 	WorkloadCount() int
 	ReadyWorkloads() []*v1alpha1.WorkloadState
 	NotReadyWorkloads() []*v1alpha1.WorkloadState
 	Iteration() int
+	OkIterations() int
 	Duration() time.Duration
 	SetOk(bool)
 	SetWorkloadCount(int)
 	SetReadyWorkloads([]*v1alpha1.WorkloadState)
 	SetNotReadyWorkloads([]*v1alpha1.WorkloadState)
 	SetIteration(int)
+	SetOkIterations(int)
 	Start()
 	ApiAdvertiseAddress() string
 	ManifestDir() string
+	WaitOptions() *utils.WaitOptions
 }
 
 type checkWorkloadData struct {
 	startTime           time.Time
+	waitOptions         *utils.WaitOptions
 	apiAdvertiseAddress string
 	readyWorkloads      []*v1alpha1.WorkloadState
 	notReadyWorkloads   []*v1alpha1.WorkloadState
 	workloadCount       int
 	iteration           int
+	okIterations        int
 	ok                  bool
 }
 
@@ -293,6 +300,10 @@ func (c *checkWorkloadData) Iteration() int {
 	return c.iteration
 }
 
+func (c *checkWorkloadData) OkIterations() int {
+	return c.okIterations
+}
+
 func (c *checkWorkloadData) SetOk(ok bool) {
 	c.ok = ok
 }
@@ -311,6 +322,10 @@ func (c *checkWorkloadData) SetNotReadyWorkloads(unready []*v1alpha1.WorkloadSta
 
 func (c *checkWorkloadData) SetIteration(iteration int) {
 	c.iteration = iteration
+}
+
+func (c *checkWorkloadData) SetOkIterations(okIterations int) {
+	c.okIterations = okIterations
 }
 
 func (c *checkWorkloadData) Start() {
@@ -332,9 +347,14 @@ func (c *checkWorkloadData) ManifestDir() string {
 	return kubeadmConstants.GetStaticPodDirectory()
 }
 
-func CreateCheckWorkloadData(apiAdvertiseAddress string) CheckData {
+func (c *checkWorkloadData) WaitOptions() *utils.WaitOptions {
+	return c.waitOptions
+}
+
+func CreateCheckWorkloadData(apiAdvertiseAddress string, waitOptions *utils.WaitOptions) CheckData {
 	return &checkWorkloadData{
 		apiAdvertiseAddress: apiAdvertiseAddress,
+		waitOptions:         waitOptions,
 	}
 }
 
@@ -422,26 +442,22 @@ func CheckWorkloads(ctx context.Context, data CheckData) (bool, string, error) {
 	if !ok {
 		return false, "", errors.New("invalid check data type")
 	}
-	config, err := LoadFromFile(
-		filepath.Join(kubeadmConstants.KubernetesDir, kubeadmConstants.AdminKubeConfigFileName),
-	)
+	config, err := LoadFromDefault()
 	if err != nil {
 		return false, "", fmt.Errorf("while loading local cluster configuration: %w", err)
 	}
 	workloadData.Start()
 
-	err = config.WaitForWorkloads(ctx, 0,
-		func(state bool, total int, ready, unready []*v1alpha1.WorkloadState, iteration int) bool {
-			workloadData.SetOk(state)
+	err = workloadData.WaitOptions().Poll(ctx, config.RESTClient().WorkloadsReadyConditionWithContextFunc(
+		func(allReady bool, total int, ready, unready []*v1alpha1.WorkloadState, iteration, okIterations int) bool {
+			workloadData.SetOk(allReady)
 			workloadData.SetWorkloadCount(total)
 			workloadData.SetReadyWorkloads(ready)
 			workloadData.SetNotReadyWorkloads(unready)
 			workloadData.SetIteration(iteration)
-			if iteration > 5 {
-				return state
-			}
-			return false
-		})
+			workloadData.SetOkIterations(okIterations)
+			return allReady
+		}))
 	if err != nil {
 		return false, "", fmt.Errorf("while waiting for workloads: %w", err)
 	}
@@ -451,7 +467,7 @@ func CheckWorkloads(ctx context.Context, data CheckData) (bool, string, error) {
 // CheckIkniteServerHealth checks the /healthz endpoint of the iknite status
 // server using the mTLS client configuration stored in constants.IkniteLocalConfPath
 // (/root/.kube/iknite.conf). It returns true when the server responds with "ok".
-func CheckIkniteServerHealth(ctx context.Context, timeout time.Duration) (bool, string, error) {
+func CheckIkniteServerHealth(ctx context.Context, waitOptions *utils.WaitOptions) (bool, string, error) {
 	kubeConfig, err := LoadFromFile(constants.IkniteLocalConfPath)
 	if err != nil {
 		return false, "", fmt.Errorf("failed to load iknite config from %s: %w", constants.IkniteLocalConfPath, err)
@@ -462,12 +478,18 @@ func CheckIkniteServerHealth(ctx context.Context, timeout time.Duration) (bool, 
 		return false, "", fmt.Errorf("failed to create REST client: %w", err)
 	}
 
-	body, err := restClient.Get().AbsPath("/healthz").Timeout(timeout).DoRaw(ctx)
+	err = waitOptions.Poll(ctx, func(ctx context.Context) (bool, error) {
+		body, healthzErr := restClient.Get().AbsPath("/healthz").Timeout(waitOptions.CheckTimeout).DoRaw(ctx)
+		if healthzErr != nil {
+			return false, fmt.Errorf("failed to call /healthz endpoint: %w", healthzErr)
+		}
+		if string(body) != "ok" {
+			return false, fmt.Errorf("iknite status server returned unexpected response: %s", string(body))
+		}
+		return true, nil
+	})
 	if err != nil {
-		return false, "", fmt.Errorf("failed to call /healthz endpoint: %w", err)
-	}
-	if string(body) != "ok" {
-		return false, fmt.Sprintf("iknite status server returned unexpected response: %s", string(body)), nil
+		return false, "", fmt.Errorf("iknite status server health check failed: %w", err)
 	}
 	return true, "Iknite status server is healthy", nil
 }

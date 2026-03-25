@@ -24,6 +24,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
@@ -74,15 +75,15 @@ kubernetes.`,
 
 	ikniteConfig := &v1alpha1.IkniteClusterSpec{}
 
-	rootCmd.AddCommand(NewKustomizeCmd())
+	rootCmd.AddCommand(NewKustomizeCmd(ikniteConfig, nil))
 	rootCmd.AddCommand(newCmdInit(os.Stdout, nil))
 	rootCmd.AddCommand(newCmdReset(os.Stdin, os.Stdout, nil))
 	rootCmd.AddCommand(NewCmdClean(ikniteConfig, nil))
-	rootCmd.AddCommand(NewKubeletCmd(ikniteConfig))
+	rootCmd.AddCommand(NewKubeletCmd(ikniteConfig, nil))
 	rootCmd.AddCommand(NewMdnsCmd())
 	rootCmd.AddCommand(NewPrepareCommand(ikniteConfig))
-	rootCmd.AddCommand(NewStartCmd(ikniteConfig))
-	rootCmd.AddCommand(NewStatusCmd(ikniteConfig))
+	rootCmd.AddCommand(NewStartCmd(ikniteConfig, nil))
+	rootCmd.AddCommand(NewStatusCmd(ikniteConfig, nil))
 	rootCmd.AddCommand(NewInfoCmd(ikniteConfig))
 
 	return rootCmd
@@ -121,4 +122,20 @@ func SetUpLogs(out io.Writer, level string, json bool) error {
 	}
 	log.SetLevel(lvl)
 	return nil
+}
+
+func inheritsFlags(sourceFlags, targetFlags *pflag.FlagSet, cmdFlags ...string) {
+	// If the list of flag to be inherited from the parent command is not defined, no flag is added
+	if cmdFlags == nil {
+		return
+	}
+
+	// add all the flags to be inherited to the target flagSet
+	sourceFlags.VisitAll(func(f *pflag.Flag) {
+		for _, c := range cmdFlags {
+			if f.Name == c {
+				targetFlags.AddFlag(f)
+			}
+		}
+	})
 }

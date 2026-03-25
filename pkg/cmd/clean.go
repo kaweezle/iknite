@@ -102,7 +102,7 @@ This command must be run as root.
 	}
 
 	initializeClean(cleanCmd.Flags(), cleanOptions)
-	config.ConfigureClusterCommand(cleanCmd.Flags(), ikniteConfig)
+	config.AddIkniteClusterFlags(cleanCmd.Flags(), ikniteConfig)
 
 	return cleanCmd
 }

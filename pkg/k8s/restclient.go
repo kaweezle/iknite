@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"sort"
 	"strings"
-	"time"
 
 	log "github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -27,7 +26,9 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/kubectl/pkg/polymorphichelpers"
+	"sigs.k8s.io/kustomize/api/provider"
 	"sigs.k8s.io/kustomize/api/resmap"
+	"sigs.k8s.io/kustomize/kyaml/resid"
 
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
 )
@@ -65,7 +66,7 @@ func (r *RESTClientGetter) ToDiscoveryClient() (discovery.CachedDiscoveryInterfa
 func (r *RESTClientGetter) ToRESTMapper() (meta.RESTMapper, error) {
 	dc, err := r.ToDiscoveryClient()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get discovery client for REST mapper: %w", err)
 	}
 	return restmapper.NewDeferredDiscoveryRESTMapper(dc), nil
 }
@@ -186,11 +187,51 @@ func (s *ApplicationStatusViewer) Status(
 	return message, healthStatusString == "Healthy" && syncStatusString == "Synced", nil
 }
 
+// ApplyResMapWithServerSideApply applies the given resources to the cluster using server-side apply. It returns the
+// IDs of the applied resources or an error if the operation fails.
+func (client *RESTClientGetter) ApplyResMapWithServerSideApply(resources resmap.ResMap) ([]resid.ResId, error) {
+	ids := resources.AllIds()
+
+	// Separate cluster-scoped resources from namespace-scoped ones, as the former need to be applied before the latter
+	// to avoid potential dependency issues.
+	clusterResources := resmap.NewFactory(provider.NewDefaultDepProvider().GetResourceFactory()).
+		FromResourceSlice(resources.ClusterScoped())
+	if clusterResources.Size() != 0 {
+		clusterInfos, err := client.ResourceInfosFromResMap(clusterResources)
+		if err != nil {
+			return nil, fmt.Errorf("failed to build cluster resource infos: %w", err)
+		}
+		if err = client.ApplyResourceInfosServerSide(clusterInfos); err != nil {
+			return nil, fmt.Errorf("failed to apply cluster resources: %w", err)
+		}
+
+		// Remove cluster-scoped resources from the original resmap to avoid applying them again in the next step.
+		for _, curID := range clusterResources.AllIds() {
+			if err = resources.Remove(curID); err != nil {
+				return nil, fmt.Errorf("failed to remove cluster-scoped resource: %w", err)
+			}
+		}
+	}
+
+	// Apply namespace-scoped resources after cluster-scoped ones.
+	if resources.Size() != 0 {
+		resourceInfos, err := client.ResourceInfosFromResMap(resources)
+		if err != nil {
+			return nil, fmt.Errorf("failed to build resource infos: %w", err)
+		}
+		if err = client.ApplyResourceInfosServerSide(resourceInfos); err != nil {
+			return nil, fmt.Errorf("failed to apply resources: %w", err)
+		}
+	}
+
+	return ids, nil
+}
+
 func (client *RESTClientGetter) HasApplications() (bool, error) {
 	var mapper meta.RESTMapper
 	var err error
 	if mapper, err = client.ToRESTMapper(); err != nil {
-		return false, err
+		return false, fmt.Errorf("failed to get REST mapper: %w", err)
 	}
 
 	_, err = mapper.RESTMapping(
@@ -264,59 +305,46 @@ func (client *RESTClientGetter) AllWorkloadStates() ([]*v1alpha1.WorkloadState, 
 	return result, nil
 }
 
-type WorkloadStateCallbackFunc func(state bool, total int, ready []*v1alpha1.WorkloadState,
-	unready []*v1alpha1.WorkloadState, iteration int) bool
+type WorkloadStateCallbackFunc func(allReady bool, total int, ready []*v1alpha1.WorkloadState,
+	unready []*v1alpha1.WorkloadState, iteration, okIterations int) bool
 
-func AreWorkloadsReady(
-	config *Config,
+func (client *RESTClientGetter) WorkloadsReadyConditionWithContextFunc(
 	callback WorkloadStateCallbackFunc,
 ) wait.ConditionWithContextFunc {
-	client := config.RESTClient()
 	iteration := 0
+	okIterations := 0
 	return func(_ context.Context) (bool, error) {
 		states, err := client.AllWorkloadStates()
 		if err != nil {
 			return false, err
 		}
-		result := true
+		allReady := true
 		var ready, unready []*v1alpha1.WorkloadState
 		for _, state := range states {
 			if !state.Ok {
-				result = false
+				allReady = false
+				okIterations = 0
 				unready = append(unready, state)
 			} else {
 				ready = append(ready, state)
 			}
 		}
 		log.WithFields(log.Fields{
-			"total":   len(states),
-			"ready":   len(ready),
-			"unready": len(unready),
-		}).Infof("Workloads total: %d, ready: %d, unready:%d", len(states), len(ready), len(unready))
+			"total":        len(states),
+			"ready":        len(ready),
+			"unready":      len(unready),
+			"okIterations": okIterations,
+		}).Infof("Workloads total: %d, ready: %d, unready:%d, okIterations: %d", len(states), len(ready), len(unready),
+			okIterations)
+		if allReady {
+			okIterations++
+		}
 
 		if callback != nil {
-			result = callback(result, len(states), ready, unready, iteration)
+			allReady = callback(allReady, len(states), ready, unready, iteration, okIterations)
 		}
 		iteration++
 
-		return result, nil
-	}
-}
-
-func (config *Config) WaitForWorkloads(
-	ctx context.Context, timeout time.Duration, callback WorkloadStateCallbackFunc,
-) error {
-	if timeout > 0 {
-		if err := wait.PollUntilContextTimeout(ctx, time.Second*time.Duration(2), timeout, true,
-			AreWorkloadsReady(config, callback)); err != nil {
-			return fmt.Errorf("failed to wait for workloads (timeout): %w", err)
-		}
-		return nil
-	} else {
-		if err := wait.PollUntilContextCancel(ctx, time.Second*time.Duration(2), true,
-			AreWorkloadsReady(config, callback)); err != nil {
-			return fmt.Errorf("failed to wait for workloads: %w", err)
-		}
-		return nil
+		return allReady, nil
 	}
 }
