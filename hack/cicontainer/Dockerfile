@@ -2,11 +2,6 @@
 # cSpell: disable
 FROM alpine:3.23 as builder
 
-ARG USERNAME=alpine
-ARG GROUPNAME=alpine
-ARG TFLINT_VERSION=0.60.0
-ARG TERRAFORM_DOCS_VERSION=0.21.0
-
 LABEL org.opencontainers.image.source="https://github.com/kaweezle/iknite.git"
 
 # Add the dependencies
