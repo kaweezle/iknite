@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-	http://www.apache.org/licenses/LICENSE-2.0
+http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,7 +15,7 @@ limitations under the License.
 */
 package cmd
 
-// cSpell: words helmfile kubeconform krusty filesys Bplo appstages appstage
+// cSpell: words helmfile kubeconform appstages appstage
 
 import (
 	"bytes"
@@ -27,10 +27,9 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/kaweezle/iknite/hack/iknitedev/pkg/kustomize"
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
-	"sigs.k8s.io/kustomize/api/krusty"
-	"sigs.k8s.io/kustomize/kyaml/filesys"
 	"sigs.k8s.io/yaml"
 )
 
@@ -117,8 +116,40 @@ func renderHelm(dir string) ([]byte, error) {
 	return stdout.Bytes(), nil
 }
 
-// renderAppWithOutput renders an application and writes output to stdout or splits into destDir.
-// For kustomize apps, it uses Go code. For helmfile and helm, it invokes the external commands.
+// renderApp renders an application directory and returns the YAML output.
+// For kustomize apps it uses Go code; for helmfile and helm it invokes the
+// respective external commands.
+func renderApp(fs afero.Fs, dir string) ([]byte, error) {
+	appT, path, err := detectAppType(fs, dir)
+	if err != nil {
+		return nil, err
+	}
+
+	switch appT {
+	case appTypeKustomize:
+		resources, buildErr := kustomize.Build(path)
+		if buildErr != nil {
+			return nil, buildErr
+		}
+		var buf bytes.Buffer
+		if writeErr := kustomize.WriteToWriter(resources, &buf); writeErr != nil {
+			return nil, writeErr
+		}
+		return buf.Bytes(), nil
+	case appTypeHelmfile:
+		return renderHelmfile(path)
+	case appTypeHelm:
+		return renderHelm(path)
+	default:
+		return nil, fmt.Errorf(
+			"directory %s has no recognized app definition (kustomization.yaml, helmfile.yaml, helmfile.yaml.gotmpl, or Chart.yaml)",
+			dir,
+		)
+	}
+}
+
+// renderAppWithOutput renders an application and writes output to stdout or
+// splits into destDir.
 func renderAppWithOutput(fs afero.Fs, out io.Writer, dir, destDir string) error {
 	appT, path, err := detectAppType(fs, dir)
 	if err != nil {
@@ -126,24 +157,14 @@ func renderAppWithOutput(fs afero.Fs, out io.Writer, dir, destDir string) error 
 	}
 
 	if appT == appTypeKustomize {
-		opts := enablePlugins(krusty.MakeDefaultOptions())
-		k := krusty.MakeKustomizer(opts)
-		resources, runErr := k.Run(filesys.MakeFsOnDisk(), path)
-		if runErr != nil {
-			return fmt.Errorf("kustomize build failed: %w", runErr)
+		resources, buildErr := kustomize.Build(path)
+		if buildErr != nil {
+			return buildErr
 		}
 		if destDir == "" {
-			yamlData, yamlErr := resources.AsYaml()
-			if yamlErr != nil {
-				return fmt.Errorf("failed to convert resources to YAML: %w", yamlErr)
-			}
-			_, err = out.Write(yamlData)
-			return err
+			return kustomize.WriteToWriter(resources, out)
 		}
-		if err = fs.MkdirAll(destDir, 0o755); err != nil {
-			return fmt.Errorf("failed to create output directory: %w", err)
-		}
-		return splitResourcesFromResMap(fs, resources, destDir)
+		return kustomize.SplitResMapToDir(fs, resources, destDir)
 	}
 
 	var yamlData []byte
@@ -165,48 +186,7 @@ func renderAppWithOutput(fs afero.Fs, out io.Writer, dir, destDir string) error 
 		_, err = out.Write(yamlData)
 		return err
 	}
-	if err = fs.MkdirAll(destDir, 0o755); err != nil {
-		return fmt.Errorf("failed to create output directory: %w", err)
-	}
-	return splitYAMLToFiles(fs, yamlData, destDir)
-}
-
-// splitYAMLToFiles splits multi-document YAML and writes each resource to a separate file.
-func splitYAMLToFiles(fs afero.Fs, yamlData []byte, destDir string) error {
-	docs := strings.Split(string(yamlData), "\n---\n")
-	for i, doc := range docs {
-		doc = strings.TrimSpace(doc)
-		if doc == "" || doc == "---" {
-			continue
-		}
-
-		var resource map[string]interface{}
-		if err := yaml.Unmarshal([]byte(doc), &resource); err != nil {
-			return fmt.Errorf("failed to parse resource %d: %w", i, err)
-		}
-
-		kind, ok := resource["kind"].(string)
-		if !ok {
-			continue
-		}
-		metadata, ok := resource["metadata"].(map[string]interface{})
-		if !ok {
-			continue
-		}
-		name, ok := metadata["name"].(string)
-		if !ok {
-			continue
-		}
-
-		safeName := strings.ReplaceAll(name, ":", "_")
-		filename := fmt.Sprintf("%s-%s.yaml", kind, safeName)
-		path := filepath.Join(destDir, filename)
-		if err := afero.WriteFile(fs, path, []byte(doc), 0o644); err != nil {
-			return fmt.Errorf("failed to write file %s: %w", path, err)
-		}
-		fmt.Fprintf(os.Stderr, "Created: %s\n", path)
-	}
-	return nil
+	return kustomize.SplitYAMLToDir(fs, yamlData, destDir)
 }
 
 // runKubeconform runs kubeconform validation on the provided YAML data.
@@ -244,41 +224,10 @@ func runValidateApp(fs afero.Fs, _ io.Writer, dir, schemasDir string) error {
 		return fmt.Errorf("directory does not exist: %s", dir)
 	}
 
-	appT, path, err := detectAppType(fs, dir)
+	yamlData, err := renderApp(fs, dir)
 	if err != nil {
 		return err
 	}
-
-	var yamlData []byte
-	switch appT {
-	case appTypeKustomize:
-		opts := enablePlugins(krusty.MakeDefaultOptions())
-		k := krusty.MakeKustomizer(opts)
-		resources, runErr := k.Run(filesys.MakeFsOnDisk(), path)
-		if runErr != nil {
-			return fmt.Errorf("kustomize build failed: %w", runErr)
-		}
-		yamlData, err = resources.AsYaml()
-		if err != nil {
-			return fmt.Errorf("failed to convert resources to YAML: %w", err)
-		}
-	case appTypeHelmfile:
-		yamlData, err = renderHelmfile(path)
-		if err != nil {
-			return err
-		}
-	case appTypeHelm:
-		yamlData, err = renderHelm(path)
-		if err != nil {
-			return err
-		}
-	default:
-		return fmt.Errorf(
-			"directory %s has no recognized app definition (kustomization.yaml, helmfile.yaml, helmfile.yaml.gotmpl, or Chart.yaml)",
-			dir,
-		)
-	}
-
 	return runKubeconform(yamlData, schemasDir)
 }
 
@@ -366,16 +315,11 @@ func runRenderAll(fs afero.Fs, out io.Writer, appstagesDir, destDir, baseDir str
 
 		fmt.Fprintf(out, "Rendering appstage %s\n", appstageName)
 
-		if err = fs.MkdirAll(manifestsDir, 0o755); err != nil {
-			return fmt.Errorf("failed to create manifests directory: %w", err)
-		}
-		opts := enablePlugins(krusty.MakeDefaultOptions())
-		k := krusty.MakeKustomizer(opts)
-		resources, runErr := k.Run(filesys.MakeFsOnDisk(), appstageDir)
+		resources, runErr := kustomize.Build(appstageDir)
 		if runErr != nil {
 			return fmt.Errorf("failed to render appstage %s: %w", appstageName, runErr)
 		}
-		if err = splitResourcesFromResMap(fs, resources, manifestsDir); err != nil {
+		if err = kustomize.SplitResMapToDir(fs, resources, manifestsDir); err != nil {
 			return fmt.Errorf("failed to write manifests for appstage %s: %w", appstageName, err)
 		}
 

@@ -210,62 +210,6 @@ spec:
 	}
 }
 
-func TestSplitResources(t *testing.T) {
-	t.Parallel()
-	fs := afero.NewMemMapFs()
-	destDir := "/output"
-
-	yamlData := []byte(`apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: test-config
-data:
-  key: value
----
-apiVersion: v1
-kind: Secret
-metadata:
-  name: test-secret
-type: Opaque
-data:
-  password: cGFzc3dvcmQ=
-`)
-
-	err := splitResources(fs, yamlData, destDir)
-	if err != nil {
-		t.Fatalf("splitResources failed: %v", err)
-	}
-
-	// Check that files were created
-	files, err := afero.ReadDir(fs, destDir)
-	if err != nil {
-		t.Fatalf("failed to read destination directory: %v", err)
-	}
-
-	if len(files) != 2 {
-		t.Errorf("expected 2 files, got %d", len(files))
-	}
-
-	// Check file contents (CamelCase kind with underscore for colons)
-	configMapPath := filepath.Join(destDir, "ConfigMap-test-config.yaml")
-	exists, err := afero.Exists(fs, configMapPath)
-	if err != nil {
-		t.Fatalf("failed to check if ConfigMap file exists: %v", err)
-	}
-	if !exists {
-		t.Error("ConfigMap file was not created")
-	}
-
-	secretPath := filepath.Join(destDir, "Secret-test-secret.yaml")
-	exists, err = afero.Exists(fs, secretPath)
-	if err != nil {
-		t.Fatalf("failed to check if secret file exists: %v", err)
-	}
-	if !exists {
-		t.Error("secret file was not created")
-	}
-}
-
 func TestKustomizeCmd_Integration(t *testing.T) {
 	t.Parallel()
 	if testing.Short() {

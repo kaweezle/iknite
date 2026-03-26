@@ -305,38 +305,3 @@ func TestRunRenderAll_NoAppstages(t *testing.T) {
 		t.Error("expected error when no appstage-* directories found")
 	}
 }
-
-// ---- splitYAMLToFiles -------------------------------------------------------
-
-func TestSplitYAMLToFiles(t *testing.T) {
-	t.Parallel()
-	fs := afero.NewMemMapFs()
-	if err := fs.MkdirAll("/out", 0o755); err != nil {
-		t.Fatal(err)
-	}
-
-	yamlData := []byte(`apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: cm1
----
-apiVersion: v1
-kind: Secret
-metadata:
-  name: sec1
-type: Opaque
-`)
-	if err := splitYAMLToFiles(fs, yamlData, "/out"); err != nil {
-		t.Fatalf("splitYAMLToFiles: %v", err)
-	}
-
-	for _, name := range []string{"ConfigMap-cm1.yaml", "Secret-sec1.yaml"} {
-		ok, err := afero.Exists(fs, filepath.Join("/out", name))
-		if err != nil {
-			t.Fatalf("Exists: %v", err)
-		}
-		if !ok {
-			t.Errorf("expected file %s not found", name)
-		}
-	}
-}
