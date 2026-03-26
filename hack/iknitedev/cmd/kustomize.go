@@ -15,22 +15,15 @@ limitations under the License.
 */
 package cmd
 
-// cSpell: words filesys kyaml Bplo kustomizer
-
 import (
 	"fmt"
 	"io"
-	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
-	"sigs.k8s.io/kustomize/api/krusty"
-	"sigs.k8s.io/kustomize/api/resmap"
-	"sigs.k8s.io/kustomize/api/types"
-	"sigs.k8s.io/kustomize/kyaml/filesys"
-	"sigs.k8s.io/yaml"
+
+	"github.com/kaweezle/iknite/hack/iknitedev/pkg/kustomize"
 )
 
 // CreateKustomizeCmd creates the kustomize command.
@@ -58,19 +51,9 @@ Examples:
 	return kustomizeCmd
 }
 
-// enablePlugins configures kustomize options with plugins and exec enabled.
-func enablePlugins(opts *krusty.Options) *krusty.Options {
-	opts.PluginConfig = types.EnabledPluginConfig(
-		types.BploUseStaticallyLinked,
-	) // cSpell: disable-line
-	opts.PluginConfig.FnpLoadingOptions.EnableExec = true
-	opts.PluginConfig.FnpLoadingOptions.AsCurrentUser = true
-	opts.PluginConfig.HelmConfig.Command = "helm"
-	opts.LoadRestrictions = types.LoadRestrictionsNone
-	return opts
-}
-
-// runKustomize executes the kustomize operation (for backward compatibility).
+// runKustomize validates the kustomization directory and delegates to the
+// kustomize package: it either writes all resources to out or splits them
+// into individual files under destDir.
 func runKustomize(fs afero.Fs, out io.Writer, args []string) error {
 	kustomizationDir := args[0]
 	var destDir string
@@ -78,7 +61,6 @@ func runKustomize(fs afero.Fs, out io.Writer, args []string) error {
 		destDir = args[1]
 	}
 
-	// Check if kustomization directory exists
 	exists, err := afero.DirExists(fs, kustomizationDir)
 	if err != nil {
 		return fmt.Errorf("failed to check kustomization directory: %w", err)
@@ -87,7 +69,6 @@ func runKustomize(fs afero.Fs, out io.Writer, args []string) error {
 		return fmt.Errorf("kustomization directory does not exist: %s", kustomizationDir)
 	}
 
-	// Check if kustomization.yaml exists
 	kustomizationFile := filepath.Join(kustomizationDir, "kustomization.yaml")
 	kustomizationExists, err := afero.Exists(fs, kustomizationFile)
 	if err != nil {
@@ -97,112 +78,21 @@ func runKustomize(fs afero.Fs, out io.Writer, args []string) error {
 		return fmt.Errorf("kustomization.yaml not found in: %s", kustomizationDir)
 	}
 
-	// Run kustomize
-	opts := enablePlugins(krusty.MakeDefaultOptions())
-	k := krusty.MakeKustomizer(opts)
-	resources, err := k.Run(filesys.MakeFsOnDisk(), kustomizationDir)
+	resources, err := kustomize.Build(kustomizationDir)
 	if err != nil {
-		return fmt.Errorf("failed to run kustomize: %w", err)
+		return fmt.Errorf("while building kustomization in %s kustomize: %w", kustomizationDir, err)
 	}
 
-	// If no destination directory, print to stdout
 	if destDir == "" {
-		output, err := resources.AsYaml()
+		err = kustomize.WriteToWriter(resources, out)
 		if err != nil {
-			return fmt.Errorf("failed to convert resources to YAML: %w", err)
-		}
-		_, err = out.Write(output)
-		if err != nil {
-			return fmt.Errorf("failed to write output: %w", err)
+			return fmt.Errorf("failed to write kustomization output: %w", err)
 		}
 		return nil
 	}
-
-	// Create destination directory if it doesn't exist
-	if err := fs.MkdirAll(destDir, 0o755); err != nil {
-		return fmt.Errorf("failed to create destination directory: %w", err)
+	err = kustomize.SplitResMapToDir(fs, resources, destDir)
+	if err != nil {
+		return fmt.Errorf("failed to split kustomization output to directory: %w", err)
 	}
-
-	// Split resources into individual files
-	return splitResourcesFromResMap(fs, resources, destDir)
-}
-
-// splitResourcesFromResMap splits resources from resmap into individual files.
-// This avoids double marshaling by working directly with the ResMap.
-func splitResourcesFromResMap(fs afero.Fs, resources resmap.ResMap, destDir string) error {
-	// Iterate over resources in the ResMap
-	for _, resource := range resources.Resources() {
-		// Extract kind and name from ResId (kind is already in CamelCase)
-		kind := resource.GetKind()
-		name := resource.GetName()
-
-		// Marshal the resource to YAML
-		yamlData, err := yaml.Marshal(resource)
-		if err != nil {
-			return fmt.Errorf("failed to marshal resource %s/%s: %w", kind, name, err)
-		}
-
-		// Create filename with CamelCase kind and underscore replacing colons
-		safeName := strings.ReplaceAll(name, ":", "_")
-		filename := fmt.Sprintf("%s-%s.yaml", kind, safeName)
-		path := filepath.Join(destDir, filename)
-
-		// Write file
-		if err := afero.WriteFile(fs, path, yamlData, 0o644); err != nil {
-			return fmt.Errorf("failed to write file %s: %w", path, err)
-		}
-
-		fmt.Fprintf(os.Stderr, "Created: %s\n", path)
-	}
-
-	return nil
-}
-
-// splitResources splits YAML resources into individual files (deprecated, kept for backward compatibility).
-func splitResources(fs afero.Fs, yamlData []byte, destDir string) error {
-	// Split by "---" separator
-	docs := strings.Split(string(yamlData), "\n---\n")
-
-	for i, doc := range docs {
-		doc = strings.TrimSpace(doc)
-		if doc == "" || doc == "---" {
-			continue
-		}
-
-		// Parse the document to extract kind and name
-		var resource map[string]interface{}
-		if err := yaml.Unmarshal([]byte(doc), &resource); err != nil {
-			return fmt.Errorf("failed to parse resource %d: %w", i, err)
-		}
-
-		// Extract kind and name
-		kind, ok := resource["kind"].(string)
-		if !ok {
-			return fmt.Errorf("resource %d missing 'kind' field", i)
-		}
-
-		metadata, ok := resource["metadata"].(map[string]interface{})
-		if !ok {
-			return fmt.Errorf("resource %d missing 'metadata' field", i)
-		}
-
-		name, ok := metadata["name"].(string)
-		if !ok {
-			return fmt.Errorf("resource %d missing 'metadata.name' field", i)
-		}
-
-		// Create filename with CamelCase kind and underscore replacing colons
-		safeName := strings.ReplaceAll(name, ":", "_")
-		filename := fmt.Sprintf("%s-%s.yaml", kind, safeName)
-		path := filepath.Join(destDir, filename)
-
-		// Write file
-		if err := afero.WriteFile(fs, path, []byte(doc), 0o644); err != nil {
-			return fmt.Errorf("failed to write file %s: %w", path, err)
-		}
-
-		fmt.Fprintf(os.Stderr, "Created: %s\n", path)
-	}
-
 	return nil
 }
