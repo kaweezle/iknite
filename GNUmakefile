@@ -132,11 +132,20 @@ IKNITE_CICONTAINER_IMAGE_MARKER := $(DIST_DIR)/iknite-cicontainer_$(IKNITE_VERSI
 IKNITE_CICONTAINER_DIR := $(ROOT_DIR)/hack/cicontainer
 IKNITE_CICONTAINER_SOURCES := $(wildcard $(IKNITE_CICONTAINER_DIR)/*)
 
+
+# Bootstrap image
+IKNITE_BOOTSTRAP_IMAGE_NAME := $(IMAGE_NAME)-bootstrap
+IKNITE_BOOTSTRAP_IMAGE := $(REGISTRY)/$(IKNITE_BOOTSTRAP_IMAGE_NAME):$(IKNITE_VERSION_TAG)
+IKNITE_BOOTSTRAP_IMAGE_MARKER := $(DIST_DIR)/iknite-bootstrap_$(IKNITE_VERSION_TAG).marker
+IKNITE_BOOTSTRAP_DIR := $(ROOT_DIR)/deploy/k8s/container-images/iknite-bootstrap
+IKNITE_BOOTSTRAP_SOURCES := $(wildcard $(IKNITE_BOOTSTRAP_DIR)/*)
+
 ifdef IKNITE_RELEASE_TAG
 PUSH_IMAGES := true
 IKNITE_ROOTFS_IMAGE_ADDITIONAL_TAG := $(IKNITE_ROOTFS_IMAGE:$(IKNITE_AND_KUBERNETES_VERSION)=latest)
 IKNITE_DEVCONTAINER_IMAGE_ADDITIONAL_TAG := $(IKNITE_DEVCONTAINER_IMAGE:$(IKNITE_VERSION_TAG)=latest)
 IKNITE_CICONTAINER_IMAGE_ADDITIONAL_TAG := $(IKNITE_CICONTAINER_IMAGE:$(IKNITE_VERSION_TAG)=latest)
+IKNITE_BOOTSTRAP_IMAGE_ADDITIONAL_TAG := $(IKNITE_BOOTSTRAP_IMAGE:$(IKNITE_VERSION_TAG)=latest)
 # SNAPSHOT =
 IKNITE_REPO_NAME := release
 else
@@ -217,6 +226,7 @@ help: # ignore checkmake
 	@echo "  make ci-vm-known-hosts              Extract VM SSH host public key to ~/.ssh/iknite_known_hosts"
 	@echo "  make ci-vm-ssh                      Connect to the E2E test VM using the fixed host key"
 	@echo "  make clean                          Remove build artifacts and temporary files"
+	@echo "  make container-bootstrap-build      Build bootstrap container image"
 	@echo "  make container-ci-build             Build CI container image"
 	@echo "  make container-dev-build            Build development container"
 	@echo "  make container-login                Log in to container registry"
@@ -755,6 +765,29 @@ $(IKNITE_CICONTAINER_IMAGE_MARKER): $(IKNITE_CICONTAINER_SOURCES) | check-prereq
 
 .PHONY: container-ci-build
 container-ci-build: $(IKNITE_CICONTAINER_IMAGE_MARKER)
+
+$(IKNITE_BOOTSTRAP_IMAGE_MARKER): $(IKNITE_BOOTSTRAP_SOURCES) | check-prerequisites container-login
+	$(BUILD_CONTAINER_CMD) build \
+		--frontend dockerfile.v0 \
+		--import-cache=$(BUILD_CONTAINER_CACHE_FROM) \
+		--export-cache=$(BUILD_CONTAINER_CACHE_TO) \
+		--local "context=$(IKNITE_BOOTSTRAP_DIR)" \
+		--local "dockerfile=$(IKNITE_BOOTSTRAP_DIR)" \
+		--opt "build-arg:IKNITE_REPO_URL=https://static.iknite.app/$(IKNITE_REPO_NAME)/" \
+		--opt "build-arg:IKNITE_VERSION=$(IKNITE_VERSION)" \
+		$(CACHE_FLAG) \
+		--output "type=docker,dest=-,name=$(IKNITE_BOOTSTRAP_IMAGE),push=false" | $(RUN_CONTAINER_CMD) load
+	if [ "$(PUSH_IMAGES)" = "true" ]; then \
+		$(RUN_CONTAINER_CMD) push "$(IKNITE_BOOTSTRAP_IMAGE)"; \
+		if [ -n "$(IKNITE_BOOTSTRAP_IMAGE_ADDITIONAL_TAG)" ]; then \
+			$(RUN_CONTAINER_CMD) tag "$(IKNITE_BOOTSTRAP_IMAGE)" "$(IKNITE_BOOTSTRAP_IMAGE_ADDITIONAL_TAG)"; \
+			$(RUN_CONTAINER_CMD) push "$(IKNITE_BOOTSTRAP_IMAGE_ADDITIONAL_TAG)"; \
+		fi; \
+	fi
+	@touch "$@"
+
+.PHONY: container-bootstrap-build
+container-bootstrap-build: $(IKNITE_BOOTSTRAP_IMAGE_MARKER)
 
 .PHONY: ci-check-argocd
 ci-check-argocd: $(IKNITE_CICONTAINER_IMAGE_MARKER) | check-prerequisites
