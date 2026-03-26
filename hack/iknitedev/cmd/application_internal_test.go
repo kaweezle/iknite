@@ -189,11 +189,15 @@ func TestRunRenderApp_Kustomize_Stdout(t *testing.T) {
 	}
 
 	tmpDir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(tmpDir, "kustomization.yaml"), []byte(`apiVersion: kustomize.config.k8s.io/v1beta1
+	if err := os.WriteFile(
+		filepath.Join(tmpDir, "kustomization.yaml"),
+		[]byte(`apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
 - configmap.yaml
-`), 0o600); err != nil {
+`),
+		0o600,
+	); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(filepath.Join(tmpDir, "configmap.yaml"), []byte(configMapContent), 0o600); err != nil {
@@ -218,11 +222,15 @@ func TestRunRenderApp_Kustomize_SplitFiles(t *testing.T) {
 
 	tmpDir := t.TempDir()
 	destDir := filepath.Join(tmpDir, "out")
-	if err := os.WriteFile(filepath.Join(tmpDir, "kustomization.yaml"), []byte(`apiVersion: kustomize.config.k8s.io/v1beta1
+	if err := os.WriteFile(
+		filepath.Join(tmpDir, "kustomization.yaml"),
+		[]byte(`apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
 - configmap.yaml
-`), 0o600); err != nil {
+`),
+		0o600,
+	); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(filepath.Join(tmpDir, "configmap.yaml"), []byte(configMapContent), 0o600); err != nil {

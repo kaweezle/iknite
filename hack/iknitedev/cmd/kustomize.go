@@ -20,9 +20,10 @@ import (
 	"io"
 	"path/filepath"
 
-	"github.com/kaweezle/iknite/hack/iknitedev/pkg/kustomize"
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
+
+	"github.com/kaweezle/iknite/hack/iknitedev/pkg/kustomize"
 )
 
 // CreateKustomizeCmd creates the kustomize command.
@@ -79,11 +80,19 @@ func runKustomize(fs afero.Fs, out io.Writer, args []string) error {
 
 	resources, err := kustomize.Build(kustomizationDir)
 	if err != nil {
-		return err
+		return fmt.Errorf("while building kustomization in %s kustomize: %w", kustomizationDir, err)
 	}
 
 	if destDir == "" {
-		return kustomize.WriteToWriter(resources, out)
+		err = kustomize.WriteToWriter(resources, out)
+		if err != nil {
+			return fmt.Errorf("failed to write kustomization output: %w", err)
+		}
+		return nil
 	}
-	return kustomize.SplitResMapToDir(fs, resources, destDir)
+	err = kustomize.SplitResMapToDir(fs, resources, destDir)
+	if err != nil {
+		return fmt.Errorf("failed to split kustomization output to directory: %w", err)
+	}
+	return nil
 }

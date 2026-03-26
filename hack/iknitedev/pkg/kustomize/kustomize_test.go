@@ -15,7 +15,7 @@ limitations under the License.
 */
 package kustomize_test
 
-// cSpell: words kustomizer
+// cSpell: words kustomizer dvcm
 
 import (
 	"bytes"
@@ -23,8 +23,9 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/kaweezle/iknite/hack/iknitedev/pkg/kustomize"
 	"github.com/spf13/afero"
+
+	"github.com/kaweezle/iknite/hack/iknitedev/pkg/kustomize"
 )
 
 const configMapContent = `apiVersion: v1
@@ -71,7 +72,7 @@ data:
 	}
 
 	for _, name := range []string{"ConfigMap-test-config.yaml", "Secret-test-secret.yaml"} {
-		ok, err := afero.Exists(fs, filepath.Join("/output", name))
+		ok, err := afero.Exists(fs, filepath.Join("/output", name)) //nolint:gocritic // Memory fs
 		if err != nil {
 			t.Fatalf("Exists: %v", err)
 		}
@@ -134,11 +135,15 @@ func TestBuild_Integration(t *testing.T) {
 	}
 
 	tmpDir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(tmpDir, "kustomization.yaml"), []byte(`apiVersion: kustomize.config.k8s.io/v1beta1
+	if err := os.WriteFile(
+		filepath.Join(tmpDir, "kustomization.yaml"),
+		[]byte(`apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
 - configmap.yaml
-`), 0o600); err != nil {
+`),
+		0o600,
+	); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(filepath.Join(tmpDir, "configmap.yaml"), []byte(configMapContent), 0o600); err != nil {
@@ -164,11 +169,15 @@ func TestWriteToWriter_Integration(t *testing.T) {
 	}
 
 	tmpDir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(tmpDir, "kustomization.yaml"), []byte(`apiVersion: kustomize.config.k8s.io/v1beta1
+	if err := os.WriteFile(
+		filepath.Join(tmpDir, "kustomization.yaml"),
+		[]byte(`apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
 - configmap.yaml
-`), 0o600); err != nil {
+`),
+		0o600,
+	); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(filepath.Join(tmpDir, "configmap.yaml"), []byte(configMapContent), 0o600); err != nil {
@@ -197,11 +206,15 @@ func TestSplitResMapToDir_Integration(t *testing.T) {
 
 	tmpDir := t.TempDir()
 	destDir := filepath.Join(tmpDir, "out")
-	if err := os.WriteFile(filepath.Join(tmpDir, "kustomization.yaml"), []byte(`apiVersion: kustomize.config.k8s.io/v1beta1
+	if err := os.WriteFile(
+		filepath.Join(tmpDir, "kustomization.yaml"),
+		[]byte(`apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
 - configmap.yaml
-`), 0o600); err != nil {
+`),
+		0o600,
+	); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(filepath.Join(tmpDir, "configmap.yaml"), []byte(configMapContent), 0o600); err != nil {
@@ -214,7 +227,7 @@ resources:
 	}
 
 	fs := afero.NewOsFs()
-	if err := kustomize.SplitResMapToDir(fs, resources, destDir); err != nil {
+	if err := kustomize.SplitResMapToDir(fs, resources, destDir); err != nil { //nolint:govet // integration test
 		t.Fatalf("SplitResMapToDir: %v", err)
 	}
 

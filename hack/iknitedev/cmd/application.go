@@ -15,10 +15,11 @@ limitations under the License.
 */
 package cmd
 
-// cSpell: words helmfile kubeconform appstages appstage
+// cSpell: words crds
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -27,10 +28,13 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/kaweezle/iknite/hack/iknitedev/pkg/kustomize"
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
+	"sigs.k8s.io/kustomize/api/provider"
+	"sigs.k8s.io/kustomize/api/resmap"
 	"sigs.k8s.io/yaml"
+
+	"github.com/kaweezle/iknite/hack/iknitedev/pkg/kustomize"
 )
 
 // appType represents the type of an application directory.
@@ -91,121 +95,124 @@ func detectAppType(fs afero.Fs, dir string) (appType, string, error) {
 	return appTypeUnknown, "", nil
 }
 
-// renderHelmfile runs helmfile template and returns the YAML output.
-func renderHelmfile(helmfileFile string) ([]byte, error) {
-	cmd := exec.Command("helmfile", "template", "--skip-tests", "--args=--skip-crds", "-f", helmfileFile)
+func runCommandToResmap(cmd *exec.Cmd) (resmap.ResMap, error) {
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 	if err := cmd.Run(); err != nil {
-		return nil, fmt.Errorf("helmfile template failed: %w\n%s", err, stderr.String())
+		return nil, fmt.Errorf("command %s failed: %w\n%s", cmd.Path, err, stderr.String())
 	}
-	return stdout.Bytes(), nil
+	result, err := resmap.NewFactory(provider.NewDefaultDepProvider().GetResourceFactory()).
+		NewResMapFromBytes(stdout.Bytes())
+	if err != nil {
+		return nil, fmt.Errorf("failed to create resmap from %s output: %w", cmd.Path, err)
+	}
+	return result, nil
+}
+
+// renderHelmfile runs helmfile template and returns the YAML output.
+func renderHelmfile(helmfileFile string) (resmap.ResMap, error) {
+	return runCommandToResmap(
+		exec.CommandContext(
+			context.Background(),
+			"helmfile",
+			"template",
+			"--skip-tests",
+			"--args=--skip-crds",
+			"-f",
+			helmfileFile,
+		),
+	)
 }
 
 // renderHelm runs helm template and returns the YAML output.
-func renderHelm(dir string) ([]byte, error) {
+func renderHelm(dir string) (resmap.ResMap, error) {
 	releaseName := filepath.Base(dir)
-	cmd := exec.Command("helm", "template", releaseName, dir, "--skip-crds")
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-	if err := cmd.Run(); err != nil {
-		return nil, fmt.Errorf("helm template failed: %w\n%s", err, stderr.String())
-	}
-	return stdout.Bytes(), nil
+	//nolint:gosec // controlled input for command and args, want to invoke helm CLI
+	cmd := exec.CommandContext(context.Background(), "helm", "template", releaseName, dir, "--skip-crds")
+	return runCommandToResmap(cmd)
 }
 
 // renderApp renders an application directory and returns the YAML output.
 // For kustomize apps it uses Go code; for helmfile and helm it invokes the
 // respective external commands.
-func renderApp(fs afero.Fs, dir string) ([]byte, error) {
+func renderApp(fs afero.Fs, dir string) (resmap.ResMap, error) {
 	appT, path, err := detectAppType(fs, dir)
 	if err != nil {
 		return nil, err
 	}
 
+	var resources resmap.ResMap
+	var buildErr error
 	switch appT {
 	case appTypeKustomize:
-		resources, buildErr := kustomize.Build(path)
-		if buildErr != nil {
-			return nil, buildErr
-		}
-		var buf bytes.Buffer
-		if writeErr := kustomize.WriteToWriter(resources, &buf); writeErr != nil {
-			return nil, writeErr
-		}
-		return buf.Bytes(), nil
+		resources, buildErr = kustomize.Build(path)
 	case appTypeHelmfile:
-		return renderHelmfile(path)
+		resources, buildErr = renderHelmfile(path)
 	case appTypeHelm:
-		return renderHelm(path)
-	default:
+		resources, buildErr = renderHelm(path)
+	case appTypeUnknown:
 		return nil, fmt.Errorf(
+			//nolint:lll // long error message
 			"directory %s has no recognized app definition (kustomization.yaml, helmfile.yaml, helmfile.yaml.gotmpl, or Chart.yaml)",
 			dir,
 		)
 	}
+	if buildErr != nil {
+		return nil, buildErr
+	}
+	return resources, nil
 }
 
 // renderAppWithOutput renders an application and writes output to stdout or
 // splits into destDir.
 func renderAppWithOutput(fs afero.Fs, out io.Writer, dir, destDir string) error {
-	appT, path, err := detectAppType(fs, dir)
+	resources, err := renderApp(fs, dir)
 	if err != nil {
-		return err
+		return fmt.Errorf("while rendering with output: %w", err)
 	}
-
-	if appT == appTypeKustomize {
-		resources, buildErr := kustomize.Build(path)
-		if buildErr != nil {
-			return buildErr
+	if destDir != "" {
+		err = kustomize.SplitResMapToDir(fs, resources, destDir)
+		if err != nil {
+			return fmt.Errorf("failed to split resources to directory: %w", err)
 		}
-		if destDir == "" {
-			return kustomize.WriteToWriter(resources, out)
-		}
-		return kustomize.SplitResMapToDir(fs, resources, destDir)
+		return nil
 	}
-
 	var yamlData []byte
-	switch appT {
-	case appTypeHelmfile:
-		yamlData, err = renderHelmfile(path)
-	case appTypeHelm:
-		yamlData, err = renderHelm(path)
-	default:
-		return fmt.Errorf(
-			"directory %s has no recognized app definition (kustomization.yaml, helmfile.yaml, helmfile.yaml.gotmpl, or Chart.yaml)",
-			dir,
-		)
-	}
+	yamlData, err = resources.AsYaml()
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to convert resources to YAML: %w", err)
 	}
-	if destDir == "" {
-		_, err = out.Write(yamlData)
-		return err
+	_, err = out.Write(yamlData)
+	if err != nil {
+		return fmt.Errorf("failed to write output: %w", err)
 	}
-	return kustomize.SplitYAMLToDir(fs, yamlData, destDir)
+	return nil
 }
 
 // runKubeconform runs kubeconform validation on the provided YAML data.
-// schemasDir may be empty to skip the local schema location.
-func runKubeconform(yamlData []byte, schemasDir string) error {
+// SchemasDir may be empty to skip the local schema location.
+func runKubeconform(resources resmap.ResMap, schemasDir string) error {
 	args := []string{"-schema-location", "default"}
 	if schemasDir != "" {
 		args = append(args, "-schema-location",
 			schemasDir+"/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json")
 	}
-	args = append(args,
+	args = append(
+		args,
 		"-schema-location",
+		//nolint:lll // template
 		"https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json",
 		"-schema-location",
 		"https://raw.githubusercontent.com/yannh/kubernetes-json-schema/master/master/customresourcedefinition.json",
 		"-summary",
 	)
-	cmd := exec.Command("kubeconform", args...)
-	cmd.Stdin = bytes.NewReader(yamlData)
+	cmd := exec.CommandContext(context.Background(), "kubeconform", args...)
+	data, err := resources.AsYaml()
+	if err != nil {
+		return fmt.Errorf("failed to convert resources to YAML: %w", err)
+	}
+	cmd.Stdin = bytes.NewReader(data)
 	cmd.Stdout = os.Stderr
 	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {
@@ -275,6 +282,8 @@ func parseApplicationsFromDir(fs afero.Fs, manifestsDir string) ([]argoApplicati
 }
 
 // runRenderAll renders all appstages in an environment, mirroring render-environment.sh.
+//
+//nolint:gocyclo // complex function but straightforward flow
 func runRenderAll(fs afero.Fs, out io.Writer, appstagesDir, destDir, baseDir string) error {
 	exists, err := afero.DirExists(fs, appstagesDir)
 	if err != nil {
@@ -305,7 +314,7 @@ func runRenderAll(fs afero.Fs, out io.Writer, appstagesDir, destDir, baseDir str
 	sort.Strings(appstageDirs)
 
 	if len(appstageDirs) == 0 {
-		return fmt.Errorf("no appstage directories found in %s", appstagesDir)
+		return fmt.Errorf("no appstage- prefixed directories found in %s", appstagesDir)
 	}
 
 	for _, appstageDir := range appstageDirs {
@@ -313,7 +322,7 @@ func runRenderAll(fs afero.Fs, out io.Writer, appstagesDir, destDir, baseDir str
 		manifestsDir := filepath.Join(destDir, appstageName, "manifests")
 		applicationsDir := filepath.Join(destDir, appstageName, "applications")
 
-		fmt.Fprintf(out, "Rendering appstage %s\n", appstageName)
+		fmt.Fprintf(out, "Rendering appstage %s\n", appstageName) //nolint:errcheck // best effort logging
 
 		resources, runErr := kustomize.Build(appstageDir)
 		if runErr != nil {
@@ -330,12 +339,13 @@ func runRenderAll(fs afero.Fs, out io.Writer, appstagesDir, destDir, baseDir str
 
 		for _, app := range apps {
 			if app.Spec.Source.Path == "" {
-				return fmt.Errorf("Application %s in appstage %s has no spec.source.path",
+				return fmt.Errorf("application %s in appstage %s has no spec.source.path",
 					app.Metadata.Name, appstageName)
 			}
 			appSourceDir := filepath.Join(baseDir, app.Spec.Source.Path)
 			appDestDir := filepath.Join(applicationsDir, app.Metadata.Name)
 
+			//nolint:errcheck // best effort logging
 			fmt.Fprintf(out, "Rendering application %s from %s\n", app.Metadata.Name, app.Spec.Source.Path)
 
 			if renderErr := renderAppWithOutput(fs, out, appSourceDir, appDestDir); renderErr != nil {
