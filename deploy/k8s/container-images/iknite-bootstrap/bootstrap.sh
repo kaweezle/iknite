@@ -47,6 +47,8 @@ fi
 
 if [[ -d /workspace/.ssh ]]; then
   echo "Using mounted SSH keys"
+  # ensure permissions are correct for SSH keys
+  chmod 600 /workspace/.ssh/id_*
   eval "$(ssh-agent)" && ssh-add /workspace/.ssh/id_*
   if [[ -f /workspace/.ssh/id_ed25519 && -z "$SOPS_AGE_SSH_PRIVATE_KEY_FILE" ]]; then
     echo "Using ed25519 SSH key for SOPS decryption"
