@@ -23,3 +23,8 @@ inputs = {
     "argocd" = "${get_repo_root()}/deploy/k8s/argocd/common/argocd-server/helmfile.yaml.gotmpl"
   }
 }
+
+exclude {
+  if      = true
+  actions = ["all"]
+}

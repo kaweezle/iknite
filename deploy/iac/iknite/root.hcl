@@ -57,6 +57,9 @@ locals {
   slug                = local.values.project.slug
   domain_suffix       = local.values.domain_suffix
   github_organization = local.values.project.github.organization
+  github_repo         = local.values.project.github.repo
+  github_repo_url     = "git@github.com:${local.github_organization}/${local.github_repo}.git"
+  github_repo_ref     = local.values.argocd.target_revision
   state_bucket        = local.values.iac.state_bucket
   email               = local.values.project.email
 

@@ -10,10 +10,13 @@ terraform {
 
 locals {
   public_key         = include.root.locals.secret.keys.main.public_key
+  private_key        = include.root.locals.secret.keys.main.private_key
   kubernetes_version = include.root.locals.kubernetes_version
   ssh_host_private   = include.root.locals.secret.iknite_vm.ssh_host_ecdsa_private
   ssh_host_public    = include.root.locals.secret.iknite_vm.ssh_host_ecdsa_public
   iknite_vm          = include.root.locals.secret.iknite_vm
+  git_url            = include.root.locals.github_repo_url
+  git_ref            = include.root.locals.github_repo_ref
 }
 
 inputs = {
@@ -48,6 +51,18 @@ write_files:
             domain_name: iknite-vm.incus
             network_interface: eth0
             enable_mdns: false
+  - path: /opt/iknite/bootstrap/.env
+    owner: "root:root"
+    permissions: "0640"
+    content: |
+        IKNITE_BOOTSTRAP_REPO_URL=${local.git_url}
+        IKNITE_BOOTSTRAP_REPO_REF=${local.git_ref}
+        IKNITE_BOOTSTRAP_SCRIPT=iknite-bootstrap.sh
+  - path: /opt/iknite/bootstrap/.ssh/id_ed25519
+    owner: "root:root"
+    permissions: "0600"
+    content: |
+        ${indent(8, local.private_key)}
 EOF
       }
       devices = {

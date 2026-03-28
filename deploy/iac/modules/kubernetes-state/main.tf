@@ -65,11 +65,15 @@ data "kubernetes_resources" "statefulsets" {
 
 # Wait for deployments to be ready if enabled
 resource "null_resource" "wait" {
-  for_each = var.wait_for_deployments && var.kubeconfig_present ? toset(["daemonsets", "statefulsets", "deployments"]) : toset([])
+  for_each = var.wait_for_deployments && var.kubeconfig_present ? toset(["all"]) : toset([])
 
   provisioner "local-exec" {
-    command     = join(" ", concat(["${path.module}/wait-resources.sh", local_file.kubeconfig.filename, var.deployment_wait_timeout, each.key], var.namespaces))
+    command     = join(" ", concat(["${path.module}/wait-settle.sh"], var.namespaces))
     interpreter = ["/bin/bash", "-c"]
+    environment = {
+      KUBECONFIG = local_file.kubeconfig.filename
+      TIMEOUT    = var.deployment_wait_timeout
+    }
   }
 
   depends_on = [local_file.kubeconfig]
