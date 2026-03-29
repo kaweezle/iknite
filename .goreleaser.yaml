@@ -41,7 +41,8 @@ builds:
     ldflags:
       - -s -w
 archives:
-  - ids: [iknite]
+  - id: iknite
+    ids: [iknite]
     name_template: >-
       {{ .ProjectName }}_
       {{- title .Os }}_
@@ -49,7 +50,8 @@ archives:
       {{- else if eq .Arch "386" }}i386
       {{- else }}{{ .Arch }}{{ end }}
       {{- if .Arm }}v{{ .Arm }}{{ end }}
-  - ids: [iknitedev]
+  - id: iknitedev
+    ids: [iknitedev]
     name_template: >-
       iknitedev_
       {{- title .Os }}_
@@ -136,7 +138,7 @@ nfpms:
         key_name: kaweezle-devel@kaweezle.com-c9d89864.rsa.pub
   - id: iknitedev-nfpm
     ids: [iknitedev]
-    formats: [apk, deb, rpm]
+    formats: [apk, deb, rpm, archlinux]
     license: Apache 2.0
     package_name: iknitedev
     file_name_template: >-

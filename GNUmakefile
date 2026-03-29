@@ -154,6 +154,7 @@ IKNITE_PACKAGE := iknite-$(IKNITE_VERSION).$(ARCH).apk
 IKNITEDEV_PACKAGE := iknitedev-$(IKNITE_VERSION).$(ARCH).apk
 IKNITEDEV_DEB_PACKAGE := iknitedev-$(IKNITE_VERSION).$(ARCH).deb
 IKNITEDEV_RPM_PACKAGE := iknitedev-$(IKNITE_VERSION).$(ARCH).rpm
+IKNITEDEV_ARCH_PACKAGE := iknitedev-$(IKNITE_VERSION).$(ARCH).pkg.tar.zst
 IKNITE_IMAGES_PACKAGE := iknite-images-$(KUBERNETES_VERSION).$(ARCH).apk
 
 # Incus Agent
@@ -319,14 +320,14 @@ $(ROOT_DIR)/$(KEY_NAME): $(SECRETS_FILE) | check-prerequisites
 ci-extract-key: $(ROOT_DIR)/$(KEY_NAME)
 
 # Goreleaser build produces both iknite and iknitedev packages in a single run
-$(DIST_DIR)/$(IKNITE_PACKAGE) $(DIST_DIR)/$(IKNITEDEV_PACKAGE) $(DIST_DIR)/$(IKNITEDEV_DEB_PACKAGE) $(DIST_DIR)/$(IKNITEDEV_RPM_PACKAGE) $(DIST_DIR)/metadata.json $(DIST_DIR)/iknite_linux_amd64_v1/iknite &: $(GOLANG_FILES) $(IKNITEDEV_FILES) $(APK_FILES) go.mod hack/iknitedev/go.mod .goreleaser.yaml | check-prerequisites
+$(DIST_DIR)/$(IKNITE_PACKAGE) $(DIST_DIR)/$(IKNITEDEV_PACKAGE) $(DIST_DIR)/$(IKNITEDEV_DEB_PACKAGE) $(DIST_DIR)/$(IKNITEDEV_RPM_PACKAGE) $(DIST_DIR)/$(IKNITEDEV_ARCH_PACKAGE) $(DIST_DIR)/metadata.json $(DIST_DIR)/iknite_linux_amd64_v1/iknite &: $(GOLANG_FILES) $(IKNITEDEV_FILES) $(APK_FILES) go.mod hack/iknitedev/go.mod .goreleaser.yaml | check-prerequisites
 	goreleaser release --skip=publish $(SNAPSHOT) --clean
 
 .PHONY: apk-iknite-build
 apk-iknite-build: $(DIST_DIR)/$(IKNITE_PACKAGE) $(DIST_DIR)/metadata.json $(DIST_DIR)/iknite_linux_amd64_v1/iknite
 
 .PHONY: apk-iknitedev-build
-apk-iknitedev-build: $(DIST_DIR)/$(IKNITEDEV_PACKAGE) $(DIST_DIR)/$(IKNITEDEV_DEB_PACKAGE) $(DIST_DIR)/$(IKNITEDEV_RPM_PACKAGE)
+apk-iknitedev-build: $(DIST_DIR)/$(IKNITEDEV_PACKAGE) $(DIST_DIR)/$(IKNITEDEV_DEB_PACKAGE) $(DIST_DIR)/$(IKNITEDEV_RPM_PACKAGE) $(DIST_DIR)/$(IKNITEDEV_ARCH_PACKAGE)
 
 # Download latest karmafun release from GitHub
 $(DIST_DIR)/$(KARMAFUN_PACKAGE): | check-prerequisites
