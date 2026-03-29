@@ -2,9 +2,9 @@
 environments:
   default:
     secrets:
-      - "{{ coalesce (env "IKNITE_STACK_PREFIX") "../../../../.." }}/secrets.sops.yaml"
+      - "{{ printf (coalesce (env "IKNITE_ENV_FORMAT") "../../../../../%s") "secrets.sops.yaml" }}"
     values:
-      - "{{ coalesce (env "IKNITE_STACK_PREFIX") "../../../../.." }}/values.yaml"
+      - "{{ printf (coalesce (env "IKNITE_ENV_FORMAT") "../../../../../%s") "values.yaml" }}"
 ---
 repositories:
   - name: kgateway

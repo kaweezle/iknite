@@ -17,14 +17,17 @@ limitations under the License.
 package cmd
 
 import (
+	"context"
 	"fmt"
+	"os"
+	"os/signal"
 
 	"github.com/spf13/cobra"
-	flag "github.com/spf13/pflag"
 	"github.com/spf13/viper"
 	"sigs.k8s.io/kustomize/api/resmap"
 	"sigs.k8s.io/kustomize/kyaml/filesys"
 
+	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
 	"github.com/kaweezle/iknite/pkg/cmd/options"
 	"github.com/kaweezle/iknite/pkg/config"
 	"github.com/kaweezle/iknite/pkg/constants"
@@ -33,15 +36,7 @@ import (
 	"github.com/kaweezle/iknite/pkg/utils"
 )
 
-var (
-	kustomization                = constants.DefaultKustomization
-	waitTimeout                  = 0
-	clusterCheckWaitMilliseconds = 500
-	clusterCheckRetries          = 1
-	clusterCheckOkResponses      = 1
-)
-
-func NewPrintKustomizeCmd() *cobra.Command {
+func NewPrintKustomizeCmd(ikniteConfig *v1alpha1.IkniteClusterSpec) *cobra.Command {
 	printKustomizeCmd := &cobra.Command{
 		Use:   "print",
 		Short: "Print the kustomize configuration",
@@ -51,12 +46,14 @@ prints the configuration in this directory. If there is no kustomization, it
 prints the Embedded configuration that installs the following components:
 
 - Flannel for networking.
-- MetalLB for Load balancer services.
+- Kube-VIP for Load balancer services.
 - Local-path provisioner to make PVCs available.
 - metrics-server to make resources work on payloads.
 
 `,
-		Run: performPrintKustomize,
+		Run: func(_ *cobra.Command, _ []string) {
+			performPrintKustomize(ikniteConfig)
+		},
 		PreRun: func(cmd *cobra.Command, _ []string) {
 			flags := cmd.Flags()
 			_ = viper.BindPFlag( //nolint:errcheck // flag exists
@@ -66,7 +63,16 @@ prints the Embedded configuration that installs the following components:
 	return printKustomizeCmd
 }
 
-func NewKustomizeCmd() *cobra.Command {
+func NewKustomizeCmd(
+	ikniteConfig *v1alpha1.IkniteClusterSpec,
+	kustomizeOptions *utils.KustomizeOptions,
+) *cobra.Command {
+	if kustomizeOptions == nil {
+		kustomizeOptions = utils.NewKustomizeOptions()
+		// Different defaults.
+		kustomizeOptions.Wait = false
+		kustomizeOptions.Immediate = false
+	}
 	kustomizeCmd := &cobra.Command{
 		Use:   "kustomize",
 		Short: "Kustomize the cluster",
@@ -77,12 +83,15 @@ applies the configuration in this directory. If there is no kustomization, it
 applies the Embedded configuration that installs the following components:
 
 - Flannel for networking.
-- MetalLB for Load balancer services.
+- Kube-VIP for Load balancer services.
 - Local-path provisioner to make PVCs available.
 - metrics-server to make resources work on payloads.
 
 `,
-		Run: performKustomize,
+		Run: func(_ *cobra.Command, _ []string) {
+			performKustomize(ikniteConfig, kustomizeOptions)
+		},
+
 		PreRun: func(cmd *cobra.Command, _ []string) {
 			flags := cmd.Flags()
 			_ = viper.BindPFlag( //nolint:errcheck // flag exists
@@ -93,46 +102,16 @@ applies the Embedded configuration that installs the following components:
 		},
 	}
 
-	initializeKustomization(kustomizeCmd.Flags())
-	kustomizeCmd.PersistentFlags().
-		StringVarP(&kustomization, options.Kustomization, "d", constants.DefaultKustomization,
-			"The directory to look for kustomization. Can be an URL")
+	config.AddIkniteClusterFlags(kustomizeCmd.Flags(), ikniteConfig)
+	utils.AddKustomizeOptionsFlags(kustomizeCmd.Flags(), kustomizeOptions)
 
-	kustomizeCmd.AddCommand(NewPrintKustomizeCmd())
+	printCmd := NewPrintKustomizeCmd(ikniteConfig)
+	inheritsFlags(kustomizeCmd.Flags(), printCmd.Flags(), options.Kustomization)
+	kustomizeCmd.AddCommand(printCmd)
 	return kustomizeCmd
 }
 
-func initializeKustomization(flagSet *flag.FlagSet) {
-	flagSet.IntVarP(
-		&waitTimeout,
-		options.Wait,
-		"w",
-		waitTimeout,
-		"Wait n seconds for all pods to settle",
-	)
-	flagSet.BoolP(
-		options.ForceConfig,
-		"C",
-		false,
-		"Force configuration even if it has already occurred",
-	)
-	flagSet.IntVar(
-		&clusterCheckWaitMilliseconds,
-		options.ClusterCheckWait,
-		clusterCheckWaitMilliseconds,
-		"Milliseconds to wait between each cluster check",
-	)
-	flagSet.IntVar(&clusterCheckRetries, options.ClusterCheckRetries, clusterCheckRetries,
-		"Number of tries to access the cluster")
-	flagSet.IntVar(
-		&clusterCheckOkResponses,
-		options.ClusterCheckOkResponses,
-		clusterCheckOkResponses,
-		"Number of Ok response to receive before proceeding",
-	)
-}
-
-func performKustomize(_ *cobra.Command, _ []string) {
+func performKustomize(ikniteConfig *v1alpha1.IkniteClusterSpec, kustomizeOptions *utils.KustomizeOptions) {
 	ip, err := utils.GetOutboundIP()
 	if err != nil {
 		cobra.CheckErr(fmt.Errorf("while getting IP address: %w", err))
@@ -143,26 +122,38 @@ func performKustomize(_ *cobra.Command, _ []string) {
 	if err != nil {
 		cobra.CheckErr(fmt.Errorf("while loading local cluster configuration: %w", err))
 	}
+	// Make wait finish when the process receives an interrupt signal
+	ctx, cancel := context.WithCancel(context.Background())
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt)
+	defer func() {
+		signal.Stop(c)
+		cancel()
+	}()
+	go func() {
+		select {
+		case <-c:
+			cancel()
+		case <-ctx.Done():
+		}
+	}()
+
 	err = kubeConfig.CheckClusterRunning(
-		clusterCheckRetries,
-		clusterCheckOkResponses,
-		clusterCheckWaitMilliseconds,
+		ctx,
+		kustomizeOptions.Retries,
+		kustomizeOptions.OkResponses,
+		kustomizeOptions.Interval,
 	)
 	cobra.CheckErr(err)
 
-	force := viper.GetBool(config.ForceConfig)
-	kustomization := viper.GetString(config.Kustomization)
-	cobra.CheckErr(kubeConfig.DoKustomization(ip, kustomization, force, waitTimeout))
+	cobra.CheckErr(kubeConfig.DoKustomization(ctx, ip, ikniteConfig.Kustomization, kustomizeOptions.ForceConfig,
+		&kustomizeOptions.WaitOptions))
 }
 
-func performPrintKustomize(_ *cobra.Command, _ []string) {
-	kustomization := viper.GetString(config.Kustomization)
-	if kustomization == "" {
-		kustomization = constants.DefaultKustomization
-	}
-	if ok, err := provision.IsBaseKustomizationAvailable(kustomization); ok {
+func performPrintKustomize(ikniteConfig *v1alpha1.IkniteClusterSpec) {
+	if ok, err := provision.IsBaseKustomizationAvailable(ikniteConfig.Kustomization); ok {
 		var resources resmap.ResMap
-		resources, err = provision.RunKustomizations(filesys.MakeFsOnDisk(), kustomization)
+		resources, err = provision.RunKustomizations(filesys.MakeFsOnDisk(), ikniteConfig.Kustomization)
 		if err != nil {
 			cobra.CheckErr(fmt.Errorf("while applying local kustomization: %w", err))
 		}
@@ -172,6 +163,6 @@ func performPrintKustomize(_ *cobra.Command, _ []string) {
 		cobra.CheckErr(err)
 		fmt.Println(string(out)) //nolint:forbidigo // printing is expected here
 	} else {
-		cobra.CheckErr(fmt.Errorf("bad kustomization: %s: %w", kustomization, err))
+		cobra.CheckErr(fmt.Errorf("bad kustomization: %s: %w", ikniteConfig.Kustomization, err))
 	}
 }

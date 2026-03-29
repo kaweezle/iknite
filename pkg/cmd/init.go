@@ -67,6 +67,7 @@ import (
 	"github.com/kaweezle/iknite/pkg/k8s"
 	iknitePhase "github.com/kaweezle/iknite/pkg/k8s/phases/init"
 	ikniteServer "github.com/kaweezle/iknite/pkg/server"
+	"github.com/kaweezle/iknite/pkg/utils"
 )
 
 // cSpell: enable
@@ -92,6 +93,7 @@ type initOptions struct {
 	patchesDir              string
 	skipCRIDetect           bool
 	ikniteCfg               *v1alpha1.IkniteClusterSpec
+	kustomizeOptions        *utils.KustomizeOptions
 }
 
 const (
@@ -106,7 +108,7 @@ const (
 )
 
 // compile-time assert that the local data object satisfies the phases data interface.
-var _ phases.InitData = &initData{}
+var _ iknitePhase.IkniteInitData = (*initData)(nil)
 
 // initData defines all the runtime information used when running the kubeadm init workflow;
 // this data is shared across all the phases that are included in the workflow.
@@ -135,7 +137,12 @@ type initData struct {
 	statusServer                *ikniteServer.IkniteServer
 	ctx                         context.Context //nolint:containedctx // passed around but not stored
 	ctxCancel                   context.CancelFunc
+	kustomizeOptions            *utils.KustomizeOptions
 }
+
+// compile-time assert that the local data object satisfies the IkniteInitData interface, that extends the kubeadm
+// InitData interface with iknite-specific information and methods.
+var _ iknitePhase.IkniteInitData = &initData{}
 
 // HACK: This is a hack to allow the use of the unexported initOptions struct in the kubeadm codebase.
 // This is needed because the kubeadm codebase uses the unexported initOptions struct in the AddInitOtherFlags function.
@@ -233,7 +240,8 @@ func newCmdInit(out io.Writer, initOptions *initOptions) *cobra.Command {
 	initOptions.bto.AddTokenFlag(cmd.Flags())
 	initOptions.bto.AddTTLFlag(cmd.Flags())
 	options.AddImageMetaFlags(cmd.Flags(), &initOptions.externalClusterCfg.ImageRepository)
-	config.ConfigureClusterCommand(cmd.Flags(), initOptions.ikniteCfg)
+	config.AddIkniteClusterFlags(cmd.Flags(), initOptions.ikniteCfg)
+	utils.AddKustomizeOptionsFlags(cmd.Flags(), initOptions.kustomizeOptions)
 
 	// defines additional flag that are not used by the init command but that could be eventually used
 	// by the sub-commands automatically generated for phases
@@ -357,6 +365,7 @@ func newInitOptions() *initOptions {
 		uploadCerts:           false,
 		ikniteCfg:             ikniteConfig,
 		ignorePreflightErrors: []string{"all"},
+		kustomizeOptions:      utils.NewKustomizeOptions(),
 	}
 }
 
@@ -545,6 +554,7 @@ func newInitData(
 		ikniteCluster:           ikniteCluster,
 		ctx:                     ctx,
 		ctxCancel:               cancel,
+		kustomizeOptions:        initOptions.kustomizeOptions,
 		dryRun: cmdUtil.ValueFromFlagsOrConfig( //nolint:errcheck,forcetypeassert // default value is false
 			cmd.Flags(),
 			options.DryRun,
@@ -839,6 +849,10 @@ func (d *initData) StatusServer() *ikniteServer.IkniteServer {
 
 func (d *initData) ContextWithCancel() (context.Context, context.CancelFunc) {
 	return d.ctx, d.ctxCancel
+}
+
+func (d *initData) KustomizeOptions() *utils.KustomizeOptions {
+	return d.kustomizeOptions
 }
 
 func PhaseName(

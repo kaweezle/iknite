@@ -21,5 +21,10 @@ inputs = {
   kubeconfig_present      = dependency.argocd.outputs.kubeconfig_present
   wait_for_deployments    = true
   deployment_wait_timeout = "5m"
-  namespaces              = ["argocd", "traefik"]
+  namespaces              = ["argocd"]
+}
+
+exclude {
+  if      = true
+  actions = ["all"]
 }

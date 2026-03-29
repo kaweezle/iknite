@@ -9,6 +9,7 @@ import (
 
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
 	"github.com/kaweezle/iknite/pkg/server"
+	"github.com/kaweezle/iknite/pkg/utils"
 )
 
 type IkniteInitData interface {
@@ -22,4 +23,5 @@ type IkniteInitData interface {
 	ContextWithCancel() (context.Context, context.CancelFunc)
 	SetStatusServer(srv *server.IkniteServer)
 	StatusServer() *server.IkniteServer
+	KustomizeOptions() *utils.KustomizeOptions
 }

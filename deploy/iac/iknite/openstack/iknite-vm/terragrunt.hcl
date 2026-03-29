@@ -27,6 +27,8 @@ locals {
   iknite_vm          = include.root.locals.secret.iknite_vm
   iknite_version     = include.root.locals.iknite_version
   kubernetes_version = include.root.locals.kubernetes_version
+  git_url            = include.root.locals.github_repo_url
+  git_ref            = include.root.locals.github_repo_ref
 }
 
 inputs = {
@@ -41,12 +43,6 @@ inputs = {
   private_keys = {
     "iknite" = local.ssh_key.private_key
   }
-  # Fixed SSH host keys ensure the VM always presents the same host key across
-  # recreations, enabling strict host key verification on SSH clients.
-  ssh_host_keys = {
-    ecdsa_private = local.iknite_vm.ssh_host_ecdsa_private
-    ecdsa_public  = local.iknite_vm.ssh_host_ecdsa_public
-  }
   instances = {
     "iknite-vm-instance" = {
       name    = "iknite-vm-instance"
@@ -55,7 +51,27 @@ inputs = {
       image_id    = try(dependency.image.outputs.images["iknite-vm-image"].id, "mock-image-id")
       flavor_name = "b3-16"
       key_name    = "iknite"
-      user_data   = tobool(get_env("IKNITE_DEBUG_INSTANCE", "false")) ? file("cloud-config-debug.yaml") : null
+      user_data   = <<-EOF
+#cloud-config
+ssh_keys:
+    ecdsa_private: |
+        ${indent(8, local.iknite_vm.ssh_host_ecdsa_private)}
+    ecdsa_public: "${local.iknite_vm.ssh_host_ecdsa_public}"
+
+write_files:
+  - path: /opt/iknite/bootstrap/.env
+    owner: "root:root"
+    permissions: "0640"
+    content: |
+        IKNITE_BOOTSTRAP_REPO_URL=${local.git_url}
+        IKNITE_BOOTSTRAP_REPO_REF=${local.git_ref}
+        IKNITE_BOOTSTRAP_SCRIPT=iknite-bootstrap.sh
+  - path: /opt/iknite/bootstrap/.ssh/id_ed25519
+    owner: "root:root"
+    permissions: "0600"
+    content: |
+        ${indent(8, local.ssh_key.private_key)}
+EOF
     }
   }
 }

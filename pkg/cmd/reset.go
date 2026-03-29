@@ -269,7 +269,7 @@ func newCmdReset(in io.Reader, out io.Writer, resetOptions *resetOptions) *cobra
 	}
 
 	AddResetFlags(cmd.Flags(), resetOptions)
-	config.ConfigureClusterCommand(cmd.Flags(), resetOptions.ikniteCfg)
+	config.AddIkniteClusterFlags(cmd.Flags(), resetOptions.ikniteCfg)
 
 	// initialize the workflow runner with the list of phases
 	resetRunner.AppendPhase(phases.NewPreflightPhase())

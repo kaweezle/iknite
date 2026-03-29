@@ -21,23 +21,24 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"time"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
-	"k8s.io/apimachinery/pkg/util/wait"
 
 	"github.com/kaweezle/iknite/pkg/alpine"
 	"github.com/kaweezle/iknite/pkg/apis/iknite"
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
-	"github.com/kaweezle/iknite/pkg/cmd/options"
 	"github.com/kaweezle/iknite/pkg/config"
 	"github.com/kaweezle/iknite/pkg/k8s"
+	"github.com/kaweezle/iknite/pkg/utils"
 )
 
 // cSpell: enable
 
-func NewStartCmd(ikniteConfig *v1alpha1.IkniteClusterSpec) *cobra.Command {
+func NewStartCmd(ikniteConfig *v1alpha1.IkniteClusterSpec, waitOptions *utils.WaitOptions) *cobra.Command {
+	if waitOptions == nil {
+		waitOptions = utils.NewWaitOptions()
+	}
 	// startCmd represents the start command
 	startCmd := &cobra.Command{
 		Use:   "start",
@@ -52,13 +53,12 @@ func NewStartCmd(ikniteConfig *v1alpha1.IkniteClusterSpec) *cobra.Command {
 - Installs flannel, metal-lb and local-path-provisioner.
 `,
 		PersistentPreRun: config.StartPersistentPreRun,
-		Run:              func(_ *cobra.Command, _ []string) { performStart(ikniteConfig) },
+		Run:              func(_ *cobra.Command, _ []string) { performStart(ikniteConfig, waitOptions) },
 	}
 	flags := startCmd.Flags()
 
-	flags.IntVarP(&timeout, options.Timeout, "t", timeout, "Wait timeout in seconds")
-	config.ConfigureClusterCommand(flags, ikniteConfig)
-	initializeKustomization(flags)
+	config.AddIkniteClusterFlags(flags, ikniteConfig)
+	utils.AddWaitOptionsFlags(flags, waitOptions)
 
 	return startCmd
 }
@@ -93,7 +93,7 @@ func IsIkniteReady(_ context.Context) (bool, error) {
 	return false, nil
 }
 
-func performStart(ikniteConfig *v1alpha1.IkniteClusterSpec) {
+func performStart(ikniteConfig *v1alpha1.IkniteClusterSpec, waitOptions *utils.WaitOptions) {
 	cobra.CheckErr(config.DecodeIkniteConfig(ikniteConfig))
 	cobra.CheckErr(k8s.PrepareKubernetesEnvironment(ikniteConfig))
 
@@ -118,22 +118,8 @@ func performStart(ikniteConfig *v1alpha1.IkniteClusterSpec) {
 		log.Info("No current configuration found. Initializing...")
 	}
 
-	// Start OpenRC
+	// Start OpenRC. This will perform `iknite init`.
 	cobra.CheckErr(alpine.EnsureOpenRC("default"))
-
-	ctx := context.Background()
-	if timeout > 0 {
-		err = wait.PollUntilContextTimeout(
-			ctx,
-			time.Second*time.Duration(2),
-			time.Duration(timeout),
-			true,
-			IsIkniteReady,
-		)
-	} else {
-		err = wait.PollUntilContextCancel(ctx, time.Second*time.Duration(2), true, IsIkniteReady)
-	}
-
-	cobra.CheckErr(err)
+	cobra.CheckErr(waitOptions.Poll(context.Background(), IsIkniteReady))
 	log.Info("Cluster is ready")
 }

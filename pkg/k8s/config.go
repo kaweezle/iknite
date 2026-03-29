@@ -36,11 +36,10 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/clientcmd/api"
 	kubeadmConstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	"sigs.k8s.io/kustomize/api/provider"
-	"sigs.k8s.io/kustomize/api/resmap"
 	"sigs.k8s.io/kustomize/kyaml/resid"
 
 	"github.com/kaweezle/iknite/pkg/provision"
+	"github.com/kaweezle/iknite/pkg/utils"
 )
 
 // cSpell: enable
@@ -148,7 +147,7 @@ func (config *Config) Client() (*kubernetes.Clientset, error) {
 // API server /readyz endpoint. It checks retries times and waits for waitTime
 // milliseconds between each check. It needs at least okResponses good responses
 // from the server.
-func (config *Config) CheckClusterRunning(retries, okResponses, waitTime int) error {
+func (config *Config) CheckClusterRunning(ctx context.Context, retries, okResponses int, interval time.Duration) error {
 	client, err := config.NewRESTClient()
 	if err != nil {
 		return err
@@ -161,14 +160,18 @@ func (config *Config) CheckClusterRunning(retries, okResponses, waitTime int) er
 		if !first {
 			log.WithFields(log.Fields{
 				"err":       err,
-				"wait_time": waitTime,
+				"wait_time": interval,
 			}).Debug("Waiting...")
-			time.Sleep(time.Duration(waitTime) * time.Millisecond)
+			select {
+			case <-ctx.Done():
+				return fmt.Errorf("context canceled: %w", ctx.Err())
+			case <-time.After(interval):
+			}
 		}
 		first = false
 
 		var content []byte
-		content, err = query.DoRaw(context.Background())
+		content, err = query.DoRaw(ctx)
 		if err != nil {
 			log.WithError(err).Debug("while querying cluster readiness")
 			continue
@@ -254,17 +257,18 @@ func (config *Config) RestartProxy() error {
 // or written, kustomizations fail to apply, or workloads don't become ready within
 // the timeout period.
 func (config *Config) DoKustomization(
+	ctx context.Context,
 	ip net.IP,
 	kustomization string,
 	force bool,
-	waitTimeout int,
+	waitOptions *utils.WaitOptions,
 ) error {
 	client, err := config.Client()
 	if err != nil {
 		return err
 	}
 
-	cm, err := GetIkniteConfigMap(client)
+	cm, err := GetIkniteConfigMap(ctx, client)
 	if err != nil {
 		return err
 	}
@@ -276,13 +280,13 @@ func (config *Config) DoKustomization(
 		"OutboundIP": ip,
 	}
 
-	ids, err := config.applyKustomizationResources(config.RESTClient(), kustomization, logContext)
+	ids, err := config.applyKustomizationResources(kustomization, logContext)
 	if err != nil {
 		return err
 	}
 
 	cm.Data["configured"] = "true"
-	_, err = WriteIkniteConfigMap(client, cm)
+	_, err = WriteIkniteConfigMap(ctx, client, cm)
 	if err != nil {
 		return fmt.Errorf("while writing configuration: %w", err)
 	}
@@ -292,21 +296,19 @@ func (config *Config) DoKustomization(
 		"resources":     ids,
 	}).Info("Configuration applied")
 
-	if waitTimeout > 0 {
-		log.Infof("Waiting for workloads for %d seconds...", waitTimeout)
+	if waitOptions.HasLoop() {
+		log.Infof("Waiting for workloads with options: %s", waitOptions.String())
 		runtime.ErrorHandlers = runtime.ErrorHandlers[:0] //nolint:reassign // disabling printing of errors to stderr
-		return config.WaitForWorkloads(
-			context.Background(),
-			time.Second*time.Duration(waitTimeout),
-			nil,
-		)
+		err = waitOptions.Poll(ctx, config.RESTClient().WorkloadsReadyConditionWithContextFunc(nil))
+		if err != nil {
+			return fmt.Errorf("while waiting for workloads to be ready: %w", err)
+		}
 	}
 
 	return nil
 }
 
 func (config *Config) applyKustomizationResources(
-	restClient *RESTClientGetter,
 	kustomization string,
 	logContext log.Fields,
 ) ([]resid.ResId, error) {
@@ -324,50 +326,13 @@ func (config *Config) applyKustomizationResources(
 		return nil, fmt.Errorf("failed to apply base kustomizations: %w", err)
 	}
 
-	return applyResMapWithServerSideApply(restClient, resources)
+	return config.RESTClient().ApplyResMapWithServerSideApply(resources)
 }
 
-func applyResMapWithServerSideApply(
-	restClient *RESTClientGetter,
-	resources resmap.ResMap,
-) ([]resid.ResId, error) {
-	ids := resources.AllIds()
-
-	clusterResources := resmap.NewFactory(provider.NewDefaultDepProvider().GetResourceFactory()).
-		FromResourceSlice(resources.ClusterScoped())
-	if clusterResources.Size() != 0 {
-		clusterInfos, err := restClient.ResourceInfosFromResMap(clusterResources)
-		if err != nil {
-			return nil, fmt.Errorf("failed to build cluster resource infos: %w", err)
-		}
-		if err = restClient.ApplyResourceInfosServerSide(clusterInfos); err != nil {
-			return nil, fmt.Errorf("failed to apply cluster resources: %w", err)
-		}
-
-		for _, curID := range clusterResources.AllIds() {
-			if err = resources.Remove(curID); err != nil {
-				return nil, fmt.Errorf("failed to remove cluster-scoped resource: %w", err)
-			}
-		}
-	}
-
-	if resources.Size() != 0 {
-		resourceInfos, err := restClient.ResourceInfosFromResMap(resources)
-		if err != nil {
-			return nil, fmt.Errorf("failed to build resource infos: %w", err)
-		}
-		if err = restClient.ApplyResourceInfosServerSide(resourceInfos); err != nil {
-			return nil, fmt.Errorf("failed to apply resources: %w", err)
-		}
-	}
-
-	return ids, nil
-}
-
-func GetIkniteConfigMap(client kubernetes.Interface) (*coreV1.ConfigMap, error) {
+func GetIkniteConfigMap(ctx context.Context, client kubernetes.Interface) (*coreV1.ConfigMap, error) {
 	cm, err := client.CoreV1().
 		ConfigMaps("kube-system").
-		Get(context.TODO(), "iknite-config", metaV1.GetOptions{})
+		Get(ctx, "iknite-config", metaV1.GetOptions{})
 	if k8Errors.IsNotFound(err) {
 		err = nil
 		cm = &coreV1.ConfigMap{
@@ -382,6 +347,7 @@ func GetIkniteConfigMap(client kubernetes.Interface) (*coreV1.ConfigMap, error) 
 }
 
 func WriteIkniteConfigMap(
+	ctx context.Context,
 	client kubernetes.Interface,
 	cm *coreV1.ConfigMap,
 ) (*coreV1.ConfigMap, error) {
@@ -390,11 +356,11 @@ func WriteIkniteConfigMap(
 	if cm.UID != "" {
 		res, err = client.CoreV1().
 			ConfigMaps("kube-system").
-			Update(context.TODO(), cm, metaV1.UpdateOptions{})
+			Update(ctx, cm, metaV1.UpdateOptions{})
 	} else {
 		res, err = client.CoreV1().
 			ConfigMaps("kube-system").
-			Create(context.TODO(), cm, metaV1.CreateOptions{})
+			Create(ctx, cm, metaV1.CreateOptions{})
 	}
 	if err != nil {
 		return res, fmt.Errorf("failed to write iknite config map: %w", err)

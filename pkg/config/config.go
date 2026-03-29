@@ -50,7 +50,7 @@ import (
 
 // cSpell: enable
 
-func ConfigureClusterCommand(flagSet *flag.FlagSet, ikniteConfig *v1alpha1.IkniteClusterSpec) {
+func AddIkniteClusterFlags(flagSet *flag.FlagSet, ikniteConfig *v1alpha1.IkniteClusterSpec) {
 	v1alpha1.SetDefaults_IkniteClusterSpec(ikniteConfig)
 
 	flagSet.IPVar(&ikniteConfig.Ip, options.Ip, ikniteConfig.Ip, "Cluster IP address")

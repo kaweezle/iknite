@@ -6,9 +6,13 @@ import (
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
 	"github.com/kaweezle/iknite/pkg/config"
 	"github.com/kaweezle/iknite/pkg/k8s"
+	"github.com/kaweezle/iknite/pkg/utils"
 )
 
-func NewKubeletCmd(ikniteConfig *v1alpha1.IkniteClusterSpec) *cobra.Command {
+func NewKubeletCmd(ikniteConfig *v1alpha1.IkniteClusterSpec, kustomizeOptions *utils.KustomizeOptions) *cobra.Command {
+	if kustomizeOptions == nil {
+		kustomizeOptions = utils.NewKustomizeOptions()
+	}
 	kubeletCmd := &cobra.Command{
 		Use:   "kubelet",
 		Short: "Start and monitor the kubelet (Experimental)",
@@ -18,17 +22,17 @@ The kubelet is started and monitored. The following operations are performed:
 - Starts the kubelet,
 - Monitors the kubelet,
 `,
-		Run:              func(_ *cobra.Command, _ []string) { performKubelet(ikniteConfig) },
+		Run:              func(_ *cobra.Command, _ []string) { performKubelet(ikniteConfig, kustomizeOptions) },
 		PersistentPreRun: config.StartPersistentPreRun,
 	}
 
-	config.ConfigureClusterCommand(kubeletCmd.Flags(), ikniteConfig)
-	initializeKustomization(kubeletCmd.Flags())
+	config.AddIkniteClusterFlags(kubeletCmd.Flags(), ikniteConfig)
+	utils.AddKustomizeOptionsFlags(kubeletCmd.Flags(), kustomizeOptions)
 
 	return kubeletCmd
 }
 
-func performKubelet(ikniteConfig *v1alpha1.IkniteClusterSpec) {
+func performKubelet(ikniteConfig *v1alpha1.IkniteClusterSpec, kustomizeOptions *utils.KustomizeOptions) {
 	cobra.CheckErr(k8s.PrepareKubernetesEnvironment(ikniteConfig))
-	cobra.CheckErr(k8s.StartAndConfigureKubelet(ikniteConfig))
+	cobra.CheckErr(k8s.StartAndConfigureKubelet(ikniteConfig, kustomizeOptions))
 }

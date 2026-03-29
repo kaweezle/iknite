@@ -109,10 +109,10 @@ Some additional components are also installed:
 - [metrics-server](https://github.com/kubernetes-sigs/metrics-server) for
   providing basic metrics to tools like [K9s](https://k9scli.io/) and for use by
   [Horizontal Pod Autoscaling](https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/)
-- [MetalLB](https://metallb.universe.tf/) allowing to created a `LoadBalancer`
-  service.
+- [kube-vip](https://kube-vip.io/) allowing to create a `LoadBalancer` service.
 - [Local Path Provisioner](https://github.com/rancher/local-path-provisioner) to
   provide a default storage class bound to the local host filesystem.
+- [kgateway](https://kgateway.dev/) for providing a local API Gateway.
 
 This project uses the following popular [go](https://go.dev/) tools:
 
@@ -259,9 +259,9 @@ metallb-system       speaker-4p5b2                            1/1     Running   
 
 <!-- cSpell:enable -->
 
-You can now deploy anything on the cluster. As in contains
-[MetalLB](https://metallb.universe.tf/), Any ingress controller (Traefik, for
-instance) can be installed and be available locally.
+You can now deploy anything on the cluster. As it contains
+[kube-vip](https://kube-vip.io/), Any ingress or API Gateway controller
+(Traefik, for instance) can be installed and be available locally.
 
 <!-- markdownlint-disable-line --><p align="right">(<a href="#top">back to top</a>)</p>
 

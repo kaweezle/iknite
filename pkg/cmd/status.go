@@ -66,12 +66,11 @@ var pkiFiles = []string{
 	"iknite-server.key",
 }
 
-var (
-	timeout      = 0
-	checkTimeout = 10 * time.Second
-)
-
-func NewStatusCmd(ikniteConfig *v1alpha1.IkniteClusterSpec) *cobra.Command {
+func NewStatusCmd(ikniteConfig *v1alpha1.IkniteClusterSpec, waitOptions *utils.WaitOptions) *cobra.Command {
+	if waitOptions == nil {
+		waitOptions = utils.NewWaitOptions()
+		waitOptions.OkResponses = 3
+	}
 	// configureCmd represents the start command
 	statusCmd := &cobra.Command{
 		Use:   "status",
@@ -83,18 +82,19 @@ func NewStatusCmd(ikniteConfig *v1alpha1.IkniteClusterSpec) *cobra.Command {
 - Statefulsets
 `,
 		PersistentPreRun: config.StartPersistentPreRun,
-		Run:              func(_ *cobra.Command, _ []string) { performStatus(ikniteConfig) },
+		Run:              func(_ *cobra.Command, _ []string) { performStatus(ikniteConfig, waitOptions) },
 	}
 
 	flags := statusCmd.Flags()
-	config.ConfigureClusterCommand(flags, ikniteConfig)
+	config.AddIkniteClusterFlags(flags, ikniteConfig)
+	utils.AddWaitOptionsFlags(flags, waitOptions)
 
 	return statusCmd
 }
 
 //nolint:gocognit,gocyclo // TODO: Should use a runner pattern to reduce complexity
-func performStatus(ikniteConfig *v1alpha1.IkniteClusterSpec) {
-	checkData := k8s.CreateCheckWorkloadData(ikniteConfig.GetApiEndPoint())
+func performStatus(ikniteConfig *v1alpha1.IkniteClusterSpec, waitOptions *utils.WaitOptions) {
+	checkData := k8s.CreateCheckWorkloadData(ikniteConfig.GetApiEndPoint(), waitOptions)
 	checkDataBuilder := func() k8s.CheckData {
 		return checkData
 	}
@@ -313,7 +313,7 @@ func performStatus(ikniteConfig *v1alpha1.IkniteClusterSpec) {
 				DependsOn:   []string{"kubelet_running"},
 				Description: "Check if the kubelet is reachable and healthy",
 				CheckFn: func(_ context.Context, _ k8s.CheckData) (bool, string, error) {
-					return k8s.CheckKubeletHealth(checkTimeout)
+					return k8s.CheckKubeletHealth(waitOptions.CheckTimeout)
 				},
 			},
 			//   - Check if the kube-apiserver is healthy
@@ -322,7 +322,7 @@ func performStatus(ikniteConfig *v1alpha1.IkniteClusterSpec) {
 				DependsOn:   []string{"kubelet_running"},
 				Description: "Check if the kube-apiserver is healthy",
 				CheckFn: func(_ context.Context, data k8s.CheckData) (bool, string, error) {
-					return k8s.CheckApiServerHealth(checkTimeout, data)
+					return k8s.CheckApiServerHealth(waitOptions.CheckTimeout, data)
 				},
 				CheckDataBuilder: checkDataBuilder,
 			},
@@ -332,7 +332,11 @@ func performStatus(ikniteConfig *v1alpha1.IkniteClusterSpec) {
 				DependsOn:   []string{"apiserver_health"},
 				Description: "Check if the iknite status server is healthy",
 				CheckFn: func(ctx context.Context, _ k8s.CheckData) (bool, string, error) {
-					return k8s.CheckIkniteServerHealth(ctx, checkTimeout)
+					waitOptions := utils.NewWaitOptions()
+					waitOptions.Retries = 3
+					waitOptions.Timeout = 15 * time.Second
+
+					return k8s.CheckIkniteServerHealth(ctx, waitOptions)
 				},
 			},
 		}),

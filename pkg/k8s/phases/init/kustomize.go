@@ -40,11 +40,14 @@ func runKustomize(c workflow.RunData) error {
 	if err != nil {
 		return fmt.Errorf("failed to load configuration: %w", err)
 	}
+	ctx, _ := data.ContextWithCancel()
+	kustomizeOptions := data.KustomizeOptions()
 	if err := k8sConfig.DoKustomization(
+		ctx,
 		ikniteConfig.Ip,
 		ikniteConfig.Kustomization,
-		force_config,
-		0,
+		kustomizeOptions.ForceConfig,
+		&kustomizeOptions.WaitOptions,
 	); err != nil {
 		return fmt.Errorf("failed to apply kustomization: %w", err)
 	}

@@ -60,7 +60,7 @@ func NewInfoCmd(ikniteConfig *v1alpha1.IkniteClusterSpec) *cobra.Command {
 		Run: func(_ *cobra.Command, _ []string) { performInfo(ikniteConfig) },
 	}
 	flags := infoCmd.PersistentFlags()
-	config.ConfigureClusterCommand(flags, ikniteConfig)
+	config.AddIkniteClusterFlags(flags, ikniteConfig)
 
 	flags = infoCmd.Flags()
 	flags.StringP(

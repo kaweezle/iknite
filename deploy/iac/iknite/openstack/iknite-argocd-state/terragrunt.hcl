@@ -23,3 +23,8 @@ inputs = {
   deployment_wait_timeout = "5m"
   namespaces              = ["argocd", "traefik"]
 }
+
+exclude {
+  if      = true
+  actions = ["all"]
+}

@@ -25,7 +25,7 @@ replacements:
           - spec.generators.*.git.repoURL
   - source:
       name: iknite-values
-      fieldPath: data.project.github.targetRevision
+      fieldPath: data.argocd.target_revision
     targets:
       - select:
           kind: Application

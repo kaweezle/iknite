@@ -2,18 +2,21 @@ package options
 
 const (
 	// General.
-	Config    = "config"
-	Verbosity = "verbosity"
-	Json      = "json"
-	Timeout   = "timeout"
+	Config           = "config"
+	Verbosity        = "verbosity"
+	Json             = "json"
+	Timeout          = "timeout"
+	Wait             = "wait"
+	Watch            = "watch"
+	CheckTimeout     = "check-timeout"
+	CheckInterval    = "check-interval"
+	CheckRetries     = "check-retries"
+	CheckOkResponses = "check-ok-responses"
+	CheckImmediate   = "check-immediate"
 
 	// Kustomization.
-	Kustomization           = "kustomization"
-	Wait                    = "wait"
-	ForceConfig             = "force-config"
-	ClusterCheckWait        = "cluster-check-wait"
-	ClusterCheckRetries     = "cluster-check-retries"
-	ClusterCheckOkResponses = "cluster-check-ok-responses"
+	Kustomization = "kustomization"
+	ForceConfig   = "force-config"
 
 	// Configuration.
 	Ip                 = "ip"

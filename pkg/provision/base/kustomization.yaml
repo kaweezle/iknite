@@ -10,6 +10,7 @@ resources:
   - ./kube-vip-addresspool.yaml
   - https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.4.0/standard-install.yaml
   - ./kgateway.yaml
+  - ./bootstrap.yaml
 
 patches:
   - patch: |-

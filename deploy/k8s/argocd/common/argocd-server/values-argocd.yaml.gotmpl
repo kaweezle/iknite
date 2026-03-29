@@ -396,8 +396,8 @@ extraObjects:
     # The dot (.) character cannot be used as separator here as names are going to be
     # used as environment variables.
     data:
-      autocloud_target_revision: {{ .Values.data.project.github.targetRevision | quote }}
-      autocloud_repo_url: {{ .Values.data.project.github.repoURL | quote }}
+      autocloud_target_revision: {{ .Values.data.argocd.target_revision | quote }}
+      autocloud_repo_url: git@github.com:{{ .Values.data.project.github.organization }}/{{ .Values.data.project.github.repo }}.git
       autocloud_bootstrap_application_path: "{{ .Values.data.argocd.base_path }}/appstages/{{ .Values.data.argocd.bootstrap_application }}/application.yaml"
   -
     apiVersion: v1

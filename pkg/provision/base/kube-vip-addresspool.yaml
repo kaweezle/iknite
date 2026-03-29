@@ -99,7 +99,7 @@ spec:
       restartPolicy: OnFailure
       containers:
         - name: create-address-pools
-          image: docker.io/alpine/kubectl:1.35.0
+          image: ghcr.io/kaweezle/iknite-bootstrap:v0.7.1-devel
           imagePullPolicy: IfNotPresent
           command:
             - /bin/sh

@@ -1,0 +1,56 @@
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  namespace: kube-system
+  labels:
+    app: iknite
+  name: iknite-bootstrap-admin
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  labels:
+    app: iknite
+  name: iknite-bootstrap-admin
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cluster-admin
+subjects:
+  - kind: ServiceAccount
+    namespace: kube-system
+    name: iknite-bootstrap-admin
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  labels:
+    app: iknite
+  name: iknite-bootstrap
+  namespace: kube-system
+spec:
+  ttlSecondsAfterFinished: 100
+  backoffLimit: 3
+  template:
+    spec:
+      serviceAccountName: iknite-bootstrap-admin
+      automountServiceAccountToken: true
+      restartPolicy: OnFailure
+      volumes:
+        - name: bootstrap-data
+          hostPath:
+            path: /opt/iknite/bootstrap
+            type: DirectoryOrCreate
+      containers:
+        - name: iknite-bootstrap
+          image: ghcr.io/kaweezle/iknite-bootstrap:v0.7.1-devel
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: ROLLOUT_INITIAL_DELAY
+              value: "3"
+            - name: ROLLOUT_TIMEOUT
+              value: "90s"
+          volumeMounts:
+            - mountPath: /workspace
+              name: bootstrap-data
