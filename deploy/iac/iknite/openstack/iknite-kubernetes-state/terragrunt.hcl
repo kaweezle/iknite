@@ -20,5 +20,5 @@ inputs = {
   kubeconfig_present      = dependency.kubeconfig_fetcher.outputs.kubeconfig != ""
   wait_for_deployments    = true
   deployment_wait_timeout = "10m"
-  namespaces              = ["kube-system", "kube-flannel", "kube-public", "default", "kube-node-lease", "local-path-storage"]
+  namespaces              = ["kube-system", "kube-flannel", "kube-public", "default", "local-path-storage", "kgateway-system", "argocd"]
 }
