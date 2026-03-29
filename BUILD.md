@@ -79,7 +79,7 @@ The project requires a signing key for APK packages. Ensure you have
 To install the signing key:
 
 ```bash
-go run hack/iknitedev/ install signing-key secrets.sops.yaml .
+go run ./cmd/iknitectl install signing-key secrets.sops.yaml .
 ```
 
 ### SOPS/Age Configuration
@@ -462,7 +462,7 @@ ls -l kaweezle-devel@kaweezle.com-c9d89864.rsa
 If missing, install it from the secrets file:
 
 ```bash
-go run hack/iknitedev/ install signing-key secrets.sops.yaml .
+go run ./cmd/iknitectl install signing-key secrets.sops.yaml .
 ```
 
 ### Container Image Pull Failures

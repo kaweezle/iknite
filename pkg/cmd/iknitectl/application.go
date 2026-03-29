@@ -13,7 +13,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-package cmd
+package iknitectl
 
 // cSpell: words crds
 
@@ -34,7 +34,7 @@ import (
 	"sigs.k8s.io/kustomize/api/resmap"
 	"sigs.k8s.io/yaml"
 
-	"github.com/kaweezle/iknite/hack/iknitedev/pkg/kustomize"
+	"github.com/kaweezle/iknite/pkg/kustomize"
 )
 
 // appType represents the type of an application directory.

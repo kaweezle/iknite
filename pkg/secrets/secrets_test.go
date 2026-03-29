@@ -29,7 +29,7 @@ import (
 	"github.com/spf13/afero"
 	"sigs.k8s.io/yaml"
 
-	"github.com/kaweezle/iknite/hack/iknitedev/pkg/secrets"
+	"github.com/kaweezle/iknite/pkg/secrets"
 )
 
 const (

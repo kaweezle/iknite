@@ -25,7 +25,7 @@ import (
 
 	"github.com/spf13/afero"
 
-	"github.com/kaweezle/iknite/hack/iknitedev/pkg/kustomize"
+	"github.com/kaweezle/iknite/pkg/kustomize"
 )
 
 const configMapContent = `apiVersion: v1

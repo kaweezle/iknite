@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 // cSpell: words tparallel gocognit gosec gocyclo
-package cmd_test
+package iknitectl_test
 
 import (
 	"path/filepath"
@@ -22,7 +22,7 @@ import (
 
 	"github.com/spf13/afero"
 
-	"github.com/kaweezle/iknite/hack/iknitedev/cmd"
+	iknitectl "github.com/kaweezle/iknite/pkg/cmd/iknitectl"
 )
 
 // cSpell: disable
@@ -71,7 +71,7 @@ func TestInstallSigningKey(t *testing.T) {
 
 	t.Run("CreateSigningKeyCmd with nil options", func(t *testing.T) {
 		t.Parallel()
-		cmdInstance := cmd.CreateSigningKeyCmd(fs, nil)
+		cmdInstance := iknitectl.CreateSigningKeyCmd(fs, nil)
 		if cmdInstance == nil {
 			t.Fatal("CreateSigningKeyCmd returned nil")
 		}
@@ -85,11 +85,11 @@ func TestInstallSigningKey(t *testing.T) {
 
 	t.Run("CreateSigningKeyCmd with custom options", func(t *testing.T) {
 		t.Parallel()
-		opts := &cmd.SigningKeyOptions{
+		opts := &iknitectl.SigningKeyOptions{
 			KeyName: "custom_key",
 			Fs:      fs,
 		}
-		cmdInstance := cmd.CreateSigningKeyCmd(fs, opts)
+		cmdInstance := iknitectl.CreateSigningKeyCmd(fs, opts)
 		if cmdInstance == nil {
 			t.Fatal("CreateSigningKeyCmd returned nil")
 		}
@@ -107,14 +107,14 @@ func TestInstallSigningKey(t *testing.T) {
 	t.Run("InstallSigningKey with missing secrets file", func(t *testing.T) {
 		t.Parallel()
 		testFs := afero.NewMemMapFs()
-		opts := &cmd.SigningKeyOptions{
+		opts := &iknitectl.SigningKeyOptions{
 			KeyName:     "apk_signing_key",
 			SecretsFile: "/nonexistent/secrets.yaml",
 			DestDir:     "/tmp/dest",
 			Fs:          testFs,
 		}
 
-		err := cmd.InstallSigningKey(opts)
+		err := iknitectl.InstallSigningKey(opts)
 		if err == nil {
 			t.Fatal("Expected error for missing secrets file, got nil")
 		}
@@ -172,7 +172,7 @@ func TestInstallSigningKey(t *testing.T) {
 		// the business logic in isolation.
 		testFs := afero.NewMemMapFs()
 
-		opts := &cmd.SigningKeyOptions{
+		opts := &iknitectl.SigningKeyOptions{
 			KeyName:     "test_key",
 			SecretsFile: "/nonexistent.yaml",
 			DestDir:     "/output",
@@ -181,7 +181,7 @@ func TestInstallSigningKey(t *testing.T) {
 
 		// This would fail because the file doesn't exist, but it demonstrates
 		// that we can call the function directly with our options
-		err := cmd.InstallSigningKey(opts)
+		err := iknitectl.InstallSigningKey(opts)
 		if err == nil {
 			t.Error("Expected error for nonexistent file")
 		}
@@ -209,7 +209,7 @@ func TestInstallSigningKey(t *testing.T) {
 
 		// Create options for the test
 		destDir := "/test/output"
-		opts := &cmd.SigningKeyOptions{
+		opts := &iknitectl.SigningKeyOptions{
 			Fs:          testFs,
 			KeyName:     "apk_signing_key",
 			SecretsFile: secretsPath,
@@ -217,7 +217,7 @@ func TestInstallSigningKey(t *testing.T) {
 		}
 
 		// Run the signing key installation
-		err := cmd.InstallSigningKey(opts)
+		err := iknitectl.InstallSigningKey(opts)
 		if err != nil {
 			t.Fatalf("InstallSigningKey failed: %v", err)
 		}
