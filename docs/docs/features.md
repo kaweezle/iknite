@@ -18,7 +18,9 @@ Iknite wraps
 a **vanilla Kubernetes** cluster. This means you get:
 
 - Full Kubernetes API compliance
-- Standard manifests, certificates, and configuration
+- Unmodified Kubernetes components (API server, controller manager, scheduler,
+  etcd/Kine, etc.)
+- Standard certificates and configuration
 - Easy path to understanding production setups
 
 ### containerd Runtime
@@ -50,6 +52,16 @@ accessed on a stable IP without external load balancers.
 
 The default virtual IP is `192.168.99.2` in WSL2 environments, bound to the
 `eth0` interface.
+
+### kgateway
+
+[kgateway](https://www.solo.io/products/kgateway/) is deployed as the default
+API gateway control plane. It provides:
+
+- A declarative API gateway with support for routing rules, rate limiting, and
+  security policies
+- Full integration with Kubernetes CRDs
+- Automated load balancer integration with Kube-VIP
 
 ## Storage
 
@@ -147,10 +159,31 @@ directory). The default kustomization installs:
 - Flannel CNI
 - Local Path Provisioner
 - Kube-VIP (control plane VIP + load balancer)
+- kgateway (API gateway control plane)
 - Metrics Server
 
 You can extend or replace this kustomization to pre-install any workloads you
 need.
+
+### Day 2 Operations & GitOps Bootstrapping
+
+After the default kustomization is applied, Iknite launches an automated
+bootstrap job that enables GitOps-style cluster customization. This mechanism
+supports:
+
+- **Automatic repository cloning** - The bootstrap job can clone your
+  infrastructure-as-code repository from git
+- **Custom bootstrap scripts** - Run your own `iknite-bootstrap.sh` script to
+  deploy applications, configure integrations, or manage cluster state
+- **Environment configuration** - Configure repository URLs, branches, and SSH
+  credentials via environment variables or cloud-init
+- **Workload coordination** - Bootstrap scripts run only after default
+  components are ready, ensuring stable dependencies
+
+This enables true "day 2" operations on cluster startup, making it easy to
+deploy additional tools, applications, and configurations as part of cluster
+initialization. See the [Deploying Argo CD](../tutorial/deploying_argocd.md)
+tutorial for a practical example using the bootstrap system.
 
 ## Pre-pulled Container Images
 
@@ -165,6 +198,7 @@ time (by 2–5 minutes).
 | Container runtime         | containerd             | ✅             |
 | Image building            | BuildKit               | ✅             |
 | CNI                       | Flannel                | ✅             |
+| API gateway               | kgateway               | ✅             |
 | Load balancer / VIP       | Kube-VIP               | ✅             |
 | Storage class             | Local Path Provisioner | ✅             |
 | Metrics                   | metrics-server         | ✅             |
