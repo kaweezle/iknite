@@ -12,21 +12,21 @@ Iknite cluster.
 
 - A running Iknite cluster (see [Installation](installation.md))
 - `kubectl` configured to access the cluster
-- A Git repository with Kubernetes manifests (optional for initial setup)
 
-## Installing Argo CD
+## Installation Methods
 
-### Step 1: Create the Namespace
+There are two main approaches to deploy Argo CD on Iknite:
+
+1. **Helmfile method** - Quick manual deployment using helmfile
+2. **Bootstrap system** - Automated deployment on cluster startup
+
+## Method 1: Helmfile Installation
+
+The fastest way to deploy Argo CD is using helmfile, which is configured in the
+repository:
 
 ```bash
-kubectl create namespace argocd
-```
-
-### Step 2: Apply the Argo CD Manifests
-
-```bash
-kubectl apply -n argocd -f \
-  https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+helmfile apply -f deploy/k8s/argocd/common/argocd-server/helmfile.yaml.gotmpl
 ```
 
 Wait for all pods to be ready:
@@ -36,10 +36,7 @@ kubectl wait --for=condition=Available deployment -n argocd --all --timeout=300s
 kubectl get pods -n argocd
 ```
 
-### Step 3: Expose Argo CD via LoadBalancer
-
-By default, Argo CD server is a `ClusterIP` service. Expose it as a
-`LoadBalancer` to access it from outside:
+Expose Argo CD via LoadBalancer to access it from outside:
 
 ```bash
 kubectl patch svc argocd-server -n argocd \
@@ -54,27 +51,184 @@ kubectl get svc argocd-server -n argocd
 # argocd-server   LoadBalancer   10.96.5.10    192.168.99.100    80:32123/TCP,443:30456/TCP    1m
 ```
 
-### Step 4: Retrieve the Initial Password
+Retrieve the initial admin password:
 
 ```bash
 kubectl -n argocd get secret argocd-initial-admin-secret \
   -o jsonpath="{.data.password}" | base64 -d
 ```
 
-### Step 5: Log In
+Access Argo CD at `https://192.168.99.100` with username `admin`.
 
-Open your browser and navigate to `https://192.168.99.100` (the external IP
-from the LoadBalancer).
+!!! warning "TLS certificate" Argo CD uses a self-signed certificate by default.
+Accept the security warning in your browser, or add `--insecure` to the Argo CD
+server flags.
 
-Log in with:
-- **Username**: `admin`
-- **Password**: (from the previous step)
+## Method 2: Bootstrap System
 
-!!! warning "TLS certificate"
-    Argo CD uses a self-signed certificate by default. Accept the security
-    warning in your browser, or add `--insecure` to the Argo CD server flags.
+For fully automated deployment on cluster startup, use the Iknite bootstrap
+system. This method integrates Argo CD deployment with your custom
+infrastructure-as-code workflows.
 
-### Step 6: Install the Argo CD CLI (Optional)
+### How It Works
+
+When Iknite initializes the default kustomization, it launches a bootstrap job
+that:
+
+1. **Waits for initial workloads** - Ensures all default components (flannel,
+   metrics-server, kgateway, etc.) are ready
+2. **Checks for bootstrap configuration** - Looks for configuration in
+   `/opt/iknite/bootstrap/`
+3. **Clones your repository** - If configured, clones the git repository with
+   your infrastructure code
+4. **Runs your bootstrap script** - Executes the configured bootstrap script
+   (e.g., `iknite-bootstrap.sh`) which can deploy Argo CD and other applications
+
+### Configuring the Bootstrap System
+
+Configure the bootstrap system by placing files in `/opt/iknite/bootstrap/`:
+
+- **`.env`** - Environment variables controlling bootstrap behavior
+- **`.ssh/id_ed25519`** - SSH private key for git repository access
+
+#### VM Configuration (via cloud-init)
+
+For VM deployments, configure bootstrap via cloud-init at launch time:
+
+```hcl
+# Example from terragrunt configuration
+user_data = <<-EOF
+#cloud-config
+write_files:
+  - path: /opt/iknite/bootstrap/.env
+    owner: "root:root"
+    permissions: "0640"
+    content: |
+        IKNITE_BOOTSTRAP_REPO_URL=git@github.com:your-org/your-infra.git
+        IKNITE_BOOTSTRAP_REPO_REF=main
+        IKNITE_BOOTSTRAP_SCRIPT=iknite-bootstrap.sh
+  - path: /opt/iknite/bootstrap/.ssh/id_ed25519
+    owner: "root:root"
+    permissions: "0600"
+    content: |
+        YOUR_PRIVATE_KEY_HERE
+EOF
+```
+
+#### Incus / WSL Configuration
+
+For Incus containers or WSL2 environments, mount or create the bootstrap files:
+
+```bash
+# Create bootstrap configuration
+mkdir -p /opt/iknite/bootstrap/.ssh
+cat > /opt/iknite/bootstrap/.env << 'EOF'
+IKNITE_BOOTSTRAP_REPO_URL=git@github.com:your-org/your-infra.git
+IKNITE_BOOTSTRAP_REPO_REF=main
+IKNITE_BOOTSTRAP_SCRIPT=iknite-bootstrap.sh
+EOF
+
+# Copy SSH key
+cp ~/.ssh/id_ed25519 /opt/iknite/bootstrap/.ssh/id_ed25519
+chmod 600 /opt/iknite/bootstrap/.ssh/id_ed25519
+```
+
+### Bootstrap Script Example
+
+Create a bootstrap script that deploys Argo CD. Here's the `iknite-bootstrap.sh`
+script from the repository as an example:
+
+```bash
+#!/bin/bash
+
+# Check that the helmfile command is available
+if ! command -v helmfile &> /dev/null; then
+  echo "helmfile command not found. Please install helmfile and ensure it is in your PATH."
+  exit 1
+fi
+
+ROOT_DIR=$(cd "$(dirname "$0")" && pwd)
+
+echo "Applying helmfile for argocd-server"
+helmfile apply -f "${ROOT_DIR}/deploy/k8s/argocd/common/argocd-server/helmfile.yaml.gotmpl"
+```
+
+You can extend this script with additional infrastructure-as-code steps, such as
+configuring repositories, creating applications, or installing other components.
+
+The bootstrap job will:
+
+1. Clone your repository to `/workspace/bootstrap-repo/`
+2. Run your `iknite-bootstrap.sh` script
+3. Capture all output in logs within `/workspace/logs/`
+
+### Bootstrap Job Details
+
+The bootstrap job is launched automatically after the default kustomization is
+applied. See the bootstrap job manifest for advanced configuration.
+
+## Creating Your First Application
+
+Once Argo CD is deployed, create an application to manage your workloads.
+
+### Connect a Git Repository
+
+```bash
+argocd repo add https://github.com/your-org/your-repo.git \
+  --username your-username \
+  --password your-token
+```
+
+### Create an Application
+
+Using the CLI:
+
+```bash
+argocd app create my-app \
+  --repo https://github.com/your-org/your-repo.git \
+  --path kubernetes/ \
+  --dest-server https://kubernetes.default.svc \
+  --dest-namespace default \
+  --sync-policy automated
+```
+
+Or using a Kubernetes manifest:
+
+```yaml
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: my-app
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/your-org/your-repo.git
+    targetRevision: HEAD
+    path: kubernetes/
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: default
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+```
+
+Apply the manifest:
+
+```bash
+kubectl apply -f my-app.yaml
+```
+
+Sync the application:
+
+```bash
+argocd app sync my-app
+argocd app status my-app
+```
+
+## Installing the Argo CD CLI (Optional)
 
 === "Windows"
 
@@ -102,82 +256,6 @@ Log in with the CLI:
 argocd login 192.168.99.100 --username admin --password <password> --insecure
 ```
 
-## Creating Your First Application
-
-### Connect a Git Repository
-
-```bash
-argocd repo add https://github.com/your-org/your-repo.git \
-  --username your-username \
-  --password your-token
-```
-
-### Create an Application
-
-```bash
-argocd app create my-app \
-  --repo https://github.com/your-org/your-repo.git \
-  --path kubernetes/ \
-  --dest-server https://kubernetes.default.svc \
-  --dest-namespace default \
-  --sync-policy automated
-```
-
-Or using a YAML manifest:
-
-```yaml
-apiVersion: argoproj.io/v1alpha1
-kind: Application
-metadata:
-  name: my-app
-  namespace: argocd
-spec:
-  project: default
-  source:
-    repoURL: https://github.com/your-org/your-repo.git
-    targetRevision: HEAD
-    path: kubernetes/
-  destination:
-    server: https://kubernetes.default.svc
-    namespace: default
-  syncPolicy:
-    automated:
-      prune: true
-      selfHeal: true
-```
-
-```bash
-kubectl apply -f my-app.yaml
-```
-
-### Sync the Application
-
-```bash
-argocd app sync my-app
-argocd app status my-app
-```
-
-## Adding Argo CD to the Bootstrap Kustomization
-
-For automatic Argo CD installation on every cluster start, add it to your
-Iknite kustomization:
-
-```yaml
-# /etc/iknite.d/kustomization.yaml
-apiVersion: kustomize.config.k8s.io/v1beta1
-kind: Kustomization
-
-resources:
-  - base/
-  - https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
-
-namespace: argocd
-```
-
-!!! tip
-    Adding Argo CD to the bootstrap kustomization means it will be deployed
-    automatically every time the cluster is reset and re-initialized.
-
 ## Troubleshooting
 
 ### Pods stuck in Pending
@@ -196,4 +274,20 @@ Ensure Kube-VIP is running and the IP pool is configured:
 ```bash
 kubectl get pods -n kube-system | grep kube-vip
 kubectl get configmap -n kube-system kube-vip
+```
+
+### Bootstrap Job Failures
+
+Check the bootstrap job logs:
+
+```bash
+# List bootstrap jobs
+kubectl get jobs -n kube-system
+
+# View job logs
+kubectl logs -n kube-system job/iknite-bootstrap
+
+# For detailed logs, check the bootstrap workspace
+# (accessible if mounted to host)
+cat /workspace/logs/rollout_status_*.log
 ```
