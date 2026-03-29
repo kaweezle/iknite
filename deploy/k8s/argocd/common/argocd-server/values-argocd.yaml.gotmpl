@@ -156,6 +156,10 @@ repoServer:
       value: "true"
     - name: IKNITE_ARGOCD
       value: "true"
+    {{ if (env "IKNITE_ENV_FORMAT") }}
+    - name: IKNITE_ENV_FORMAT
+      value: {{ env "IKNITE_ENV_FORMAT" | quote }}
+    {{ end }}
 
   # -- Additional volumeMounts to the repo server main container
   volumeMounts:
@@ -203,6 +207,10 @@ repoServer:
       value: "sops"
     - name: IKNITE_ARGOCD
       value: "true"
+    {{ if (env "IKNITE_ENV_FORMAT") }}
+    - name: IKNITE_ENV_FORMAT
+      value: {{ env "IKNITE_ENV_FORMAT" | quote }}
+    {{ end }}
     securityContext:
       runAsNonRoot: true
       runAsUser: 999
