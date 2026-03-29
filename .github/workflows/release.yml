@@ -80,7 +80,7 @@ jobs:
         env:
           AGE_PRIVATE_KEY: ${{ secrets.AGE_PRIVATE_KEY }}
       -
-        name: Run GoReleaser
+        name: Run GoReleaser (iknite and iknitedev packages)
         run: |
           make apk-iknite-build
       -
