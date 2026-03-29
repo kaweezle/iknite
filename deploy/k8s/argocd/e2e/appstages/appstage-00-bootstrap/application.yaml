@@ -15,7 +15,7 @@ spec:
   source:
     path: deploy/k8s/argocd/e2e/appstages/appstage-00-bootstrap
     repoURL: git@github.com:kaweezle/iknite.git
-    targetRevision: deploy/ama/local
+    targetRevision: main
   syncPolicy:
     automated:
       prune: true

@@ -15,13 +15,13 @@ spec:
   source:
     path: deploy/k8s/argocd/common/kgateway
     repoURL: git@github.com:kaweezle/iknite.git
-    targetRevision: deploy/ama/local
+    targetRevision: main
     plugin:
       # Helmfile environment variables
       env:
-      # We have resources in multiple namespaces
-      # - name: HELMFILE_USE_CONTEXT_NAMESPACE
-      #   value: "true"
+        # We have resources in multiple namespaces
+        # - name: HELMFILE_USE_CONTEXT_NAMESPACE
+        #   value: "true"
   syncPolicy:
     automated:
       prune: true
