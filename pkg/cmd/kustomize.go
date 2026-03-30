@@ -13,7 +13,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-// cSpell: words filesys kyaml forbidigo
+// cSpell: words filesys kyaml forbidigo apimachinery sirupsen
 package cmd
 
 import (
@@ -22,8 +22,10 @@ import (
 	"os"
 	"os/signal"
 
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"k8s.io/apimachinery/pkg/util/runtime"
 
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
 	"github.com/kaweezle/iknite/pkg/cmd/options"
@@ -65,12 +67,16 @@ prints the Embedded configuration that installs the following components:
 func NewKustomizeCmd(
 	ikniteConfig *v1alpha1.IkniteClusterSpec,
 	kustomizeOptions *utils.KustomizeOptions,
+	waitOptions *utils.WaitOptions,
 ) *cobra.Command {
 	if kustomizeOptions == nil {
 		kustomizeOptions = utils.NewKustomizeOptions()
-		// Different defaults.
-		kustomizeOptions.Wait = false
-		kustomizeOptions.Immediate = false
+	}
+	if waitOptions != nil {
+		waitOptions = utils.NewWaitOptions()
+		// Different defaults
+		waitOptions.Immediate = false
+		waitOptions.Wait = false
 	}
 	kustomizeCmd := &cobra.Command{
 		Use:   "kustomize",
@@ -88,7 +94,7 @@ applies the Embedded configuration that installs the following components:
 
 `,
 		Run: func(_ *cobra.Command, _ []string) {
-			performKustomize(ikniteConfig, kustomizeOptions)
+			performKustomize(ikniteConfig, kustomizeOptions, waitOptions)
 		},
 
 		PreRun: func(cmd *cobra.Command, _ []string) {
@@ -110,7 +116,11 @@ applies the Embedded configuration that installs the following components:
 	return kustomizeCmd
 }
 
-func performKustomize(ikniteConfig *v1alpha1.IkniteClusterSpec, kustomizeOptions *utils.KustomizeOptions) {
+func performKustomize(
+	ikniteConfig *v1alpha1.IkniteClusterSpec,
+	kustomizeOptions *utils.KustomizeOptions,
+	waitOptions *utils.WaitOptions,
+) {
 	// We need to get it from root as we will apply configuration
 	kubeConfig, err := k8s.LoadFromFile(constants.KubernetesRootConfig)
 	if err != nil {
@@ -134,14 +144,19 @@ func performKustomize(ikniteConfig *v1alpha1.IkniteClusterSpec, kustomizeOptions
 
 	err = kubeConfig.CheckClusterRunning(
 		ctx,
-		kustomizeOptions.Retries,
-		kustomizeOptions.OkResponses,
-		kustomizeOptions.Interval,
+		waitOptions.Retries,
+		waitOptions.OkResponses,
+		waitOptions.Interval,
 	)
 	cobra.CheckErr(err)
 
-	cobra.CheckErr(kubeConfig.DoKustomization(ctx, ikniteConfig.Kustomization, kustomizeOptions.ForceConfig,
-		&kustomizeOptions.WaitOptions))
+	cobra.CheckErr(kubeConfig.Kustomize(ctx, ikniteConfig.Kustomization, kustomizeOptions.ForceConfig))
+
+	if waitOptions.HasLoop() {
+		logrus.Infof("Waiting for workloads with options: %s", waitOptions.String())
+		runtime.ErrorHandlers = runtime.ErrorHandlers[:0] //nolint:reassign // disabling printing of errors to stderr
+		cobra.CheckErr(waitOptions.Poll(ctx, kubeConfig.RESTClient().WorkloadsReadyConditionWithContextFunc(nil)))
+	}
 }
 
 func performPrintKustomize(ikniteConfig *v1alpha1.IkniteClusterSpec) {

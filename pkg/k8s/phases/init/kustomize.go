@@ -42,11 +42,10 @@ func runKustomize(c workflow.RunData) error {
 	}
 	ctx, _ := data.ContextWithCancel()
 	kustomizeOptions := data.KustomizeOptions()
-	if err := k8sConfig.DoKustomization(
+	if err := k8sConfig.Kustomize(
 		ctx,
 		ikniteConfig.Kustomization,
 		kustomizeOptions.ForceConfig,
-		&kustomizeOptions.WaitOptions,
 	); err != nil {
 		return fmt.Errorf("failed to apply kustomization: %w", err)
 	}

@@ -75,7 +75,7 @@ kubernetes.`,
 
 	ikniteConfig := &v1alpha1.IkniteClusterSpec{}
 
-	rootCmd.AddCommand(NewKustomizeCmd(ikniteConfig, nil))
+	rootCmd.AddCommand(NewKustomizeCmd(ikniteConfig, nil, nil))
 	rootCmd.AddCommand(newCmdInit(os.Stdout, nil))
 	rootCmd.AddCommand(newCmdReset(os.Stdin, os.Stdout, nil))
 	rootCmd.AddCommand(NewCmdClean(ikniteConfig, nil))

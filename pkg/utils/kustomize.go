@@ -23,19 +23,16 @@ import (
 
 type KustomizeOptions struct {
 	ForceConfig bool
-	WaitOptions
 }
 
 func NewKustomizeOptions() *KustomizeOptions {
 	result := &KustomizeOptions{
 		ForceConfig: false,
 	}
-	InitializeWaitOptions(&result.WaitOptions)
 	return result
 }
 
 func AddKustomizeOptionsFlags(flagSet *flag.FlagSet, kustomizeConfig *KustomizeOptions) {
-	AddWaitOptionsFlags(flagSet, &kustomizeConfig.WaitOptions)
 	flagSet.BoolVarP(
 		&kustomizeConfig.ForceConfig,
 		options.ForceConfig,

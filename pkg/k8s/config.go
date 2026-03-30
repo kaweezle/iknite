@@ -28,7 +28,6 @@ import (
 	coreV1 "k8s.io/api/core/v1"
 	k8Errors "k8s.io/apimachinery/pkg/api/errors"
 	metaV1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -37,7 +36,6 @@ import (
 	kubeadmConstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 
 	"github.com/kaweezle/iknite/pkg/provision"
-	"github.com/kaweezle/iknite/pkg/utils"
 )
 
 // cSpell: enable
@@ -238,15 +236,15 @@ func (config *Config) RestartProxy() error {
 	return nil
 }
 
-// DoKustomization applies Kubernetes kustomizations to configure the cluster.
+// Kustomize applies Kubernetes kustomizations to configure the cluster.
 // It takes an outbound IP address, a kustomization path or content, a force flag,
 // and a wait timeout in seconds.
 //
 // The function checks if configuration has already been applied by reading the
 // 'configured' field in the iknite ConfigMap. If already configured and force is
 // false, it logs a warning and skips configuration. Otherwise, it applies the
-// provided kustomization using provision.ApplyBaseKustomizations and marks the
-// cluster as configured by updating the ConfigMap.
+// provided kustomization and  marks the cluster as configured by updating the
+// ConfigMap.
 //
 // If waitTimeout is greater than 0, the function waits for all workloads to be
 // ready for the specified duration before returning.
@@ -254,11 +252,10 @@ func (config *Config) RestartProxy() error {
 // Returns an error if the client cannot be created, the ConfigMap cannot be read
 // or written, kustomizations fail to apply, or workloads don't become ready within
 // the timeout period.
-func (config *Config) DoKustomization(
+func (config *Config) Kustomize(
 	ctx context.Context,
 	kustomization string,
 	force bool,
-	waitOptions *utils.WaitOptions,
 ) error {
 	if kustomization == "" {
 		log.Warn("Empty kustomization.")
@@ -304,15 +301,6 @@ func (config *Config) DoKustomization(
 		"kustomization": kustomization,
 		"resources":     ids,
 	}).Info("Configuration applied")
-
-	if waitOptions.HasLoop() {
-		log.Infof("Waiting for workloads with options: %s", waitOptions.String())
-		runtime.ErrorHandlers = runtime.ErrorHandlers[:0] //nolint:reassign // disabling printing of errors to stderr
-		err = waitOptions.Poll(ctx, config.RESTClient().WorkloadsReadyConditionWithContextFunc(nil))
-		if err != nil {
-			return fmt.Errorf("while waiting for workloads to be ready: %w", err)
-		}
-	}
 
 	return nil
 }
