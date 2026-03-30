@@ -24,14 +24,13 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"sigs.k8s.io/kustomize/api/resmap"
-	"sigs.k8s.io/kustomize/kyaml/filesys"
 
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
 	"github.com/kaweezle/iknite/pkg/cmd/options"
 	"github.com/kaweezle/iknite/pkg/config"
 	"github.com/kaweezle/iknite/pkg/constants"
 	"github.com/kaweezle/iknite/pkg/k8s"
+	"github.com/kaweezle/iknite/pkg/kustomize"
 	"github.com/kaweezle/iknite/pkg/provision"
 	"github.com/kaweezle/iknite/pkg/utils"
 )
@@ -112,11 +111,6 @@ applies the Embedded configuration that installs the following components:
 }
 
 func performKustomize(ikniteConfig *v1alpha1.IkniteClusterSpec, kustomizeOptions *utils.KustomizeOptions) {
-	ip, err := utils.GetOutboundIP()
-	if err != nil {
-		cobra.CheckErr(fmt.Errorf("while getting IP address: %w", err))
-	}
-
 	// We need to get it from root as we will apply configuration
 	kubeConfig, err := k8s.LoadFromFile(constants.KubernetesRootConfig)
 	if err != nil {
@@ -146,23 +140,14 @@ func performKustomize(ikniteConfig *v1alpha1.IkniteClusterSpec, kustomizeOptions
 	)
 	cobra.CheckErr(err)
 
-	cobra.CheckErr(kubeConfig.DoKustomization(ctx, ip, ikniteConfig.Kustomization, kustomizeOptions.ForceConfig,
+	cobra.CheckErr(kubeConfig.DoKustomization(ctx, ikniteConfig.Kustomization, kustomizeOptions.ForceConfig,
 		&kustomizeOptions.WaitOptions))
 }
 
 func performPrintKustomize(ikniteConfig *v1alpha1.IkniteClusterSpec) {
-	if ok, err := provision.IsBaseKustomizationAvailable(ikniteConfig.Kustomization); ok {
-		var resources resmap.ResMap
-		resources, err = provision.RunKustomizations(filesys.MakeFsOnDisk(), ikniteConfig.Kustomization)
-		if err != nil {
-			cobra.CheckErr(fmt.Errorf("while applying local kustomization: %w", err))
-		}
-		// Dump resources as YAML to stdout
-		var out []byte
-		out, err = resources.AsYaml()
-		cobra.CheckErr(err)
-		fmt.Println(string(out)) //nolint:forbidigo // printing is expected here
-	} else {
-		cobra.CheckErr(fmt.Errorf("bad kustomization: %s: %w", ikniteConfig.Kustomization, err))
+	resources, err := provision.GetBaseKustomizationResources(ikniteConfig.Kustomization)
+	if err != nil {
+		cobra.CheckErr(fmt.Errorf("while getting kustomization resources: %w", err))
 	}
+	cobra.CheckErr(kustomize.WriteToWriter(resources, os.Stdout))
 }

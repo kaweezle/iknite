@@ -44,7 +44,6 @@ func runKustomize(c workflow.RunData) error {
 	kustomizeOptions := data.KustomizeOptions()
 	if err := k8sConfig.DoKustomization(
 		ctx,
-		ikniteConfig.Ip,
 		ikniteConfig.Kustomization,
 		kustomizeOptions.ForceConfig,
 		&kustomizeOptions.WaitOptions,

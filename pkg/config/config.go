@@ -365,7 +365,7 @@ var workloadKinds = []resid.Gvk{
 
 func getKustomizationImages(kustomization string) ([]string, error) {
 	var containerImages []string
-	resources, err := provision.ApplyBaseKustomizations(kustomization, nil)
+	resources, err := provision.GetBaseKustomizationResources(kustomization)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get resources from base kustomizations: %w", err)
 	}

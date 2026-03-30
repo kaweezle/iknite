@@ -302,7 +302,6 @@ func StartAndConfigureKubelet(kubeConfig *v1alpha1.IkniteClusterSpec, kustomizeO
 					} else {
 						configErr <- apiConfig.DoKustomization(
 							cancelCtx,
-							kubeConfig.Ip,
 							kubeConfig.Kustomization,
 							kustomizeOptions.ForceConfig,
 							&kustomizeOptions.WaitOptions,

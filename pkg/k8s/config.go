@@ -20,7 +20,6 @@ package k8s
 import (
 	"context"
 	"fmt"
-	"net"
 	"net/http"
 	"time"
 
@@ -36,7 +35,6 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/clientcmd/api"
 	kubeadmConstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	"sigs.k8s.io/kustomize/kyaml/resid"
 
 	"github.com/kaweezle/iknite/pkg/provision"
 	"github.com/kaweezle/iknite/pkg/utils"
@@ -258,11 +256,15 @@ func (config *Config) RestartProxy() error {
 // the timeout period.
 func (config *Config) DoKustomization(
 	ctx context.Context,
-	ip net.IP,
 	kustomization string,
 	force bool,
 	waitOptions *utils.WaitOptions,
 ) error {
+	if kustomization == "" {
+		log.Warn("Empty kustomization.")
+		return nil
+	}
+
 	client, err := config.Client()
 	if err != nil {
 		return err
@@ -276,13 +278,20 @@ func (config *Config) DoKustomization(
 		log.Info("configuration has already occurred. Use -C to force.")
 		return nil
 	}
-	logContext := log.Fields{
-		"OutboundIP": ip,
-	}
 
-	ids, err := config.applyKustomizationResources(kustomization, logContext)
+	log.WithFields(log.Fields{
+		"kustomization": kustomization,
+	}).Info("Performing configuration")
+
+	resources, err := provision.GetBaseKustomizationResources(kustomization)
 	if err != nil {
-		return err
+		return fmt.Errorf("while getting kustomization resources: %w", err)
+	}
+	log.WithField("resourceCount", resources.Size()).Info("Applying base kustomization resources")
+
+	ids, err := config.RESTClient().ApplyResMapWithServerSideApply(resources)
+	if err != nil {
+		return fmt.Errorf("while applying kustomization resources server side: %w", err)
 	}
 
 	cm.Data["configured"] = "true"
@@ -306,27 +315,6 @@ func (config *Config) DoKustomization(
 	}
 
 	return nil
-}
-
-func (config *Config) applyKustomizationResources(
-	kustomization string,
-	logContext log.Fields,
-) ([]resid.ResId, error) {
-	if kustomization == "" {
-		log.Warn("Empty kustomization.")
-		return nil, nil
-	}
-
-	log.WithFields(log.Fields{
-		"kustomization": kustomization,
-	}).Info("Performing configuration")
-
-	resources, err := provision.ApplyBaseKustomizations(kustomization, logContext)
-	if err != nil {
-		return nil, fmt.Errorf("failed to apply base kustomizations: %w", err)
-	}
-
-	return config.RESTClient().ApplyResMapWithServerSideApply(resources)
 }
 
 func GetIkniteConfigMap(ctx context.Context, client kubernetes.Interface) (*coreV1.ConfigMap, error) {
