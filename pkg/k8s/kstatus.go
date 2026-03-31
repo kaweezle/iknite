@@ -29,39 +29,10 @@ func NewRESTClientGetterFromKubeconfig(kubeconfigPath string) *RESTClientGetter 
 	}
 }
 
-// WorkloadStatesForNamespaces returns the readiness state of deployments, statefulsets, and
-// daemonsets in the given namespaces using kstatus to evaluate each resource.
-// If namespaces is empty all namespaces are considered.
-func (client *RESTClientGetter) WorkloadStatesForNamespaces(namespaces []string) ([]*v1alpha1.WorkloadState, error) {
-	const resourceTypes = "deployments,statefulsets,daemonsets"
-
-	r := resource.NewBuilder(client).
-		Unstructured().
-		AllNamespaces(true).
-		ResourceTypeOrNameArgs(true, resourceTypes).
-		ContinueOnError().
-		Flatten().
-		Do()
-
-	infos, err := r.Infos()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get resource infos: %w", err)
-	}
-
-	// Build a set for O(1) namespace look-ups.
-	nsSet := make(map[string]struct{}, len(namespaces))
-	for _, ns := range namespaces {
-		nsSet[ns] = struct{}{}
-	}
-
+// workloadStatesToSlice converts resource.Info objects to WorkloadState using kstatus.
+func workloadStatesToSlice(infos []*resource.Info) ([]*v1alpha1.WorkloadState, error) {
 	result := make([]*v1alpha1.WorkloadState, 0, len(infos))
 	for _, info := range infos {
-		if len(namespaces) > 0 {
-			if _, ok := nsSet[info.Namespace]; !ok {
-				continue
-			}
-		}
-
 		u, err := runtime.DefaultUnstructuredConverter.ToUnstructured(info.Object)
 		if err != nil {
 			return nil, fmt.Errorf("failed to convert %s to unstructured: %w", info.ObjectName(), err)
@@ -91,4 +62,65 @@ func (client *RESTClientGetter) WorkloadStatesForNamespaces(namespaces []string)
 		return result[i].String() < result[j].String()
 	})
 	return result, nil
+}
+
+// WorkloadStatesForNamespace returns the readiness state of deployments, statefulsets, and
+// daemonsets in a single namespace using kstatus to evaluate each resource.
+func (client *RESTClientGetter) WorkloadStatesForNamespace(namespace string) ([]*v1alpha1.WorkloadState, error) {
+	const resourceTypes = "deployments,statefulsets,daemonsets"
+
+	r := resource.NewBuilder(client).
+		Unstructured().
+		NamespaceParam(namespace).
+		DefaultNamespace().
+		ResourceTypeOrNameArgs(true, resourceTypes).
+		ContinueOnError().
+		Flatten().
+		Do()
+
+	infos, err := r.Infos()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get resource infos in namespace %s: %w", namespace, err)
+	}
+
+	return workloadStatesToSlice(infos)
+}
+
+// WorkloadStatesForNamespaces returns the readiness state of deployments, statefulsets, and
+// daemonsets in the given namespaces using kstatus to evaluate each resource.
+// If namespaces is empty all namespaces are considered.
+func (client *RESTClientGetter) WorkloadStatesForNamespaces(namespaces []string) ([]*v1alpha1.WorkloadState, error) {
+	const resourceTypes = "deployments,statefulsets,daemonsets"
+
+	r := resource.NewBuilder(client).
+		Unstructured().
+		AllNamespaces(true).
+		ResourceTypeOrNameArgs(true, resourceTypes).
+		ContinueOnError().
+		Flatten().
+		Do()
+
+	infos, err := r.Infos()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get resource infos: %w", err)
+	}
+
+	// Build a set for O(1) namespace look-ups.
+	nsSet := make(map[string]struct{}, len(namespaces))
+	for _, ns := range namespaces {
+		nsSet[ns] = struct{}{}
+	}
+
+	filtered := make([]*resource.Info, 0, len(infos))
+	for _, info := range infos {
+		if len(namespaces) == 0 {
+			filtered = append(filtered, info)
+			continue
+		}
+		if _, ok := nsSet[info.Namespace]; ok {
+			filtered = append(filtered, info)
+		}
+	}
+
+	return workloadStatesToSlice(filtered)
 }
