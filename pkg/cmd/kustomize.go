@@ -13,7 +13,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-// cSpell: words filesys kyaml forbidigo
+// cSpell: words filesys kyaml forbidigo apimachinery sirupsen
 package cmd
 
 import (
@@ -22,21 +22,25 @@ import (
 	"os"
 	"os/signal"
 
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"sigs.k8s.io/kustomize/api/resmap"
-	"sigs.k8s.io/kustomize/kyaml/filesys"
+	"k8s.io/apimachinery/pkg/util/runtime"
 
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
 	"github.com/kaweezle/iknite/pkg/cmd/options"
 	"github.com/kaweezle/iknite/pkg/config"
 	"github.com/kaweezle/iknite/pkg/constants"
 	"github.com/kaweezle/iknite/pkg/k8s"
+	"github.com/kaweezle/iknite/pkg/kustomize"
 	"github.com/kaweezle/iknite/pkg/provision"
 	"github.com/kaweezle/iknite/pkg/utils"
 )
 
-func NewPrintKustomizeCmd(ikniteConfig *v1alpha1.IkniteClusterSpec) *cobra.Command {
+func NewPrintKustomizeCmd(
+	ikniteConfig *v1alpha1.IkniteClusterSpec,
+	kustomizeOptions *utils.KustomizeOptions,
+) *cobra.Command {
 	printKustomizeCmd := &cobra.Command{
 		Use:   "print",
 		Short: "Print the kustomize configuration",
@@ -52,7 +56,7 @@ prints the Embedded configuration that installs the following components:
 
 `,
 		Run: func(_ *cobra.Command, _ []string) {
-			performPrintKustomize(ikniteConfig)
+			performPrintKustomize(ikniteConfig, kustomizeOptions)
 		},
 		PreRun: func(cmd *cobra.Command, _ []string) {
 			flags := cmd.Flags()
@@ -66,12 +70,16 @@ prints the Embedded configuration that installs the following components:
 func NewKustomizeCmd(
 	ikniteConfig *v1alpha1.IkniteClusterSpec,
 	kustomizeOptions *utils.KustomizeOptions,
+	waitOptions *utils.WaitOptions,
 ) *cobra.Command {
 	if kustomizeOptions == nil {
 		kustomizeOptions = utils.NewKustomizeOptions()
-		// Different defaults.
-		kustomizeOptions.Wait = false
-		kustomizeOptions.Immediate = false
+	}
+	if waitOptions != nil {
+		waitOptions = utils.NewWaitOptions()
+		// Different defaults
+		waitOptions.Immediate = false
+		waitOptions.Wait = false
 	}
 	kustomizeCmd := &cobra.Command{
 		Use:   "kustomize",
@@ -89,7 +97,7 @@ applies the Embedded configuration that installs the following components:
 
 `,
 		Run: func(_ *cobra.Command, _ []string) {
-			performKustomize(ikniteConfig, kustomizeOptions)
+			performKustomize(ikniteConfig, kustomizeOptions, waitOptions)
 		},
 
 		PreRun: func(cmd *cobra.Command, _ []string) {
@@ -105,18 +113,17 @@ applies the Embedded configuration that installs the following components:
 	config.AddIkniteClusterFlags(kustomizeCmd.Flags(), ikniteConfig)
 	utils.AddKustomizeOptionsFlags(kustomizeCmd.Flags(), kustomizeOptions)
 
-	printCmd := NewPrintKustomizeCmd(ikniteConfig)
+	printCmd := NewPrintKustomizeCmd(ikniteConfig, kustomizeOptions)
 	inheritsFlags(kustomizeCmd.Flags(), printCmd.Flags(), options.Kustomization)
 	kustomizeCmd.AddCommand(printCmd)
 	return kustomizeCmd
 }
 
-func performKustomize(ikniteConfig *v1alpha1.IkniteClusterSpec, kustomizeOptions *utils.KustomizeOptions) {
-	ip, err := utils.GetOutboundIP()
-	if err != nil {
-		cobra.CheckErr(fmt.Errorf("while getting IP address: %w", err))
-	}
-
+func performKustomize(
+	ikniteConfig *v1alpha1.IkniteClusterSpec,
+	kustomizeOptions *utils.KustomizeOptions,
+	waitOptions *utils.WaitOptions,
+) {
 	// We need to get it from root as we will apply configuration
 	kubeConfig, err := k8s.LoadFromFile(constants.KubernetesRootConfig)
 	if err != nil {
@@ -140,29 +147,28 @@ func performKustomize(ikniteConfig *v1alpha1.IkniteClusterSpec, kustomizeOptions
 
 	err = kubeConfig.CheckClusterRunning(
 		ctx,
-		kustomizeOptions.Retries,
-		kustomizeOptions.OkResponses,
-		kustomizeOptions.Interval,
+		waitOptions.Retries,
+		waitOptions.OkResponses,
+		waitOptions.Interval,
 	)
 	cobra.CheckErr(err)
 
-	cobra.CheckErr(kubeConfig.DoKustomization(ctx, ip, ikniteConfig.Kustomization, kustomizeOptions.ForceConfig,
-		&kustomizeOptions.WaitOptions))
+	cobra.CheckErr(kubeConfig.Kustomize(ctx, ikniteConfig.Kustomization, kustomizeOptions))
+
+	if waitOptions.HasLoop() {
+		logrus.Infof("Waiting for workloads with options: %s", waitOptions.String())
+		runtime.ErrorHandlers = runtime.ErrorHandlers[:0] //nolint:reassign // disabling printing of errors to stderr
+		cobra.CheckErr(waitOptions.Poll(ctx, kubeConfig.RESTClient().WorkloadsReadyConditionWithContextFunc(nil)))
+	}
 }
 
-func performPrintKustomize(ikniteConfig *v1alpha1.IkniteClusterSpec) {
-	if ok, err := provision.IsBaseKustomizationAvailable(ikniteConfig.Kustomization); ok {
-		var resources resmap.ResMap
-		resources, err = provision.RunKustomizations(filesys.MakeFsOnDisk(), ikniteConfig.Kustomization)
-		if err != nil {
-			cobra.CheckErr(fmt.Errorf("while applying local kustomization: %w", err))
-		}
-		// Dump resources as YAML to stdout
-		var out []byte
-		out, err = resources.AsYaml()
-		cobra.CheckErr(err)
-		fmt.Println(string(out)) //nolint:forbidigo // printing is expected here
-	} else {
-		cobra.CheckErr(fmt.Errorf("bad kustomization: %s: %w", ikniteConfig.Kustomization, err))
+func performPrintKustomize(ikniteConfig *v1alpha1.IkniteClusterSpec, kustomizeOptions *utils.KustomizeOptions) {
+	resources, err := provision.GetBaseKustomizationResources(
+		ikniteConfig.Kustomization,
+		kustomizeOptions.ForceEmbedded,
+	)
+	if err != nil {
+		cobra.CheckErr(fmt.Errorf("while getting kustomization resources: %w", err))
 	}
+	cobra.CheckErr(kustomize.WriteToWriter(resources, os.Stdout))
 }

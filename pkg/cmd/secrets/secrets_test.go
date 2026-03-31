@@ -27,8 +27,8 @@ import (
 	"github.com/spf13/afero"
 	"sigs.k8s.io/yaml"
 
-	secretsCmd "github.com/kaweezle/iknite/hack/iknitedev/pkg/cmd/secrets"
-	"github.com/kaweezle/iknite/hack/iknitedev/pkg/secrets"
+	secretsCmd "github.com/kaweezle/iknite/pkg/cmd/secrets"
+	"github.com/kaweezle/iknite/pkg/secrets"
 )
 
 func TestCreateSecretsCmd(t *testing.T) {

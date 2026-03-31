@@ -17,7 +17,6 @@ package cmd
 
 // cSpell: words forbidigo
 
-// cSpell: disable
 import (
 	"fmt"
 	"os"
@@ -29,9 +28,8 @@ import (
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
 	"github.com/kaweezle/iknite/pkg/cmd/options"
 	"github.com/kaweezle/iknite/pkg/config"
+	"github.com/kaweezle/iknite/pkg/utils"
 )
-
-// cSpell: enable
 
 func NewInfoCmd(ikniteConfig *v1alpha1.IkniteClusterSpec) *cobra.Command {
 	// infoCmd represents the start command
@@ -83,14 +81,17 @@ func NewInfoCmd(ikniteConfig *v1alpha1.IkniteClusterSpec) *cobra.Command {
 }
 
 func NewImagesCmd(ikniteConfig *v1alpha1.IkniteClusterSpec) *cobra.Command {
+	kustomizeOptions := utils.NewKustomizeOptions()
+
 	imagesCmd := &cobra.Command{
 		Use:   "images",
 		Short: "Lists the container images used by iknite",
 		Long:  `Lists the container images used by iknite.`,
 		Run: func(_ *cobra.Command, _ []string) {
-			performImages(ikniteConfig)
+			performImages(ikniteConfig, kustomizeOptions)
 		},
 	}
+	utils.AddKustomizeOptionsFlags(imagesCmd.Flags(), kustomizeOptions)
 	return imagesCmd
 }
 
@@ -135,10 +136,10 @@ func performInfo(ikniteConfig *v1alpha1.IkniteClusterSpec) {
 	cobra.CheckErr(config.PrintIkniteConfig(writer, ikniteConfig, outputFormat))
 }
 
-func performImages(ikniteConfig *v1alpha1.IkniteClusterSpec) {
+func performImages(ikniteConfig *v1alpha1.IkniteClusterSpec, kustomizeOptions *utils.KustomizeOptions) {
 	cobra.CheckErr(config.DecodeIkniteConfig(ikniteConfig))
 
-	containerImages, err := config.GetIkniteImages(ikniteConfig)
+	containerImages, err := config.GetIkniteImages(ikniteConfig, kustomizeOptions.ForceEmbedded)
 	cobra.CheckErr(err)
 
 	for _, image := range containerImages {

@@ -20,7 +20,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	pkgSecrets "github.com/kaweezle/iknite/hack/iknitedev/pkg/secrets"
+	pkgSecrets "github.com/kaweezle/iknite/pkg/secrets"
 )
 
 func createSecretsInitCmd(opts *pkgSecrets.Options) *cobra.Command {

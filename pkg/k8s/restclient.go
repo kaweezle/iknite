@@ -37,22 +37,31 @@ import (
 
 type RESTClientGetter struct {
 	clientconfig clientcmd.ClientConfig
+	restConfig   *rest.Config
 }
 
 func (config *Config) RESTClient() *RESTClientGetter {
-	return &RESTClientGetter{clientcmd.NewDefaultClientConfig(api.Config(*config), nil)}
+	return &RESTClientGetter{clientconfig: clientcmd.NewDefaultClientConfig(api.Config(*config), nil)}
 }
 
 func (r *RESTClientGetter) ToRESTConfig() (*rest.Config, error) {
+	if r.restConfig != nil {
+		return r.restConfig, nil
+	}
+
+	if r.clientconfig == nil {
+		return nil, fmt.Errorf("client configuration is not set")
+	}
 	restConfig, err := r.clientconfig.ClientConfig()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get REST config: %w", err)
 	}
+	r.restConfig = restConfig
 	return restConfig, nil
 }
 
 func (r *RESTClientGetter) ToDiscoveryClient() (discovery.CachedDiscoveryInterface, error) {
-	restconfig, err := r.clientconfig.ClientConfig()
+	restconfig, err := r.ToRESTConfig()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get REST config for discovery: %w", err)
 	}
@@ -72,7 +81,17 @@ func (r *RESTClientGetter) ToRESTMapper() (meta.RESTMapper, error) {
 }
 
 func (r *RESTClientGetter) ToRawKubeConfigLoader() clientcmd.ClientConfig {
-	return r.clientconfig
+	if r.clientconfig != nil {
+		return r.clientconfig
+	}
+	loadingRules := clientcmd.NewDefaultClientConfigLoadingRules()
+	// use the standard defaults for this client command
+	// DEPRECATED: remove and replace with something more accurate
+	loadingRules.DefaultClientConfig = &clientcmd.DefaultClientConfig
+
+	overrides := &clientcmd.ConfigOverrides{ClusterDefaults: clientcmd.ClusterDefaults}
+
+	return clientcmd.NewNonInteractiveDeferredLoadingClientConfig(loadingRules, overrides)
 }
 
 func (r *RESTClientGetter) ResourceInfosFromResMap(resources resmap.ResMap) ([]*resource.Info, error) {
@@ -96,7 +115,7 @@ func (r *RESTClientGetter) ResourceInfosFromResMap(resources resmap.ResMap) ([]*
 	return infos, nil
 }
 
-func (r *RESTClientGetter) ApplyResourceInfosServerSide(infos []*resource.Info) error {
+func ApplyResourceInfosServerSide(infos []*resource.Info) error {
 	force := true
 	for _, info := range infos {
 		unstructuredObj, err := runtime.DefaultUnstructuredConverter.ToUnstructured(info.Object)
@@ -201,7 +220,7 @@ func (client *RESTClientGetter) ApplyResMapWithServerSideApply(resources resmap.
 		if err != nil {
 			return nil, fmt.Errorf("failed to build cluster resource infos: %w", err)
 		}
-		if err = client.ApplyResourceInfosServerSide(clusterInfos); err != nil {
+		if err = ApplyResourceInfosServerSide(clusterInfos); err != nil {
 			return nil, fmt.Errorf("failed to apply cluster resources: %w", err)
 		}
 
@@ -219,7 +238,7 @@ func (client *RESTClientGetter) ApplyResMapWithServerSideApply(resources resmap.
 		if err != nil {
 			return nil, fmt.Errorf("failed to build resource infos: %w", err)
 		}
-		if err = client.ApplyResourceInfosServerSide(resourceInfos); err != nil {
+		if err = ApplyResourceInfosServerSide(resourceInfos); err != nil {
 			return nil, fmt.Errorf("failed to apply resources: %w", err)
 		}
 	}

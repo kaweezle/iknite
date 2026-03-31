@@ -22,25 +22,31 @@ import (
 )
 
 type KustomizeOptions struct {
-	ForceConfig bool
-	WaitOptions
+	ForceConfig   bool
+	ForceEmbedded bool
 }
 
 func NewKustomizeOptions() *KustomizeOptions {
 	result := &KustomizeOptions{
-		ForceConfig: false,
+		ForceConfig:   false,
+		ForceEmbedded: false,
 	}
-	InitializeWaitOptions(&result.WaitOptions)
 	return result
 }
 
 func AddKustomizeOptionsFlags(flagSet *flag.FlagSet, kustomizeConfig *KustomizeOptions) {
-	AddWaitOptionsFlags(flagSet, &kustomizeConfig.WaitOptions)
 	flagSet.BoolVarP(
 		&kustomizeConfig.ForceConfig,
 		options.ForceConfig,
 		"C",
 		kustomizeConfig.ForceConfig,
 		"Force configuration even if it has already occurred",
+	)
+	flagSet.BoolVarP(
+		&kustomizeConfig.ForceEmbedded,
+		options.ForceEmbedded,
+		"E",
+		kustomizeConfig.ForceEmbedded,
+		"Force use of embedded kustomization even if a custom one is available",
 	)
 }

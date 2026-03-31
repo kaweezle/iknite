@@ -224,6 +224,11 @@ func RemovePidFiles() {
 }
 
 func StartAndConfigureKubelet(kubeConfig *v1alpha1.IkniteClusterSpec, kustomizeOptions *utils.KustomizeOptions) error {
+	apiConfig, err := LoadFromDefault()
+	if err != nil {
+		return fmt.Errorf("failed to load kubeconfig: %w", err)
+	}
+
 	cmd, err := StartKubelet()
 	if err != nil {
 		return fmt.Errorf("failed to start kubelet: %w", err)
@@ -281,12 +286,7 @@ func StartAndConfigureKubelet(kubeConfig *v1alpha1.IkniteClusterSpec, kustomizeO
 			} else {
 				log.Info("Kubelet is healthy. Waiting for API server to be healthy...")
 				go func() {
-					apiConfig, err := LoadFromDefault()
-					if err != nil {
-						apiServerHealthz <- err
-					} else {
-						apiServerHealthz <- apiConfig.CheckClusterRunning(cancelCtx, 30, 2, 10*time.Second)
-					}
+					apiServerHealthz <- apiConfig.CheckClusterRunning(cancelCtx, 30, 2, 10*time.Second)
 				}()
 			}
 		case isApiServerHealthy := <-apiServerHealthz:
@@ -296,18 +296,11 @@ func StartAndConfigureKubelet(kubeConfig *v1alpha1.IkniteClusterSpec, kustomizeO
 			} else {
 				log.Info("API server is healthy")
 				go func() {
-					apiConfig, err := LoadFromDefault()
-					if err != nil {
-						configErr <- err
-					} else {
-						configErr <- apiConfig.DoKustomization(
-							cancelCtx,
-							kubeConfig.Ip,
-							kubeConfig.Kustomization,
-							kustomizeOptions.ForceConfig,
-							&kustomizeOptions.WaitOptions,
-						)
-					}
+					configErr <- apiConfig.Kustomize(
+						cancelCtx,
+						kubeConfig.Kustomization,
+						kustomizeOptions,
+					)
 				}()
 			}
 		case configError := <-configErr:

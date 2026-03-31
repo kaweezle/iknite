@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 // cSpell: ignore getsops kyaml
-package cmd
+package iknitectl
 
 import (
 	"fmt"
@@ -60,8 +60,8 @@ signing key, and writes it to the specified destination directory with appropria
 permissions (0400).
 
 Example:
-  iknitedev install signing-key secrets.sops.yaml .
-  iknitedev install signing-key --key data.apk_signing_key secrets.sops.yaml /path/to/dest`,
+  iknitectl install signing-key secrets.sops.yaml .
+  iknitectl install signing-key --key data.apk_signing_key secrets.sops.yaml /path/to/dest`,
 		Args: cobra.ExactArgs(2),
 		RunE: func(_ *cobra.Command, args []string) error {
 			opts.SecretsFile = args[0]

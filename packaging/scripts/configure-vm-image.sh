@@ -140,6 +140,7 @@ step 'Allow only key based ssh login'
 sed -e '/PermitRootLogin yes/d' \
     -e 's/^#PasswordAuthentication yes/PasswordAuthentication no/' \
     -e 's/^#PubkeyAuthentication yes/PubkeyAuthentication yes/' \
+    -e 's/^AllowTcpForwarding no/AllowTcpForwarding yes/' \
     -i /etc/ssh/sshd_config
 
 # Terraform and github actions need ssh-rsa as accepted algorithm

@@ -16,9 +16,9 @@ limitations under the License.
 package main
 
 import (
-	"github.com/kaweezle/iknite/hack/iknitedev/cmd"
+	"github.com/kaweezle/iknite/pkg/cmd/iknitectl"
 )
 
 func main() {
-	cmd.Execute()
+	iknitectl.Execute()
 }

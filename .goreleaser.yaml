@@ -27,9 +27,9 @@ builds:
         -X github.com/kaweezle/iknite/pkg/cmd.BuiltBy=goreleaser
         -X github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1.KubernetesVersionDefault={{ .Env.KUBERNETES_VERSION }}
     binary: iknite
-  - id: iknitedev
-    main: ./hack/iknitedev
-    binary: iknitedev
+  - id: iknitectl
+    main: ./cmd/iknitectl
+    binary: iknitectl
     env:
       - CGO_ENABLED=0
     goos:
@@ -50,10 +50,10 @@ archives:
       {{- else if eq .Arch "386" }}i386
       {{- else }}{{ .Arch }}{{ end }}
       {{- if .Arm }}v{{ .Arm }}{{ end }}
-  - id: iknitedev
-    ids: [iknitedev]
+  - id: iknitectl
+    ids: [iknitectl]
     name_template: >-
-      iknitedev_
+      iknitectl_
       {{- title .Os }}_
       {{- if eq .Arch "amd64" }}x86_64
       {{- else if eq .Arch "386" }}i386
@@ -138,11 +138,11 @@ nfpms:
       signature:
         key_file: kaweezle-devel@kaweezle.com-c9d89864.rsa
         key_name: kaweezle-devel@kaweezle.com-c9d89864.rsa.pub
-  - id: iknitedev-nfpm
-    ids: [iknitedev]
+  - id: iknitectl-nfpm
+    ids: [iknitectl]
     formats: [apk, deb, rpm, archlinux]
     license: Apache 2.0
-    package_name: iknitedev
+    package_name: iknitectl
     file_name_template: >-
       {{ .PackageName }}-
       {{- .Version }}.

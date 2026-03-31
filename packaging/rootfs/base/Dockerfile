@@ -11,6 +11,7 @@ LABEL org.opencontainers.image.source="https://github.com/kaweezle/iknite.git"
 
 # Add the dependencies
 RUN --mount=type=bind,target=/apks  \
+    echo "https://dl-cdn.alpinelinux.org/alpine/edge/main/" >> /etc/apk/repositories && \
     echo "https://dl-cdn.alpinelinux.org/alpine/edge/community/" >> /etc/apk/repositories && \
     echo "https://dl-cdn.alpinelinux.org/alpine/edge/testing/" >> /etc/apk/repositories && \
     echo "${IKNITE_REPO_URL}" >> /etc/apk/repositories && \

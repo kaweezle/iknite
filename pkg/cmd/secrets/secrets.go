@@ -21,7 +21,7 @@ import (
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 
-	pkgSecrets "github.com/kaweezle/iknite/hack/iknitedev/pkg/secrets"
+	pkgSecrets "github.com/kaweezle/iknite/pkg/secrets"
 )
 
 // CreateSecretsCmd creates the secrets command.

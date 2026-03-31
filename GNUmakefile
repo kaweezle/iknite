@@ -1,6 +1,6 @@
 # Makefile for building Iknite packages, rootfs images, and VM images.
 # cSpell: words gsub rootfull chainguard apkindex doas vhdx apks covermode coverprofile checkmake
-# cSpell: words moby oras hyperv keygen nistp gomplate iknitedev
+# cSpell: words moby oras hyperv keygen nistp gomplate iknitectl
 SHELL := /bin/sh
 
 # Main variables
@@ -160,10 +160,10 @@ ROOTFS_PATH := $(DIST_DIR)/$(ROOTFS_NAME)
 # Package file names
 KARMAFUN_PACKAGE := karmafun-$(patsubst v%,%,$(KARMAFUN_VERSION)).$(ARCH).apk
 IKNITE_PACKAGE := iknite-$(IKNITE_VERSION).$(ARCH).apk
-IKNITEDEV_PACKAGE := iknitedev-$(IKNITE_VERSION).$(ARCH).apk
-IKNITEDEV_DEB_PACKAGE := iknitedev-$(IKNITE_VERSION).$(ARCH).deb
-IKNITEDEV_RPM_PACKAGE := iknitedev-$(IKNITE_VERSION).$(ARCH).rpm
-IKNITEDEV_ARCH_PACKAGE := iknitedev-$(IKNITE_VERSION).$(ARCH).pkg.tar.zst
+IKNITECTL_PACKAGE := iknitectl-$(IKNITE_VERSION).$(ARCH).apk
+IKNITECTL_DEB_PACKAGE := iknitectl-$(IKNITE_VERSION).$(ARCH).deb
+IKNITECTL_RPM_PACKAGE := iknitectl-$(IKNITE_VERSION).$(ARCH).rpm
+IKNITECTL_ARCH_PACKAGE := iknitectl-$(IKNITE_VERSION).$(ARCH).pkg.tar.zst
 IKNITE_IMAGES_PACKAGE := iknite-images-$(KUBERNETES_VERSION).$(ARCH).apk
 
 # Incus Agent
@@ -174,7 +174,6 @@ INCUS_AGENT_SOURCES := $(wildcard $(ROOT_DIR)/$(INCUS_AGENT_SOURCE_DIR)/*)
 
 KUSTOMIZATION_FILES = $(wildcard $(ROOT_DIR)/packaging/apk/iknite/iknite.d/**/*)
 GOLANG_FILES = $(shell find "$(ROOT_DIR)/cmd" "$(ROOT_DIR)/pkg" -type f -name '*.go' ! -name '*_test.go')
-IKNITEDEV_FILES = $(shell find "$(ROOT_DIR)/hack/iknitedev" -type f -name '*.go' ! -name '*_test.go')
 APK_FILES = $(wildcard $(ROOT_DIR)/packaging/apk/iknite/**/*)
 APK_INDEX_FILE = $(DIST_DIR)/repo/$(ARCH)/APKINDEX.tar.gz
 
@@ -212,7 +211,7 @@ help: # ignore checkmake
 	@echo "Step targets:"
 	@echo "  make all                            Run full pipeline (extract key, build packages, rootfs, VM images, etc.)"
 	@echo "  make apk-iknite-build               Build iknite package (goreleaser)"
-	@echo "  make apk-iknitedev-build            Build iknitedev package (goreleaser)"
+	@echo "  make apk-iknitectl-build            Build iknitectl package (goreleaser)"
 	@echo "  make apk-images-build               Build iknite-images APK"
 	@echo "  make apk-incus-agent-build          Build incus-agent APK"
 	@echo "  make apk-karmafun-fetch             Fetch karmafun dependencies"
@@ -283,8 +282,8 @@ info:
 # Define the main build target that depends on all the individual steps
 # First extract the signing key for signing the APK packages and the repo.
 ALL_DEPS := ci-extract-key
-# Build the APK packages (iknite, iknitedev, iknite-images, incus-agent) and fetch karmafun, then set up the APK repository with the built packages and signing key
-ALL_DEPS += apk-iknite-build apk-iknitedev-build apk-karmafun-fetch apk-images-build apk-incus-agent-build apk-repo-build
+# Build the APK packages (iknite, iknitectl, iknite-images, incus-agent) and fetch karmafun, then set up the APK repository with the built packages and signing key
+ALL_DEPS += apk-iknite-build apk-iknitectl-build apk-karmafun-fetch apk-images-build apk-incus-agent-build apk-repo-build
 # Build the rootfs base image, then the rootfs container with preloaded images, then the final rootfs image, and attach the Incus metadata to it in the registry
 ALL_DEPS += rootfs-base-image rootfs-container rootfs rootfs-image
 ALL_DEPS += vm-images-build incus-metadata-build vm-images-push rootfs-image-incus-attachment
@@ -329,15 +328,15 @@ $(ROOT_DIR)/$(KEY_NAME): $(SECRETS_FILE) | check-prerequisites
 .PHONY: ci-extract-key
 ci-extract-key: $(ROOT_DIR)/$(KEY_NAME)
 
-# Goreleaser build produces both iknite and iknitedev packages in a single run
-$(DIST_DIR)/$(IKNITE_PACKAGE) $(DIST_DIR)/$(IKNITEDEV_PACKAGE) $(DIST_DIR)/$(IKNITEDEV_DEB_PACKAGE) $(DIST_DIR)/$(IKNITEDEV_RPM_PACKAGE) $(DIST_DIR)/$(IKNITEDEV_ARCH_PACKAGE) $(DIST_DIR)/metadata.json $(DIST_DIR)/iknite_linux_amd64_v1/iknite &: $(GOLANG_FILES) $(IKNITEDEV_FILES) $(APK_FILES) go.mod hack/iknitedev/go.mod .goreleaser.yaml | check-prerequisites
+# Goreleaser build produces both iknite and iknitectl packages in a single run
+$(DIST_DIR)/$(IKNITE_PACKAGE) $(DIST_DIR)/$(IKNITECTL_PACKAGE) $(DIST_DIR)/$(IKNITECTL_DEB_PACKAGE) $(DIST_DIR)/$(IKNITECTL_RPM_PACKAGE) $(DIST_DIR)/$(IKNITECTL_ARCH_PACKAGE) $(DIST_DIR)/metadata.json $(DIST_DIR)/iknite_linux_amd64_v1/iknite &: $(GOLANG_FILES) $(APK_FILES) go.mod .goreleaser.yaml | check-prerequisites
 	goreleaser release --skip=publish $(SNAPSHOT) --clean
 
 .PHONY: apk-iknite-build
 apk-iknite-build: $(DIST_DIR)/$(IKNITE_PACKAGE) $(DIST_DIR)/metadata.json $(DIST_DIR)/iknite_linux_amd64_v1/iknite
 
-.PHONY: apk-iknitedev-build
-apk-iknitedev-build: $(DIST_DIR)/$(IKNITEDEV_PACKAGE) $(DIST_DIR)/$(IKNITEDEV_DEB_PACKAGE) $(DIST_DIR)/$(IKNITEDEV_RPM_PACKAGE) $(DIST_DIR)/$(IKNITEDEV_ARCH_PACKAGE)
+.PHONY: apk-iknitectl-build
+apk-iknitectl-build: $(DIST_DIR)/$(IKNITECTL_PACKAGE) $(DIST_DIR)/$(IKNITECTL_DEB_PACKAGE) $(DIST_DIR)/$(IKNITECTL_RPM_PACKAGE) $(DIST_DIR)/$(IKNITECTL_ARCH_PACKAGE)
 
 # Download latest karmafun release from GitHub
 $(DIST_DIR)/$(KARMAFUN_PACKAGE): | check-prerequisites
@@ -354,7 +353,7 @@ $(DIST_DIR)/$(IKNITE_IMAGES_PACKAGE): $(DIST_DIR)/iknite_linux_amd64_v1/iknite $
 	rm -rf "$$BUILD_DIR"; \
 	mkdir -p "$$BUILD_DIR"; \
 	echo "KUBERNETES_VERSION: $(KUBERNETES_VERSION)" > "$$BUILD_DIR/.env"; \
-	"$(DIST_DIR)/iknite_linux_amd64_v1/iknite" info images > "$$BUILD_DIR/image-list.txt"; \
+	"$(DIST_DIR)/iknite_linux_amd64_v1/iknite" info images --force-embedded > "$$BUILD_DIR/image-list.txt"; \
 	sort -u "$$BUILD_DIR/image-list.txt" -o "$$BUILD_DIR/image-list.txt"; \
 	$(RUN_CONTAINER_CMD) run --privileged --rm -v "$(ROOT_DIR):/work" cgr.dev/chainguard/melange \
 		build packaging/apk/iknite-images/iknite-images.yaml \
@@ -400,7 +399,7 @@ $(APK_INDEX_BUILDER_IMAGE_MARKER): $(APK_INDEX_BUILDER_IMAGE_SOURCES) | check-pr
 	touch "$@"
 
 # Create APK repository in dist/repo by generating APKINDEX.tar.gz with the built packages and copying APKs
-$(APK_INDEX_FILE): $(DIST_DIR)/$(KARMAFUN_PACKAGE) $(DIST_DIR)/$(IKNITE_PACKAGE) $(DIST_DIR)/$(IKNITEDEV_PACKAGE) $(DIST_DIR)/$(IKNITE_IMAGES_PACKAGE) $(DIST_DIR)/$(INCUS_AGENT_PACKAGE) $(ROOT_DIR)/$(KEY_NAME) $(APK_INDEX_BUILDER_IMAGE_MARKER) | check-prerequisites
+$(APK_INDEX_FILE): $(DIST_DIR)/$(KARMAFUN_PACKAGE) $(DIST_DIR)/$(IKNITE_PACKAGE) $(DIST_DIR)/$(IKNITECTL_PACKAGE) $(DIST_DIR)/$(IKNITE_IMAGES_PACKAGE) $(DIST_DIR)/$(INCUS_AGENT_PACKAGE) $(ROOT_DIR)/$(KEY_NAME) $(APK_INDEX_BUILDER_IMAGE_MARKER) | check-prerequisites
 	rm -rf "$(DIST_DIR)/repo"
 	mkdir -p "$(DIST_DIR)/repo"
 	$(RUN_CONTAINER_CMD) run --rm \
@@ -615,9 +614,9 @@ e2e: e2e-tg-init e2e-tg-apply e2e-check-argocd e2e-tg-destroy
 
 RELEASE_FILES := \
 	$(DIST_DIR)/$(IKNITE_PACKAGE) \
-	$(DIST_DIR)/$(IKNITEDEV_PACKAGE) \
-	$(DIST_DIR)/$(IKNITEDEV_DEB_PACKAGE) \
-	$(DIST_DIR)/$(IKNITEDEV_RPM_PACKAGE) \
+	$(DIST_DIR)/$(IKNITECTL_PACKAGE) \
+	$(DIST_DIR)/$(IKNITECTL_DEB_PACKAGE) \
+	$(DIST_DIR)/$(IKNITECTL_RPM_PACKAGE) \
 	$(DIST_DIR)/$(IKNITE_IMAGES_PACKAGE) \
 	$(ROOT_DIR)/packaging/rootfs/base/$(KEY_NAME).pub \
 	$(ROOT_DIR)/Get-Iknite.ps1 \

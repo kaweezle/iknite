@@ -17,35 +17,28 @@ package secrets
 
 import (
 	"fmt"
-	"io"
-	"strings"
 
 	"github.com/spf13/cobra"
 
-	pkgSecrets "github.com/kaweezle/iknite/hack/iknitedev/pkg/secrets"
+	pkgSecrets "github.com/kaweezle/iknite/pkg/secrets"
 )
 
-func createSecretsSetCmd(opts *pkgSecrets.Options) *cobra.Command {
+func createSecretsGetCmd(opts *pkgSecrets.Options) *cobra.Command {
 	return &cobra.Command{
-		Use:   "set <path> [value]",
-		Short: "Set a secret value in the secrets file",
-		Long: `Set a secret value in the secrets file.
-
-When value is omitted, it is read from stdin.`,
-		Args: cobra.RangeArgs(1, 2),
+		Use:   "get <path>",
+		Short: "Get a secret value from the secrets file",
+		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			var value string
-			if len(args) == 2 {
-				value = args[1]
-			} else {
-				data, err := io.ReadAll(cmd.InOrStdin())
-				if err != nil {
-					return fmt.Errorf("failed to read value from stdin: %w", err)
-				}
-				value = strings.TrimRight(string(data), "\r\n")
+			value, err := pkgSecrets.GetSecret(opts, args[0])
+			if err != nil {
+				return fmt.Errorf("failed to get secret: %w", err)
 			}
 
-			return pkgSecrets.SetSecret(opts, args[0], value)
+			_, err = fmt.Fprintln(cmd.OutOrStdout(), value)
+			if err != nil {
+				return fmt.Errorf("error while outputting result: %w", err)
+			}
+			return nil
 		},
 	}
 }

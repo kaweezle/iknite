@@ -16,29 +16,18 @@ limitations under the License.
 package secrets
 
 import (
-	"fmt"
-
 	"github.com/spf13/cobra"
 
-	pkgSecrets "github.com/kaweezle/iknite/hack/iknitedev/pkg/secrets"
+	pkgSecrets "github.com/kaweezle/iknite/pkg/secrets"
 )
 
-func createSecretsGetCmd(opts *pkgSecrets.Options) *cobra.Command {
+func createSecretsRemoveCmd(opts *pkgSecrets.Options) *cobra.Command {
 	return &cobra.Command{
-		Use:   "get <path>",
-		Short: "Get a secret value from the secrets file",
+		Use:   "remove <path>",
+		Short: "Remove a secret key from the secrets file",
 		Args:  cobra.ExactArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			value, err := pkgSecrets.GetSecret(opts, args[0])
-			if err != nil {
-				return fmt.Errorf("failed to get secret: %w", err)
-			}
-
-			_, err = fmt.Fprintln(cmd.OutOrStdout(), value)
-			if err != nil {
-				return fmt.Errorf("error while outputting result: %w", err)
-			}
-			return nil
+		RunE: func(_ *cobra.Command, args []string) error {
+			return pkgSecrets.RemoveSecret(opts, args[0])
 		},
 	}
 }

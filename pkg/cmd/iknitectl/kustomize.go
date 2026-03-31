@@ -13,7 +13,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-package cmd
+package iknitectl
 
 import (
 	"fmt"
@@ -23,7 +23,7 @@ import (
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 
-	"github.com/kaweezle/iknite/hack/iknitedev/pkg/kustomize"
+	"github.com/kaweezle/iknite/pkg/kustomize"
 )
 
 // CreateKustomizeCmd creates the kustomize command.
@@ -38,10 +38,10 @@ into individual files named <kind>-<name>.yaml.
 
 Examples:
   # Print kustomization to stdout
-  iknitedev kustomize /path/to/kustomization
+  iknitectl kustomize /path/to/kustomization
 
   # Split resources into individual files
-  iknitedev kustomize /path/to/kustomization /path/to/output`,
+  iknitectl kustomize /path/to/kustomization /path/to/output`,
 		Args: cobra.RangeArgs(1, 2),
 		RunE: func(_ *cobra.Command, args []string) error {
 			return runKustomize(fs, out, args)

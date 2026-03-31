@@ -1,4 +1,4 @@
-<!-- cSpell:words argocd checkmake codegen devcontainer iknitedev releaserepo testutils vhdx -->
+<!-- cSpell:words argocd checkmake codegen devcontainer iknitectl releaserepo testutils vhdx -->
 <!-- cSpell:words overlayfs testrepo devenv prds venv dockerimage -->
 
 # Directory Structure
@@ -167,7 +167,7 @@ Development helpers, generator scripts, and local tooling:
 - `update-codegen.sh` - regenerate Kubernetes-style code
 - `verify-codegen.sh` - verify generated code is up to date
 - `devcontainer/` - devcontainer build context and supporting config
-- `iknitedev/` - auxiliary development CLI module
+- `iknitectl/` - development CLI (cmd/iknitectl)
 
 ### `test/`
 

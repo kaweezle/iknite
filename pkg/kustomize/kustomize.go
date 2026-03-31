@@ -44,16 +44,22 @@ func EnablePlugins(opts *krusty.Options) *krusty.Options {
 	return opts
 }
 
-// Build runs kustomize on the given directory with plugins enabled and returns
-// the resulting resource map.
-func Build(dir string) (resmap.ResMap, error) {
+// BuildOnFileSystem runs kustomize on the given directory using the provided file system and returns the resulting
+// resource map.
+func BuildOnFileSystem(fs filesys.FileSystem, dir string) (resmap.ResMap, error) {
 	opts := EnablePlugins(krusty.MakeDefaultOptions())
 	k := krusty.MakeKustomizer(opts)
-	resources, err := k.Run(filesys.MakeFsOnDisk(), dir)
+	resources, err := k.Run(fs, dir)
 	if err != nil {
 		return nil, fmt.Errorf("failed to run kustomize on %s: %w", dir, err)
 	}
 	return resources, nil
+}
+
+// Build runs kustomize on the given directory with plugins enabled and returns
+// the resulting resource map.
+func Build(dir string) (resmap.ResMap, error) {
+	return BuildOnFileSystem(filesys.MakeFsOnDisk(), dir)
 }
 
 // WriteToWriter converts a resource map to YAML and writes it to the given writer.

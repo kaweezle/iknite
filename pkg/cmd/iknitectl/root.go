@@ -13,7 +13,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-package cmd
+package iknitectl
 
 import (
 	"fmt"
@@ -24,7 +24,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
-	"github.com/kaweezle/iknite/hack/iknitedev/pkg/cmd/secrets"
+	"github.com/kaweezle/iknite/pkg/cmd/secrets"
 )
 
 // RootOptions contains configuration for the root command.
@@ -44,9 +44,9 @@ func CreateRootCmd(opts *RootOptions) *cobra.Command {
 	}
 
 	rootCmd := &cobra.Command{
-		Use:   "iknitedev",
+		Use:   "iknitectl",
 		Short: "Development tools for iknite",
-		Long: `iknitedev is a collection of development tools for the iknite project.
+		Long: `iknitectl is a collection of development tools for the iknite project.
 
 It provides utilities for managing secrets, building artifacts, and other
 development tasks that are not part of the main iknite binary.`,
@@ -55,7 +55,7 @@ development tasks that are not part of the main iknite binary.`,
 	cobra.OnInitialize(func() { initConfig(opts.CfgFile) })
 
 	rootCmd.PersistentFlags().
-		StringVar(&opts.CfgFile, "config", "", "config file (default is $HOME/.iknitedev.yaml)")
+		StringVar(&opts.CfgFile, "config", "", "config file (default is $HOME/.iknitectl.yaml)")
 
 	// Add subcommands
 	rootCmd.AddCommand(CreateInstallCmd(opts.Fs))
@@ -82,10 +82,10 @@ func initConfig(cfgFile string) {
 		home, err := os.UserHomeDir()
 		cobra.CheckErr(err)
 
-		// Search config in home directory with name ".iknitedev" (without extension).
+		// Search config in home directory with name ".iknitectl" (without extension).
 		viper.AddConfigPath(home)
 		viper.SetConfigType("yaml")
-		viper.SetConfigName(".iknitedev")
+		viper.SetConfigName(".iknitectl")
 	}
 
 	viper.AutomaticEnv() // read in environment variables that match

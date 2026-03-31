@@ -8,26 +8,18 @@ step() {
 }
 
 echo "Setting up development environment..."
-ARG TFLINT_VERSION=0.60.0
-ARG TERRAFORM_DOCS_VERSION=0.21.0
 
 
 step "Installing packages..."
 # shellcheck disable=SC2046
 apk update --quiet && \
-apk add --quiet --no-progress --no-cache zsh tzdata git libstdc++ doas iproute2 gnupg socat openssh openrc curl tar zstd && \
-apk add --quiet --no-progress --no-cache pipx uv go jq skopeo tenv kubectl k9s golangci-lint gnupg sops age nodejs npm openssl abuild && \
-apk add --quiet --no-progress --no-cache ip6tables containerd kubelet kubeadm cni-plugins cni-plugin-flannel util-linux-misc buildkit buildctl nerdctl rootlesskit slirp4netns && \
-GORELEASER_VERSION=$(curl --silent  https://api.github.com/repos/goreleaser/goreleaser/releases/latest | jq -r .tag_name | sed -e 's/^v//') && \
-wget -q -O /tmp/goreleaser.apk "https://github.com/goreleaser/goreleaser/releases/download/v${GORELEASER_VERSION}/goreleaser_${GORELEASER_VERSION}_x86_64.apk" && \
-apk add --quiet --no-progress --allow-untrusted --no-cache /tmp/goreleaser.apk && \
-rm -f /tmp/goreleaser.apk && \
-wget -q -O /tmp/tflint.zip "https://github.com/terraform-linters/tflint/releases/download/v${TFLINT_VERSION}/tflint_linux_amd64.zip" && \
-unzip -q /tmp/tflint.zip -d /usr/local/bin/ && \
-rm -f /tmp/tflint.zip && \
-wget -q -O /tmp/terraform-docs.tar.gz "https://github.com/terraform-docs/terraform-docs/releases/download/v${TERRAFORM_DOCS_VERSION}/terraform-docs-v${TERRAFORM_DOCS_VERSION}-linux-amd64.tar.gz" && \
-tar -xzf /tmp/terraform-docs.tar.gz -C /usr/local/bin/ terraform-docs && \
-rm -f /tmp/terraform-docs.tar.gz && \
+apk add --quiet --no-progress --no-cache abuild age bash curl doas git gnupg go gojq golangci-lint ip6tables k9s kubectx libarchive-tools make nodejs npm openssl pipx rootlesskit slirp4netns sops uv zstd  && \
+test -f /usr/bin/jq || ln -s /usr/bin/gojq /usr/bin/jq && \
+AQUA_VERSION=$(curl --silent "https://api.github.com/repos/aquaproj/aqua/releases/latest" | gojq -r .tag_name | sed -e 's/^v//') && \
+wget -q -O /tmp/aqua.tar.gz "https://github.com/aquaproj/aqua/releases/download/v${AQUA_VERSION}/aqua_linux_amd64.tar.gz" && \
+tar -xzf /tmp/aqua.tar.gz -C /usr/local/bin/ aqua && \
+rm -f /tmp/aqua.tar.gz && \
+echo "export PATH=\"\${PATH}:$(/usr/local/bin/aqua root-dir)/bin\"" >> /root/.zshrc && \
 rm -rf $(find /var/cache/apk/ -type f)
 
 
@@ -36,9 +28,12 @@ pipx install pre-commit
 
 step "Manual steps instructions..."
 
-echo "- Install the age key for SOPS decryption in ~/.config/sops/age/keys.txt"
+echo "- Install the ssh key for SOPS decryption in ~/.ssh/id_ed25519"
+echo "- Add $(aqua root-dir)/bin to your PATH."
+echo "- Install go based tools with:"
+echo "    aqua i"
 echo "- To install the signing key, run:"
-echo "    go run hack/iknitedev/ install signing-key deploy/iac/iknite/secrets.sops.yaml ."
+echo "    go run hack/iknitectl/iknitectl.go install signing-key secrets.sops.yaml ."
 echo "- Configure git as needed. The following is an example ~/.gitconfig:"
 echo ""
 printf '\033[90m' # dark gray
