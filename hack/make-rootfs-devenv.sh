@@ -38,7 +38,7 @@ step "Manual steps instructions..."
 
 echo "- Install the age key for SOPS decryption in ~/.config/sops/age/keys.txt"
 echo "- To install the signing key, run:"
-echo "    go run hack/iknitedev/ install signing-key deploy/iac/iknite/secrets.sops.yaml ."
+echo "    go run cmd/iknitectl/iknitectl.go install signing-key deploy/iac/iknite/secrets.sops.yaml ."
 echo "- Configure git as needed. The following is an example ~/.gitconfig:"
 echo ""
 printf '\033[90m' # dark gray

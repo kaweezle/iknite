@@ -84,14 +84,18 @@ func isBaseKustomizationAvailable(dirname string) (bool, error) {
 
 // GetBaseKustomizationResources applies the kustomizations located in the specified
 // directory if available, otherwise returns the embedded kustomizations.
-func GetBaseKustomizationResources(dirname string) (resmap.ResMap, error) {
+func GetBaseKustomizationResources(dirname string, forceEmbedded bool) (resmap.ResMap, error) {
 	ok, err := isBaseKustomizationAvailable(dirname)
 	if err != nil {
 		return nil, fmt.Errorf("while checking for base kustomization: %w", err)
 	}
 	fs := filesys.MakeFsOnDisk()
-	if !ok {
-		log.WithField("directory", dirname).Debug("No base kustomization found, using embedded kustomization...")
+	if !ok || forceEmbedded {
+		log.WithFields(log.Fields{
+			"directory":      dirname,
+			"force_embedded": forceEmbedded,
+			"exists":         ok,
+		}).Debug("Using embedded kustomization.")
 		fs = filesys.MakeFsInMemory()
 		dirname = "base"
 		err = createTempKustomizeDirectory(&content, fs, dirname, dirname)

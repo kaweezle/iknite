@@ -45,7 +45,7 @@ func runKustomize(c workflow.RunData) error {
 	if err := k8sConfig.Kustomize(
 		ctx,
 		ikniteConfig.Kustomization,
-		kustomizeOptions.ForceConfig,
+		kustomizeOptions,
 	); err != nil {
 		return fmt.Errorf("failed to apply kustomization: %w", err)
 	}

@@ -37,7 +37,10 @@ import (
 	"github.com/kaweezle/iknite/pkg/utils"
 )
 
-func NewPrintKustomizeCmd(ikniteConfig *v1alpha1.IkniteClusterSpec) *cobra.Command {
+func NewPrintKustomizeCmd(
+	ikniteConfig *v1alpha1.IkniteClusterSpec,
+	kustomizeOptions *utils.KustomizeOptions,
+) *cobra.Command {
 	printKustomizeCmd := &cobra.Command{
 		Use:   "print",
 		Short: "Print the kustomize configuration",
@@ -53,7 +56,7 @@ prints the Embedded configuration that installs the following components:
 
 `,
 		Run: func(_ *cobra.Command, _ []string) {
-			performPrintKustomize(ikniteConfig)
+			performPrintKustomize(ikniteConfig, kustomizeOptions)
 		},
 		PreRun: func(cmd *cobra.Command, _ []string) {
 			flags := cmd.Flags()
@@ -110,7 +113,7 @@ applies the Embedded configuration that installs the following components:
 	config.AddIkniteClusterFlags(kustomizeCmd.Flags(), ikniteConfig)
 	utils.AddKustomizeOptionsFlags(kustomizeCmd.Flags(), kustomizeOptions)
 
-	printCmd := NewPrintKustomizeCmd(ikniteConfig)
+	printCmd := NewPrintKustomizeCmd(ikniteConfig, kustomizeOptions)
 	inheritsFlags(kustomizeCmd.Flags(), printCmd.Flags(), options.Kustomization)
 	kustomizeCmd.AddCommand(printCmd)
 	return kustomizeCmd
@@ -150,7 +153,7 @@ func performKustomize(
 	)
 	cobra.CheckErr(err)
 
-	cobra.CheckErr(kubeConfig.Kustomize(ctx, ikniteConfig.Kustomization, kustomizeOptions.ForceConfig))
+	cobra.CheckErr(kubeConfig.Kustomize(ctx, ikniteConfig.Kustomization, kustomizeOptions))
 
 	if waitOptions.HasLoop() {
 		logrus.Infof("Waiting for workloads with options: %s", waitOptions.String())
@@ -159,8 +162,11 @@ func performKustomize(
 	}
 }
 
-func performPrintKustomize(ikniteConfig *v1alpha1.IkniteClusterSpec) {
-	resources, err := provision.GetBaseKustomizationResources(ikniteConfig.Kustomization)
+func performPrintKustomize(ikniteConfig *v1alpha1.IkniteClusterSpec, kustomizeOptions *utils.KustomizeOptions) {
+	resources, err := provision.GetBaseKustomizationResources(
+		ikniteConfig.Kustomization,
+		kustomizeOptions.ForceEmbedded,
+	)
 	if err != nil {
 		cobra.CheckErr(fmt.Errorf("while getting kustomization resources: %w", err))
 	}

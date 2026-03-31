@@ -17,6 +17,7 @@ const (
 	// Kustomization.
 	Kustomization = "kustomization"
 	ForceConfig   = "force-config"
+	ForceEmbedded = "force-embedded"
 
 	// Configuration.
 	Ip                 = "ip"

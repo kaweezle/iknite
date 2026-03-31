@@ -36,6 +36,7 @@ import (
 	kubeadmConstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 
 	"github.com/kaweezle/iknite/pkg/provision"
+	"github.com/kaweezle/iknite/pkg/utils"
 )
 
 // cSpell: enable
@@ -255,7 +256,7 @@ func (config *Config) RestartProxy() error {
 func (config *Config) Kustomize(
 	ctx context.Context,
 	kustomization string,
-	force bool,
+	options *utils.KustomizeOptions,
 ) error {
 	if kustomization == "" {
 		log.Warn("Empty kustomization.")
@@ -271,7 +272,7 @@ func (config *Config) Kustomize(
 	if err != nil {
 		return err
 	}
-	if cm.Data["configured"] == "true" && !force {
+	if cm.Data["configured"] == "true" && !options.ForceConfig {
 		log.Info("configuration has already occurred. Use -C to force.")
 		return nil
 	}
@@ -280,7 +281,7 @@ func (config *Config) Kustomize(
 		"kustomization": kustomization,
 	}).Info("Performing configuration")
 
-	resources, err := provision.GetBaseKustomizationResources(kustomization)
+	resources, err := provision.GetBaseKustomizationResources(kustomization, options.ForceEmbedded)
 	if err != nil {
 		return fmt.Errorf("while getting kustomization resources: %w", err)
 	}

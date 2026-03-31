@@ -299,7 +299,7 @@ func StartAndConfigureKubelet(kubeConfig *v1alpha1.IkniteClusterSpec, kustomizeO
 					configErr <- apiConfig.Kustomize(
 						cancelCtx,
 						kubeConfig.Kustomization,
-						kustomizeOptions.ForceConfig,
+						kustomizeOptions,
 					)
 				}()
 			}
