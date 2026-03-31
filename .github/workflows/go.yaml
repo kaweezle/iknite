@@ -1,4 +1,4 @@
-# cSpell: words covermode coverprofile unittests
+# cSpell: words covermode coverprofile unittests iknitectl
 name: "Iknite: Build and test with Go"
 
 on:
@@ -19,6 +19,8 @@ jobs:
   build:
     name: Build and test
     runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
     strategy:
       matrix:
         os: [ubuntu-latest]
@@ -31,8 +33,11 @@ jobs:
           cache: true
         id: go
 
-      - name: Build
-        run: go build -v cmd/iknite/iknite.go cmd/iknitectl/iknitectl.go
+      - name: Build iknite
+        run: go build -v ./cmd/iknite/...
+
+      - name: Build iknitectl
+        run: go build -v ./cmd/iknitectl/...
 
       - name: Test
         run: go test -v -race -covermode=atomic -coverprofile=coverage.out ./...
