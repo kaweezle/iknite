@@ -26,6 +26,8 @@ gpg_key.asc
 .env
 
 /iknite
+/iknitectl
+/kubewait
 packages/
 
 .terraform/
