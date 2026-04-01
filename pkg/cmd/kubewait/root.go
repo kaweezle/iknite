@@ -20,7 +20,7 @@ limitations under the License.
 // a bootstrap repository script.
 package kubewait
 
-// cSpell: words godotenv clientcmd apimachinery kstatus errorf
+// cSpell: words godotenv clientcmd apimachinery kstatus errorf sirupsen joho metav1
 
 import (
 	"context"
@@ -30,16 +30,22 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/joho/godotenv"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+	coreV1 "k8s.io/api/core/v1"
 	k8errors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
+	kubeUtil "k8s.io/kubectl/pkg/cmd/util"
+	"sigs.k8s.io/cli-utils/pkg/kstatus/polling"
+	"sigs.k8s.io/cli-utils/pkg/kstatus/polling/engine"
+	pollingEvent "sigs.k8s.io/cli-utils/pkg/kstatus/polling/event"
 
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
 	"github.com/kaweezle/iknite/pkg/k8s"
@@ -49,8 +55,9 @@ const (
 	defaultBootstrapScript = "iknite-bootstrap.sh"
 	defaultBootstrapDir    = "/workspace/bootstrap-repo"
 	defaultTimeout         = 10 * time.Minute
-	defaultInterval        = 10 * time.Second
-	defaultGracePeriod     = 5 * time.Second
+	defaultInterval        = 2 * time.Second
+	defaultGracePeriod     = 30 * time.Second
+	defaultResourceTypes   = "deployments,statefulsets,daemonsets,jobs,cronjobs,applications"
 )
 
 // Options holds the configuration for the kubewait command.
@@ -61,10 +68,11 @@ type Options struct {
 	RepoURL         string
 	RepoRef         string
 	EnvFile         string
+	ResourceTypes   string
+	Verbosity       string
 	Timeout         time.Duration
 	Interval        time.Duration
 	GracePeriod     time.Duration
-	Verbosity       string
 	JSONLogs        bool
 }
 
@@ -138,6 +146,13 @@ Examples:
 	flags.StringVarP(&opts.Verbosity, "verbosity", "v", "info",
 		"Log level (debug, info, warn, error, fatal, panic)")
 	flags.BoolVar(&opts.JSONLogs, "json", false, "Emit log messages as JSON")
+	flags.StringVar(
+		&opts.ResourceTypes,
+		"resource-types",
+		defaultResourceTypes,
+		//nolint:lll // flag description is long but it's helpful to list the supported resource types here
+		"Comma-separated list of resource types to check (e.g. deployments,statefulsets,daemonsets,jobs,cronjobs,applications)",
+	)
 
 	return cmd
 }
@@ -181,6 +196,16 @@ func run(ctx context.Context, opts *Options, namespaces []string) error {
 		return fmt.Errorf("failed to create Kubernetes client: %w", err)
 	}
 
+	// Validate that the requested resource types are supported by the cluster before starting the wait loops.
+	validTypes, err := client.ValidateResourceTypes(opts.ResourceTypes)
+	if err != nil {
+		return fmt.Errorf("resource type validation failed: %w", err)
+	}
+	if len(validTypes) == 0 {
+		return errors.New("none of the specified resource types are supported by the cluster")
+	}
+	opts.ResourceTypes = strings.Join(validTypes, ",")
+
 	// If no namespaces were given, list all that exist right now.
 	if len(namespaces) == 0 {
 		namespaces, err = listNamespaces(ctx, k8sClient, opts.Interval)
@@ -204,7 +229,7 @@ func run(ctx context.Context, opts *Options, namespaces []string) error {
 	wg.Wait()
 	close(errCh)
 
-	var errs []error
+	errs := make([]error, 0, len(namespaces))
 	for e := range errCh {
 		errs = append(errs, e)
 	}
@@ -237,7 +262,8 @@ func listNamespaces(
 			return false, nil
 		}
 		names = make([]string, 0, len(list.Items))
-		for _, ns := range list.Items {
+		for i := range list.Items {
+			ns := &list.Items[i]
 			names = append(names, ns.Name)
 		}
 		return true, nil
@@ -257,13 +283,16 @@ func waitNamespaceWorkloads(
 	namespace string,
 	opts *Options,
 ) error {
+	logger := log.WithField("namespace", namespace)
 	// 1. Wait for the namespace to exist.
-	log.Infof("[%s] Waiting for namespace to exist...", namespace)
+	logger.Infof("Waiting for namespace to exist...")
+	var ns *coreV1.Namespace
 	if err := wait.PollUntilContextCancel(ctx, opts.Interval, true, func(ctx context.Context) (bool, error) {
-		_, err := k8sClient.CoreV1().Namespaces().Get(ctx, namespace, metav1.GetOptions{})
+		var err error
+		ns, err = k8sClient.CoreV1().Namespaces().Get(ctx, namespace, metav1.GetOptions{})
 		if err != nil {
 			if k8errors.IsNotFound(err) {
-				log.Debugf("[%s] Namespace not yet present, waiting...", namespace)
+				logger.Debugf("Namespace not yet present, waiting...")
 				return false, nil
 			}
 			return false, fmt.Errorf("error checking namespace: %w", err)
@@ -273,35 +302,83 @@ func waitNamespaceWorkloads(
 		return fmt.Errorf("namespace %s did not appear: %w", namespace, err)
 	}
 
-	// 2. Grace period — let workloads be scheduled before polling.
-	log.Infof("[%s] Namespace found; waiting grace period %s for workloads to appear", namespace, opts.GracePeriod)
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	case <-time.After(opts.GracePeriod):
+	nsExistence := time.Since(ns.CreationTimestamp.Time)
+	timeToWait := max(0, opts.GracePeriod-nsExistence)
+	logger2 := logger.WithFields(
+		log.Fields{
+			"namespaceAge": nsExistence.Round(time.Second),
+			"gracePeriod":  opts.GracePeriod.Round(time.Second),
+			"timeToWait":   timeToWait.Round(time.Second),
+		},
+	)
+	if timeToWait > 0 {
+		logger2.Info("Namespace younger than grace period, waiting")
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("context canceled while waiting for namespace %s: %w", namespace, ctx.Err())
+		case <-time.After(timeToWait):
+		}
+	} else {
+		logger2.Info("Namespace older than grace period, skipping wait")
 	}
 
-	// 3. Poll workloads until all are ready.
-	log.Infof("[%s] Checking workload readiness...", namespace)
-	if err := wait.PollUntilContextCancel(
-		ctx, opts.Interval, true,
-		namespaceWorkloadCondition(client, namespace),
-	); err != nil {
-		return fmt.Errorf("workloads in namespace %s did not become ready: %w", namespace, err)
+	factory := kubeUtil.NewFactory(client)
+	// TODO: implement applications status reader
+	poller, err := polling.NewStatusPollerFromFactory(factory, polling.Options{
+		CustomStatusReaders: []engine.StatusReader{&k8s.ApplicationStatusReader{}},
+	})
+	if err != nil {
+		return fmt.Errorf("failed to create status poller: %w", err)
+	}
+	identifiers, err := client.ObjectMetadataSetForNamespace(namespace, opts.ResourceTypes)
+	if err != nil {
+		return fmt.Errorf("failed to get object metadata set for namespace %s: %w", namespace, err)
 	}
 
-	log.Infof("[%s] All workloads ready", namespace)
-	return nil
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	eventChannel := poller.Poll(ctx, identifiers, polling.PollOptions{
+		PollInterval: opts.Interval,
+	})
+
+	for {
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("context canceled while polling workloads in namespace %s: %w", namespace, ctx.Err())
+		case event, ok := <-eventChannel:
+			if !ok {
+				return errors.New("event channel closed unexpectedly")
+			}
+			logger.Debugf("Received event: %v", event)
+			if event.Type == pollingEvent.ErrorEvent {
+				logger.Errorf("Error event received: %v", event.Error)
+				cancel() // stop polling on error
+				return fmt.Errorf("error while polling workloads: %w", event.Error)
+			}
+			if event.Type == pollingEvent.ResourceUpdateEvent {
+				logger.WithFields(log.Fields{
+					"group":     event.Resource.Identifier.GroupKind.Group,
+					"kind":      event.Resource.Identifier.GroupKind.Kind,
+					"name":      event.Resource.Identifier.Name,
+					"namespace": event.Resource.Identifier.Namespace,
+					"status":    event.Resource.Status,
+					"message":   event.Resource.Message,
+				}).Infof("Resource update")
+			}
+		}
+	}
 }
 
-// namespaceWorkloadCondition returns a ConditionWithContextFunc that polls workload readiness
+// NamespaceWorkloadCondition returns a ConditionWithContextFunc that polls workload readiness
 // for a single namespace.
-func namespaceWorkloadCondition(
+func NamespaceWorkloadCondition(
 	client *k8s.RESTClientGetter,
 	namespace string,
+	resourceTypes string,
 ) wait.ConditionWithContextFunc {
-	return func(ctx context.Context) (bool, error) {
-		states, err := client.WorkloadStatesForNamespace(namespace)
+	return func(_ context.Context) (bool, error) {
+		states, err := client.WorkloadStatesForNamespace(namespace, resourceTypes)
 		if err != nil {
 			log.WithError(err).Warnf("[%s] Failed to get workload states, will retry", namespace)
 			return false, nil
@@ -359,11 +436,17 @@ func runBootstrap(ctx context.Context, opts *Options) error {
 	// Locate and execute the bootstrap script.
 	scriptPath := filepath.Join(opts.BootstrapDir, opts.BootstrapScript)
 	if _, err := os.Stat(scriptPath); err != nil {
-		log.Infof("Bootstrap script %s not found in %s, skipping", opts.BootstrapScript, opts.BootstrapDir)
+		log.Infof(
+			"Bootstrap script %s not found in %s with error %v, skipping",
+			opts.BootstrapScript,
+			opts.BootstrapDir,
+			err,
+		)
 		return nil
 	}
 
-	if err := os.Chmod(scriptPath, 0o755); err != nil { //nolint:gosec // ensure executable, matching bootstrap.sh chmod +x
+	//nolint:gosec // ensure executable, matching bootstrap.sh chmod +x
+	if err := os.Chmod(scriptPath, 0o755); err != nil {
 		return fmt.Errorf("failed to make bootstrap script executable: %w", err)
 	}
 
@@ -392,7 +475,17 @@ func cloneBootstrapRepo(ctx context.Context, opts *Options) error {
 	}
 
 	//nolint:gosec // arguments come from CLI flags under user control
-	cmd := exec.CommandContext(ctx, "git", "clone", "--depth", "1", "--branch", opts.RepoRef, opts.RepoURL, opts.BootstrapDir)
+	cmd := exec.CommandContext(
+		ctx,
+		"git",
+		"clone",
+		"--depth",
+		"1",
+		"--branch",
+		opts.RepoRef,
+		opts.RepoURL,
+		opts.BootstrapDir,
+	)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 
