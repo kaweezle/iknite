@@ -30,7 +30,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strings"
 	"sync"
 	"time"
 
@@ -62,8 +61,9 @@ const (
 	defaultResourcesUpdateInterval = 2 * time.Second
 	defaultSettlePeriod            = 10 * time.Second
 	defaultNamespaceSettlePeriod   = 20 * time.Second
-	defaultResourceTypes           = "deployments,statefulsets,daemonsets,jobs,cronjobs,applications"
 )
+
+var defaultResourceTypes = []string{"deployments", "statefulsets", "daemonsets", "jobs", "cronjobs", "applications"}
 
 // Options holds the configuration for the kubewait command.
 type Options struct {
@@ -73,7 +73,7 @@ type Options struct {
 	RepoURL                 string
 	RepoRef                 string
 	EnvFile                 string
-	ResourceTypes           string
+	ResourceTypes           []string
 	Verbosity               string
 	Timeout                 time.Duration
 	StatusUpdateInterval    time.Duration
@@ -159,7 +159,7 @@ Examples:
 	flags.StringVarP(&opts.Verbosity, "verbosity", "v", "info",
 		"Log level (debug, info, warn, error, fatal, panic)")
 	flags.BoolVar(&opts.JSONLogs, "json", false, "Emit log messages as JSON")
-	flags.StringVar(
+	flags.StringSliceVar(
 		&opts.ResourceTypes,
 		"resource-types",
 		defaultResourceTypes,
@@ -216,7 +216,7 @@ func run(ctx context.Context, opts *Options, namespaces []string) error {
 	if len(validTypes) == 0 {
 		return errors.New("none of the specified resource types are supported by the cluster")
 	}
-	opts.ResourceTypes = strings.Join(validTypes, ",")
+	opts.ResourceTypes = validTypes
 
 	// If no namespaces were given, list all that exist right now.
 	if len(namespaces) == 0 {

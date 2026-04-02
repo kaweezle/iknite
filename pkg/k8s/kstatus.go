@@ -91,9 +91,7 @@ var resourceTypesGroupVersions = map[string]string{
 	"applications": "argoproj.io/v1alpha1",
 }
 
-func (client *RESTClientGetter) ValidateResourceTypes(resourceTypes string) ([]string, error) {
-	types := strings.Split(resourceTypes, ",")
-
+func (client *RESTClientGetter) ValidateResourceTypes(types []string) ([]string, error) {
 	groupVersionsResourceTypes := make(map[string][]string)
 	for _, t := range types {
 		gv, ok := resourceTypesGroupVersions[t]
@@ -142,12 +140,16 @@ func (client *RESTClientGetter) ValidateResourceTypes(resourceTypes string) ([]s
 }
 
 // ResourceInfosForNamespace returns resource.Info objects for the given namespace and resource types.
-func (client *RESTClientGetter) ResourceInfosForNamespace(namespace, resourceTypes string) ([]*resource.Info, error) {
+func (client *RESTClientGetter) ResourceInfosForNamespace(
+	namespace string,
+	resourceTypes []string,
+) ([]*resource.Info, error) {
 	r := resource.NewBuilder(client).
 		Unstructured().
 		NamespaceParam(namespace).
 		DefaultNamespace().
-		ResourceTypeOrNameArgs(true, resourceTypes).
+		ResourceTypes(resourceTypes...).
+		SelectAllParam(true).
 		ContinueOnError().
 		Flatten().
 		Do()
@@ -177,7 +179,7 @@ func infosToObjectMetadataSet(infos []*resource.Info) object.ObjMetadataSet {
 }
 
 func (client *RESTClientGetter) ObjectMetadataSetForNamespace(
-	namespace, resourceTypes string,
+	namespace string, resourceTypes []string,
 ) (object.ObjMetadataSet, error) {
 	const maxAttempts = 3
 	const retryDelay = 2 * time.Second
@@ -187,6 +189,7 @@ func (client *RESTClientGetter) ObjectMetadataSetForNamespace(
 		log.WithError(err).WithFields(log.Fields{
 			"resourceTypes": resourceTypes,
 			"attempt":       attempt,
+			"namespace":     namespace,
 		}).Warn("Failed to get resource infos, retrying")
 		time.Sleep(retryDelay)
 		infos, err = client.ResourceInfosForNamespace(namespace, resourceTypes)
@@ -200,7 +203,7 @@ func (client *RESTClientGetter) ObjectMetadataSetForNamespace(
 // WorkloadStatesForNamespace returns the readiness state of deployments, statefulsets, and
 // daemonsets in a single namespace using kstatus to evaluate each resource.
 func (client *RESTClientGetter) WorkloadStatesForNamespace(
-	namespace, resourceTypes string,
+	namespace string, resourceTypes []string,
 ) ([]*v1alpha1.WorkloadState, error) {
 	infos, err := client.ResourceInfosForNamespace(namespace, resourceTypes)
 	if err != nil {
@@ -208,45 +211,6 @@ func (client *RESTClientGetter) WorkloadStatesForNamespace(
 	}
 
 	return workloadStatesToSlice(infos)
-}
-
-// WorkloadStatesForNamespaces returns the readiness state of deployments, statefulsets, and
-// daemonsets in the given namespaces using kstatus to evaluate each resource.
-// If namespaces is empty all namespaces are considered.
-func (client *RESTClientGetter) WorkloadStatesForNamespaces(namespaces []string) ([]*v1alpha1.WorkloadState, error) {
-	const resourceTypes = "deployments,statefulsets,daemonsets"
-
-	r := resource.NewBuilder(client).
-		Unstructured().
-		AllNamespaces(true).
-		ResourceTypeOrNameArgs(true, resourceTypes).
-		ContinueOnError().
-		Flatten().
-		Do()
-
-	infos, err := r.Infos()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get resource infos: %w", err)
-	}
-
-	// Build a set for O(1) namespace look-ups.
-	nsSet := make(map[string]struct{}, len(namespaces))
-	for _, ns := range namespaces {
-		nsSet[ns] = struct{}{}
-	}
-
-	filtered := make([]*resource.Info, 0, len(infos))
-	for _, info := range infos {
-		if len(namespaces) == 0 {
-			filtered = append(filtered, info)
-			continue
-		}
-		if _, ok := nsSet[info.Namespace]; ok {
-			filtered = append(filtered, info)
-		}
-	}
-
-	return workloadStatesToSlice(filtered)
 }
 
 type ApplicationStatusReader struct{}

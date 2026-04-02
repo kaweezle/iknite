@@ -268,19 +268,20 @@ func (client *RESTClientGetter) HasApplications() (bool, error) {
 }
 
 func (client *RESTClientGetter) AllWorkloadStates() ([]*v1alpha1.WorkloadState, error) {
-	resourceTypes := "deployments,statefulsets,daemonsets"
+	resourceTypes := []string{"deployments", "statefulsets", "daemonsets"}
 	hasApplications, err := client.HasApplications()
 	if err != nil {
 		return nil, err
 	}
 	if hasApplications {
-		resourceTypes += ",applications"
+		resourceTypes = append(resourceTypes, "applications")
 	}
 
 	r := resource.NewBuilder(client).
 		Unstructured().
 		AllNamespaces(true).
-		ResourceTypeOrNameArgs(true, resourceTypes).
+		ResourceTypes(resourceTypes...).
+		SelectAllParam(true).
 		ContinueOnError().
 		Flatten().
 		Do()
