@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 // Package kubewait implements the kubewait command.
-// It waits for Kubernetes workloads in specified namespaces to become ready
+// It waits for Kubernetes resources in specified namespaces to become ready
 // using kstatus (one goroutine per namespace), then optionally clones and runs
 // a bootstrap repository script.
 package kubewait
@@ -51,7 +51,6 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/kstatus/status"
 	"sigs.k8s.io/cli-utils/pkg/object"
 
-	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
 	"github.com/kaweezle/iknite/pkg/k8s"
 )
 
@@ -59,7 +58,7 @@ const (
 	defaultBootstrapScript         = "iknite-bootstrap.sh"
 	defaultBootstrapDir            = "/workspace/bootstrap-repo"
 	defaultTimeout                 = 10 * time.Minute
-	defaultStatusUpdateInterval    = 2 * time.Second
+	defaultStatusUpdateInterval    = 4 * time.Second
 	defaultResourcesUpdateInterval = 2 * time.Second
 	defaultSettlePeriod            = 10 * time.Second
 	defaultNamespaceSettlePeriod   = 20 * time.Second
@@ -99,29 +98,29 @@ func CreateKubewaitCmd(out io.Writer) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "kubewait [namespaces...]",
-		Short: "Wait for Kubernetes workloads to be ready",
+		Short: "Wait for Kubernetes resources to be ready",
 		Long: `kubewait waits for all deployments, statefulsets and daemonsets in the
 specified namespaces to reach a ready state according to kstatus.
 
 Each namespace is watched concurrently. If a namespace is not yet present at
 invocation time the goroutine waits for its creation, then applies a short
-grace period to let workloads appear before polling their readiness.
+grace period to let resources appear before polling their readiness.
 
 If no namespaces are given, all namespaces present in the cluster at invocation
 time are watched.
 
-After all workloads are ready, an optional bootstrap repository is cloned
+After all resources are ready, an optional bootstrap repository is cloned
 (when --bootstrap-repo-url and --bootstrap-repo-ref are provided) and then the
 bootstrap script inside that directory is executed.
 
 Examples:
-  # Wait for workloads in all namespaces
+  # Wait for resources in all namespaces
   kubewait
 
   # Wait for specific namespaces
   kubewait kube-system default
 
-  # Clone and run a bootstrap script after workloads are ready
+  # Clone and run a bootstrap script after resources are ready
   kubewait --bootstrap-repo-url git@github.com:org/repo.git --bootstrap-repo-ref main
 
   # Use a specific kubeconfig
@@ -148,15 +147,15 @@ Examples:
 	flags.StringVar(&opts.EnvFile, "env-file", "",
 		"Path to an env file to load before running the bootstrap script (default: .env inside --bootstrap-dir)")
 	flags.DurationVar(&opts.Timeout, "timeout", defaultTimeout,
-		"Maximum time to wait for workloads to become ready (0 means wait forever)")
+		"Maximum time to wait for resources to become ready (0 means wait forever)")
 	flags.DurationVar(&opts.StatusUpdateInterval, "status-update-interval", defaultStatusUpdateInterval,
 		"Polling interval between readiness checks")
 	flags.DurationVar(&opts.ResourcesUpdateInterval, "resources-update-interval", defaultResourcesUpdateInterval,
 		"Polling interval between checks for new or deleted resources in the watched namespaces")
 	flags.DurationVar(&opts.SettlePeriod, "settle-period", defaultSettlePeriod,
-		"Time to wait after all workloads are ready before proceeding to ensure stability")
+		"Time to wait after all resources are ready before proceeding to ensure stability")
 	flags.DurationVar(&opts.NamespaceSettlePeriod, "namespace-settle-period", defaultNamespaceSettlePeriod,
-		"Grace period to wait after a namespace appears before checking its workloads")
+		"Grace period to wait after a namespace appears before checking its resources")
 	flags.StringVarP(&opts.Verbosity, "verbosity", "v", "info",
 		"Log level (debug, info, warn, error, fatal, panic)")
 	flags.BoolVar(&opts.JSONLogs, "json", false, "Emit log messages as JSON")
@@ -234,7 +233,7 @@ func run(ctx context.Context, opts *Options, namespaces []string) error {
 	var wg sync.WaitGroup
 	for _, ns := range namespaces {
 		wg.Go(func() {
-			if err := waitNamespaceWorkloads(ctx, client, k8sClient, ns, opts); err != nil {
+			if err := waitNamespaceResources(ctx, client, k8sClient, ns, opts); err != nil {
 				errCh <- err
 			}
 		})
@@ -250,7 +249,7 @@ func run(ctx context.Context, opts *Options, namespaces []string) error {
 		return errors.Join(errs...)
 	}
 
-	log.Info("All workloads in all namespaces are ready")
+	log.Info("All resources in all namespaces are ready")
 
 	// Run the optional bootstrap when a repo URL is provided.
 	if opts.RepoURL != "" {
@@ -288,14 +287,17 @@ func listNamespaces(
 }
 
 type resourceWaiter struct {
-	logger         log.FieldLogger
-	client         *k8s.RESTClientGetter
-	poller         *polling.StatusPoller
-	settleTimer    *time.Timer
-	endChannel     chan error
-	opts           *Options
-	namespace      string
-	currentDataSet object.ObjMetadataSet
+	logger             log.FieldLogger
+	client             *k8s.RESTClientGetter
+	poller             *polling.StatusPoller
+	pollCancel         context.CancelFunc
+	watchDatasetCancel context.CancelFunc
+	settleTimer        *time.Timer
+	endChannel         chan error
+	opts               *Options
+	namespace          string
+	currentDataSet     object.ObjMetadataSet
+	mu                 sync.Mutex
 }
 
 func newResourceWaiter(
@@ -318,33 +320,195 @@ func newResourceWaiter(
 		namespace:      namespace,
 		poller:         poller,
 		logger:         logger,
+		pollCancel:     nil,
 		settleTimer:    nil,
-		endChannel:     make(chan error),
+		endChannel:     make(chan error, 1),
 		currentDataSet: object.ObjMetadataSet{},
 		opts:           opts,
 	}, nil
 }
 
 func (w *resourceWaiter) StartSettleTimer() error {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
 	if w.settleTimer != nil {
-		return fmt.Errorf("settle timer already started")
+		return nil
 	}
 	w.settleTimer = time.AfterFunc(w.opts.SettlePeriod, func() {
-		close(w.endChannel)
+		w.reportDone(nil)
 	})
 
 	return nil
 }
 
 func (w *resourceWaiter) StopSettleTimer() error {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
 	if w.settleTimer == nil {
-		return fmt.Errorf("settle timer not started")
+		return nil
 	}
-	if !w.settleTimer.Stop() {
-		<-w.settleTimer.C
-	}
+	w.settleTimer.Stop()
 	w.settleTimer = nil
 	return nil
+}
+
+func (w *resourceWaiter) hasSettleTimer() bool {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
+	return w.settleTimer != nil
+}
+
+func (w *resourceWaiter) stopWatchingDataSetChanges() {
+	w.mu.Lock()
+	cancel := w.watchDatasetCancel
+	w.watchDatasetCancel = nil
+	w.mu.Unlock()
+
+	if cancel != nil {
+		cancel()
+	}
+}
+
+func (w *resourceWaiter) reportDone(err error) {
+	w.stopWatchingDataSetChanges()
+	select {
+	case w.endChannel <- err:
+	default:
+	}
+}
+
+func (w *resourceWaiter) stopPolling() {
+	w.mu.Lock()
+	cancel := w.pollCancel
+	w.pollCancel = nil
+	w.mu.Unlock()
+
+	if cancel != nil {
+		cancel()
+	}
+}
+
+func (w *resourceWaiter) setCurrentDataSet(dataSet object.ObjMetadataSet) {
+	w.mu.Lock()
+	w.currentDataSet = dataSet
+	w.mu.Unlock()
+}
+
+func (w *resourceWaiter) getCurrentDataSet() object.ObjMetadataSet {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
+	return append(object.ObjMetadataSet(nil), w.currentDataSet...)
+}
+
+func (w *resourceWaiter) startPolling(ctx context.Context, dataSet object.ObjMetadataSet) {
+	pollCtx, cancel := context.WithCancel(ctx)
+
+	w.mu.Lock()
+	w.pollCancel = cancel
+	w.mu.Unlock()
+
+	w.logger.WithFields(log.Fields{
+		"pollInterval":  w.opts.StatusUpdateInterval.Round(time.Second),
+		"resourceCount": len(dataSet),
+	}).Info("Waiting for resources to become ready")
+
+	coll := collector.NewResourceStatusCollector(dataSet)
+
+	eventChannel := w.poller.Poll(pollCtx, dataSet, polling.PollOptions{
+		PollInterval: w.opts.StatusUpdateInterval,
+	})
+
+	done := coll.ListenWithObserver(eventChannel, collector.ObserverFunc(
+		func(rsc *collector.ResourceStatusCollector, event pollingEvent.Event) {
+			w.processEvent(rsc, event)
+		}),
+	)
+
+	go func() {
+		for result := range done {
+			if result.Err != nil {
+				w.logger.Errorf("Error while polling resource statuses: %v", result.Err)
+				w.reportDone(result.Err)
+				return
+			}
+		}
+	}()
+}
+
+func (w *resourceWaiter) refreshDataSet() (object.ObjMetadataSet, error) {
+	dataSet, err := w.client.ObjectMetadataSetForNamespace(w.namespace, w.opts.ResourceTypes)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get object metadata set for namespace %s: %w", w.namespace, err)
+	}
+
+	return dataSet, nil
+}
+
+func (w *resourceWaiter) restartPolling(ctx context.Context, newDataSet object.ObjMetadataSet) error {
+	w.stopPolling()
+
+	if err := w.StopSettleTimer(); err != nil {
+		return err
+	}
+
+	w.setCurrentDataSet(newDataSet)
+	if len(newDataSet) == 0 {
+		w.logger.Info("No resources found in namespace, waiting for settle period")
+		if err := w.StartSettleTimer(); err != nil {
+			return fmt.Errorf("failed to start settle timer: %w", err)
+		}
+		return nil
+	}
+
+	w.startPolling(ctx, newDataSet)
+
+	return nil
+}
+
+func (w *resourceWaiter) watchDataSetChanges(ctx context.Context) {
+	if w.opts.ResourcesUpdateInterval <= 0 {
+		return
+	}
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(w.opts.ResourcesUpdateInterval):
+			newDataSet, err := w.refreshDataSet()
+			if err != nil {
+				w.reportDone(err)
+				return
+			}
+
+			currentDataSet := w.getCurrentDataSet()
+			if currentDataSet.Equal(newDataSet) {
+				w.logger.Debug("Resource dataset unchanged")
+				continue
+			}
+
+			// check that context is not already canceled before restarting the poller
+			if ctx.Err() != nil {
+				w.logger.Warn("Context canceled, skipping poller restart")
+				return
+			}
+
+			w.logger.WithFields(log.Fields{
+				"previousCount": len(currentDataSet),
+				"currentCount":  len(newDataSet),
+				"interval":      w.opts.ResourcesUpdateInterval.Round(time.Second),
+			}).Info("Resource dataset changed, restarting poller")
+
+			if err := w.restartPolling(ctx, newDataSet); err != nil {
+				w.reportDone(err)
+				return
+			}
+		}
+	}
 }
 
 func (w *resourceWaiter) processEvent(rsc *collector.ResourceStatusCollector, event pollingEvent.Event) {
@@ -363,15 +527,15 @@ func (w *resourceWaiter) processEvent(rsc *collector.ResourceStatusCollector, ev
 		rss = append(rss, rs)
 	}
 	aggStatus := aggregator.AggregateStatus(rss, status.CurrentStatus)
-	if aggStatus == status.CurrentStatus && w.settleTimer == nil {
+	if aggStatus == status.CurrentStatus && !w.hasSettleTimer() {
 		w.logger.WithField("timer", w.opts.SettlePeriod.Round(time.Second)).Info(
-			"All workloads are ready, starting settle timer",
+			"All resources are ready, starting settle timer",
 		)
 		if err := w.StartSettleTimer(); err != nil {
 			w.logger.Errorf("Failed to start settle timer: %v", err)
 		}
-	} else if aggStatus != status.CurrentStatus && w.settleTimer != nil {
-		w.logger.Infof("A workload is no longer ready, stopping settle timer")
+	} else if aggStatus != status.CurrentStatus && w.hasSettleTimer() {
+		w.logger.Infof("A resource is no longer ready, stopping settle timer")
 		if err := w.StopSettleTimer(); err != nil {
 			w.logger.Errorf("Failed to stop settle timer: %v", err)
 		}
@@ -379,46 +543,25 @@ func (w *resourceWaiter) processEvent(rsc *collector.ResourceStatusCollector, ev
 }
 
 func (w *resourceWaiter) Start(ctx context.Context) error {
-	var err error
-	w.currentDataSet, err = w.client.ObjectMetadataSetForNamespace(w.namespace, w.opts.ResourceTypes)
+	dataSet, err := w.refreshDataSet()
 	if err != nil {
-		return fmt.Errorf("failed to get object metadata set for namespace %s: %w", w.namespace, err)
+		return err
 	}
 
-	if len(w.currentDataSet) == 0 {
-		w.logger.Info("No workloads found in namespace, waiting for settle period")
-		if err := w.StartSettleTimer(); err != nil {
-			return fmt.Errorf("failed to start settle timer: %w", err)
-		}
-	} else {
-		coll := collector.NewResourceStatusCollector(w.currentDataSet)
-
-		eventChannel := w.poller.Poll(ctx, w.currentDataSet, polling.PollOptions{
-			PollInterval: w.opts.StatusUpdateInterval,
-		})
-
-		done := coll.ListenWithObserver(eventChannel, collector.ObserverFunc(
-			func(rsc *collector.ResourceStatusCollector, event pollingEvent.Event) {
-				w.processEvent(rsc, event)
-			}),
-		)
-		go func() {
-			for result := range done {
-				if result.Err != nil {
-					w.logger.Errorf("Error while polling resource statuses: %v", result.Err)
-					w.endChannel <- result.Err
-					return
-				}
-			}
-		}()
+	if err := w.restartPolling(ctx, dataSet); err != nil {
+		return fmt.Errorf("while starting poll on resources: %w", err)
 	}
+	watchDatasetContext, cancel := context.WithCancel(ctx)
+	w.watchDatasetCancel = cancel
+
+	go w.watchDataSetChanges(watchDatasetContext)
 
 	return nil
 }
 
-// waitNamespaceWorkloads waits for a namespace to exist, applies the grace period,
-// then polls until every workload in that namespace is ready.
-func waitNamespaceWorkloads(
+// waitNamespaceResources waits for a namespace to exist, applies the grace period,
+// then polls until every resource in that namespace is ready.
+func waitNamespaceResources(
 	ctx context.Context,
 	client *k8s.RESTClientGetter,
 	k8sClient kubernetes.Interface,
@@ -481,63 +624,19 @@ func waitNamespaceWorkloads(
 		return fmt.Errorf("failed to start resource waiter: %w", err)
 	}
 
-	logger.Infof(
-		"Waiting for workloads to become ready with a status update interval of %s...",
-		opts.StatusUpdateInterval.Round(time.Second),
-	)
 	for {
 		select {
 		case <-cancellableCtx.Done():
-			return fmt.Errorf("context canceled while polling workloads in namespace %s: %w", namespace, ctx.Err())
+			return fmt.Errorf("context canceled while polling resources in namespace %s: %w", namespace, ctx.Err())
 		case err := <-waiter.endChannel:
 			if err != nil {
-				return fmt.Errorf("error while polling workloads in namespace %s: %w", namespace, err)
+				return fmt.Errorf("error while polling resources in namespace %s: %w", namespace, err)
 			}
 			// This case is hit when the settle timer completes,
-			// which means all workloads have been ready for the entire settle period.
+			// which means all resources have been ready for the entire settle period.
 			logger.Info("Namespace ready")
 			return nil
 		}
-	}
-}
-
-// NamespaceWorkloadCondition returns a ConditionWithContextFunc that polls workload readiness
-// for a single namespace.
-func NamespaceWorkloadCondition(
-	client *k8s.RESTClientGetter,
-	namespace string,
-	resourceTypes string,
-) wait.ConditionWithContextFunc {
-	return func(_ context.Context) (bool, error) {
-		states, err := client.WorkloadStatesForNamespace(namespace, resourceTypes)
-		if err != nil {
-			log.WithError(err).Warnf("[%s] Failed to get workload states, will retry", namespace)
-			return false, nil
-		}
-
-		allReady := true
-		var ready, unready []*v1alpha1.WorkloadState
-		for _, s := range states {
-			if s.Ok {
-				ready = append(ready, s)
-			} else {
-				allReady = false
-				unready = append(unready, s)
-			}
-		}
-
-		log.WithFields(log.Fields{
-			"namespace": namespace,
-			"total":     len(states),
-			"ready":     len(ready),
-			"unready":   len(unready),
-		}).Infof("Workload status: %d/%d ready", len(ready), len(states))
-
-		for _, ws := range unready {
-			log.Infof("[%s]   Not ready: %s", namespace, ws.LongString())
-		}
-
-		return allReady, nil
 	}
 }
 
