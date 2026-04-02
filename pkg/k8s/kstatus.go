@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"time"
 
 	argoV1 "github.com/argoproj/argo-cd/v3/pkg/apis/application/v1alpha1"
 	log "github.com/sirupsen/logrus"
@@ -73,40 +74,71 @@ func workloadStatesToSlice(infos []*resource.Info) ([]*v1alpha1.WorkloadState, e
 	return result, nil
 }
 
-func (client *RESTClientGetter) ValidateResourceTypes(resourceTypes string) ([]string, error) {
-	types := strings.Split(resourceTypes, ",")
-	validTypes := make([]string, 0, len(types))
-	for _, t := range types {
-		has, err := client.HasResourceType(t)
-		if err != nil {
-			return nil, fmt.Errorf("while checking resource type %s: %w", t, err)
-		}
-		if has {
-			validTypes = append(validTypes, t)
-		} else {
-			log.WithField("resourceType", t).Warn("Non existent resource type, removing...")
-		}
-	}
-	return validTypes, nil
+// FIXME:
+// While the cluster is starting, if we retrieve all resources, we get:
+//
+//	while getting server preferred resources: unable to retrieve the complete list of server
+//	APIs: metrics.k8s.io/v1beta1: stale GroupVersion discovery: metrics.k8s.io/v1beta1
+//
+// We try to mitigate this by only retrieving the resources we care about, but this limits the functionality of the
+// tool. We should consider implementing a retry mechanism with backoff to handle this more gracefully.
+var resourceTypesGroupVersions = map[string]string{
+	"deployments":  "apps/v1",
+	"statefulsets": "apps/v1",
+	"daemonsets":   "apps/v1",
+	"jobs":         "batch/v1",
+	"cronjobs":     "batch/v1",
+	"applications": "argoproj.io/v1alpha1",
 }
 
-func (client *RESTClientGetter) HasResourceType(resourceType string) (bool, error) {
+func (client *RESTClientGetter) ValidateResourceTypes(resourceTypes string) ([]string, error) {
+	types := strings.Split(resourceTypes, ",")
+
+	groupVersionsResourceTypes := make(map[string][]string)
+	for _, t := range types {
+		gv, ok := resourceTypesGroupVersions[t]
+		if !ok {
+			return nil, fmt.Errorf("resource type %s is not supported", t)
+		}
+		groupVersionsResourceTypes[gv] = append(groupVersionsResourceTypes[gv], t)
+	}
 	discovery, err := client.ToDiscoveryClient()
 	if err != nil {
-		return false, fmt.Errorf("while getting discovery client: %w", err)
+		return nil, fmt.Errorf("while getting discovery client: %w", err)
 	}
-	list, err := discovery.ServerPreferredResources()
-	if err != nil {
-		return false, fmt.Errorf("while getting server preferred resources: %w", err)
-	}
-	for _, apiResourceList := range list {
-		for i := range apiResourceList.APIResources {
-			if apiResourceList.APIResources[i].Name == resourceType {
-				return true, nil
+
+	validTypes := make([]string, 0, len(types))
+	for gv, rts := range groupVersionsResourceTypes {
+		log.WithField("groupVersion", gv).Infof("Checking resource types: %s", strings.Join(rts, ","))
+		const maxAttempts = 3
+		const retryDelay = 3 * time.Second
+
+		list, err := discovery.ServerResourcesForGroupVersion(gv)
+		for attempt := 2; err != nil && attempt <= maxAttempts; attempt++ {
+			log.WithError(err).WithFields(log.Fields{
+				"groupVersion": gv,
+				"attempt":      attempt,
+			}).Warn("Failed to discover server resources, retrying")
+			time.Sleep(retryDelay)
+			list, err = discovery.ServerResourcesForGroupVersion(gv)
+		}
+		if err != nil {
+			return nil, fmt.Errorf("while getting server resources for group version %s: %w", gv, err)
+		}
+		availableResourceTypes := make(map[string]struct{}, len(list.APIResources))
+		for i := range list.APIResources {
+			availableResourceTypes[list.APIResources[i].Name] = struct{}{}
+		}
+		for _, rt := range rts {
+			if _, ok := availableResourceTypes[rt]; ok {
+				log.WithField("resourceType", rt).Info("Resource type is available")
+				validTypes = append(validTypes, rt)
+			} else {
+				log.WithField("resourceType", rt).Warn("Non existent resource type, removing...")
 			}
 		}
 	}
-	return false, nil
+	return validTypes, nil
 }
 
 // ResourceInfosForNamespace returns resource.Info objects for the given namespace and resource types.
@@ -147,7 +179,18 @@ func infosToObjectMetadataSet(infos []*resource.Info) object.ObjMetadataSet {
 func (client *RESTClientGetter) ObjectMetadataSetForNamespace(
 	namespace, resourceTypes string,
 ) (object.ObjMetadataSet, error) {
+	const maxAttempts = 3
+	const retryDelay = 2 * time.Second
+
 	infos, err := client.ResourceInfosForNamespace(namespace, resourceTypes)
+	for attempt := 2; err != nil && attempt <= maxAttempts; attempt++ {
+		log.WithError(err).WithFields(log.Fields{
+			"resourceTypes": resourceTypes,
+			"attempt":       attempt,
+		}).Warn("Failed to get resource infos, retrying")
+		time.Sleep(retryDelay)
+		infos, err = client.ResourceInfosForNamespace(namespace, resourceTypes)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("while getting object metadata set for namespace %s: %w", namespace, err)
 	}

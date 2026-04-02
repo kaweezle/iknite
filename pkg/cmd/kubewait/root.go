@@ -61,8 +61,8 @@ const (
 	defaultTimeout                 = 10 * time.Minute
 	defaultStatusUpdateInterval    = 2 * time.Second
 	defaultResourcesUpdateInterval = 2 * time.Second
-	defaultSettlePeriod            = 6 * time.Second
-	defaultNamespaceSettlePeriod   = 30 * time.Second
+	defaultSettlePeriod            = 10 * time.Second
+	defaultNamespaceSettlePeriod   = 20 * time.Second
 	defaultResourceTypes           = "deployments,statefulsets,daemonsets,jobs,cronjobs,applications"
 )
 
@@ -154,7 +154,7 @@ Examples:
 	flags.DurationVar(&opts.ResourcesUpdateInterval, "resources-update-interval", defaultResourcesUpdateInterval,
 		"Polling interval between checks for new or deleted resources in the watched namespaces")
 	flags.DurationVar(&opts.SettlePeriod, "settle-period", defaultSettlePeriod,
-		"Time to wait after all workloads are ready before running the bootstrap script")
+		"Time to wait after all workloads are ready before proceeding to ensure stability")
 	flags.DurationVar(&opts.NamespaceSettlePeriod, "namespace-settle-period", defaultNamespaceSettlePeriod,
 		"Grace period to wait after a namespace appears before checking its workloads")
 	flags.StringVarP(&opts.Verbosity, "verbosity", "v", "info",
@@ -164,8 +164,7 @@ Examples:
 		&opts.ResourceTypes,
 		"resource-types",
 		defaultResourceTypes,
-		//nolint:lll // flag description is long but it's helpful to list the supported resource types here
-		"Comma-separated list of resource types to check (e.g. deployments,statefulsets,daemonsets,jobs,cronjobs,applications)",
+		"Comma-separated list of resource types to check",
 	)
 
 	return cmd
@@ -289,15 +288,14 @@ func listNamespaces(
 }
 
 type resourceWaiter struct {
-	logger          log.FieldLogger
-	client          *k8s.RESTClientGetter
-	poller          *polling.StatusPoller
-	settleTimer     *time.Timer
-	allReadyChannel chan struct{}
-	done            <-chan collector.ListenerResult
-	opts            *Options
-	namespace       string
-	currentDataSet  object.ObjMetadataSet
+	logger         log.FieldLogger
+	client         *k8s.RESTClientGetter
+	poller         *polling.StatusPoller
+	settleTimer    *time.Timer
+	endChannel     chan error
+	opts           *Options
+	namespace      string
+	currentDataSet object.ObjMetadataSet
 }
 
 func newResourceWaiter(
@@ -316,15 +314,14 @@ func newResourceWaiter(
 	logger := log.WithField("namespace", namespace)
 
 	return &resourceWaiter{
-		client:          client,
-		namespace:       namespace,
-		poller:          poller,
-		logger:          logger,
-		settleTimer:     nil,
-		allReadyChannel: make(chan struct{}),
-		done:            nil,
-		currentDataSet:  object.ObjMetadataSet{},
-		opts:            opts,
+		client:         client,
+		namespace:      namespace,
+		poller:         poller,
+		logger:         logger,
+		settleTimer:    nil,
+		endChannel:     make(chan error),
+		currentDataSet: object.ObjMetadataSet{},
+		opts:           opts,
 	}, nil
 }
 
@@ -333,7 +330,7 @@ func (w *resourceWaiter) StartSettleTimer() error {
 		return fmt.Errorf("settle timer already started")
 	}
 	w.settleTimer = time.AfterFunc(w.opts.SettlePeriod, func() {
-		close(w.allReadyChannel)
+		close(w.endChannel)
 	})
 
 	return nil
@@ -400,11 +397,20 @@ func (w *resourceWaiter) Start(ctx context.Context) error {
 			PollInterval: w.opts.StatusUpdateInterval,
 		})
 
-		w.done = coll.ListenWithObserver(eventChannel, collector.ObserverFunc(
+		done := coll.ListenWithObserver(eventChannel, collector.ObserverFunc(
 			func(rsc *collector.ResourceStatusCollector, event pollingEvent.Event) {
 				w.processEvent(rsc, event)
 			}),
 		)
+		go func() {
+			for result := range done {
+				if result.Err != nil {
+					w.logger.Errorf("Error while polling resource statuses: %v", result.Err)
+					w.endChannel <- result.Err
+					return
+				}
+			}
+		}()
 	}
 
 	return nil
@@ -481,14 +487,12 @@ func waitNamespaceWorkloads(
 	)
 	for {
 		select {
-		case result := <-waiter.done:
-			if result.Err != nil {
-				return fmt.Errorf("error while polling workloads in namespace %s: %w", namespace, result.Err)
-			}
-			return nil
 		case <-cancellableCtx.Done():
 			return fmt.Errorf("context canceled while polling workloads in namespace %s: %w", namespace, ctx.Err())
-		case <-waiter.allReadyChannel:
+		case err := <-waiter.endChannel:
+			if err != nil {
+				return fmt.Errorf("error while polling workloads in namespace %s: %w", namespace, err)
+			}
 			// This case is hit when the settle timer completes,
 			// which means all workloads have been ready for the entire settle period.
 			logger.Info("Namespace ready")
