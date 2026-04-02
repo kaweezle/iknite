@@ -27,9 +27,11 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -55,32 +57,38 @@ import (
 
 const (
 	defaultBootstrapScript         = "iknite-bootstrap.sh"
-	defaultBootstrapDir            = "/workspace/bootstrap-repo"
+	defaultBootstrapDir            = "/workspace"
+	defaultEnvFile                 = ".env"
 	defaultTimeout                 = 10 * time.Minute
 	defaultStatusUpdateInterval    = 4 * time.Second
 	defaultResourcesUpdateInterval = 2 * time.Second
 	defaultSettlePeriod            = 10 * time.Second
 	defaultNamespaceSettlePeriod   = 20 * time.Second
+	bootstrapRepoURLEnvVar         = "IKNITE_BOOTSTRAP_REPO_URL"
+	bootstrapRepoRefEnvVar         = "IKNITE_BOOTSTRAP_REPO_REF"
+	bootstrapScriptEnvVar          = "IKNITE_BOOTSTRAP_SCRIPT"
+	bootstrapRepoDirname           = "bootstrap-repo"
 )
 
 var defaultResourceTypes = []string{"deployments", "statefulsets", "daemonsets", "jobs", "cronjobs", "applications"}
 
 // Options holds the configuration for the kubewait command.
 type Options struct {
-	Kubeconfig              string
+	Verbosity               string
 	BootstrapDir            string
 	BootstrapScript         string
 	RepoURL                 string
 	RepoRef                 string
 	EnvFile                 string
+	Kubeconfig              string
 	ResourceTypes           []string
-	Verbosity               string
 	Timeout                 time.Duration
 	StatusUpdateInterval    time.Duration
 	ResourcesUpdateInterval time.Duration
 	SettlePeriod            time.Duration
 	NamespaceSettlePeriod   time.Duration
 	JSONLogs                bool
+	SkipWaitingForResources bool
 }
 
 // CreateKubewaitCmd creates the root cobra command for kubewait.
@@ -129,7 +137,7 @@ Examples:
 			if err := setUpLogs(out, opts.Verbosity, opts.JSONLogs); err != nil {
 				return err
 			}
-			return run(cmd.Context(), opts, args)
+			return runKubewait(cmd.Context(), opts, args)
 		},
 	}
 
@@ -165,6 +173,12 @@ Examples:
 		defaultResourceTypes,
 		"Comma-separated list of resource types to check",
 	)
+	flags.BoolVar(
+		&opts.SkipWaitingForResources,
+		"skip-wait",
+		false,
+		"Skip waiting for resources to be ready and proceed directly to the optional bootstrap (for testing purposes)",
+	)
 
 	return cmd
 }
@@ -188,8 +202,8 @@ func setUpLogs(out io.Writer, level string, jsonFormat bool) error {
 	return nil
 }
 
-// run is the main logic for the kubewait command.
-func run(ctx context.Context, opts *Options, namespaces []string) error {
+// waitForResources waits for all resources in the specified namespaces to become ready.
+func waitForResources(ctx context.Context, opts *Options, namespaces []string) error {
 	if opts.Timeout > 0 {
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(ctx, opts.Timeout)
@@ -250,10 +264,19 @@ func run(ctx context.Context, opts *Options, namespaces []string) error {
 	}
 
 	log.Info("All resources in all namespaces are ready")
+	return nil
+}
 
-	// Run the optional bootstrap when a repo URL is provided.
-	if opts.RepoURL != "" {
-		return runBootstrap(ctx, opts)
+// runKubewait is the main logic for the kubewait command.
+func runKubewait(ctx context.Context, opts *Options, namespaces []string) error {
+	if !opts.SkipWaitingForResources {
+		if err := waitForResources(ctx, opts, namespaces); err != nil {
+			return fmt.Errorf("error while waiting for resources: %w", err)
+		}
+	}
+
+	if err := runBootstrap(ctx, opts); err != nil {
+		return fmt.Errorf("error during bootstrap: %w", err)
 	}
 	return nil
 }
@@ -644,16 +667,11 @@ func waitNamespaceResources(
 // file (if present), and executes the bootstrap script.
 func runBootstrap(ctx context.Context, opts *Options) error {
 	// Clone the repository when a ref is also supplied; if no ref is given the clone is skipped.
-	if opts.RepoRef != "" {
-		if err := cloneBootstrapRepo(ctx, opts); err != nil {
-			return err
-		}
-	}
 
 	// Determine the env file path.
 	envFile := opts.EnvFile
 	if envFile == "" {
-		envFile = filepath.Join(opts.BootstrapDir, ".env")
+		envFile = filepath.Join(opts.BootstrapDir, defaultEnvFile)
 	}
 
 	if info, err := os.Stat(envFile); err == nil && !info.IsDir() {
@@ -663,13 +681,39 @@ func runBootstrap(ctx context.Context, opts *Options) error {
 		}
 	}
 
+	bootstrapRepoURL, ok := os.LookupEnv(bootstrapRepoURLEnvVar)
+	if ok {
+		log.Infof("Overriding bootstrap repo URL from env var %s: %s", bootstrapRepoURLEnvVar, bootstrapRepoURL)
+		opts.RepoURL = bootstrapRepoURL
+	}
+	bootstrapRepoRef, ok := os.LookupEnv(bootstrapRepoRefEnvVar)
+	if ok {
+		log.Infof("Overriding bootstrap repo ref from env var %s: %s", bootstrapRepoRefEnvVar, bootstrapRepoRef)
+		opts.RepoRef = bootstrapRepoRef
+	}
+	bootstrapScript, ok := os.LookupEnv(bootstrapScriptEnvVar)
+	if ok {
+		log.Infof("Overriding bootstrap script from env var %s: %s", bootstrapScriptEnvVar, bootstrapScript)
+		opts.BootstrapScript = bootstrapScript
+	}
+
+	baseDir := opts.BootstrapDir
+	if opts.RepoURL != "" && opts.RepoRef != "" {
+		if err := cloneBootstrapRepo(ctx, opts); err != nil {
+			return fmt.Errorf("error during bootstrap: %w", err)
+		}
+		baseDir = filepath.Join(opts.BootstrapDir, bootstrapRepoDirname)
+	} else {
+		log.Info("Bootstrap repo URL or ref not provided, skipping clone")
+	}
+
 	// Locate and execute the bootstrap script.
-	scriptPath := filepath.Join(opts.BootstrapDir, opts.BootstrapScript)
+	scriptPath := filepath.Join(baseDir, opts.BootstrapScript)
 	if _, err := os.Stat(scriptPath); err != nil {
 		log.Infof(
 			"Bootstrap script %s not found in %s with error %v, skipping",
 			opts.BootstrapScript,
-			opts.BootstrapDir,
+			baseDir,
 			err,
 		)
 		return nil
@@ -697,11 +741,16 @@ func runBootstrap(ctx context.Context, opts *Options) error {
 
 // cloneBootstrapRepo performs a shallow git clone of the bootstrap repository.
 func cloneBootstrapRepo(ctx context.Context, opts *Options) error {
-	log.Infof("Cloning bootstrap repository %s (ref: %s) to %s", opts.RepoURL, opts.RepoRef, opts.BootstrapDir)
+	repoPath := filepath.Join(opts.BootstrapDir, bootstrapRepoDirname)
+	log.Infof("Cloning bootstrap repository %s (ref: %s) to %s", opts.RepoURL, opts.RepoRef, repoPath)
+
+	if err := ensureSSHKnownHost(ctx, opts.RepoURL); err != nil {
+		return err
+	}
 
 	// Remove any existing target directory so the clone is clean.
-	if err := os.RemoveAll(opts.BootstrapDir); err != nil {
-		return fmt.Errorf("failed to remove existing bootstrap dir %s: %w", opts.BootstrapDir, err)
+	if err := os.RemoveAll(repoPath); err != nil {
+		return fmt.Errorf("failed to remove existing bootstrap dir %s: %w", repoPath, err)
 	}
 
 	//nolint:gosec // arguments come from CLI flags under user control
@@ -714,7 +763,7 @@ func cloneBootstrapRepo(ctx context.Context, opts *Options) error {
 		"--branch",
 		opts.RepoRef,
 		opts.RepoURL,
-		opts.BootstrapDir,
+		repoPath,
 	)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -724,4 +773,70 @@ func cloneBootstrapRepo(ctx context.Context, opts *Options) error {
 	}
 
 	return nil
+}
+
+func ensureSSHKnownHost(ctx context.Context, repoURL string) error {
+	sshServer := extractDomain(repoURL)
+	if sshServer == "" {
+		log.Warnf(
+			"Failed to extract SSH server from repo URL %s, SSH host key will not be added to known_hosts",
+			repoURL,
+		)
+		return nil
+	}
+
+	log.Infof("Waiting for SSH server %s to be resolvable...", sshServer)
+	if err := wait.PollUntilContextCancel(ctx, 2*time.Second, true, func(ctx context.Context) (bool, error) {
+		addrs, err := net.DefaultResolver.LookupHost(ctx, sshServer)
+		if err != nil {
+			log.WithError(err).Debugf("SSH server %s not yet resolvable, retrying...", sshServer)
+			return false, nil
+		}
+		if len(addrs) == 0 {
+			log.Debugf("SSH server %s resolved without addresses, retrying...", sshServer)
+			return false, nil
+		}
+		return true, nil
+	}); err != nil {
+		return fmt.Errorf("SSH server %s did not become resolvable: %w", sshServer, err)
+	}
+
+	log.Infof("Adding SSH server %s to known_hosts", sshServer)
+	//nolint:gosec // sshServer is derived from repoURL and only used for ssh-keyscan host lookup.
+	sshKeyscanCmd := exec.CommandContext(ctx, "ssh-keyscan", "-t", "rsa", sshServer)
+	keyscanOutput, err := sshKeyscanCmd.Output()
+	if err != nil {
+		return fmt.Errorf("failed to scan SSH key for %s: %w", sshServer, err)
+	}
+
+	// Ensure $HOME/.ssh directory exists so that ssh-keyscan can write to known_hosts without permission issues.
+	sshDir := filepath.Join(os.Getenv("HOME"), ".ssh")
+
+	//nolint:gosec // path is constrained to user-local HOME and mode is intentionally restrictive.
+	if err := os.MkdirAll(sshDir, 0o700); err != nil {
+		return fmt.Errorf("failed to create .ssh directory: %w", err)
+	}
+
+	knownHostsPath := filepath.Join(sshDir, "known_hosts")
+
+	//nolint:gosec // path is constrained to user-local HOME and mode is intentionally restrictive.
+	if err := os.WriteFile(knownHostsPath, keyscanOutput, 0o600); err != nil {
+		return fmt.Errorf("failed to write known_hosts file: %w", err)
+	}
+
+	return nil
+}
+
+func extractDomain(repoURL string) string {
+	// This is a very naive extraction that assumes the repo URL is in the form "git@domain:owner/repo.git".
+	// In a real implementation, you would want to handle more cases and validate the input properly.
+	parts := strings.Split(repoURL, "@")
+	if len(parts) != 2 {
+		return ""
+	}
+	domainParts := strings.Split(parts[1], ":")
+	if len(domainParts) != 2 {
+		return ""
+	}
+	return domainParts[0]
 }

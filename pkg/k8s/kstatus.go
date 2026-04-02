@@ -15,6 +15,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/resource"
+	clientRest "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling/engine"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling/event"
@@ -29,6 +30,14 @@ import (
 // loading rules. If kubeconfigPath is non-empty it is used directly; otherwise KUBECONFIG
 // env var and ~/.kube/config are tried in turn, with a final fall-back to in-cluster config.
 func NewRESTClientGetterFromKubeconfig(kubeconfigPath string) *RESTClientGetter {
+	restConfig, err := clientRest.InClusterConfig()
+	if err == nil {
+		log.Info("Using in-cluster configuration")
+		return &RESTClientGetter{
+			clientconfig: nil, // Not needed for in-cluster config
+			restConfig:   restConfig,
+		}
+	}
 	loadingRules := clientcmd.NewDefaultClientConfigLoadingRules()
 	if kubeconfigPath != "" {
 		loadingRules.ExplicitPath = kubeconfigPath
