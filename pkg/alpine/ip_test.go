@@ -93,7 +93,7 @@ func TestAddIpMapping(t *testing.T) {
 	}
 
 	ip := net.ParseIP("192.168.99.2")
-	domainName := "kaweezle.local"
+	domainName := "iknite.local"
 
 	err = alpine.AddIpMapping(&config, ip, domainName, []net.IP{})
 	req.NoError(err)
@@ -101,7 +101,7 @@ func TestAddIpMapping(t *testing.T) {
 	changed, err := afs.ReadFile(f.Name())
 	req.NoError(err)
 
-	re := regexp.MustCompile(`(?m)^192\.168\.99\.2\s+kaweezle.local$`)
+	re := regexp.MustCompile(`(?m)^192\.168\.99\.2\s+iknite.local$`)
 
 	found := re.Find(changed)
 	req.NotNilf(found, "File doesn't contain ip mapping:\n[%s]", string(changed))
