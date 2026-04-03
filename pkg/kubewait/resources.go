@@ -26,18 +26,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
-	"net"
-	"os"
-	"os/exec"
-	"path/filepath"
-	"strings"
 	"sync"
 	"time"
 
-	"github.com/joho/godotenv"
 	log "github.com/sirupsen/logrus"
-	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 	coreV1 "k8s.io/api/core/v1"
 	k8errors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -56,30 +49,17 @@ import (
 )
 
 const (
-	defaultBootstrapScript         = "iknite-bootstrap.sh"
-	defaultBootstrapDir            = "/workspace"
-	defaultEnvFile                 = ".env"
 	defaultTimeout                 = 10 * time.Minute
 	defaultStatusUpdateInterval    = 4 * time.Second
 	defaultResourcesUpdateInterval = 2 * time.Second
 	defaultSettlePeriod            = 10 * time.Second
 	defaultNamespaceSettlePeriod   = 20 * time.Second
-	bootstrapRepoURLEnvVar         = "IKNITE_BOOTSTRAP_REPO_URL"
-	bootstrapRepoRefEnvVar         = "IKNITE_BOOTSTRAP_REPO_REF"
-	bootstrapScriptEnvVar          = "IKNITE_BOOTSTRAP_SCRIPT"
-	bootstrapRepoDirname           = "bootstrap-repo"
 )
 
 var defaultResourceTypes = []string{"deployments", "statefulsets", "daemonsets", "jobs", "cronjobs", "applications"}
 
-// Options holds the configuration for the kubewait command.
-type Options struct {
-	Verbosity               string
-	BootstrapDir            string
-	BootstrapScript         string
-	RepoURL                 string
-	RepoRef                 string
-	EnvFile                 string
+// ResourcesOptions holds the configuration for the kubewait command.
+type ResourcesOptions struct {
 	Kubeconfig              string
 	ResourceTypes           []string
 	Timeout                 time.Duration
@@ -87,73 +67,21 @@ type Options struct {
 	ResourcesUpdateInterval time.Duration
 	SettlePeriod            time.Duration
 	NamespaceSettlePeriod   time.Duration
-	JSONLogs                bool
-	SkipWaitingForResources bool
 }
 
-// CreateKubewaitCmd creates the root cobra command for kubewait.
-func CreateKubewaitCmd(out io.Writer) *cobra.Command {
-	opts := &Options{
-		BootstrapScript:         defaultBootstrapScript,
-		BootstrapDir:            defaultBootstrapDir,
+func NewResourcesOptions() ResourcesOptions {
+	return ResourcesOptions{
 		Timeout:                 defaultTimeout,
 		StatusUpdateInterval:    defaultStatusUpdateInterval,
 		ResourcesUpdateInterval: defaultResourcesUpdateInterval,
 		SettlePeriod:            defaultSettlePeriod,
 		NamespaceSettlePeriod:   defaultNamespaceSettlePeriod,
-		Verbosity:               "info",
 	}
+}
 
-	cmd := &cobra.Command{
-		Use:   "kubewait [namespaces...]",
-		Short: "Wait for Kubernetes resources to be ready",
-		Long: `kubewait waits for all deployments, statefulsets and daemonsets in the
-specified namespaces to reach a ready state according to kstatus.
-
-Each namespace is watched concurrently. If a namespace is not yet present at
-invocation time the goroutine waits for its creation, then applies a short
-grace period to let resources appear before polling their readiness.
-
-If no namespaces are given, all namespaces present in the cluster at invocation
-time are watched.
-
-After all resources are ready, an optional bootstrap repository is cloned
-(when --bootstrap-repo-url and --bootstrap-repo-ref are provided) and then the
-bootstrap script inside that directory is executed.
-
-Examples:
-  # Wait for resources in all namespaces
-  kubewait
-
-  # Wait for specific namespaces
-  kubewait kube-system default
-
-  # Clone and run a bootstrap script after resources are ready
-  kubewait --bootstrap-repo-url git@github.com:org/repo.git --bootstrap-repo-ref main
-
-  # Use a specific kubeconfig
-  kubewait --kubeconfig ~/.kube/config kube-system`,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := setUpLogs(out, opts.Verbosity, opts.JSONLogs); err != nil {
-				return err
-			}
-			return runKubewait(cmd.Context(), opts, args)
-		},
-	}
-
-	flags := cmd.Flags()
+func AddResourcesFlags(flags *pflag.FlagSet, opts *ResourcesOptions) {
 	flags.StringVar(&opts.Kubeconfig, "kubeconfig", "",
 		"Path to kubeconfig file (defaults to KUBECONFIG env var or ~/.kube/config; falls back to in-cluster config)")
-	flags.StringVar(&opts.BootstrapDir, "bootstrap-dir", defaultBootstrapDir,
-		"Directory to clone the bootstrap repository into (also used as the script working directory)")
-	flags.StringVar(&opts.BootstrapScript, "bootstrap-script", defaultBootstrapScript,
-		"Name of the bootstrap script to run inside --bootstrap-dir")
-	flags.StringVar(&opts.RepoURL, "bootstrap-repo-url", "",
-		"URL of the bootstrap git repository to clone (requires --bootstrap-repo-ref)")
-	flags.StringVar(&opts.RepoRef, "bootstrap-repo-ref", "",
-		"Git branch or tag to checkout when cloning the bootstrap repository")
-	flags.StringVar(&opts.EnvFile, "env-file", "",
-		"Path to an env file to load before running the bootstrap script (default: .env inside --bootstrap-dir)")
 	flags.DurationVar(&opts.Timeout, "timeout", defaultTimeout,
 		"Maximum time to wait for resources to become ready (0 means wait forever)")
 	flags.DurationVar(&opts.StatusUpdateInterval, "status-update-interval", defaultStatusUpdateInterval,
@@ -164,42 +92,12 @@ Examples:
 		"Time to wait after all resources are ready before proceeding to ensure stability")
 	flags.DurationVar(&opts.NamespaceSettlePeriod, "namespace-settle-period", defaultNamespaceSettlePeriod,
 		"Grace period to wait after a namespace appears before checking its resources")
-	flags.StringVarP(&opts.Verbosity, "verbosity", "v", "info",
-		"Log level (debug, info, warn, error, fatal, panic)")
-	flags.BoolVar(&opts.JSONLogs, "json", false, "Emit log messages as JSON")
 	flags.StringSliceVar(
 		&opts.ResourceTypes,
 		"resource-types",
 		defaultResourceTypes,
 		"Comma-separated list of resource types to check",
 	)
-	flags.BoolVar(
-		&opts.SkipWaitingForResources,
-		"skip-wait",
-		false,
-		"Skip waiting for resources to be ready and proceed directly to the optional bootstrap (for testing purposes)",
-	)
-
-	return cmd
-}
-
-// Execute is the entry point called from main.
-func Execute() {
-	cobra.CheckErr(CreateKubewaitCmd(os.Stdout).Execute())
-}
-
-// setUpLogs configures logrus output and level.
-func setUpLogs(out io.Writer, level string, jsonFormat bool) error {
-	log.SetOutput(out)
-	if jsonFormat {
-		log.SetFormatter(&log.JSONFormatter{})
-	}
-	lvl, err := log.ParseLevel(level)
-	if err != nil {
-		return fmt.Errorf("invalid log level %q: %w", level, err)
-	}
-	log.SetLevel(lvl)
-	return nil
 }
 
 // waitForResources waits for all resources in the specified namespaces to become ready.
@@ -264,20 +162,6 @@ func waitForResources(ctx context.Context, opts *Options, namespaces []string) e
 	}
 
 	log.Info("All resources in all namespaces are ready")
-	return nil
-}
-
-// runKubewait is the main logic for the kubewait command.
-func runKubewait(ctx context.Context, opts *Options, namespaces []string) error {
-	if !opts.SkipWaitingForResources {
-		if err := waitForResources(ctx, opts, namespaces); err != nil {
-			return fmt.Errorf("error while waiting for resources: %w", err)
-		}
-	}
-
-	if err := runBootstrap(ctx, opts); err != nil {
-		return fmt.Errorf("error during bootstrap: %w", err)
-	}
 	return nil
 }
 
@@ -661,182 +545,4 @@ func waitNamespaceResources(
 			return nil
 		}
 	}
-}
-
-// runBootstrap clones the bootstrap repository (if URL and ref are provided), loads the env
-// file (if present), and executes the bootstrap script.
-func runBootstrap(ctx context.Context, opts *Options) error {
-	// Clone the repository when a ref is also supplied; if no ref is given the clone is skipped.
-
-	// Determine the env file path.
-	envFile := opts.EnvFile
-	if envFile == "" {
-		envFile = filepath.Join(opts.BootstrapDir, defaultEnvFile)
-	}
-
-	if info, err := os.Stat(envFile); err == nil && !info.IsDir() {
-		log.Infof("Loading environment from %s", envFile)
-		if loadErr := godotenv.Load(envFile); loadErr != nil {
-			return fmt.Errorf("failed to load env file %s: %w", envFile, loadErr)
-		}
-	}
-
-	bootstrapRepoURL, ok := os.LookupEnv(bootstrapRepoURLEnvVar)
-	if ok {
-		log.Infof("Overriding bootstrap repo URL from env var %s: %s", bootstrapRepoURLEnvVar, bootstrapRepoURL)
-		opts.RepoURL = bootstrapRepoURL
-	}
-	bootstrapRepoRef, ok := os.LookupEnv(bootstrapRepoRefEnvVar)
-	if ok {
-		log.Infof("Overriding bootstrap repo ref from env var %s: %s", bootstrapRepoRefEnvVar, bootstrapRepoRef)
-		opts.RepoRef = bootstrapRepoRef
-	}
-	bootstrapScript, ok := os.LookupEnv(bootstrapScriptEnvVar)
-	if ok {
-		log.Infof("Overriding bootstrap script from env var %s: %s", bootstrapScriptEnvVar, bootstrapScript)
-		opts.BootstrapScript = bootstrapScript
-	}
-
-	baseDir := opts.BootstrapDir
-	if opts.RepoURL != "" && opts.RepoRef != "" {
-		if err := cloneBootstrapRepo(ctx, opts); err != nil {
-			return fmt.Errorf("error during bootstrap: %w", err)
-		}
-		baseDir = filepath.Join(opts.BootstrapDir, bootstrapRepoDirname)
-	} else {
-		log.Info("Bootstrap repo URL or ref not provided, skipping clone")
-	}
-
-	// Locate and execute the bootstrap script.
-	scriptPath := filepath.Join(baseDir, opts.BootstrapScript)
-	if _, err := os.Stat(scriptPath); err != nil {
-		log.Infof(
-			"Bootstrap script %s not found in %s with error %v, skipping",
-			opts.BootstrapScript,
-			baseDir,
-			err,
-		)
-		return nil
-	}
-
-	//nolint:gosec // ensure executable, matching bootstrap.sh chmod +x
-	if err := os.Chmod(scriptPath, 0o755); err != nil {
-		return fmt.Errorf("failed to make bootstrap script executable: %w", err)
-	}
-
-	log.Infof("Running bootstrap script: %s", scriptPath)
-	//nolint:gosec // scriptPath is controlled by the user via --bootstrap-dir / --bootstrap-script flags
-	cmd := exec.CommandContext(ctx, scriptPath)
-	cmd.Dir = opts.BootstrapDir
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	cmd.Stdin = os.Stdin
-
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("bootstrap script %s failed: %w", scriptPath, err)
-	}
-
-	return nil
-}
-
-// cloneBootstrapRepo performs a shallow git clone of the bootstrap repository.
-func cloneBootstrapRepo(ctx context.Context, opts *Options) error {
-	repoPath := filepath.Join(opts.BootstrapDir, bootstrapRepoDirname)
-	log.Infof("Cloning bootstrap repository %s (ref: %s) to %s", opts.RepoURL, opts.RepoRef, repoPath)
-
-	if err := ensureSSHKnownHost(ctx, opts.RepoURL); err != nil {
-		return err
-	}
-
-	// Remove any existing target directory so the clone is clean.
-	if err := os.RemoveAll(repoPath); err != nil {
-		return fmt.Errorf("failed to remove existing bootstrap dir %s: %w", repoPath, err)
-	}
-
-	//nolint:gosec // arguments come from CLI flags under user control
-	cmd := exec.CommandContext(
-		ctx,
-		"git",
-		"clone",
-		"--depth",
-		"1",
-		"--branch",
-		opts.RepoRef,
-		opts.RepoURL,
-		repoPath,
-	)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("git clone of %s failed: %w", opts.RepoURL, err)
-	}
-
-	return nil
-}
-
-func ensureSSHKnownHost(ctx context.Context, repoURL string) error {
-	sshServer := extractDomain(repoURL)
-	if sshServer == "" {
-		log.Warnf(
-			"Failed to extract SSH server from repo URL %s, SSH host key will not be added to known_hosts",
-			repoURL,
-		)
-		return nil
-	}
-
-	log.Infof("Waiting for SSH server %s to be resolvable...", sshServer)
-	if err := wait.PollUntilContextCancel(ctx, 2*time.Second, true, func(ctx context.Context) (bool, error) {
-		addrs, err := net.DefaultResolver.LookupHost(ctx, sshServer)
-		if err != nil {
-			log.WithError(err).Debugf("SSH server %s not yet resolvable, retrying...", sshServer)
-			return false, nil
-		}
-		if len(addrs) == 0 {
-			log.Debugf("SSH server %s resolved without addresses, retrying...", sshServer)
-			return false, nil
-		}
-		return true, nil
-	}); err != nil {
-		return fmt.Errorf("SSH server %s did not become resolvable: %w", sshServer, err)
-	}
-
-	log.Infof("Adding SSH server %s to known_hosts", sshServer)
-	//nolint:gosec // sshServer is derived from repoURL and only used for ssh-keyscan host lookup.
-	sshKeyscanCmd := exec.CommandContext(ctx, "ssh-keyscan", "-t", "rsa", sshServer)
-	keyscanOutput, err := sshKeyscanCmd.Output()
-	if err != nil {
-		return fmt.Errorf("failed to scan SSH key for %s: %w", sshServer, err)
-	}
-
-	// Ensure $HOME/.ssh directory exists so that ssh-keyscan can write to known_hosts without permission issues.
-	sshDir := filepath.Join(os.Getenv("HOME"), ".ssh")
-
-	//nolint:gosec // path is constrained to user-local HOME and mode is intentionally restrictive.
-	if err := os.MkdirAll(sshDir, 0o700); err != nil {
-		return fmt.Errorf("failed to create .ssh directory: %w", err)
-	}
-
-	knownHostsPath := filepath.Join(sshDir, "known_hosts")
-
-	//nolint:gosec // path is constrained to user-local HOME and mode is intentionally restrictive.
-	if err := os.WriteFile(knownHostsPath, keyscanOutput, 0o600); err != nil {
-		return fmt.Errorf("failed to write known_hosts file: %w", err)
-	}
-
-	return nil
-}
-
-func extractDomain(repoURL string) string {
-	// This is a very naive extraction that assumes the repo URL is in the form "git@domain:owner/repo.git".
-	// In a real implementation, you would want to handle more cases and validate the input properly.
-	parts := strings.Split(repoURL, "@")
-	if len(parts) != 2 {
-		return ""
-	}
-	domainParts := strings.Split(parts[1], ":")
-	if len(domainParts) != 2 {
-		return ""
-	}
-	return domainParts[0]
 }

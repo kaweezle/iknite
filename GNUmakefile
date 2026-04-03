@@ -164,6 +164,10 @@ IKNITECTL_PACKAGE := iknitectl-$(IKNITE_VERSION).$(ARCH).apk
 IKNITECTL_DEB_PACKAGE := iknitectl-$(IKNITE_VERSION).$(ARCH).deb
 IKNITECTL_RPM_PACKAGE := iknitectl-$(IKNITE_VERSION).$(ARCH).rpm
 IKNITECTL_ARCH_PACKAGE := iknitectl-$(IKNITE_VERSION).$(ARCH).pkg.tar.zst
+KUBEWAIT_PACKAGE := kubewait-$(IKNITE_VERSION).$(ARCH).apk
+KUBEWAIT_DEB_PACKAGE := kubewait-$(IKNITE_VERSION).$(ARCH).deb
+KUBEWAIT_RPM_PACKAGE := kubewait-$(IKNITE_VERSION).$(ARCH).rpm
+KUBEWAIT_ARCH_PACKAGE := kubewait-$(IKNITE_VERSION).$(ARCH).pkg.tar.zst
 IKNITE_IMAGES_PACKAGE := iknite-images-$(KUBERNETES_VERSION).$(ARCH).apk
 
 # Incus Agent
@@ -212,6 +216,7 @@ help: # ignore checkmake
 	@echo "  make all                            Run full pipeline (extract key, build packages, rootfs, VM images, etc.)"
 	@echo "  make apk-iknite-build               Build iknite package (goreleaser)"
 	@echo "  make apk-iknitectl-build            Build iknitectl package (goreleaser)"
+	@echo "  make apk-kubewait-build             Build kubewait package (goreleaser)"
 	@echo "  make apk-images-build               Build iknite-images APK"
 	@echo "  make apk-incus-agent-build          Build incus-agent APK"
 	@echo "  make apk-karmafun-fetch             Fetch karmafun dependencies"
@@ -328,8 +333,12 @@ $(ROOT_DIR)/$(KEY_NAME): $(SECRETS_FILE) | check-prerequisites
 .PHONY: ci-extract-key
 ci-extract-key: $(ROOT_DIR)/$(KEY_NAME)
 
+PACKAGES := $(DIST_DIR)/$(IKNITE_PACKAGE)
+PACKAGES += $(DIST_DIR)/$(IKNITECTL_PACKAGE) $(DIST_DIR)/$(IKNITECTL_DEB_PACKAGE) $(DIST_DIR)/$(IKNITECTL_RPM_PACKAGE) $(DIST_DIR)/$(IKNITECTL_ARCH_PACKAGE)
+PACKAGES += $(DIST_DIR)/$(KUBEWAIT_PACKAGE) $(DIST_DIR)/$(KUBEWAIT_DEB_PACKAGE) $(DIST_DIR)/$(KUBEWAIT_RPM_PACKAGE) $(DIST_DIR)/$(KUBEWAIT_ARCH_PACKAGE)
+
 # Goreleaser build produces both iknite and iknitectl packages in a single run
-$(DIST_DIR)/$(IKNITE_PACKAGE) $(DIST_DIR)/$(IKNITECTL_PACKAGE) $(DIST_DIR)/$(IKNITECTL_DEB_PACKAGE) $(DIST_DIR)/$(IKNITECTL_RPM_PACKAGE) $(DIST_DIR)/$(IKNITECTL_ARCH_PACKAGE) $(DIST_DIR)/metadata.json $(DIST_DIR)/iknite_linux_amd64_v1/iknite &: $(GOLANG_FILES) $(APK_FILES) go.mod .goreleaser.yaml | check-prerequisites
+$(PACKAGES) $(DIST_DIR)/metadata.json $(DIST_DIR)/iknite_linux_amd64_v1/iknite &: $(GOLANG_FILES) $(APK_FILES) go.mod .goreleaser.yaml | check-prerequisites
 	goreleaser release --skip=publish $(SNAPSHOT) --clean
 
 .PHONY: apk-iknite-build
@@ -337,6 +346,9 @@ apk-iknite-build: $(DIST_DIR)/$(IKNITE_PACKAGE) $(DIST_DIR)/metadata.json $(DIST
 
 .PHONY: apk-iknitectl-build
 apk-iknitectl-build: $(DIST_DIR)/$(IKNITECTL_PACKAGE) $(DIST_DIR)/$(IKNITECTL_DEB_PACKAGE) $(DIST_DIR)/$(IKNITECTL_RPM_PACKAGE) $(DIST_DIR)/$(IKNITECTL_ARCH_PACKAGE)
+
+.PHONY: apk-kubewait-build
+apk-kubewait-build: $(DIST_DIR)/$(KUBEWAIT_PACKAGE) $(DIST_DIR)/$(KUBEWAIT_DEB_PACKAGE) $(DIST_DIR)/$(KUBEWAIT_RPM_PACKAGE) $(DIST_DIR)/$(KUBEWAIT_ARCH_PACKAGE)
 
 # Download latest karmafun release from GitHub
 $(DIST_DIR)/$(KARMAFUN_PACKAGE): | check-prerequisites
