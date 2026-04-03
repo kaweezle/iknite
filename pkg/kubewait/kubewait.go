@@ -14,6 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// cSpell: words kstatus sirupsen logrus
 // Package kubewait implements the kubewait command.
 // It waits for Kubernetes resources in specified namespaces to become ready
 // using kstatus (one goroutine per namespace), then optionally clones and runs
@@ -24,11 +25,14 @@ import (
 	"context"
 	"fmt"
 
+	log "github.com/sirupsen/logrus"
 	"github.com/spf13/pflag"
+
+	"github.com/kaweezle/iknite/pkg/cmd/util"
 )
 
 type Options struct {
-	Verbosity               string
+	Verbosity               log.Level
 	JSONLogs                bool
 	SkipWaitingForResources bool
 	ResourcesOptions
@@ -39,7 +43,7 @@ func NewOptions() *Options {
 	opts := &Options{
 		ResourcesOptions: NewResourcesOptions(),
 		BootstrapOptions: NewBootstrapOptions(),
-		Verbosity:        "info",
+		Verbosity:        log.InfoLevel,
 	}
 	return opts
 }
@@ -47,8 +51,12 @@ func NewOptions() *Options {
 func AddKubewaitFlags(flags *pflag.FlagSet, opts *Options) {
 	AddResourcesFlags(flags, &opts.ResourcesOptions)
 	AddBootstrapFlags(flags, &opts.BootstrapOptions)
-	flags.StringVarP(&opts.Verbosity, "verbosity", "v", "info",
-		"Log level (debug, info, warn, error, fatal, panic)")
+	flags.VarP(
+		util.NewLogLevelValue(&opts.Verbosity),
+		"verbosity",
+		"v",
+		"Log level (debug, info, warn, error, fatal, panic)",
+	)
 	flags.BoolVar(&opts.JSONLogs, "json", false, "Emit log messages as JSON")
 	flags.BoolVar(
 		&opts.SkipWaitingForResources,
@@ -56,7 +64,6 @@ func AddKubewaitFlags(flags *pflag.FlagSet, opts *Options) {
 		false,
 		"Skip waiting for resources to be ready and proceed directly to the optional bootstrap (for testing purposes)",
 	)
-
 }
 
 // RunKubewait is the main logic for the kubewait command.

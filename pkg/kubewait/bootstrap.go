@@ -42,9 +42,6 @@ const (
 	defaultBootstrapScript = "iknite-bootstrap.sh"
 	defaultBootstrapDir    = "/workspace"
 	defaultEnvFile         = ".env"
-	bootstrapRepoURLEnvVar = "IKNITE_BOOTSTRAP_REPO_URL"
-	bootstrapRepoRefEnvVar = "IKNITE_BOOTSTRAP_REPO_REF"
-	bootstrapScriptEnvVar  = "IKNITE_BOOTSTRAP_SCRIPT"
 	bootstrapRepoDirname   = "bootstrap-repo"
 )
 
@@ -77,11 +74,7 @@ func AddBootstrapFlags(flags *pflag.FlagSet, opts *BootstrapOptions) {
 		"Path to an env file to load before running the bootstrap script (default: .env inside --bootstrap-dir)")
 }
 
-// runBootstrap clones the bootstrap repository (if URL and ref are provided), loads the env
-// file (if present), and executes the bootstrap script.
-func runBootstrap(ctx context.Context, opts *Options) error {
-	// Clone the repository when a ref is also supplied; if no ref is given the clone is skipped.
-
+func (opts *BootstrapOptions) ReadEnvFile() (bool, error) {
 	// Determine the env file path.
 	envFile := opts.EnvFile
 	if envFile == "" {
@@ -91,25 +84,17 @@ func runBootstrap(ctx context.Context, opts *Options) error {
 	if info, err := os.Stat(envFile); err == nil && !info.IsDir() {
 		log.Infof("Loading environment from %s", envFile)
 		if loadErr := godotenv.Load(envFile); loadErr != nil {
-			return fmt.Errorf("failed to load env file %s: %w", envFile, loadErr)
+			return false, fmt.Errorf("failed to load env file %s: %w", envFile, loadErr)
 		}
 	}
 
-	bootstrapRepoURL, ok := os.LookupEnv(bootstrapRepoURLEnvVar)
-	if ok {
-		log.Infof("Overriding bootstrap repo URL from env var %s: %s", bootstrapRepoURLEnvVar, bootstrapRepoURL)
-		opts.RepoURL = bootstrapRepoURL
-	}
-	bootstrapRepoRef, ok := os.LookupEnv(bootstrapRepoRefEnvVar)
-	if ok {
-		log.Infof("Overriding bootstrap repo ref from env var %s: %s", bootstrapRepoRefEnvVar, bootstrapRepoRef)
-		opts.RepoRef = bootstrapRepoRef
-	}
-	bootstrapScript, ok := os.LookupEnv(bootstrapScriptEnvVar)
-	if ok {
-		log.Infof("Overriding bootstrap script from env var %s: %s", bootstrapScriptEnvVar, bootstrapScript)
-		opts.BootstrapScript = bootstrapScript
-	}
+	return true, nil
+}
+
+// runBootstrap clones the bootstrap repository (if URL and ref are provided), loads the env
+// file (if present), and executes the bootstrap script.
+func runBootstrap(ctx context.Context, opts *Options) error {
+	// Clone the repository when a ref is also supplied; if no ref is given the clone is skipped.
 
 	baseDir := opts.BootstrapDir
 	if opts.RepoURL != "" && opts.RepoRef != "" {

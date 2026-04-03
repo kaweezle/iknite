@@ -23,13 +23,14 @@ package kubewait
 // cSpell: words godotenv clientcmd apimachinery kstatus errorf sirupsen joho metav1
 
 import (
-	"fmt"
 	"io"
 	"os"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 
+	cmdUtil "github.com/kaweezle/iknite/pkg/cmd/util"
 	"github.com/kaweezle/iknite/pkg/kubewait"
 )
 
@@ -70,12 +71,27 @@ Examples:
 			if err := setUpLogs(out, opts.Verbosity, opts.JSONLogs); err != nil {
 				return err
 			}
+
 			return kubewait.RunKubewait(cmd.Context(), opts, args)
+		},
+		PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
+			rootCmd := cmd.Root()
+			err := cmdUtil.InitializeConfiguration(rootCmd)
+			cobra.CheckErr(err)
+			cmdUtil.ApplyViperConfigToFlags(rootCmd, viper.GetViper(), "")
+			ok, err := opts.ReadEnvFile()
+			cobra.CheckErr(err)
+			if ok {
+				// Re-apply config to flags to override with env file values if needed
+				cmdUtil.ApplyViperConfigToFlags(rootCmd, viper.GetViper(), "")
+			}
+			return nil
 		},
 	}
 
 	flags := cmd.Flags()
 	kubewait.AddKubewaitFlags(flags, opts)
+	cmdUtil.BindFlagsToViper(cmd, viper.GetViper(), "")
 
 	return cmd
 }
@@ -86,15 +102,11 @@ func Execute() {
 }
 
 // setUpLogs configures logrus output and level.
-func setUpLogs(out io.Writer, level string, jsonFormat bool) error {
+func setUpLogs(out io.Writer, level log.Level, jsonFormat bool) error {
 	log.SetOutput(out)
 	if jsonFormat {
 		log.SetFormatter(&log.JSONFormatter{})
 	}
-	lvl, err := log.ParseLevel(level)
-	if err != nil {
-		return fmt.Errorf("invalid log level %q: %w", level, err)
-	}
-	log.SetLevel(lvl)
+	log.SetLevel(level)
 	return nil
 }
