@@ -107,7 +107,10 @@ func runBootstrap(ctx context.Context, opts *Options) error {
 	}
 
 	// Locate and execute the bootstrap script.
-	scriptPath := filepath.Join(baseDir, opts.BootstrapScript)
+	scriptPath := opts.BootstrapScript
+	if !filepath.IsAbs(scriptPath) {
+		scriptPath = filepath.Join(baseDir, opts.BootstrapScript)
+	}
 	if _, err := os.Stat(scriptPath); err != nil {
 		log.Infof(
 			"Bootstrap script %s not found in %s with error %v, skipping",
@@ -135,7 +138,7 @@ func runBootstrap(ctx context.Context, opts *Options) error {
 	log.Infof("Running bootstrap script: %s", scriptPath)
 	//nolint:gosec // scriptPath is controlled by the user via --bootstrap-dir / --bootstrap-script flags
 	cmd := exec.CommandContext(ctx, scriptPath)
-	cmd.Dir = opts.BootstrapDir
+	cmd.Dir = baseDir
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	cmd.Stdin = os.Stdin

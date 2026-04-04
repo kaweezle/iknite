@@ -113,12 +113,10 @@ spec:
       containers:
         - name: create-address-pools
           image: ghcr.io/kaweezle/iknite-bootstrap:v0.7.1-devel
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: Always
           env:
-            - name: KUBEWAIT_BOOTSTRAP_DIR
-              value: "/scripts"
             - name: KUBEWAIT_BOOTSTRAP_SCRIPT
-              value: "create-address-pools.sh"
+              value: "/scripts/create-address-pools.sh"
             - name: KUBEWAIT_RESOURCE_TYPES
               value: "deployments,daemonsets,statefulsets"
           volumeMounts:
