@@ -127,6 +127,10 @@ func toStringSlice(val any) ([]string, error) {
 	switch v := val.(type) {
 	case []string:
 		return v, nil
+	// For the case where the value is defined in a environment variable.
+	// see https://github.com/spf13/viper/issues/380
+	case string:
+		return strings.Split(v, ","), nil
 	case []any:
 		values := make([]string, len(v))
 		for i, item := range v {

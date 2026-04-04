@@ -118,9 +118,18 @@ func runBootstrap(ctx context.Context, opts *Options) error {
 		return nil
 	}
 
-	//nolint:gosec // ensure executable, matching bootstrap.sh chmod +x
-	if err := os.Chmod(scriptPath, 0o755); err != nil {
-		return fmt.Errorf("failed to make bootstrap script executable: %w", err)
+	// Check if the script is executable, and if not, attempt to make it executable.
+	// Don't touch it if it is already executable because it may reside on a read-only filesystem.
+	info, err := os.Stat(scriptPath)
+	if err != nil {
+		return fmt.Errorf("failed to stat bootstrap script %s: %w", scriptPath, err)
+	}
+	if info.Mode()&0o111 == 0 {
+		log.Infof("Bootstrap script %s is not executable, attempting to make it executable", scriptPath)
+		//nolint:gosec // ensure executable, matching bootstrap.sh chmod +x
+		if chmodErr := os.Chmod(scriptPath, 0o755); chmodErr != nil {
+			return fmt.Errorf("failed to make bootstrap script %s executable: %w", scriptPath, chmodErr)
+		}
 	}
 
 	log.Infof("Running bootstrap script: %s", scriptPath)

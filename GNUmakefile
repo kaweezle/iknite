@@ -337,12 +337,15 @@ PACKAGES := $(DIST_DIR)/$(IKNITE_PACKAGE)
 PACKAGES += $(DIST_DIR)/$(IKNITECTL_PACKAGE) $(DIST_DIR)/$(IKNITECTL_DEB_PACKAGE) $(DIST_DIR)/$(IKNITECTL_RPM_PACKAGE) $(DIST_DIR)/$(IKNITECTL_ARCH_PACKAGE)
 PACKAGES += $(DIST_DIR)/$(KUBEWAIT_PACKAGE) $(DIST_DIR)/$(KUBEWAIT_DEB_PACKAGE) $(DIST_DIR)/$(KUBEWAIT_RPM_PACKAGE) $(DIST_DIR)/$(KUBEWAIT_ARCH_PACKAGE)
 
+IKNITE_BINARY := $(DIST_DIR)/iknite_linux_amd64_v1/iknite
+KUBEWAIT_BINARY := $(DIST_DIR)/kubewait_linux_amd64_v1/kubewait
+
 # Goreleaser build produces both iknite and iknitectl packages in a single run
-$(PACKAGES) $(DIST_DIR)/metadata.json $(DIST_DIR)/iknite_linux_amd64_v1/iknite &: $(GOLANG_FILES) $(APK_FILES) go.mod .goreleaser.yaml | check-prerequisites
+$(PACKAGES) $(DIST_DIR)/metadata.json $(IKNITE_BINARY) $(KUBEWAIT_BINARY) &: $(GOLANG_FILES) $(APK_FILES) go.mod .goreleaser.yaml | check-prerequisites
 	goreleaser release --skip=publish $(SNAPSHOT) --clean
 
 .PHONY: apk-iknite-build
-apk-iknite-build: $(DIST_DIR)/$(IKNITE_PACKAGE) $(DIST_DIR)/metadata.json $(DIST_DIR)/iknite_linux_amd64_v1/iknite
+apk-iknite-build: $(DIST_DIR)/$(IKNITE_PACKAGE) $(DIST_DIR)/metadata.json $(IKNITE_BINARY)
 
 .PHONY: apk-iknitectl-build
 apk-iknitectl-build: $(DIST_DIR)/$(IKNITECTL_PACKAGE) $(DIST_DIR)/$(IKNITECTL_DEB_PACKAGE) $(DIST_DIR)/$(IKNITECTL_RPM_PACKAGE) $(DIST_DIR)/$(IKNITECTL_ARCH_PACKAGE)
@@ -359,14 +362,13 @@ $(DIST_DIR)/$(KARMAFUN_PACKAGE): | check-prerequisites
 apk-karmafun-fetch: $(DIST_DIR)/$(KARMAFUN_PACKAGE)
 
 # Build iknite-images APK by extracting image list from kustomization and using melange in a container
-$(DIST_DIR)/$(IKNITE_IMAGES_PACKAGE): $(DIST_DIR)/iknite_linux_amd64_v1/iknite $(KUSTOMIZATION_FILES) $(ROOT_DIR)/$(KEY_NAME)| check-prerequisites
+$(DIST_DIR)/$(IKNITE_IMAGES_PACKAGE): $(IKNITE_BINARY) $(KUSTOMIZATION_FILES) $(ROOT_DIR)/$(KEY_NAME)| check-prerequisites
 	BUILD_DIR_SUFFIX="build/apk/iknite-images"; \
 	BUILD_DIR="$(ROOT_DIR)/$$BUILD_DIR_SUFFIX"; \
 	rm -rf "$$BUILD_DIR"; \
 	mkdir -p "$$BUILD_DIR"; \
 	echo "KUBERNETES_VERSION: $(KUBERNETES_VERSION)" > "$$BUILD_DIR/.env"; \
-	"$(DIST_DIR)/iknite_linux_amd64_v1/iknite" info images --force-embedded > "$$BUILD_DIR/image-list.txt"; \
-	sort -u "$$BUILD_DIR/image-list.txt" -o "$$BUILD_DIR/image-list.txt"; \
+	"$(IKNITE_BINARY)" info images --force-embedded > "$$BUILD_DIR/image-list.txt"; \
 	$(RUN_CONTAINER_CMD) run --privileged --rm -v "$(ROOT_DIR):/work" cgr.dev/chainguard/melange \
 		build packaging/apk/iknite-images/iknite-images.yaml \
 		--arch "$(ARCH)" \
@@ -777,17 +779,22 @@ $(IKNITE_CICONTAINER_IMAGE_MARKER): $(IKNITE_CICONTAINER_SOURCES) | check-prereq
 .PHONY: container-ci-build
 container-ci-build: $(IKNITE_CICONTAINER_IMAGE_MARKER)
 
-$(IKNITE_BOOTSTRAP_IMAGE_MARKER): $(IKNITE_BOOTSTRAP_SOURCES) | check-prerequisites container-login
+$(IKNITE_BOOTSTRAP_IMAGE_MARKER): $(KUBEWAIT_BINARY) $(IKNITE_BOOTSTRAP_SOURCES) | check-prerequisites container-login
+	BUILD_DIR_PATH="$(BUILD_DIR)/iknite-bootstrap"; \
+	rm -rf "$$BUILD_DIR_PATH"; \
+	mkdir -p "$$BUILD_DIR_PATH"; \
+	cp -r "$(ROOT_DIR)/deploy/k8s/container-images/iknite-bootstrap/." "$$BUILD_DIR_PATH/"; \
+	cp "$(KUBEWAIT_BINARY)" "$$BUILD_DIR_PATH/"; \
 	$(BUILD_CONTAINER_CMD) build \
 		--frontend dockerfile.v0 \
 		--import-cache=$(BUILD_CONTAINER_CACHE_FROM) \
 		--export-cache=$(BUILD_CONTAINER_CACHE_TO) \
-		--local "context=$(IKNITE_BOOTSTRAP_DIR)" \
-		--local "dockerfile=$(IKNITE_BOOTSTRAP_DIR)" \
+		--local "context=$$BUILD_DIR_PATH" \
+		--local "dockerfile=$$BUILD_DIR_PATH" \
 		--opt "build-arg:IKNITE_REPO_URL=https://static.iknite.app/$(IKNITE_REPO_NAME)/" \
 		--opt "build-arg:IKNITE_VERSION=$(IKNITE_VERSION)" \
 		$(CACHE_FLAG) \
-		--output "type=docker,dest=-,name=$(IKNITE_BOOTSTRAP_IMAGE),push=false" | $(RUN_CONTAINER_CMD) load
+		--output "type=docker,name=$(IKNITE_BOOTSTRAP_IMAGE)" | $(RUN_CONTAINER_CMD) load; \
 	if [ "$(PUSH_IMAGES)" = "true" ]; then \
 		$(RUN_CONTAINER_CMD) push "$(IKNITE_BOOTSTRAP_IMAGE)"; \
 		if [ -n "$(IKNITE_BOOTSTRAP_IMAGE_ADDITIONAL_TAG)" ]; then \
