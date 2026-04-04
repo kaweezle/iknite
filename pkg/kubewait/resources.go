@@ -20,12 +20,13 @@ limitations under the License.
 // a bootstrap repository script.
 package kubewait
 
-// cSpell: words godotenv clientcmd apimachinery kstatus errorf sirupsen joho metav1
+// cSpell: words godotenv clientcmd apimachinery kstatus errorf sirupsen joho metav1 serviceaccount
 
 import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"sync"
 	"time"
 
@@ -53,6 +54,7 @@ const (
 	defaultResourcesUpdateInterval = 2 * time.Second
 	defaultSettlePeriod            = 10 * time.Second
 	defaultNamespaceSettlePeriod   = 20 * time.Second
+	currentNamespaceFile           = "/var/run/secrets/kubernetes.io/serviceaccount/namespace"
 )
 
 var defaultResourceTypes = []string{"deployments", "statefulsets", "daemonsets", "jobs", "cronjobs", "applications"}
@@ -121,9 +123,20 @@ func waitForResources(ctx context.Context, opts *Options, namespaces []string) e
 
 	// If no namespaces were given, list all that exist right now.
 	if len(namespaces) == 0 {
-		namespaces, err = listNamespaces(ctx, client, opts.StatusUpdateInterval)
-		if err != nil {
-			return err
+		if info, err := os.Stat(currentNamespaceFile); err == nil && !info.IsDir() && !opts.AllNamespaces {
+			log.Infof("Getting namespace from %s", currentNamespaceFile)
+			namespaceBytes, readErr := os.ReadFile(currentNamespaceFile)
+			if readErr != nil {
+				return fmt.Errorf("failed to read namespace from file %s: %w", currentNamespaceFile, readErr)
+			}
+			namespace := string(namespaceBytes)
+			log.Infof("Watching current namespace: %s", namespace)
+			namespaces = []string{namespace}
+		} else {
+			namespaces, err = listNamespaces(ctx, client, opts.StatusUpdateInterval)
+			if err != nil {
+				return fmt.Errorf("failed to list namespaces: %w", err)
+			}
 		}
 	}
 

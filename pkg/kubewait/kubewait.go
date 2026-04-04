@@ -36,6 +36,7 @@ type Options struct {
 	JSONLogs                bool
 	SkipWaitingForResources bool
 	SkipBootstrap           bool
+	AllNamespaces           bool
 	ResourcesOptions
 	BootstrapOptions
 }
@@ -70,6 +71,12 @@ func AddKubewaitFlags(flags *pflag.FlagSet, opts *Options) {
 		"skip-bootstrap",
 		false,
 		"Skip the bootstrap process (for testing purposes)",
+	)
+	flags.BoolVar(
+		&opts.AllNamespaces,
+		"all-namespaces",
+		false,
+		"Watch all namespaces in the cluster (ignored if specific namespaces are provided as arguments)",
 	)
 }
 
