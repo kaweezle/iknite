@@ -35,6 +35,7 @@ type Options struct {
 	Verbosity               log.Level
 	JSONLogs                bool
 	SkipWaitingForResources bool
+	SkipBootstrap           bool
 	ResourcesOptions
 	BootstrapOptions
 }
@@ -64,6 +65,12 @@ func AddKubewaitFlags(flags *pflag.FlagSet, opts *Options) {
 		false,
 		"Skip waiting for resources to be ready and proceed directly to the optional bootstrap (for testing purposes)",
 	)
+	flags.BoolVar(
+		&opts.SkipBootstrap,
+		"skip-bootstrap",
+		false,
+		"Skip the bootstrap process (for testing purposes)",
+	)
 }
 
 // RunKubewait is the main logic for the kubewait command.
@@ -74,8 +81,10 @@ func RunKubewait(ctx context.Context, opts *Options, namespaces []string) error 
 		}
 	}
 
-	if err := runBootstrap(ctx, opts); err != nil {
-		return fmt.Errorf("error during bootstrap: %w", err)
+	if !opts.SkipBootstrap {
+		if err := runBootstrap(ctx, opts); err != nil {
+			return fmt.Errorf("error during bootstrap: %w", err)
+		}
 	}
 	return nil
 }

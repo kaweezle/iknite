@@ -35,7 +35,6 @@ import (
 	k8errors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/client-go/kubernetes"
 	kubeUtil "k8s.io/kubectl/pkg/cmd/util"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling/aggregator"
@@ -110,16 +109,6 @@ func waitForResources(ctx context.Context, opts *Options, namespaces []string) e
 
 	client := k8s.NewRESTClientGetterFromKubeconfig(opts.Kubeconfig)
 
-	restConfig, err := client.ToRESTConfig()
-	if err != nil {
-		return fmt.Errorf("failed to build REST config: %w", err)
-	}
-
-	k8sClient, err := kubernetes.NewForConfig(restConfig)
-	if err != nil {
-		return fmt.Errorf("failed to create Kubernetes client: %w", err)
-	}
-
 	// Validate that the requested resource types are supported by the cluster before starting the wait loops.
 	validTypes, err := client.ValidateResourceTypes(opts.ResourceTypes)
 	if err != nil {
@@ -132,7 +121,7 @@ func waitForResources(ctx context.Context, opts *Options, namespaces []string) e
 
 	// If no namespaces were given, list all that exist right now.
 	if len(namespaces) == 0 {
-		namespaces, err = listNamespaces(ctx, k8sClient, opts.StatusUpdateInterval)
+		namespaces, err = listNamespaces(ctx, client, opts.StatusUpdateInterval)
 		if err != nil {
 			return err
 		}
@@ -145,7 +134,7 @@ func waitForResources(ctx context.Context, opts *Options, namespaces []string) e
 	var wg sync.WaitGroup
 	for _, ns := range namespaces {
 		wg.Go(func() {
-			if err := waitNamespaceResources(ctx, client, k8sClient, ns, opts); err != nil {
+			if err := waitNamespaceResources(ctx, client, ns, opts); err != nil {
 				errCh <- err
 			}
 		})
@@ -168,14 +157,19 @@ func waitForResources(ctx context.Context, opts *Options, namespaces []string) e
 // listNamespaces polls the API server until it can list all namespaces.
 func listNamespaces(
 	ctx context.Context,
-	k8sClient kubernetes.Interface,
+	client *k8s.RESTClientGetter,
 	interval time.Duration,
 ) ([]string, error) {
 	log.Info("No namespaces specified, listing all namespaces from the cluster...")
 
+	k8sInterface, err := client.ToKubernetesInterface()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create Kubernetes client: %w", err)
+	}
+
 	var names []string
 	if err := wait.PollUntilContextCancel(ctx, interval, true, func(ctx context.Context) (bool, error) {
-		list, listErr := k8sClient.CoreV1().Namespaces().List(ctx, metav1.ListOptions{})
+		list, listErr := k8sInterface.CoreV1().Namespaces().List(ctx, metav1.ListOptions{})
 		if listErr != nil {
 			log.WithError(listErr).Debug("API not available yet, retrying...")
 			return false, nil
@@ -471,7 +465,6 @@ func (w *resourceWaiter) Start(ctx context.Context) error {
 func waitNamespaceResources(
 	ctx context.Context,
 	client *k8s.RESTClientGetter,
-	k8sClient kubernetes.Interface,
 	namespace string,
 	opts *Options,
 ) error {
@@ -479,13 +472,17 @@ func waitNamespaceResources(
 	// 1. Wait for the namespace to exist.
 	logger.Infof("Waiting for namespace to exist...")
 	var ns *coreV1.Namespace
+	k8sInterface, err := client.ToKubernetesInterface()
+	if err != nil {
+		return fmt.Errorf("failed to create Kubernetes client: %w", err)
+	}
 	if err := wait.PollUntilContextCancel(
 		ctx,
 		opts.StatusUpdateInterval,
 		true,
 		func(ctx context.Context) (bool, error) {
 			var err error
-			ns, err = k8sClient.CoreV1().Namespaces().Get(ctx, namespace, metav1.GetOptions{})
+			ns, err = k8sInterface.CoreV1().Namespaces().Get(ctx, namespace, metav1.GetOptions{})
 			if err != nil {
 				if k8errors.IsNotFound(err) {
 					logger.Debugf("Namespace not yet present, waiting...")

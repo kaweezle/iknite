@@ -161,6 +161,7 @@ func (client *RESTClientGetter) ResourceInfosForNamespace(
 		SelectAllParam(true).
 		ContinueOnError().
 		Flatten().
+		Latest().
 		Do()
 
 	infos, err := r.Infos()

@@ -21,6 +21,7 @@ import (
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/discovery/cached/memory"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/restmapper"
 	"k8s.io/client-go/tools/clientcmd"
@@ -46,7 +47,8 @@ func (config *Config) RESTClient() *RESTClientGetter {
 
 func (r *RESTClientGetter) ToRESTConfig() (*rest.Config, error) {
 	if r.restConfig != nil {
-		return r.restConfig, nil
+		result := *r.restConfig
+		return &result, nil
 	}
 
 	if r.clientconfig == nil {
@@ -70,6 +72,18 @@ func (r *RESTClientGetter) ToDiscoveryClient() (discovery.CachedDiscoveryInterfa
 		return nil, fmt.Errorf("failed to create discovery client: %w", err)
 	}
 	return memory.NewMemCacheClient(dc), nil
+}
+
+func (r *RESTClientGetter) ToKubernetesInterface() (kubernetes.Interface, error) {
+	restconfig, err := r.ToRESTConfig()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get REST config for Kubernetes client: %w", err)
+	}
+	client, err := kubernetes.NewForConfig(restconfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create Kubernetes client: %w", err)
+	}
+	return client, nil
 }
 
 func (r *RESTClientGetter) ToRESTMapper() (meta.RESTMapper, error) {
