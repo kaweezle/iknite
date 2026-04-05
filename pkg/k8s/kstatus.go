@@ -4,13 +4,14 @@ package k8s
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sort"
-	"strings"
 	"time"
 
 	argoV1 "github.com/argoproj/argo-cd/v3/pkg/apis/application/v1alpha1"
 	log "github.com/sirupsen/logrus"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -83,67 +84,43 @@ func workloadStatesToSlice(infos []*resource.Info) ([]*v1alpha1.WorkloadState, e
 	return result, nil
 }
 
-// FIXME:
-// While the cluster is starting, if we retrieve all resources, we get:
-//
-//	while getting server preferred resources: unable to retrieve the complete list of server
-//	APIs: metrics.k8s.io/v1beta1: stale GroupVersion discovery: metrics.k8s.io/v1beta1
-//
-// We try to mitigate this by only retrieving the resources we care about, but this limits the functionality of the
-// tool. We should consider implementing a retry mechanism with backoff to handle this more gracefully.
-var resourceTypesGroupVersions = map[string]string{
-	"deployments":  "apps/v1",
-	"statefulsets": "apps/v1",
-	"daemonsets":   "apps/v1",
-	"jobs":         "batch/v1",
-	"cronjobs":     "batch/v1",
-	"applications": "argoproj.io/v1alpha1",
-}
-
+// ValidateResourceTypes checks if the provided resource types are valid by attempting to find their corresponding
+// GroupVersionKind in the REST mapper. It returns a slice of valid resource types and an error if the
+// validation process encounters an issue.
 func (client *RESTClientGetter) ValidateResourceTypes(types []string) ([]string, error) {
-	groupVersionsResourceTypes := make(map[string][]string)
-	for _, t := range types {
-		gv, ok := resourceTypesGroupVersions[t]
-		if !ok {
-			return nil, fmt.Errorf("resource type %s is not supported", t)
-		}
-		groupVersionsResourceTypes[gv] = append(groupVersionsResourceTypes[gv], t)
-	}
-	discovery, err := client.ToDiscoveryClient()
+	restMapper, err := client.ToRESTMapper()
 	if err != nil {
-		return nil, fmt.Errorf("while getting discovery client: %w", err)
+		return nil, fmt.Errorf("while getting REST mapper: %w", err)
 	}
 
 	validTypes := make([]string, 0, len(types))
-	for gv, rts := range groupVersionsResourceTypes {
-		log.WithField("groupVersion", gv).Infof("Checking resource types: %s", strings.Join(rts, ","))
+	noMatchError := &meta.NoResourceMatchError{}
+	for _, t := range types {
 		const maxAttempts = 3
-		const retryDelay = 3 * time.Second
+		const retryDelay = 1 * time.Second
 
-		list, err := discovery.ServerResourcesForGroupVersion(gv)
-		for attempt := 2; err != nil && attempt <= maxAttempts; attempt++ {
+		gvr := schema.GroupVersionResource{Group: "", Version: "", Resource: t}
+		_, err := restMapper.KindFor(gvr)
+		for attempt := 2; err != nil && !errors.Is(err, noMatchError) && attempt <= maxAttempts; attempt++ {
 			log.WithError(err).WithFields(log.Fields{
-				"groupVersion": gv,
+				"resourceType": t,
 				"attempt":      attempt,
-			}).Warn("Failed to discover server resources, retrying")
+			}).Warn("Failed to get resource infos, retrying")
 			time.Sleep(retryDelay)
-			list, err = discovery.ServerResourcesForGroupVersion(gv)
+			_, err = restMapper.KindFor(gvr)
 		}
+
 		if err != nil {
-			return nil, fmt.Errorf("while getting server resources for group version %s: %w", gv, err)
-		}
-		availableResourceTypes := make(map[string]struct{}, len(list.APIResources))
-		for i := range list.APIResources {
-			availableResourceTypes[list.APIResources[i].Name] = struct{}{}
-		}
-		for _, rt := range rts {
-			if _, ok := availableResourceTypes[rt]; ok {
-				log.WithField("resourceType", rt).Info("Resource type is available")
-				validTypes = append(validTypes, rt)
-			} else {
-				log.WithField("resourceType", rt).Warn("Non existent resource type, removing...")
+			if errors.Is(err, noMatchError) {
+				log.WithError(err).
+					WithField("resourceType", t).
+					Warn("Resource type not found in REST mapper, skipping...")
+				continue
 			}
+			return nil, fmt.Errorf("while validating resource type %s: %w", t, err)
 		}
+		log.WithField("resourceType", t).Info("Resource type is available in REST mapper")
+		validTypes = append(validTypes, t)
 	}
 	return validTypes, nil
 }
