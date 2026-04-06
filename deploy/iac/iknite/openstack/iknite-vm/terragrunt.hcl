@@ -63,9 +63,11 @@ write_files:
     owner: "root:root"
     permissions: "0640"
     content: |
-        IKNITE_BOOTSTRAP_REPO_URL=${local.git_url}
-        IKNITE_BOOTSTRAP_REPO_REF=${local.git_ref}
-        IKNITE_BOOTSTRAP_SCRIPT=iknite-bootstrap.sh
+        KUBEWAIT_BOOTSTRAP_REPO_URL=${local.git_url}
+        KUBEWAIT_BOOTSTRAP_REPO_REF=${local.git_ref}
+        KUBEWAIT_BOOTSTRAP_SCRIPT=iknite-bootstrap.sh
+        GIT_SSH_COMMAND="ssh -i /workspace/.ssh/id_ed25519"
+        SOPS_AGE_SSH_PRIVATE_KEY_FILE="/workspace/.ssh/id_ed25519"
   - path: /opt/iknite/bootstrap/.ssh/id_ed25519
     owner: "root:root"
     permissions: "0600"

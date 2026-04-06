@@ -1,3 +1,4 @@
+# cSpell: words kubevip
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
@@ -22,14 +23,9 @@ metadata:
   name: kube-vip-address-pool-admin
   namespace: kube-system
 rules:
-  - apiGroups:
-      - apps
-    resources:
-      - deployments
-    verbs:
-      - get
-      - list
-      - watch
+  - apiGroups: ["", "apps"]
+    resources: ["*"]
+    verbs: [get, list]
   - apiGroups:
       - ""
     resources:
@@ -82,6 +78,18 @@ subjects:
     name: kube-vip-address-pool-admin
     namespace: kube-system
 ---
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: kubevip-address-pool-script
+  namespace: kube-system
+data:
+  create-address-pools.sh: |
+    #!/bin/sh
+    set -xe
+    ip=$(kubectl get nodes -o jsonpath='{range .items[*]}{range .status.addresses[*]}{.address}{"\n"}{end}{end}' | head -1)
+    kubectl create configmap -n kube-system kubevip --from-literal cidr-global=$ip/32 -o yaml --dry-run=client | kubectl apply -f -
+---
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -97,16 +105,20 @@ spec:
       serviceAccountName: kube-vip-address-pool-admin
       automountServiceAccountToken: true
       restartPolicy: OnFailure
+      volumes:
+        - name: script
+          configMap:
+            name: kubevip-address-pool-script
+            defaultMode: 0755
       containers:
         - name: create-address-pools
           image: ghcr.io/kaweezle/iknite-bootstrap:v0.7.1-devel
-          imagePullPolicy: IfNotPresent
-          command:
-            - /bin/sh
-            - -c
-            - |
-              set -xe
-              kubectl rollout status deployment/kube-vip-cloud-provider -n kube-system
-              ip=$(kubectl get nodes -o jsonpath='{range .items[*]}{range .status.addresses[*]}{.address}{"\n"}{end}{end}' | head -1)
-              sleep 3
-              kubectl create configmap -n kube-system kubevip --from-literal cidr-global=$ip/32 -o yaml --dry-run=client | kubectl apply -f -
+          imagePullPolicy: Always
+          env:
+            - name: KUBEWAIT_BOOTSTRAP_SCRIPT
+              value: "/scripts/create-address-pools.sh"
+            - name: KUBEWAIT_RESOURCE_TYPES
+              value: "deployments,daemonsets,statefulsets"
+          volumeMounts:
+            - name: script
+              mountPath: /scripts

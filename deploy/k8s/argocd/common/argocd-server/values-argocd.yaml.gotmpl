@@ -396,19 +396,6 @@ extraObjects:
   {{ if not (env "IKNITE_ARGOCD") }}
   -
     apiVersion: v1
-    kind: ConfigMap
-    metadata:
-      name: bootstrap
-      annotations:
-        argocd.argoproj.io/hook: Skip
-    # The dot (.) character cannot be used as separator here as names are going to be
-    # used as environment variables.
-    data:
-      autocloud_target_revision: {{ .Values.data.argocd.target_revision | quote }}
-      autocloud_repo_url: git@github.com:{{ .Values.data.project.github.organization }}/{{ .Values.data.project.github.repo }}.git
-      autocloud_bootstrap_application_path: "{{ .Values.data.argocd.base_path }}/appstages/{{ .Values.data.argocd.bootstrap_application }}/application.yaml"
-  -
-    apiVersion: v1
     kind: ServiceAccount
     metadata:
       labels:
@@ -434,6 +421,18 @@ extraObjects:
         namespace: argocd
         name: argocd-application-admin
   -
+    apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: bootstrap-script
+      annotations:
+        argocd.argoproj.io/hook: Skip
+    data:
+      deploy-bootstrap-application.sh: |
+         #!/bin/sh
+         set -e
+         kubectl apply -f "{{ .Values.data.argocd.base_path }}/appstages/{{ .Values.data.argocd.bootstrap_application }}/application.yaml"
+  -
     apiVersion: batch/v1
     kind: Job
     metadata:
@@ -454,41 +453,33 @@ extraObjects:
             - name: ssh-key-volume
               secret:
                 secretName: argocd-ssh-private-key
+                defaultMode: 0400
+            - name: bootstrap-script
+              configMap:
+                name: bootstrap-script
+                defaultMode: 0755
           containers:
             - name: create-bootstrap-application
-              image: {{ .Values.data.argocd.repo_server.image_name }}:{{ .Values.data.argocd.repo_server.image_tag }}
+              image: ghcr.io/kaweezle/iknite-bootstrap:v0.7.1-devel
               imagePullPolicy: IfNotPresent
-              envFrom:
-                - configMapRef:
-                    name: bootstrap
               env:
-                - name: ROLLOUT_INITIAL_DELAY
-                  value: "5"
-                - name: ROLLOUT_TIMEOUT
-                  value: "90s"
-              command:
-                - /bin/bash
-                - -c
-                - |
-                  set -xe
-
-                  whoami
-                  mkdir ~/.ssh
-                  chmod -R 777 ~/.ssh
-                  cp /etc/ssh-key/* ~/.ssh
-                  eval $(ssh-agent) && ssh-add /etc/ssh-key/id_ed25519
-                  ssh-keyscan -t rsa github.com >> ~/.ssh/known_hosts
-
-                  sleep $ROLLOUT_INITIAL_DELAY
-                  ns=$(cat /var/run/secrets/kubernetes.io/serviceaccount/namespace)
-                  # Wait for ArgoCD deployment to settle. If the application is created too early,
-                  # It won't be deployed.
-                  kubectl -n "$ns" rollout status deployments,statefulsets,daemonsets --timeout=$ROLLOUT_TIMEOUT
-
-                  git clone "${autocloud_repo_url}" repo
-                  cd repo; git checkout "${autocloud_target_revision}"
-                  kubectl apply -f "${autocloud_bootstrap_application_path}"
+                - name: KUBEWAIT_BOOTSTRAP_REPO_REF
+                  value: {{ .Values.data.argocd.target_revision | quote }}
+                - name: KUBEWAIT_BOOTSTRAP_REPO_URL
+                  value: "git@github.com:{{ .Values.data.project.github.organization }}/{{ .Values.data.project.github.repo }}.git"
+                - name: KUBEWAIT_BOOTSTRAP_SCRIPT
+                  value: /bootstrap/deploy-bootstrap-application.sh
+                - name: GIT_SSH_COMMAND
+                  value: "ssh -i /etc/ssh-key/id_ed25519"
+                - name: SOPS_AGE_SSH_PRIVATE_KEY_FILE
+                  value: "/etc/ssh-key/id_ed25519"
+              {{ if (env "IKNITE_ENV_FORMAT") }}
+                - name: IKNITE_ENV_FORMAT
+                  value: {{ env "IKNITE_ENV_FORMAT" | quote }}
+              {{ end }}
               volumeMounts:
                 - mountPath: /etc/ssh-key
                   name: ssh-key-volume
+                - mountPath: /bootstrap
+                  name: bootstrap-script
   {{ end }}

@@ -9,7 +9,7 @@ before:
     - go mod tidy
 builds:
   - id: iknite
-    main: ./cmd/iknite/iknite.go
+    main: ./cmd/iknite
     env:
       - CGO_ENABLED=0
     goos:
@@ -40,6 +40,19 @@ builds:
       - -trimpath
     ldflags:
       - -s -w
+  - id: kubewait
+    main: ./cmd/kubewait
+    binary: kubewait
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+    goarch:
+      - amd64
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w
 archives:
   - id: iknite
     ids: [iknite]
@@ -54,6 +67,15 @@ archives:
     ids: [iknitectl]
     name_template: >-
       iknitectl_
+      {{- title .Os }}_
+      {{- if eq .Arch "amd64" }}x86_64
+      {{- else if eq .Arch "386" }}i386
+      {{- else }}{{ .Arch }}{{ end }}
+      {{- if .Arm }}v{{ .Arm }}{{ end }}
+  - id: kubewait
+    ids: [kubewait]
+    name_template: >-
+      kubewait_
       {{- title .Os }}_
       {{- if eq .Arch "amd64" }}x86_64
       {{- else if eq .Arch "386" }}i386
@@ -143,6 +165,27 @@ nfpms:
     formats: [apk, deb, rpm, archlinux]
     license: Apache 2.0
     package_name: iknitectl
+    file_name_template: >-
+      {{ .PackageName }}-
+      {{- .Version }}.
+      {{- if eq .Arch "amd64" }}x86_64
+      {{- else if eq .Arch "386" }}i386
+      {{- else }}{{ .Arch }}{{ end }}
+      {{- if .Arm }}v{{ .Arm }}{{ end }}
+      {{- if .Mips }}_{{ .Mips }}{{ end }}
+    maintainer: Kaweezle <kaweezle-devel@kaweezle.com>
+    description: Development tools for iknite
+    homepage: https://github.com/kaweezle/iknite
+    bindir: /usr/bin
+    apk:
+      signature:
+        key_file: kaweezle-devel@kaweezle.com-c9d89864.rsa
+        key_name: kaweezle-devel@kaweezle.com-c9d89864.rsa.pub
+  - id: kubewait-nfpm
+    ids: [kubewait]
+    formats: [apk, deb, rpm, archlinux]
+    license: Apache 2.0
+    package_name: kubewait
     file_name_template: >-
       {{ .PackageName }}-
       {{- .Version }}.

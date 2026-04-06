@@ -16,9 +16,11 @@ dependency "kubeconfig_fetcher" {
 }
 
 inputs = {
-  kubeconfig_content      = dependency.kubeconfig_fetcher.outputs.kubeconfig
-  kubeconfig_present      = dependency.kubeconfig_fetcher.outputs.kubeconfig != ""
-  wait_for_deployments    = true
-  deployment_wait_timeout = "10m"
-  namespaces              = ["kube-system", "kube-flannel", "kube-public", "default", "local-path-storage", "kgateway-system", "argocd"]
+  kubeconfig_content       = dependency.kubeconfig_fetcher.outputs.kubeconfig
+  kubeconfig_present       = dependency.kubeconfig_fetcher.outputs.kubeconfig != ""
+  wait_for_deployments     = true
+  deployment_wait_timeout  = "10m"
+  deployment_settle_period = "5s"
+  namespaces               = ["kube-system", "kube-flannel", "kube-public", "default", "local-path-storage", "kgateway-system", "argocd"]
+  kubewait_path            = "${get_repo_root()}/dist/kubewait_linux_amd64_v1/kubewait"
 }
