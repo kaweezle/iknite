@@ -21,6 +21,19 @@ variable "deployment_wait_timeout" {
   description = "The timeout to wait for deployments to be ready"
 }
 
+variable "deployment_settle_period" {
+  type        = string
+  default     = "5s"
+  description = "The period to wait for deployments to settle after becoming ready"
+}
+
+
+variable "kubewait_path" {
+  type        = string
+  default     = "kubewait"
+  description = "The path to the kubewait binary"
+}
+
 variable "namespaces" {
   type        = list(string)
   default     = ["kube-system", "kube-flannel", "kube-public", "default", "kube-node-lease", "local-path-storage"]

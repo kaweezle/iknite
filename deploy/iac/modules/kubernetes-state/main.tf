@@ -68,11 +68,12 @@ resource "null_resource" "wait" {
   for_each = var.wait_for_deployments && var.kubeconfig_present ? toset(["all"]) : toset([])
 
   provisioner "local-exec" {
-    command     = join(" ", concat(["${path.module}/wait-settle.sh"], var.namespaces))
+    command     = join(" ", concat([var.kubewait_path], var.namespaces))
     interpreter = ["/bin/bash", "-c"]
     environment = {
-      KUBECONFIG = local_file.kubeconfig.filename
-      TIMEOUT    = var.deployment_wait_timeout
+      KUBEWAIT_KUBECONFIG    = local_file.kubeconfig.filename
+      KUBEWAIT_TIMEOUT       = var.deployment_wait_timeout
+      KUBEWAIT_SETTLE_PERIOD = var.deployment_settle_period
     }
   }
 
