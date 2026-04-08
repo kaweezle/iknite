@@ -78,12 +78,12 @@ Examples:
 			rootCmd := cmd.Root()
 			err := cmdUtil.InitializeConfiguration(rootCmd)
 			cobra.CheckErr(err)
-			cmdUtil.ApplyViperConfigToFlags(rootCmd, viper.GetViper(), "")
+			cmdUtil.ApplyViperConfigToFlags(rootCmd, viper.GetViper())
 			ok, err := opts.ReadEnvFile()
 			cobra.CheckErr(err)
 			if ok {
 				// Re-apply config to flags to override with env file values if needed
-				cmdUtil.ApplyViperConfigToFlags(rootCmd, viper.GetViper(), "")
+				cmdUtil.ApplyViperConfigToFlags(rootCmd, viper.GetViper())
 			}
 			return nil
 		},
@@ -91,7 +91,7 @@ Examples:
 
 	flags := cmd.Flags()
 	kubewait.AddKubewaitFlags(flags, opts)
-	cmdUtil.BindFlagsToViper(cmd, viper.GetViper(), "")
+	cmdUtil.BindFlagsToViper(cmd, viper.GetViper())
 
 	return cmd
 }

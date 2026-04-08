@@ -250,15 +250,15 @@ func BindFlags(
 }
 
 // BindFlagsToViper binds each cobra flag to its associated viper configuration (config file and environment variable).
-func BindFlagsToViper(cmd *cobra.Command, v *viper.Viper, prefix string) {
-	BindFlags(cmd, v, prefix, BindFlag)
+func BindFlagsToViper(cmd *cobra.Command, v *viper.Viper) {
+	BindFlags(cmd, v, "", BindFlag)
 }
 
 // ApplyViperConfigToFlags applies the viper configuration to the flags of the command when the flags are not set.
 // This allows the configuration file and environment variables to override the default flag values,
 // but still allow the user to override them with command line flags.
-func ApplyViperConfigToFlags(cmd *cobra.Command, v *viper.Viper, prefix string) {
-	BindFlags(cmd, v, prefix, BindFlagValue)
+func ApplyViperConfigToFlags(cmd *cobra.Command, v *viper.Viper) {
+	BindFlags(cmd, v, "", BindFlagValue)
 }
 
 // GetConfigDirectory returns the directory where the configuration file should be stored based on the
