@@ -95,6 +95,7 @@
     "Kubeconfigs",
     "kubeconform",
     "kubelet",
+    "kubewait",
     "Kustomization",
     "Kustomizations",
     "kwzl",

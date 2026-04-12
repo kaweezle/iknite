@@ -19,7 +19,7 @@ RUN echo "http://dl-cdn.alpinelinux.org/alpine/edge/testing/" >> /etc/apk/reposi
     mkdir -p /root/.ssh && \
     chmod 700 /root/.ssh
 
-COPY bootstrap.sh /bootstrap.sh
+COPY kubewait /bin/kubewait
 WORKDIR /workspace
 
-CMD /bootstrap.sh
+CMD /bin/kubewait

@@ -47,10 +47,8 @@ spec:
           image: ghcr.io/kaweezle/iknite-bootstrap:v0.7.1-devel
           imagePullPolicy: IfNotPresent
           env:
-            - name: ROLLOUT_INITIAL_DELAY
-              value: "3"
-            - name: ROLLOUT_TIMEOUT
-              value: "90s"
+            - name: KUBEWAIT_ALL_NAMESPACES
+              value: "1"
           volumeMounts:
             - mountPath: /workspace
               name: bootstrap-data
