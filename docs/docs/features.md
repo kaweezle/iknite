@@ -182,7 +182,7 @@ supports:
 
 This enables true "day 2" operations on cluster startup, making it easy to
 deploy additional tools, applications, and configurations as part of cluster
-initialization. See the [Deploying Argo CD](../tutorial/deploying_argocd.md)
+initialization. See the [Deploying Argo CD](tutorial/deploying_argocd.md)
 tutorial for a practical example using the bootstrap system.
 
 ## Pre-pulled Container Images
