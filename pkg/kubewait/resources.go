@@ -122,7 +122,7 @@ func waitForResources(ctx context.Context, opts *Options, namespaces []string) e
 	opts.ResourceTypes = validTypes
 
 	// If no namespaces were given, list all that exist right now.
-	if len(namespaces) == 0 {
+	if len(namespaces) == 0 { //nolint:nestif // this is clearer as a single if block
 		if info, err := os.Stat(currentNamespaceFile); err == nil && !info.IsDir() && !opts.AllNamespaces {
 			log.Infof("Getting namespace from %s", currentNamespaceFile)
 			namespaceBytes, readErr := os.ReadFile(currentNamespaceFile)
@@ -489,19 +489,19 @@ func waitNamespaceResources(
 	if err != nil {
 		return fmt.Errorf("failed to create Kubernetes client: %w", err)
 	}
-	if err := wait.PollUntilContextCancel(
+	if err = wait.PollUntilContextCancel(
 		ctx,
 		opts.StatusUpdateInterval,
 		true,
 		func(ctx context.Context) (bool, error) {
-			var err error
-			ns, err = k8sInterface.CoreV1().Namespaces().Get(ctx, namespace, metav1.GetOptions{})
-			if err != nil {
-				if k8errors.IsNotFound(err) {
+			var nsErr error
+			ns, nsErr = k8sInterface.CoreV1().Namespaces().Get(ctx, namespace, metav1.GetOptions{})
+			if nsErr != nil {
+				if k8errors.IsNotFound(nsErr) {
 					logger.Debugf("Namespace not yet present, waiting...")
 					return false, nil
 				}
-				return false, fmt.Errorf("error checking namespace: %w", err)
+				return false, fmt.Errorf("error checking namespace: %w", nsErr)
 			}
 			return true, nil
 		},

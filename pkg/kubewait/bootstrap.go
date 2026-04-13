@@ -223,14 +223,12 @@ func ensureSSHKnownHost(ctx context.Context, repoURL string) error {
 	// Ensure $HOME/.ssh directory exists so that ssh-keyscan can write to known_hosts without permission issues.
 	sshDir := filepath.Join(os.Getenv("HOME"), ".ssh")
 
-	//nolint:gosec // path is constrained to user-local HOME and mode is intentionally restrictive.
 	if err := os.MkdirAll(sshDir, 0o700); err != nil {
 		return fmt.Errorf("failed to create .ssh directory: %w", err)
 	}
 
 	knownHostsPath := filepath.Join(sshDir, "known_hosts")
 
-	//nolint:gosec // path is constrained to user-local HOME and mode is intentionally restrictive.
 	if err := os.WriteFile(knownHostsPath, keyscanOutput, 0o600); err != nil {
 		return fmt.Errorf("failed to write known_hosts file: %w", err)
 	}

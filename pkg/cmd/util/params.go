@@ -20,26 +20,24 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
-
-	"github.com/kaweezle/iknite/pkg/cmd/options"
 )
 
 const (
 	ConfigSectionAnnotation = "config-section"
 	SkipViperBindAnnotation = "skip-viper-bind"
+	ConfigFlag              = "config"
 )
 
 // GetBaseDirectory returns the first parent directory that contains a .git directory.
 func GetBaseDirectory() (string, error) {
 	dir, err := os.Getwd()
-	if err != nil {
+	if err != nil { // nocov -- unlikely to fail and hard to test
 		return "", fmt.Errorf("while getting base directory: %w", err)
 	}
 	for dir != "/" {
@@ -261,66 +259,44 @@ func ApplyViperConfigToFlags(cmd *cobra.Command, v *viper.Viper) {
 	BindFlags(cmd, v, "", BindFlagValue)
 }
 
-// GetConfigDirectory returns the directory where the configuration file should be stored based on the
-// operating system conventions.
-func GetConfigDirectory(commandName string) (string, error) {
-	switch runtime.GOOS {
-	case "windows":
-		appData := os.Getenv("APPDATA")
-		if appData == "" {
-			return "", fmt.Errorf("APPDATA environment variable is not set")
-		}
-		return filepath.Join(appData, commandName), nil
-	case "darwin":
-		homeDir, err := os.UserHomeDir()
-		if err != nil {
-			return "", fmt.Errorf("while getting user home directory: %w", err)
-		}
-		return filepath.Join(homeDir, "Library", "Application Support", commandName), nil
-	default: // Linux and other Unix-like systems
-		xdgConfigHome := os.Getenv("XDG_CONFIG_HOME")
-		if xdgConfigHome == "" {
-			homeDir, err := os.UserHomeDir()
-			if err != nil {
-				return "", fmt.Errorf("while getting user home directory: %w", err)
-			}
-			xdgConfigHome = filepath.Join(homeDir, ".config")
-		}
-		return filepath.Join(xdgConfigHome, commandName), nil
-	}
-}
-
 // InitializeConfiguration reads in config file and ENV variables if set.
-func InitializeConfiguration(rootCmd *cobra.Command) error {
+func InitializeConfiguration(rootCmd *cobra.Command, v *viper.Viper) error {
 	commandName := rootCmd.Name()
 	envPrefix := strings.ToUpper(commandName)
-	configFileFlag := rootCmd.PersistentFlags().Lookup(options.Config)
+	configFileFlag := rootCmd.PersistentFlags().Lookup(ConfigFlag)
 
 	if configFileFlag != nil && configFileFlag.Value.String() != "" {
 		// Use config file from the flag.
-		viper.SetConfigFile(configFileFlag.Value.String())
+		v.SetConfigFile(configFileFlag.Value.String())
 	} else {
 		// Search config in home directory with name ".<commandName>" (without extension).
-		viper.SetConfigName("." + commandName)
-		configDirectory, err := GetConfigDirectory(commandName)
+		v.SetConfigName("." + commandName)
+		configDirectory, err := os.UserConfigDir()
 		if err != nil {
 			return fmt.Errorf("while getting configuration directory: %w", err)
 		}
-		viper.AddConfigPath(configDirectory)
+		v.AddConfigPath(configDirectory)
 		if baseDir, err := GetBaseDirectory(); err == nil {
-			viper.AddConfigPath(baseDir) // adding current directory as first search path
+			v.AddConfigPath(baseDir) // adding current directory as first search path
 		} else {
 			logrus.WithError(err).Warn("could not determine base directory for config file search, skipping")
 		}
 	}
 
-	viper.AutomaticEnv() // read in environment variables that match
-	viper.SetEnvPrefix(envPrefix)
-	viper.SetEnvKeyReplacer(strings.NewReplacer("-", "_", ".", "_"))
+	v.AutomaticEnv() // read in environment variables that match
+	v.SetEnvPrefix(envPrefix)
+	v.SetEnvKeyReplacer(strings.NewReplacer("-", "_", ".", "_"))
 
 	// If a config file is found, read it in.
-	if err := viper.ReadInConfig(); err != nil {
+	if err := v.ReadInConfig(); err != nil {
 		logrus.WithError(err).Debug("could not read config file, skipping")
 	}
+	ApplyViperConfigToFlags(rootCmd, v)
 	return nil
+}
+
+func AddConfigFlag(cmd *cobra.Command) {
+	supportedExts := strings.Join(viper.SupportedExts, "|")
+	cmd.PersistentFlags().
+		StringP(ConfigFlag, "c", "", fmt.Sprintf("config file (default is $HOME/.%s.<%s>)", cmd.Name(), supportedExts))
 }

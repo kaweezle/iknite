@@ -24,6 +24,7 @@ package kubewait
 import (
 	"context"
 	"fmt"
+	"io"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/pflag"
@@ -32,13 +33,13 @@ import (
 )
 
 type Options struct {
+	BootstrapOptions
+	ResourcesOptions
 	Verbosity               log.Level
 	JSONLogs                bool
 	SkipWaitingForResources bool
 	SkipBootstrap           bool
 	AllNamespaces           bool
-	ResourcesOptions
-	BootstrapOptions
 }
 
 func NewOptions() *Options {
@@ -50,7 +51,7 @@ func NewOptions() *Options {
 	return opts
 }
 
-func AddKubewaitFlags(flags *pflag.FlagSet, opts *Options) {
+func (opts *Options) AddFlags(flags *pflag.FlagSet) {
 	AddResourcesFlags(flags, &opts.ResourcesOptions)
 	AddBootstrapFlags(flags, &opts.BootstrapOptions)
 	flags.VarP(
@@ -78,6 +79,16 @@ func AddKubewaitFlags(flags *pflag.FlagSet, opts *Options) {
 		false,
 		"Watch all namespaces in the cluster (ignored if specific namespaces are provided as arguments)",
 	)
+}
+
+// setUpLogs configures logrus output and level.
+func (opts *Options) SetUpLogs(out io.Writer) error {
+	log.SetOutput(out)
+	if opts.JSONLogs {
+		log.SetFormatter(&log.JSONFormatter{})
+	}
+	log.SetLevel(opts.Verbosity)
+	return nil
 }
 
 // RunKubewait is the main logic for the kubewait command.

@@ -20,13 +20,12 @@ limitations under the License.
 // a bootstrap repository script.
 package kubewait
 
-// cSpell: words godotenv clientcmd apimachinery kstatus errorf sirupsen joho metav1
+// cSpell: words godotenv clientcmd apimachinery kstatus errorf sirupsen joho metav1 wrapcheck
 
 import (
 	"io"
 	"os"
 
-	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
@@ -37,6 +36,7 @@ import (
 // CreateKubewaitCmd creates the root cobra command for kubewait.
 func CreateKubewaitCmd(out io.Writer) *cobra.Command {
 	opts := kubewait.NewOptions()
+	v := viper.GetViper()
 
 	cmd := &cobra.Command{
 		Use:   "kubewait [namespaces...]",
@@ -68,30 +68,30 @@ Examples:
   # Use a specific kubeconfig
   kubewait --kubeconfig ~/.kube/config kube-system`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := setUpLogs(out, opts.Verbosity, opts.JSONLogs); err != nil {
-				return err
+			if err := opts.SetUpLogs(out); err != nil {
+				return err //nolint:wrapcheck // we want to preserve the original error type for testing
 			}
 
 			return kubewait.RunKubewait(cmd.Context(), opts, args)
 		},
 		PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
 			rootCmd := cmd.Root()
-			err := cmdUtil.InitializeConfiguration(rootCmd)
+			err := cmdUtil.InitializeConfiguration(rootCmd, v)
 			cobra.CheckErr(err)
-			cmdUtil.ApplyViperConfigToFlags(rootCmd, viper.GetViper())
 			ok, err := opts.ReadEnvFile()
 			cobra.CheckErr(err)
 			if ok {
 				// Re-apply config to flags to override with env file values if needed
-				cmdUtil.ApplyViperConfigToFlags(rootCmd, viper.GetViper())
+				cmdUtil.ApplyViperConfigToFlags(rootCmd, v)
 			}
 			return nil
 		},
 	}
 
+	cmdUtil.AddConfigFlag(cmd)
 	flags := cmd.Flags()
-	kubewait.AddKubewaitFlags(flags, opts)
-	cmdUtil.BindFlagsToViper(cmd, viper.GetViper())
+	opts.AddFlags(flags)
+	cmdUtil.BindFlagsToViper(cmd, v)
 
 	return cmd
 }
@@ -99,14 +99,4 @@ Examples:
 // Execute is the entry point called from main.
 func Execute() {
 	cobra.CheckErr(CreateKubewaitCmd(os.Stdout).Execute())
-}
-
-// setUpLogs configures logrus output and level.
-func setUpLogs(out io.Writer, level log.Level, jsonFormat bool) error {
-	log.SetOutput(out)
-	if jsonFormat {
-		log.SetFormatter(&log.JSONFormatter{})
-	}
-	log.SetLevel(level)
-	return nil
 }
