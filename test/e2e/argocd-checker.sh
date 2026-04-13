@@ -379,26 +379,38 @@ verify_applications() {
     log_info "Verifying ArgoCD applications..."
 
     local required_apps=("argocd-server" "appstage-00-bootstrap")
-    local app_list
-    app_list=$("${ARGOCD_CLI}" app list -o name)
+    local max_attempts=3
+    local attempt=1
 
-    local all_found=true
+    while [[ ${attempt} -le ${max_attempts} ]]; do
+        local app_list
+        app_list=$("${ARGOCD_CLI}" app list -o name 2>/dev/null || true)
 
-    for app in "${required_apps[@]}"; do
-        if echo "${app_list}" | grep -q "${app}"; then
-            log_info "  ✓ Application '${app}' found"
-        else
-            log_error "  ✗ Application '${app}' not found"
-            all_found=false
+        local all_found=true
+        for app in "${required_apps[@]}"; do
+            if echo "${app_list}" | grep -q "${app}"; then
+                log_info "  ✓ Application '${app}' found"
+            else
+                log_warning "  ✗ Application '${app}' not found (attempt ${attempt}/${max_attempts})"
+                all_found=false
+            fi
+        done
+
+        if [[ "${all_found}" == "true" ]]; then
+            log_info "All required applications are present"
+            return 0
         fi
+
+        if [[ ${attempt} -lt ${max_attempts} ]]; then
+            log_warning "Applications not ready yet, retrying in 5 seconds..."
+            sleep 5
+        fi
+
+        attempt=$((attempt + 1))
     done
 
-    if [[ "${all_found}" != "true" ]]; then
-        log_error "Some required applications are missing"
-        exit 1
-    fi
-
-    log_info "All required applications are present"
+    log_error "Some required applications are missing after ${max_attempts} attempts"
+    exit 1
 }
 
 # Main execution
