@@ -52,8 +52,7 @@ func NewStartCmd(ikniteConfig *v1alpha1.IkniteClusterSpec, waitOptions *utils.Wa
 - Allows the use of kubectl from the root account,
 - Installs flannel, metal-lb and local-path-provisioner.
 `,
-		PersistentPreRun: config.StartPersistentPreRun,
-		Run:              func(_ *cobra.Command, _ []string) { performStart(ikniteConfig, waitOptions) },
+		Run: func(_ *cobra.Command, _ []string) { performStart(ikniteConfig, waitOptions) },
 	}
 	flags := startCmd.Flags()
 
@@ -94,7 +93,6 @@ func IsIkniteReady(_ context.Context) (bool, error) {
 }
 
 func performStart(ikniteConfig *v1alpha1.IkniteClusterSpec, waitOptions *utils.WaitOptions) {
-	cobra.CheckErr(config.DecodeIkniteConfig(ikniteConfig))
 	cobra.CheckErr(k8s.PrepareKubernetesEnvironment(ikniteConfig))
 
 	// If Kubernetes is already installed, check that the configuration has not

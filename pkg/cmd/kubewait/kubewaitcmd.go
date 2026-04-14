@@ -23,6 +23,7 @@ package kubewait
 // cSpell: words godotenv clientcmd apimachinery kstatus errorf sirupsen joho metav1 wrapcheck
 
 import (
+	"fmt"
 	"io"
 	"os"
 
@@ -68,21 +69,28 @@ Examples:
   # Use a specific kubeconfig
   kubewait --kubeconfig ~/.kube/config kube-system`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := opts.SetUpLogs(out); err != nil {
-				return err //nolint:wrapcheck // we want to preserve the original error type for testing
-			}
-
 			return kubewait.RunKubewait(cmd.Context(), opts, args)
 		},
 		PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
+			if err := opts.SetUpLogs(out); err != nil {
+				return fmt.Errorf("while setting up logs: %w", err)
+			}
 			rootCmd := cmd.Root()
-			err := cmdUtil.InitializeConfiguration(rootCmd, v)
-			cobra.CheckErr(err)
+			if err := cmdUtil.InitializeConfiguration(rootCmd, v); err != nil {
+				return fmt.Errorf("while initializing configuration: %w", err)
+			}
 			ok, err := opts.ReadEnvFile()
-			cobra.CheckErr(err)
+			if err != nil {
+				return fmt.Errorf("while reading env file: %w", err)
+			}
 			if ok {
 				// Re-apply config to flags to override with env file values if needed
 				cmdUtil.ApplyViperConfigToFlags(rootCmd, v)
+			}
+			// Re-setup logs after configuration is loaded to apply any log-related settings from the config file or
+			// env file
+			if err := opts.SetUpLogs(out); err != nil {
+				return fmt.Errorf("while setting up logs: %w", err)
 			}
 			return nil
 		},

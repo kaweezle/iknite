@@ -58,11 +58,6 @@ prints the Embedded configuration that installs the following components:
 		Run: func(_ *cobra.Command, _ []string) {
 			performPrintKustomize(ikniteConfig, kustomizeOptions)
 		},
-		PreRun: func(cmd *cobra.Command, _ []string) {
-			flags := cmd.Flags()
-			_ = viper.BindPFlag( //nolint:errcheck // flag exists
-				config.Kustomization, flags.Lookup(options.Kustomization))
-		},
 	}
 	return printKustomizeCmd
 }
@@ -102,8 +97,6 @@ applies the Embedded configuration that installs the following components:
 
 		PreRun: func(cmd *cobra.Command, _ []string) {
 			flags := cmd.Flags()
-			_ = viper.BindPFlag( //nolint:errcheck // flag exists
-				config.Kustomization, flags.Lookup(options.Kustomization))
 
 			_ = viper.BindPFlag( //nolint:errcheck // flag exists
 				config.ForceConfig, flags.Lookup(options.ForceConfig))

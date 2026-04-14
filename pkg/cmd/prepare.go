@@ -39,8 +39,7 @@ func NewPrepareCommand(ikniteConfig *v1alpha1.IkniteClusterSpec) *cobra.Command 
 - Ensures the Virtual IP address is set and mapped to the hostname,
 - Ensures Iknite is started with OpenRC.
 `,
-		PersistentPreRun: config.StartPersistentPreRun,
-		Run:              func(_ *cobra.Command, _ []string) { performPrepare(ikniteConfig) },
+		Run: func(_ *cobra.Command, _ []string) { performPrepare(ikniteConfig) },
 	}
 	flags := prepareCmd.Flags()
 
@@ -50,7 +49,6 @@ func NewPrepareCommand(ikniteConfig *v1alpha1.IkniteClusterSpec) *cobra.Command 
 }
 
 func performPrepare(ikniteConfig *v1alpha1.IkniteClusterSpec) {
-	cobra.CheckErr(config.DecodeIkniteConfig(ikniteConfig))
 	cobra.CheckErr(k8s.PrepareKubernetesEnvironment(ikniteConfig))
 	log.Info("VM is ready")
 }

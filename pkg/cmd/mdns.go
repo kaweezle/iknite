@@ -13,25 +13,23 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
+// cSpell: words sirupsen
 package cmd
 
 import (
 	"fmt"
 	"net"
-	"os"
 
 	"github.com/pion/mdns"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 	"golang.org/x/net/ipv4"
 
-	"github.com/kaweezle/iknite/pkg/cmd/options"
+	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
 	"github.com/kaweezle/iknite/pkg/config"
-	"github.com/kaweezle/iknite/pkg/constants"
-	"github.com/kaweezle/iknite/pkg/utils"
 )
 
-func NewMdnsCmd() *cobra.Command {
+func NewMdnsCmd(ikniteConfig *v1alpha1.IkniteClusterSpec) *cobra.Command {
 	// configureCmd represents the start command
 	mdnsCmd := &cobra.Command{
 		Use:   "mdns",
@@ -41,37 +39,37 @@ with the DNS on the Windows side.
 
 It assumes that mDNS is not use elsewhere inside WSL.
 `,
-		PersistentPreRun: mdnsPersistentPreRun,
-		Run:              performMdns,
+		Run: func(_ *cobra.Command, _ []string) {
+			performMdns(ikniteConfig)
+		},
 	}
 
-	hostname, err := os.Hostname()
-	cobra.CheckErr(err)
-	if utils.IsOnWSL() || utils.IsOnIncus() {
-		hostname = constants.WSLHostName
-	}
-	mdnsCmd.Flags().String(options.DomainName, hostname, "Domain name of the cluster")
+	config.AddIkniteClusterFlags(mdnsCmd.Flags(), ikniteConfig)
 
 	return mdnsCmd
 }
 
-func mdnsPersistentPreRun(cmd *cobra.Command, _ []string) {
-	_ = viper.BindPFlag( //nolint:errcheck // flag exists
-		config.DomainName,
-		cmd.Flags().Lookup(options.DomainName),
-	)
-}
-
-func performMdns(_ *cobra.Command, _ []string) {
+func performMdns(ikniteConfig *v1alpha1.IkniteClusterSpec) {
 	addr, err := net.ResolveUDPAddr("udp", mdns.DefaultAddress)
-	cobra.CheckErr(fmt.Errorf("cannot resolve default address: %w", err))
+	if err != nil {
+		cobra.CheckErr(fmt.Errorf("cannot resolve default address: %w", err))
+	}
 
 	l, err := net.ListenUDP("udp4", addr)
-	cobra.CheckErr(fmt.Errorf("cannot listen on default address: %w", err))
+	if err != nil {
+		cobra.CheckErr(fmt.Errorf("cannot listen on default address: %w", err))
+	}
+
+	logrus.WithFields(logrus.Fields{
+		"domainName": ikniteConfig.DomainName,
+		"addr":       addr,
+	}).Debug("Start mdns responder...")
 
 	_, err = mdns.Server(ipv4.NewPacketConn(l), &mdns.Config{
-		LocalNames: []string{viper.GetString(config.DomainName)},
+		LocalNames: []string{ikniteConfig.DomainName},
 	})
-	cobra.CheckErr(fmt.Errorf("cannot create server: %w", err))
+	if err != nil {
+		cobra.CheckErr(fmt.Errorf("cannot create server: %w", err))
+	}
 	select {}
 }

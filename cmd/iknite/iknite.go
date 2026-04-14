@@ -22,5 +22,5 @@ import (
 )
 
 func main() {
-	cobra.CheckErr(cmd.NewRootCmd().Execute())
+	cobra.CheckErr(cmd.NewRootCmd(nil).Execute())
 }

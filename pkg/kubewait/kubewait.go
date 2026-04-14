@@ -24,9 +24,7 @@ package kubewait
 import (
 	"context"
 	"fmt"
-	"io"
 
-	log "github.com/sirupsen/logrus"
 	"github.com/spf13/pflag"
 
 	"github.com/kaweezle/iknite/pkg/cmd/util"
@@ -35,8 +33,7 @@ import (
 type Options struct {
 	BootstrapOptions
 	ResourcesOptions
-	Verbosity               log.Level
-	JSONLogs                bool
+	util.BaseOptions
 	SkipWaitingForResources bool
 	SkipBootstrap           bool
 	AllNamespaces           bool
@@ -46,7 +43,7 @@ func NewOptions() *Options {
 	opts := &Options{
 		ResourcesOptions: NewResourcesOptions(),
 		BootstrapOptions: NewBootstrapOptions(),
-		Verbosity:        log.InfoLevel,
+		BaseOptions:      *util.DefaultBaseOptions(),
 	}
 	return opts
 }
@@ -54,13 +51,7 @@ func NewOptions() *Options {
 func (opts *Options) AddFlags(flags *pflag.FlagSet) {
 	AddResourcesFlags(flags, &opts.ResourcesOptions)
 	AddBootstrapFlags(flags, &opts.BootstrapOptions)
-	flags.VarP(
-		util.NewLogLevelValue(&opts.Verbosity),
-		"verbosity",
-		"v",
-		"Log level (debug, info, warn, error, fatal, panic)",
-	)
-	flags.BoolVar(&opts.JSONLogs, "json", false, "Emit log messages as JSON")
+	opts.BaseOptions.AddFlags(flags)
 	flags.BoolVar(
 		&opts.SkipWaitingForResources,
 		"skip-wait",
@@ -79,16 +70,6 @@ func (opts *Options) AddFlags(flags *pflag.FlagSet) {
 		false,
 		"Watch all namespaces in the cluster (ignored if specific namespaces are provided as arguments)",
 	)
-}
-
-// setUpLogs configures logrus output and level.
-func (opts *Options) SetUpLogs(out io.Writer) error {
-	log.SetOutput(out)
-	if opts.JSONLogs {
-		log.SetFormatter(&log.JSONFormatter{})
-	}
-	log.SetLevel(opts.Verbosity)
-	return nil
 }
 
 // RunKubewait is the main logic for the kubewait command.

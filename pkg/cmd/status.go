@@ -81,8 +81,7 @@ func NewStatusCmd(ikniteConfig *v1alpha1.IkniteClusterSpec, waitOptions *utils.W
 - Daemonsets
 - Statefulsets
 `,
-		PersistentPreRun: config.StartPersistentPreRun,
-		Run:              func(_ *cobra.Command, _ []string) { performStatus(ikniteConfig, waitOptions) },
+		Run: func(_ *cobra.Command, _ []string) { performStatus(ikniteConfig, waitOptions) },
 	}
 
 	flags := statusCmd.Flags()

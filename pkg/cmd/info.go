@@ -46,7 +46,6 @@ func NewInfoCmd(ikniteConfig *v1alpha1.IkniteClusterSpec) *cobra.Command {
 - Installs flannel, metal-lb and local-path-provisioner.
 `,
 		PersistentPreRun: func(cmd *cobra.Command, args []string) {
-			config.StartPersistentPreRun(cmd, args)
 			flags := cmd.Flags()
 			_ = viper.BindPFlag( //nolint:errcheck // flag exists
 				options.OutputFormat,
@@ -119,7 +118,6 @@ func NewVersionsCmd() *cobra.Command {
 }
 
 func performInfo(ikniteConfig *v1alpha1.IkniteClusterSpec) {
-	cobra.CheckErr(config.DecodeIkniteConfig(ikniteConfig))
 	// Marshal config into YAML and print it to the output
 	outputFormat := viper.GetString(options.OutputFormat)
 	outputDestination := viper.GetString(options.OutputDestination)
@@ -137,8 +135,6 @@ func performInfo(ikniteConfig *v1alpha1.IkniteClusterSpec) {
 }
 
 func performImages(ikniteConfig *v1alpha1.IkniteClusterSpec, kustomizeOptions *utils.KustomizeOptions) {
-	cobra.CheckErr(config.DecodeIkniteConfig(ikniteConfig))
-
 	containerImages, err := config.GetIkniteImages(ikniteConfig, kustomizeOptions.ForceEmbedded)
 	cobra.CheckErr(err)
 

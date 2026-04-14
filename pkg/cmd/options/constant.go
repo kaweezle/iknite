@@ -21,8 +21,8 @@ const (
 
 	// Configuration.
 	Ip                 = "ip"
-	IpCreate           = "ip-create"
-	IpNetworkInterface = "ip-network-interface"
+	IpCreate           = "create-ip"
+	IpNetworkInterface = "network-interface"
 	DomainName         = "domain-name"
 	EnableMDNS         = "enable-mdns"
 	ClusterName        = "cluster-name"

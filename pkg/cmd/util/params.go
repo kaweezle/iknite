@@ -58,6 +58,32 @@ func SetCommandConfigSection(cmd *cobra.Command, section string) {
 	cmd.Annotations[ConfigSectionAnnotation] = section
 }
 
+// SetFlagConfigSection sets the annotation for the flag to indicate that it belongs to a configuration section.
+func SetFlagConfigSection(flagSet *pflag.FlagSet, name, section string) error {
+	return flagSet.SetAnnotation(name, ConfigSectionAnnotation, []string{section}) //nolint:wrapcheck // no added value
+}
+
+// GetFlagConfigSection returns the configuration section for the flag.
+func GetFlagConfigSection(flag *pflag.Flag) string {
+	if flag.Annotations == nil {
+		return ""
+	}
+	val, ok := flag.Annotations[ConfigSectionAnnotation]
+	if !ok || len(val) == 0 {
+		return ""
+	}
+	return val[0]
+}
+
+// GetFlagViperName returns the viper key name for the flag, taking into account the configuration section if it exists.
+func GetFlagViperName(flag *pflag.Flag, prefix string) string {
+	section := GetFlagConfigSection(flag)
+	if section != "" {
+		prefix = section + "."
+	}
+	return fmt.Sprintf("%s%s", prefix, strings.ReplaceAll(flag.Name, "-", "_"))
+}
+
 // CommandHasConfigSection checks if the command has a configuration section.
 func CommandHasConfigSection(cmd *cobra.Command) bool {
 	if cmd.Annotations == nil {
@@ -199,6 +225,28 @@ func BindFlag(f *pflag.Flag, v *viper.Viper, viperName string) error {
 	return v.BindPFlag(viperName, f) //nolint:wrapcheck // no added value from wrapping error
 }
 
+// BindFlagsToViper binds each cobra flag to its associated viper configuration (config file and environment variable).
+func BindFlagSet(
+	flagSet *pflag.FlagSet,
+	v *viper.Viper,
+	prefix string,
+	binder func(f *pflag.Flag, v *viper.Viper, viperName string) error,
+) {
+	flagSet.VisitAll(func(f *pflag.Flag) {
+		if !FlagShouldSkipViperBind(f) {
+			// Environment variables can't have dashes in them, so bind them to their equivalent
+			// keys with underscores, e.g. --favorite-color to STING_FAVORITE_COLOR
+			viperName := GetFlagViperName(f, prefix)
+			if err := binder(f, v, viperName); err != nil {
+				logrus.WithFields(logrus.Fields{
+					"option":    f.Name,
+					"viper_key": viperName,
+				}).WithError(err).Error("error binding flag to viper")
+			}
+		}
+	})
+}
+
 // BindFlags binds each cobra flag to its associated viper configuration (config file and environment variable).
 func BindFlags(
 	cmd *cobra.Command,
@@ -213,34 +261,9 @@ func BindFlags(
 		prefix = CommandConfigSection(cmd) + "."
 	}
 
-	persistent := cmd.PersistentFlags()
-	persistent.VisitAll(func(f *pflag.Flag) {
-		if !FlagShouldSkipViperBind(f) {
-			// Environment variables can't have dashes in them, so bind them to their equivalent
-			// keys with underscores, e.g. --favorite-color to STING_FAVORITE_COLOR
-			viperName := prefix + strings.ReplaceAll(f.Name, "-", "_")
-			if err := binder(f, v, viperName); err != nil {
-				logrus.WithFields(logrus.Fields{
-					"option":    f.Name,
-					"viper_key": viperName,
-				}).WithError(err).Error("error binding flag to viper")
-			}
-		}
-	})
+	BindFlagSet(cmd.PersistentFlags(), v, prefix, binder)
+	BindFlagSet(cmd.Flags(), v, prefix, binder)
 
-	flags := cmd.Flags()
-	// Same with the command flags
-	flags.VisitAll(func(f *pflag.Flag) {
-		if !FlagShouldSkipViperBind(f) {
-			viperName := prefix + strings.ReplaceAll(f.Name, "-", "_")
-			if err := binder(f, v, viperName); err != nil {
-				logrus.WithFields(logrus.Fields{
-					"option":    f.Name,
-					"viper_key": viperName,
-				}).WithError(err).Error("error binding flag to viper")
-			}
-		}
-	})
 	// visit the subcommands
 	for _, c := range cmd.Commands() {
 		BindFlags(c, v, prefix, binder)

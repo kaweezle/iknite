@@ -25,22 +25,29 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/kaweezle/iknite/pkg/cmd/secrets"
+	"github.com/kaweezle/iknite/pkg/cmd/util"
 )
 
 // RootOptions contains configuration for the root command.
 type RootOptions struct {
-	Fs      afero.Fs
-	out     io.Writer
-	CfgFile string
+	Fs  afero.Fs
+	out io.Writer
+	util.BaseOptions
+}
+
+func NewRootOptions() *RootOptions {
+	opts := &RootOptions{
+		BaseOptions: *util.DefaultBaseOptions(),
+		Fs:          afero.NewOsFs(),
+		out:         os.Stdout,
+	}
+	return opts
 }
 
 // CreateRootCmd creates the root command with the given options.
 func CreateRootCmd(opts *RootOptions) *cobra.Command {
 	if opts == nil {
-		opts = &RootOptions{
-			Fs:  afero.NewOsFs(),
-			out: os.Stdout,
-		}
+		opts = NewRootOptions()
 	}
 
 	rootCmd := &cobra.Command{
@@ -50,18 +57,34 @@ func CreateRootCmd(opts *RootOptions) *cobra.Command {
 
 It provides utilities for managing secrets, building artifacts, and other
 development tasks that are not part of the main iknite binary.`,
+		PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
+			err := opts.SetUpLogs(opts.out)
+			if err != nil {
+				return fmt.Errorf("failed to set up logs: %w", err)
+			}
+			err = util.InitializeConfiguration(cmd.Root(), viper.GetViper())
+			if err != nil {
+				return fmt.Errorf("failed to initialize configuration: %w", err)
+			}
+			// Re-setup logs after configuration is loaded to apply any log-related settings from the config file
+			err = opts.SetUpLogs(opts.out)
+			if err != nil {
+				return fmt.Errorf("failed to set up logs: %w", err)
+			}
+			return nil
+		},
 	}
 
-	cobra.OnInitialize(func() { initConfig(opts.CfgFile) })
-
-	rootCmd.PersistentFlags().
-		StringVar(&opts.CfgFile, "config", "", "config file (default is $HOME/.iknitectl.yaml)")
+	opts.AddFlags(rootCmd.PersistentFlags())
 
 	// Add subcommands
 	rootCmd.AddCommand(CreateInstallCmd(opts.Fs))
 	rootCmd.AddCommand(CreateKustomizeCmd(opts.Fs, opts.out))
 	rootCmd.AddCommand(CreateApplicationCmd(opts.Fs, opts.out))
 	rootCmd.AddCommand(secrets.CreateSecretsCmd(opts.Fs, nil))
+	util.AddConfigFlag(rootCmd)
+
+	util.BindFlagsToViper(rootCmd, viper.GetViper())
 
 	return rootCmd
 }
@@ -70,28 +93,4 @@ development tasks that are not part of the main iknite binary.`,
 // This is called by main.main(). It only needs to happen once to the rootCmd.
 func Execute() {
 	cobra.CheckErr(CreateRootCmd(nil).Execute())
-}
-
-// initConfig reads in config file and ENV variables if set.
-func initConfig(cfgFile string) {
-	if cfgFile != "" {
-		// Use config file from the flag.
-		viper.SetConfigFile(cfgFile)
-	} else {
-		// Find home directory.
-		home, err := os.UserHomeDir()
-		cobra.CheckErr(err)
-
-		// Search config in home directory with name ".iknitectl" (without extension).
-		viper.AddConfigPath(home)
-		viper.SetConfigType("yaml")
-		viper.SetConfigName(".iknitectl")
-	}
-
-	viper.AutomaticEnv() // read in environment variables that match
-
-	// If a config file is found, read it in.
-	if err := viper.ReadInConfig(); err == nil {
-		fmt.Fprintln(os.Stderr, "Using config file:", viper.ConfigFileUsed())
-	}
 }
