@@ -1,8 +1,22 @@
-<!-- cspell: words chainguard vhdx gofmt softlevel covermode coverprofile testutils configmap devenv mkdocs livereload -->
+<!-- cspell: words chainguard vhdx gofmt softlevel covermode coverprofile testutils configmap devenv mkdocs -->
+<!-- cspell: words oras subtests livereload -->
 
 # Iknite Development Guide for AI Agents
 
-## General Guidelines
+### Responses, Documentation and comments style rules (Required)
+
+Drop: articles (a/an/the), filler (just/really/basically/actually/simply),
+pleasantries (sure/certainly/of course/happy to), hedging. Fragments OK. Short
+synonyms (big not extensive, fix not "implement a solution for"). Technical
+terms exact. Code blocks unchanged. Errors quoted exact.
+
+Pattern: `[thing] [action] [reason]. [next step].`
+
+Not: "Sure! I'd be happy to help you with that. The issue you're experiencing is
+likely caused by..." Yes: "Bug in auth middleware. Token expiry check use `<`
+not `<=`. Fix:"
+
+## General Guidelines (Required)
 
 - UPDATE THIS FILE WITH NEW LEARNINGS.
 - Be concise. Focus on key information and avoid unnecessary details, especially
@@ -65,14 +79,14 @@ The project provides the following deliverables:
 4. **Root filesystem image** (built with
    [Dockerfile](../packaging/rootfs/base/Dockerfile))
    - Alpine Linux base with `iknite` and `iknite-images` pre-installed
-   - Exported as tarball for WSL2 import
+   - Exported as tarball for WSL2/Incus import
    - Single-layer Docker image
      ([Dockerfile](../packaging/rootfs/with-images/Dockerfile)) for container
      registries
 
 5. **VM images** (built with
    [packaging/scripts/build-vm-image.sh](../packaging/scripts/build-vm-image.sh))
-   - QCOW2 format for QEMU/KVM/OpenStack
+   - QCOW2 format for QEMU/KVM/Incus/OpenStack
    - VHDX format for Hyper-V
    - Pre-configured with iknite ready to start on first boot
    - Includes cloud-init for easy customization
@@ -210,11 +224,35 @@ Common variables (override with VAR=value):
 
 #### Testing Patterns
 
-- Use `testify/suite` for stateful test fixtures (see
+- Use `testify` for assertions and stateful test fixtures (see
   [pkg/k8s/runtime_environment_test.go](../pkg/k8s/runtime_environment_test.go))
 - Mock executors via `pkg/testutils.MockExecutor` to avoid shell dependencies
 - Afero filesystem mocking for file I/O tests (see
   [pkg/utils/filesystem_test.go](../pkg/utils/filesystem_test.go))
+
+### Test Duplication Guardrails (Required)
+
+When adding or modifying tests, avoid copy-paste test bodies. Treat this as a
+hard requirement because `golangci-lint` (`dupl`) fails the build.
+
+1. Prefer table-driven tests when only inputs, expected output, or expected
+   error differ.
+2. Extract shared setup into helpers (plugin creation, config loading,
+   ResourceMap construction, transform execution).
+3. Move repeated YAML/config snippets into named constants near the top of the
+   test file.
+4. Keep one-off tests only for truly unique logic branches; if two tests share
+   the same control flow, merge them into one table-driven test with subtests.
+5. For error-path testing, use a single table with `wantErrContains`-style
+   assertions instead of one function per error variant.
+6. Before finishing, run `golangci-lint run --fix` and verify no `dupl` findings
+   remain in edited test files.
+
+Quick check before adding a new test function:
+
+- Can this be a new row in an existing test table?
+- Is setup duplicated from another test in the same file?
+- Is any multiline YAML/config string repeated more than once?
 
 #### Adding Commands
 
@@ -222,7 +260,7 @@ Follow [pkg/cmd/status.go](../pkg/cmd/status.go) pattern:
 
 1. Create `NewXxxCmd(*v1alpha1.IkniteClusterSpec)` returning `*cobra.Command`
 2. Implement `performXxx(ikniteConfig)` with main logic
-3. Register in [pkg/cmd/root.go](../pkg/cmd/root.go#L46-L89)'s `NewRootCmd()`
+3. Register in [pkg/cmd/root.go](../pkg/cmd/root.go)'s `NewRootCmd()`
 4. Use `config.ConfigureClusterCommand(flags, ikniteConfig)` for standard flags
 
 #### Modifying Kubernetes Components
@@ -255,14 +293,14 @@ This can be done also with iknite:
 - Use `logrus` (aliased as `log`)
 - Verbosity set via `-v` flag: `debug`, `info`, `warn`, `error`
 - JSON output via `--json` flag (see
-  [pkg/cmd/root.go](../pkg/cmd/root.go#L113-L131))
+  [pkg/cmd/util/base_options.go](../pkg/cmd/util/base_options.go).
 
 #### Configuration
 
 - Viper binds flags to environment variables (prefix: `IKNITE_`)
 - Priority: CLI flags > ENV vars > config file > defaults
 - Cluster config loaded from `/run/iknite/status.json` (see
-  [pkg/apis/iknite/v1alpha1/types.go](../pkg/apis/iknite/v1alpha1/types.go#L133-L151))
+  [pkg/apis/iknite/v1alpha1/types.go](../pkg/apis/iknite/v1alpha1/types.go))
 
 #### Code Generation
 
@@ -356,7 +394,7 @@ them, a container is created and the `iknite-images` APK package is installed
 inside it. This container is then exported as as tarball and is the base root
 filesystem image that is distributed.
 
-A single layer Docker images is built using
+A single layer Docker image is built using
 ([packaging/rootfs/with-images/Dockerfile](../packaging/rootfs/with-images/Dockerfile))
 that adds metadata and configures the image for use as a root filesystem image
 in WSL2 and Docker.
@@ -373,27 +411,21 @@ a QCOW2 image for QEMU/KVM and converts it into a VHDX image for Hyper-V.
 ### Development Workflows
 
 The project build and release process is controlled by a central Makefile
-([GNUmakefile](../GNUmakefile)) that defines all the necessary targets to build
-the APK packages, the root filesystem image and the VM images. The Makefile also
-defines targets to extract signing keys, manage the APK repository and run the
-end-to-end tests with terragrunt. The targets are obtained by running
-`make help`.
+([GNUmakefile](../GNUmakefile)) The targets are obtained by running `make help`.
 
 It is used in the release workflow defined in
 [.github/workflows/release.yml](../.github/workflows/release.yml) and can be
 used locally to run the different steps of the build process.
 
-The build process needs a container runtime and an image builder. For the
-container runtime, Docker or Containerd can be used. For the image builder, only
-buildkit is supported and is used via the `buildctl` command. The makefile
-detects which container runtime is available and sets the appropriate variables
-to use it, using either the `docker` command or `nerdctl`. If containerd is
-available, the makefile checks if root permissions are needed. If so, it uses
-`sudo` or `doas` to run the necessary commands. When docker is used, the
-makefile creates a buildx builder named `iknite` and enables its use through
-buildctl by exporting the appropriate `BUILDKIT_HOST="docker-container://..."`
-variable. These settings allow the makefile to run both inside the devcontainer
-and in the GitHub Actions runners without modification.
+Information about the build process:
+
+- A container runtime is needed. The project supports both Docker (`docker`
+  command used) and Containerd (`nerdctl` command used).
+- Buildkit is used as the image builder via the `buildctl` command. When Docker
+  is used, a buildx builder named `iknite` is created and enabled for buildctl
+  by exporting the appropriate `BUILDKIT_HOST` (`"docker-container://..."`)
+  variable.
+- On Github Actions, docker is used.
 
 ## General Project Guidelines
 
@@ -494,7 +526,6 @@ targets.
 | Task                     | Command                                                                  |
 | ------------------------ | ------------------------------------------------------------------------ |
 | Run iknite locally       | `go run cmd/iknite/iknite.go start -v debug`                             |
-| Run all tests            | `go test ./...`                                                          |
 | Run tests with coverage  | `go test -v -race -covermode=atomic -coverprofile=coverage.out ./...`    |
 | Build single target APK  | `goreleaser build --single-target --snapshot` or `make apk-iknite-build` |
 | Update generated code    | `./hack/update-codegen.sh`                                               |
@@ -509,14 +540,3 @@ targets.
 | Build documentation | `cd docs && uv run mkdocs build --clean --strict` |
 | Serve docs locally  | `cd docs && uv run mkdocs serve --livereload`     |
 | Install/update deps | `cd docs && uv sync`                              |
-
-### Cluster Management
-
-| Task                  | Command/Path                                            |
-| --------------------- | ------------------------------------------------------- |
-| View cluster state    | `cat /run/iknite/status.json`                           |
-| View kubeconfig       | `cat /root/.kube/config`                                |
-| Check service status  | `rc-status`                                             |
-| View service logs     | `cat /var/log/iknite.log`                               |
-| APK dependencies      | `.goreleaser.yaml`                                      |
-| Default kustomization | `packaging/apk/iknite/iknite.d/base/kustomization.yaml` |
