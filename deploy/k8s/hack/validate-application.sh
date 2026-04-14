@@ -43,7 +43,7 @@ for file in "$@"; do
 
     # Step 1: Check if metadata.name matches directory name
     step "Step 1: Checking metadata.name matches directory name"
-    application_name_in_file=$(yq e '.metadata.name' "$file")
+    application_name_in_file=$(yq e '. | select(.kind == "Application") | .metadata.name' "$file")
     if [[ "$application_name_in_file" != "$app_name" ]]; then
         error "App name in $file is '$application_name_in_file', expected '$app_name'"
         all_valid=false
@@ -53,7 +53,7 @@ for file in "$@"; do
 
     # Step 2: Check if spec.source.path matches relative path
     step "Step 2: Checking spec.source.path matches relative path"
-    application_path_in_file=$(yq e '.spec.source.path' "$file")
+    application_path_in_file=$(yq e '. | select(.kind == "Application") | .spec.source.path' "$file")
     if [[ "$application_path_in_file" != "$relative_path" ]]; then
         error "App path in $file is '$application_path_in_file', expected '$relative_path'"
         all_valid=false
