@@ -1,26 +1,26 @@
 // cSpell: words testutils
 package testutils
 
-import "github.com/kaweezle/iknite/pkg/utils"
+import "github.com/kaweezle/iknite/pkg/host"
 
-func CreateTestFS() (utils.FileSystem, func()) {
-	oldFS := utils.FS
+func CreateTestFS() (host.FileSystem, func()) {
+	oldFS := host.FS
 	cleanup := func() {
-		utils.FS = oldFS
+		host.FS = oldFS
 	}
-	utils.FS = utils.NewMemMapFS()
-	return utils.FS, cleanup
+	host.FS = host.NewMemMapFS()
+	return host.FS, cleanup
 }
 
-func CreateTestFSAndExecutor() (utils.FileSystem, *MockExecutor, func()) {
-	oldFS := utils.FS
-	utils.FS = utils.NewMemMapFS()
+func CreateTestFSAndExecutor() (host.FileSystem, *MockExecutor, func()) {
+	oldFS := host.FS
+	host.FS = host.NewMemMapFS()
 	mockExec := &MockExecutor{}
-	oldExec := utils.Exec
-	utils.Exec = mockExec
+	oldExec := host.Exec
+	host.Exec = mockExec
 	cleanup := func() {
-		utils.FS = oldFS
-		utils.Exec = oldExec
+		host.FS = oldFS
+		host.Exec = oldExec
 	}
-	return utils.FS, mockExec, cleanup
+	return host.FS, mockExec, cleanup
 }

@@ -1,4 +1,4 @@
-package utils_test
+package host_test
 
 // cSpell: words testdir
 
@@ -13,13 +13,13 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/kaweezle/iknite/pkg/utils"
+	"github.com/kaweezle/iknite/pkg/host"
 )
 
 const basicTestPath = "test.txt"
 
 var basicTests = []struct {
-	setupFS func(t *testing.T) utils.FileSystem
+	setupFS func(t *testing.T) host.FileSystem
 	name    string
 }{
 	{
@@ -34,21 +34,21 @@ var basicTests = []struct {
 
 // cSpell: enable
 
-func setupTempFSOnDirectory(t *testing.T, tempDir string) utils.FileSystem {
+func setupTempFSOnDirectory(t *testing.T, tempDir string) host.FileSystem {
 	t.Helper()
 	baseFs := afero.NewOsFs()
-	fs := utils.NewBasePathFS(baseFs, tempDir)
+	fs := host.NewBasePathFS(baseFs, tempDir)
 	return fs
 }
 
 // setupMemFS creates an in-memory filesystem.
-func setupMemFS(t *testing.T) utils.FileSystem {
+func setupMemFS(t *testing.T) host.FileSystem {
 	t.Helper()
-	return utils.NewMemMapFS()
+	return host.NewMemMapFS()
 }
 
 // setupTempFS creates a filesystem backed by a temporary directory.
-func setupTempFS(t *testing.T) utils.FileSystem {
+func setupTempFS(t *testing.T) host.FileSystem {
 	t.Helper()
 	return setupTempFSOnDirectory(t, t.TempDir())
 }
@@ -79,7 +79,7 @@ func TestFileSystem_WriteFile_NonExistentDir(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		setupFS     func(t *testing.T) utils.FileSystem
+		setupFS     func(t *testing.T) host.FileSystem
 		name        string
 		expectError bool
 	}{
@@ -363,7 +363,7 @@ func TestFileSystem_Symlink(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		setupFS func(t *testing.T) utils.FileSystem
+		setupFS func(t *testing.T) host.FileSystem
 		name    string
 	}{
 		{
@@ -399,7 +399,7 @@ func TestFileSystem_Symlink_NoSupport(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		setupFS func(t *testing.T) utils.FileSystem
+		setupFS func(t *testing.T) host.FileSystem
 		name    string
 	}{
 		// Note: MemMapFs doesn't support symlinks, so we skip it
@@ -614,7 +614,7 @@ func TestFileSystem_WritePipe_NonExistentDirectory(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		setupFS func(t *testing.T) utils.FileSystem
+		setupFS func(t *testing.T) host.FileSystem
 		name    string
 	}{
 		{
@@ -799,7 +799,7 @@ func TestFileSystem_TempFSWithRealPath(t *testing.T) {
 func TestNewMemMapFS(t *testing.T) {
 	t.Parallel()
 
-	fs := utils.NewMemMapFS()
+	fs := host.NewMemMapFS()
 	require.NotNil(t, fs)
 
 	// Basic functionality test

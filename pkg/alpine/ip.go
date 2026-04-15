@@ -10,7 +10,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/txn2/txeh"
 
-	"github.com/kaweezle/iknite/pkg/utils"
+	"github.com/kaweezle/iknite/pkg/host"
 )
 
 // cSpell: enable
@@ -61,7 +61,7 @@ func AddIpAddress(iface string, address net.IP) error {
 		"broadcast", "+", // This will set the broadcast address automatically
 		"dev", iface,
 	}
-	if out, err := utils.Exec.Run(true, "/sbin/ip", parameters...); err != nil {
+	if out, err := host.Exec.Run(true, "/sbin/ip", parameters...); err != nil {
 		return fmt.Errorf("%s: %w", string(out), err)
 	}
 	return nil

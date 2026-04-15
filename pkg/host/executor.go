@@ -1,4 +1,4 @@
-package utils
+package host
 
 import (
 	"context"
@@ -10,12 +10,13 @@ import (
 // ExecutorFunction is a function that executes a command and returns its input.
 type ExecutorFunction = func(cmd string, arguments ...string) ([]byte, error)
 
-// The Executor interface provides a way to run commands and pipe input to them.
+// Executor provides methods to run commands and optionally pipe input to them.
 type Executor interface {
 	Run(combined bool, cmd string, arguments ...string) ([]byte, error)
 	Pipe(stdin io.Reader, combined bool, cmd string, arguments ...string) ([]byte, error)
 }
 
+// CommandExecutor executes commands on host environment.
 type CommandExecutor struct{}
 
 func (c *CommandExecutor) Run(combined bool, cmd string, arguments ...string) ([]byte, error) {
@@ -57,4 +58,5 @@ func (c *CommandExecutor) Pipe(
 	return output, nil
 }
 
+// Exec is shared command executor used by code interacting with host system.
 var Exec Executor = &CommandExecutor{}

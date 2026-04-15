@@ -26,8 +26,8 @@ import (
 	"sigs.k8s.io/kustomize/api/resmap"
 	"sigs.k8s.io/kustomize/kyaml/filesys"
 
+	"github.com/kaweezle/iknite/pkg/host"
 	"github.com/kaweezle/iknite/pkg/kustomize"
-	"github.com/kaweezle/iknite/pkg/utils"
 )
 
 //go:embed base
@@ -74,7 +74,7 @@ func isBaseKustomizationAvailable(dirname string) (bool, error) {
 	if err == nil && kustomizationURl.Scheme != "" && kustomizationURl.Host != "" {
 		exists = true
 	} else {
-		exists, err = utils.FS.Exists(path.Join(dirname, "kustomization.yaml"))
+		exists, err = host.FS.Exists(path.Join(dirname, "kustomization.yaml"))
 		if err != nil {
 			return false, fmt.Errorf("while testing for directory: %w", err)
 		}

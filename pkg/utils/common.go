@@ -20,12 +20,14 @@ import (
 	"fmt"
 	"net"
 	"time"
+
+	"github.com/kaweezle/iknite/pkg/host"
 )
 
 // ExecuteOnExistence executes the function fn if the file existence is the
 // one given by the parameter.
 func ExecuteOnExistence(file string, existence bool, fn func() error) error {
-	exists, err := FS.Exists(file)
+	exists, err := host.FS.Exists(file)
 	if err != nil {
 		return fmt.Errorf("error while checking if %s exists: %w", file, err)
 	}
@@ -51,7 +53,7 @@ func ExecuteIfExist(file string, fn func() error) error {
 // MoveFileIfExists moves the file src to the destination dst
 // if it exists.
 func MoveFileIfExists(src, dst string) error {
-	exists, err := FS.Exists(src)
+	exists, err := host.FS.Exists(src)
 	if err != nil {
 		return fmt.Errorf("error while checking existence of %s: %w", src, err)
 	}
@@ -59,7 +61,7 @@ func MoveFileIfExists(src, dst string) error {
 		return nil
 	}
 
-	if err := FS.Rename(src, dst); err != nil {
+	if err := host.FS.Rename(src, dst); err != nil {
 		return fmt.Errorf("failed to move file from %s to %s: %w", src, dst, err)
 	}
 	return nil
@@ -88,7 +90,7 @@ func GetOutboundIP() (net.IP, error) {
 }
 
 func IsOnWSL() bool {
-	wsl, err := FS.DirExists("/run/WSL")
+	wsl, err := host.FS.DirExists("/run/WSL")
 	if err != nil {
 		return false
 	}
@@ -96,7 +98,7 @@ func IsOnWSL() bool {
 }
 
 func IsOnIncus() bool {
-	incus, err := FS.DirExists("/dev/.lxc/proc")
+	incus, err := host.FS.DirExists("/dev/.lxc/proc")
 	if err != nil {
 		return false
 	}

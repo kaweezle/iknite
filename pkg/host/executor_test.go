@@ -1,5 +1,5 @@
 // cSpell: words stretchr
-package utils_test
+package host_test
 
 import (
 	"strings"
@@ -7,14 +7,14 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/kaweezle/iknite/pkg/utils"
+	"github.com/kaweezle/iknite/pkg/host"
 )
 
 func TestCommandExecutor_Run(t *testing.T) {
 	t.Parallel()
 	req := require.New(t)
 
-	exec := &utils.CommandExecutor{}
+	exec := &host.CommandExecutor{}
 
 	out, err := exec.Run(false, "/bin/echo", "hello")
 	req.NoError(err)
@@ -30,7 +30,7 @@ func TestCommandExecutor_Pipe(t *testing.T) {
 	t.Parallel()
 	req := require.New(t)
 
-	exec := &utils.CommandExecutor{}
+	exec := &host.CommandExecutor{}
 	out, err := exec.Pipe(strings.NewReader("abc"), false, "/bin/cat")
 	req.NoError(err)
 	req.Equal("abc", string(out))

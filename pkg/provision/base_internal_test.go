@@ -72,9 +72,8 @@ func TestCreateTempKustomizeDirectory(t *testing.T) {
 	req.True(fs.Exists("base/kustomization.yaml"))
 }
 
+//nolint:paralleltest // kustomize uses global state disallowing parallel tests
 func TestGetBaseKustomizationResources(t *testing.T) {
-	t.Parallel()
-
 	tests := []struct {
 		prepare       func(t *testing.T) string
 		name          string
@@ -119,7 +118,6 @@ func TestGetBaseKustomizationResources(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
 			req := require.New(t)
 
 			resources, err := GetBaseKustomizationResources(tt.prepare(t), tt.forceEmbedded)

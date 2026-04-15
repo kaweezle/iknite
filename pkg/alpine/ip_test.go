@@ -14,8 +14,8 @@ import (
 	"github.com/txn2/txeh"
 
 	"github.com/kaweezle/iknite/pkg/alpine"
+	"github.com/kaweezle/iknite/pkg/host"
 	tu "github.com/kaweezle/iknite/pkg/testutils"
-	"github.com/kaweezle/iknite/pkg/utils"
 )
 
 // cSpell: enable
@@ -23,10 +23,10 @@ import (
 func setupExecutor(t *testing.T) (*tu.MockExecutor, func()) {
 	t.Helper()
 	executor := &tu.MockExecutor{}
-	old := utils.Exec
-	utils.Exec = executor
+	old := host.Exec
+	host.Exec = executor
 	return executor, func() {
-		utils.Exec = old
+		host.Exec = old
 	}
 }
 

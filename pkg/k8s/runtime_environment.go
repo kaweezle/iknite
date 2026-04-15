@@ -29,6 +29,7 @@ import (
 	"github.com/kaweezle/iknite/pkg/alpine"
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
 	"github.com/kaweezle/iknite/pkg/constants"
+	"github.com/kaweezle/iknite/pkg/host"
 	"github.com/kaweezle/iknite/pkg/utils"
 )
 
@@ -42,7 +43,7 @@ const (
 func HasConfigFileConfigurationLine(confFilePath, line string) (bool, error) {
 	var lines int
 	var err error
-	if lines, err = utils.FS.Pipe(confFilePath).
+	if lines, err = host.FS.Pipe(confFilePath).
 		Match(line).
 		CountLines(); err != nil {
 		return false, fmt.Errorf("failed to count lines in config file: %w", err)
@@ -54,7 +55,7 @@ func HasConfigFileConfigurationLine(confFilePath, line string) (bool, error) {
 // configuration file. If the line is already present, it does nothing. If the line is not present, it adds it to the
 // end of the file.
 func EnsureConfigFileHasConfigurationLine(confFilePath, line string) error {
-	present, err := utils.FS.Pipe(confFilePath).Match(line).CountLines()
+	present, err := host.FS.Pipe(confFilePath).Match(line).CountLines()
 	if err != nil {
 		return fmt.Errorf("while checking %s for %s: %w", confFilePath, line, err)
 	}
@@ -64,10 +65,10 @@ func EnsureConfigFileHasConfigurationLine(confFilePath, line string) error {
 	}
 	log.Infof("Adding configuration line '%s' to %s", line, confFilePath)
 	var lines []string
-	if lines, err = utils.FS.Pipe(confFilePath).Slice(); err == nil {
+	if lines, err = host.FS.Pipe(confFilePath).Slice(); err == nil {
 		lines = append(lines, line)
 		content := strings.Join(lines, "\n") + "\n"
-		if err = utils.FS.WriteFile(confFilePath, []byte(content), 0o644); err != nil {
+		if err = host.FS.WriteFile(confFilePath, []byte(content), 0o644); err != nil {
 			return fmt.Errorf("while writing %s: %w", confFilePath, err)
 		}
 	} else {
@@ -103,7 +104,7 @@ func MakeIkniteServiceNeedNetworking(confFilePath string) error {
 func EnsureNetworkInterfacesConfiguration() error {
 	log.Infof("Ensuring network interfaces configuration in %s...", constants.NetworkInterfacesConfFile)
 	if err := utils.ExecuteIfNotExist(constants.NetworkInterfacesConfFile, func() error {
-		return utils.FS.WriteFile(
+		return host.FS.WriteFile(
 			constants.NetworkInterfacesConfFile,
 			[]byte(dedent.Dedent(`
                 # cSpell: words iface
@@ -162,7 +163,7 @@ func ensureIpConfiguration(ikniteConfig *v1alpha1.IkniteClusterSpec) error {
 // not the case, this function will fail. We also assume that we are running with CGroups V2.
 func EnableCGroupSubtreeControl() error {
 	// Check if subtree control is already enabled
-	content, err := utils.FS.ReadFile("/sys/fs/cgroup/cgroup.subtree_control")
+	content, err := host.FS.ReadFile("/sys/fs/cgroup/cgroup.subtree_control")
 	if err != nil {
 		return fmt.Errorf("while reading cgroup.subtree_control: %w", err)
 	}
@@ -174,14 +175,14 @@ func EnableCGroupSubtreeControl() error {
 	log.Infof("Enabling cgroup subtree control...")
 	// Create a group to move all current processes to, as enabling subtree control requires that no processes are in
 	// the root cgroup.
-	err = utils.FS.MkdirAll("/sys/fs/cgroup/iknite_init", 0o755)
+	err = host.FS.MkdirAll("/sys/fs/cgroup/iknite_init", 0o755)
 	if err != nil {
 		return fmt.Errorf("while creating cgroup directory: %w", err)
 	}
 	// Move all processes to the new group
-	if processNumbers, procErr := utils.FS.Pipe("/sys/fs/cgroup/cgroup.procs").Slice(); procErr == nil {
+	if processNumbers, procErr := host.FS.Pipe("/sys/fs/cgroup/cgroup.procs").Slice(); procErr == nil {
 		for _, processNumber := range processNumbers {
-			if procErr = utils.FS.WriteFile(
+			if procErr = host.FS.WriteFile(
 				"/sys/fs/cgroup/iknite_init/cgroup.procs",
 				[]byte(processNumber),
 				0o644,
@@ -198,7 +199,7 @@ func EnableCGroupSubtreeControl() error {
 	}
 
 	// Now read the current controllers and create the string to enable all of them in the subtree control
-	controllersContent, err := utils.FS.ReadFile("/sys/fs/cgroup/cgroup.controllers")
+	controllersContent, err := host.FS.ReadFile("/sys/fs/cgroup/cgroup.controllers")
 	if err != nil {
 		return fmt.Errorf("while reading cgroup.controllers: %w", err)
 	}
@@ -210,7 +211,7 @@ func EnableCGroupSubtreeControl() error {
 	}
 
 	// Enable subtree control
-	err = utils.FS.WriteFile("/sys/fs/cgroup/cgroup.subtree_control", []byte(enableControllers.String()+"\n"), 0o644)
+	err = host.FS.WriteFile("/sys/fs/cgroup/cgroup.subtree_control", []byte(enableControllers.String()+"\n"), 0o644)
 	if err != nil {
 		return fmt.Errorf("while enabling cgroup subtree control: %w", err)
 	}
@@ -237,7 +238,7 @@ func PrepareKubernetesEnvironment(ikniteConfig *v1alpha1.IkniteClusterSpec) erro
 
 	// Allow forwarding (kubeadm requirement)
 	log.Info("Ensuring basic settings...")
-	err := utils.FS.WriteFile(
+	err := host.FS.WriteFile(
 		"/proc/sys/net/ipv4/ip_forward",
 		[]byte("1\n"),
 		os.FileMode(int(0o644)),
@@ -251,7 +252,7 @@ func PrepareKubernetesEnvironment(ikniteConfig *v1alpha1.IkniteClusterSpec) erro
 	}
 
 	// Make bridge use ip-tables
-	err = utils.FS.WriteFile(
+	err = host.FS.WriteFile(
 		"/proc/sys/net/bridge/bridge-nf-call-iptables",
 		[]byte("1\n"),
 		os.FileMode(int(0o644)),
@@ -261,7 +262,7 @@ func PrepareKubernetesEnvironment(ikniteConfig *v1alpha1.IkniteClusterSpec) erro
 	}
 
 	// Setting loose mode on reverse path forwarding because of VIP addresses
-	err = utils.FS.WriteFile(
+	err = host.FS.WriteFile(
 		"/proc/sys/net/ipv4/conf/default/rp_filter",
 		[]byte("2\n"),
 		os.FileMode(int(0o644)),
@@ -328,7 +329,7 @@ func PrepareKubernetesEnvironment(ikniteConfig *v1alpha1.IkniteClusterSpec) erro
 
 	log.Infof("Ensuring %s existence...", constants.CrictlYaml)
 	if err := utils.ExecuteIfNotExist(constants.CrictlYaml, func() error {
-		return utils.FS.WriteFile(
+		return host.FS.WriteFile(
 			constants.CrictlYaml,
 			[]byte("runtime-endpoint: unix://"+constants.ContainerServiceSock+"\n"),
 			os.FileMode(int(0o644)))

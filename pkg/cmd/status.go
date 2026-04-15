@@ -31,6 +31,7 @@ import (
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
 	"github.com/kaweezle/iknite/pkg/config"
 	"github.com/kaweezle/iknite/pkg/constants"
+	"github.com/kaweezle/iknite/pkg/host"
 	"github.com/kaweezle/iknite/pkg/k8s"
 	"github.com/kaweezle/iknite/pkg/utils"
 )
@@ -281,7 +282,7 @@ func performStatus(ikniteConfig *v1alpha1.IkniteClusterSpec, waitOptions *utils.
 				Name:        "openrc",
 				Description: "Check that OpenRC is started",
 				CheckFn: func(_ context.Context, _ k8s.CheckData) (bool, string, error) {
-					exists, err := utils.FS.Exists(constants.SoftLevelPath)
+					exists, err := host.FS.Exists(constants.SoftLevelPath)
 					if err != nil {
 						return false, "", fmt.Errorf(
 							"failed to check if OpenRC is started: %w",

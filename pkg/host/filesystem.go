@@ -1,9 +1,9 @@
-// Package utils provides utility functions and interfaces for filesystem operations.
+// Package host provides host-level filesystem and command execution abstractions.
 // This file defines a FileSystem interface that abstracts filesystem operations,
 // allowing for both real filesystem access and testing with in-memory filesystems.
 //
 //nolint:wrapcheck // Justification: Test compatible interface.
-package utils
+package host
 
 // cSpell: words wrapcheck interfacebloat
 
@@ -85,7 +85,7 @@ type FileSystem interface {
 	// DirExists checks if the directory at the given path exists.
 	DirExists(path string) (bool, error)
 
-	// MoveFile moves a file from oldPath to newPath.
+	// Rename moves a file from oldPath to newPath.
 	Rename(oldPath, newPath string) error
 }
 
@@ -196,7 +196,7 @@ func (a *aferoFS) Rename(oldPath, newPath string) error {
 	return a.fs.Rename(oldPath, newPath)
 }
 
-// For tests.
+// NewMemMapFS creates in-memory filesystem for tests.
 func NewMemMapFS() FileSystem {
 	return &aferoFS{fs: afero.NewMemMapFs()}
 }

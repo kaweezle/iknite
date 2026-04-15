@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 
+	"github.com/kaweezle/iknite/pkg/host"
 	"github.com/kaweezle/iknite/pkg/utils"
 )
 
@@ -27,7 +28,7 @@ const (
 func EnsureNetFilter() error {
 	if err := utils.ExecuteIfNotExist(brNetfilterDir, func() error {
 		log.Debug("Enabling netfilter...")
-		if out, err := utils.Exec.Run(true, "/sbin/modprobe", netfilter_module); err == nil {
+		if out, err := host.Exec.Run(true, "/sbin/modprobe", netfilter_module); err == nil {
 			log.Trace(string(out))
 		} else {
 			return fmt.Errorf("error while enabling netfilter: %s: %w", string(out), err)
@@ -47,7 +48,7 @@ func EnsureMachineID() error {
 			"filename": machineIDFile,
 		}).Info("Generating machine ID...")
 
-		if err := utils.FS.WriteFile(
+		if err := host.FS.WriteFile(
 			machineIDFile,
 			[]byte(id.String()),
 			os.FileMode(int(0o644)),

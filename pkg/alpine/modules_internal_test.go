@@ -7,8 +7,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/kaweezle/iknite/pkg/host"
 	tu "github.com/kaweezle/iknite/pkg/testutils"
-	"github.com/kaweezle/iknite/pkg/utils"
 )
 
 //nolint:paralleltest // tests modify global state
@@ -23,7 +23,7 @@ func TestEnsureNetFilter(t *testing.T) {
 			prepare: func(t *testing.T, _ *tu.MockExecutor) {
 				t.Helper()
 				req := require.New(t)
-				req.NoError(utils.FS.MkdirAll(brNetfilterDir, 0o755))
+				req.NoError(host.FS.MkdirAll(brNetfilterDir, 0o755))
 			},
 			wantErr: false,
 		},
@@ -70,20 +70,20 @@ func TestEnsureMachineID(t *testing.T) {
 	_, cleanup := tu.CreateTestFS()
 	t.Cleanup(cleanup)
 
-	req.NoError(utils.FS.MkdirAll("/etc", 0o755))
+	req.NoError(host.FS.MkdirAll("/etc", 0o755))
 
 	req.NoError(EnsureMachineID())
 
-	exists, err := utils.FS.Exists(machineIDFile)
+	exists, err := host.FS.Exists(machineIDFile)
 	req.NoError(err)
 	req.True(exists)
 
-	before, err := utils.FS.ReadFile(machineIDFile)
+	before, err := host.FS.ReadFile(machineIDFile)
 	req.NoError(err)
 	req.NotEmpty(before)
 
 	req.NoError(EnsureMachineID())
-	after, err := utils.FS.ReadFile(machineIDFile)
+	after, err := host.FS.ReadFile(machineIDFile)
 	req.NoError(err)
 	req.Equal(string(before), string(after))
 }

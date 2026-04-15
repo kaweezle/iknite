@@ -8,9 +8,9 @@ import (
 	"github.com/lithammer/dedent"
 	"github.com/stretchr/testify/require"
 
+	"github.com/kaweezle/iknite/pkg/host"
 	"github.com/kaweezle/iknite/pkg/k8s"
 	"github.com/kaweezle/iknite/pkg/testutils"
-	"github.com/kaweezle/iknite/pkg/utils"
 )
 
 // cSpell: enable
@@ -41,13 +41,13 @@ func TestPreventKubeletServiceFromStarting(t *testing.T) {
 
 	req := require.New(t)
 
-	err := utils.FS.WriteFile(confFilePath, []byte(rcConfFileContent), 0o644)
+	err := host.FS.WriteFile(confFilePath, []byte(rcConfFileContent), 0o644)
 	req.NoError(err)
 
 	err = k8s.PreventKubeletServiceFromStarting(confFilePath)
 	req.NoError(err)
 
-	content, err := utils.FS.ReadFile(confFilePath)
+	content, err := host.FS.ReadFile(confFilePath)
 	req.NoError(err)
 	req.Equal(rcConfFileContent+k8s.RcConfPreventKubeletRunning+"\n", string(content))
 }
@@ -69,13 +69,13 @@ func TestPreventKubeletServiceFromStarting_WhenLineIsPresent(t *testing.T) {
 
 	req := require.New(t)
 
-	err := utils.FS.WriteFile(confFilePath, []byte(existingContent), 0o644)
+	err := host.FS.WriteFile(confFilePath, []byte(existingContent), 0o644)
 	req.NoError(err)
 
 	err = k8s.PreventKubeletServiceFromStarting(confFilePath)
 	req.NoError(err)
 
-	content, err := utils.FS.ReadFile(confFilePath)
+	content, err := host.FS.ReadFile(confFilePath)
 	req.NoError(err)
 	req.Equal(existingContent, string(content))
 }
@@ -96,13 +96,13 @@ func TestMakeIkniteServiceNeedNetworking(t *testing.T) {
 
 	req := require.New(t)
 
-	err := utils.FS.WriteFile(confFilePath, []byte(rcConfFileContent), 0o644)
+	err := host.FS.WriteFile(confFilePath, []byte(rcConfFileContent), 0o644)
 	req.NoError(err)
 
 	err = k8s.MakeIkniteServiceNeedNetworking(confFilePath)
 	req.NoError(err)
 
-	content, err := utils.FS.ReadFile(confFilePath)
+	content, err := host.FS.ReadFile(confFilePath)
 	req.NoError(err)
 	req.Equal(rcConfFileContent+k8s.RcConfIkniteNeedsNetworking+"\n", string(content))
 }
@@ -124,13 +124,13 @@ func TestMakeIkniteServiceNeedNetworking_WhenLineIsPresent(t *testing.T) {
 
 	req := require.New(t)
 
-	err := utils.FS.WriteFile(confFilePath, []byte(existingContent), 0o644)
+	err := host.FS.WriteFile(confFilePath, []byte(existingContent), 0o644)
 	req.NoError(err)
 
 	err = k8s.MakeIkniteServiceNeedNetworking(confFilePath)
 	req.NoError(err)
 
-	content, err := utils.FS.ReadFile(confFilePath)
+	content, err := host.FS.ReadFile(confFilePath)
 	req.NoError(err)
 	req.Equal(existingContent, string(content))
 }

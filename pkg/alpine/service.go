@@ -25,6 +25,7 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	"github.com/kaweezle/iknite/pkg/constants"
+	"github.com/kaweezle/iknite/pkg/host"
 	"github.com/kaweezle/iknite/pkg/utils"
 )
 
@@ -41,7 +42,7 @@ var startedServicesDir = path.Join(openRCDirectory, "started")
 
 func EnsureOpenRC(level string) error {
 	log.WithField("level", level).Info("Ensuring OpenRC...")
-	if out, err := utils.Exec.Run(true, "/sbin/openrc", "default"); err == nil {
+	if out, err := host.Exec.Run(true, "/sbin/openrc", "default"); err == nil {
 		log.Trace(string(out))
 		return nil
 	} else {
@@ -63,7 +64,7 @@ func StartOpenRC() error {
 
 func IsServiceStarted(serviceName string) (bool, error) {
 	serviceLink := path.Join(startedServicesDir, serviceName)
-	exists, err := utils.FS.Exists(serviceLink)
+	exists, err := host.FS.Exists(serviceLink)
 	if err != nil {
 		return false, fmt.Errorf("failed to check if service %s is started: %w", serviceName, err)
 	}
@@ -124,7 +125,7 @@ func DisableService(serviceName string) error {
 // StartService start the serviceName service if it is not already started.
 func StartService(serviceName string) error {
 	return ExecuteIfServiceNotStarted(serviceName, func() error {
-		if out, err := utils.Exec.Run(false, "/sbin/rc-service", serviceName, "start"); err == nil {
+		if out, err := host.Exec.Run(false, "/sbin/rc-service", serviceName, "start"); err == nil {
 			log.Trace(string(out))
 			return nil
 		} else {
@@ -136,7 +137,7 @@ func StartService(serviceName string) error {
 // StopService stops the serviceName service if it is  started.
 func StopService(serviceName string) error {
 	return ExecuteIfServiceStarted(serviceName, func() error {
-		if out, err := utils.Exec.Run(false, "/sbin/rc-service", serviceName, "stop"); err == nil {
+		if out, err := host.Exec.Run(false, "/sbin/rc-service", serviceName, "stop"); err == nil {
 			log.Trace(string(out))
 			return nil
 		} else {
