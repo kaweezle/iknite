@@ -451,6 +451,9 @@ Keep commits atomic and descriptive (see [CONTRIBUTING.md](../CONTRIBUTING.md)).
    pollution
 4. **Alpine vs standard Linux**: Use `/sbin/openrc`, not systemd; paths differ
    (`/lib/rc/init.d`)
+5. **Race-prone globals in tests**: Avoid parallel tests when mutating global
+   state (`viper`, `utils.Exec`, `utils.FS`, env vars). Prefer serialized tests
+   with explicit cleanup, or refactor code to injected dependencies.
 
 ## CI/CD
 

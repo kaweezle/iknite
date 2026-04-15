@@ -34,8 +34,6 @@ import (
 
 var (
 	cfgFile       string
-	v             string
-	jsonLogs      bool
 	IkniteVersion = "v0.5.2"
 	Commit        = "unknown"
 	BuildDate     = "unknown"

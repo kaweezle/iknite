@@ -21,6 +21,6 @@ import (
 	"github.com/kaweezle/iknite/pkg/cmd"
 )
 
-func main() {
+func main() { // nocov -- tested by integration tests
 	cobra.CheckErr(cmd.NewRootCmd(nil).Execute())
 }

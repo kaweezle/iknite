@@ -19,6 +19,6 @@ import (
 	"github.com/kaweezle/iknite/pkg/cmd/iknitectl"
 )
 
-func main() {
+func main() { // nocov -- tested by integration tests
 	iknitectl.Execute()
 }

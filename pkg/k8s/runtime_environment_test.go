@@ -1,3 +1,4 @@
+// cSpell: words testutils
 package k8s_test
 
 // cSpell: disable
@@ -8,7 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/kaweezle/iknite/pkg/k8s"
-	tu "github.com/kaweezle/iknite/pkg/testutils"
+	"github.com/kaweezle/iknite/pkg/testutils"
 	"github.com/kaweezle/iknite/pkg/utils"
 )
 
@@ -18,15 +19,8 @@ import (
 
 func setupExecutor(t *testing.T) func() {
 	t.Helper()
-	executor := &tu.MockExecutor{}
-	old := utils.Exec
-	utils.Exec = executor
-	oldFS := utils.FS
-	utils.FS = utils.NewMemMapFS()
-	return func() {
-		utils.Exec = old
-		utils.FS = oldFS
-	}
+	_, _, cleanup := testutils.CreateTestFSAndExecutor()
+	return cleanup
 }
 
 const confFilePath = "/etc/rc.conf"

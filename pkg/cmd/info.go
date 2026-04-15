@@ -45,7 +45,7 @@ func NewInfoCmd(ikniteConfig *v1alpha1.IkniteClusterSpec) *cobra.Command {
 - Allows the use of kubectl from the root account,
 - Installs flannel, metal-lb and local-path-provisioner.
 `,
-		PersistentPreRun: func(cmd *cobra.Command, args []string) {
+		PersistentPreRun: func(cmd *cobra.Command, _ []string) {
 			flags := cmd.Flags()
 			_ = viper.BindPFlag( //nolint:errcheck // flag exists
 				options.OutputFormat,

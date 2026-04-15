@@ -21,6 +21,23 @@ const (
 	StatusFailed
 )
 
+func (s CheckStatus) String() string {
+	switch s {
+	case StatusPending:
+		return "pending"
+	case StatusRunning:
+		return "running"
+	case StatusSkipped:
+		return "skipped"
+	case StatusSuccess:
+		return "success"
+	case StatusFailed:
+		return "failed"
+	default:
+		return "unknown"
+	}
+}
+
 type CheckData any
 
 type CheckDataBuilder func() CheckData

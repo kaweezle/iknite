@@ -43,6 +43,8 @@ import (
 
 type Config api.Config
 
+const configuredValueTrue = "true"
+
 // LoadFromFile loads the configuration from the file specified by filename.
 func LoadFromFile(filename string) (*Config, error) {
 	_config, err := clientcmd.LoadFromFile(filename)
@@ -272,7 +274,7 @@ func (config *Config) Kustomize(
 	if err != nil {
 		return err
 	}
-	if cm.Data["configured"] == "true" && !options.ForceConfig {
+	if cm.Data["configured"] == configuredValueTrue && !options.ForceConfig {
 		log.Info("configuration has already occurred. Use -C to force.")
 		return nil
 	}
@@ -292,7 +294,7 @@ func (config *Config) Kustomize(
 		return fmt.Errorf("while applying kustomization resources server side: %w", err)
 	}
 
-	cm.Data["configured"] = "true"
+	cm.Data["configured"] = configuredValueTrue
 	_, err = WriteIkniteConfigMap(ctx, client, cm)
 	if err != nil {
 		return fmt.Errorf("while writing configuration: %w", err)

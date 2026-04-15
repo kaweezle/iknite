@@ -4,6 +4,7 @@ package k8s
 // cSpell: disable
 import (
 	"context"
+	"strings"
 
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
@@ -13,6 +14,8 @@ import (
 
 // cSpell: enable
 
+var _ tea.Model = (*CheckModel)(nil) // compile-time assertion that CheckModel implements tea.Model
+
 type CheckModel struct {
 	executor *CheckExecutor
 	ctx      context.Context //nolint:containedctx // passed around to sub-checks
@@ -20,7 +23,7 @@ type CheckModel struct {
 	spinner  spinner.Model
 }
 
-func (m CheckModel) Init() tea.Cmd { //nolint:gocritic // Implements tea.Model
+func (m *CheckModel) Init() tea.Cmd {
 	go m.executor.Run(m.ctx)
 
 	return tea.Batch(
@@ -30,7 +33,7 @@ func (m CheckModel) Init() tea.Cmd { //nolint:gocritic // Implements tea.Model
 	)
 }
 
-func (m CheckModel) Update( //nolint:gocritic // Implements tea.Model
+func (m *CheckModel) Update(
 	msg tea.Msg,
 ) (tea.Model, tea.Cmd) {
 	switch msg.(type) {
@@ -61,20 +64,24 @@ func (m CheckModel) Update( //nolint:gocritic // Implements tea.Model
 	}
 }
 
-func (m CheckModel) View() string { //nolint:gocritic // Implements tea.Model
-	var output string
+func (m *CheckModel) View() string {
+	var output strings.Builder
 	for _, result := range m.executor.Results {
-		output += result.Format("", m.spinner.View())
+		output.WriteString(result.Format("", m.spinner.View()))
 	}
-	return output
+	return output.String()
 }
 
-func NewCheckModel(ctx context.Context, executor *CheckExecutor) CheckModel {
+func (m *CheckModel) Context() context.Context {
+	return m.ctx
+}
+
+func NewCheckModel(ctx context.Context, executor *CheckExecutor) *CheckModel {
 	newCtx, cancel := context.WithCancel(ctx)
 	s := spinner.New()
 	s.Spinner = spinner.MiniDot
 	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
-	return CheckModel{
+	return &CheckModel{
 		executor: executor,
 		ctx:      newCtx,
 		cancel:   cancel,

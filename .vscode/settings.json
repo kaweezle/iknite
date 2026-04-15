@@ -23,5 +23,8 @@
   "makefile.configureOnOpen": false,
   "files.associations": {
     "*.gotmpl": "helm"
+  },
+  "chat.tools.terminal.autoApprove": {
+    "go": true
   }
 }
