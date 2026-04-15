@@ -1,4 +1,3 @@
-// cSpell: words stretchr
 package iknite_test
 
 import (

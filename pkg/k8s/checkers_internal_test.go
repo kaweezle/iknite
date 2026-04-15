@@ -1,4 +1,3 @@
-// cSpell: words stretchr
 package k8s
 
 import (
@@ -10,6 +9,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/kaweezle/iknite/pkg/alpine"
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
 	"github.com/kaweezle/iknite/pkg/utils"
 )
@@ -81,7 +81,7 @@ func TestCheckWorkloadDataAccessors(t *testing.T) {
 	req := require.New(t)
 
 	waitOptions := utils.NewWaitOptions()
-	raw := CreateCheckWorkloadData("10.0.0.1", waitOptions)
+	raw := CreateCheckWorkloadData("10.0.0.1", waitOptions, alpine.NewDefaultAlpineHost())
 	data, ok := raw.(*checkWorkloadData)
 	req.True(ok)
 
@@ -146,7 +146,10 @@ func TestAdditionalCheckerPaths(t *testing.T) {
 	t.Parallel()
 	req := require.New(t)
 
-	ok, msg, err := CheckService("ignored", false, false)
+	// TODO: Use mocks and make a full test of CheckService.
+	h := alpine.NewDefaultAlpineHost()
+
+	ok, msg, err := CheckService(h, "ignored", false, false)
 	req.NoError(err)
 	req.True(ok)
 	req.Contains(msg, "Service ignored is running")

@@ -101,7 +101,7 @@ func runDaemonize(c workflow.RunData) error {
 	ensureServerStopped(data)
 
 	data.IkniteCluster().Update(iknite.Cleaning, "clean", nil, nil)
-	err = k8s.CleanAll(&data.IkniteCluster().Spec, true, false, false, false)
+	err = k8s.CleanAll(data.AlpineHost(), &data.IkniteCluster().Spec, true, false, false, false)
 	if err != nil {
 		log.WithError(err).Warn("Error during cleanup after kubelet stopped")
 	}

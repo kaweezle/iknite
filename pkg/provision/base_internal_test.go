@@ -1,4 +1,4 @@
-// cSpell: words paralleltest kyaml filesys stretchr
+// cSpell: words paralleltest kyaml filesys
 package provision
 
 import (

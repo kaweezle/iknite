@@ -1,4 +1,4 @@
-// cSpell: words paralleltest testpackage stretchr apimachinery metav1 clientcmd
+// cSpell: words paralleltest testpackage apimachinery metav1 clientcmd
 //
 //nolint:paralleltest // tests operate on package/global config and fake client objects
 package k8s

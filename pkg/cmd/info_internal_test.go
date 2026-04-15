@@ -1,4 +1,4 @@
-// cSpell: words  stretchr paralleltest
+// cSpell: words  paralleltest
 //
 //nolint:gosec // in-package command tests require global stdout/viper and temp file path reads
 package cmd

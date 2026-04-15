@@ -10,7 +10,6 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	"github.com/kaweezle/iknite/pkg/host"
-	"github.com/kaweezle/iknite/pkg/utils"
 )
 
 // cSpell: enable
@@ -21,14 +20,26 @@ const (
 	machineIDFile    = "/etc/machine-id"
 )
 
+type AlpineHost struct {
+	host.Host
+}
+
+func NewAlpineHost(fs host.FileSystem, exec host.Executor, network host.NetworkHost, system host.System) *AlpineHost {
+	return &AlpineHost{Host: *host.NewHost(fs, exec, network, system)}
+}
+
+func NewDefaultAlpineHost() *AlpineHost {
+	return &AlpineHost{Host: *host.NewDefaultHost()}
+}
+
 // EnsureNetFilter ensures net filtering is available. It does so by checking
 // The availability of the /proc/sys/net/bridge directory. On Windows 11, WSL2
 // includes br_netfilter in the kernel and modprobe is not available.
 // On other linuxes, netfilter is provided as a module.
-func EnsureNetFilter() error {
-	if err := utils.ExecuteIfNotExist(brNetfilterDir, func() error {
+func (h *AlpineHost) EnsureNetFilter() error {
+	if err := h.ExecuteIfNotExist(brNetfilterDir, func() error {
 		log.Debug("Enabling netfilter...")
-		if out, err := host.Exec.Run(true, "/sbin/modprobe", netfilter_module); err == nil {
+		if out, err := h.Exec.Run(true, "/sbin/modprobe", netfilter_module); err == nil {
 			log.Trace(string(out))
 		} else {
 			return fmt.Errorf("error while enabling netfilter: %s: %w", string(out), err)
@@ -40,15 +51,15 @@ func EnsureNetFilter() error {
 	return nil
 }
 
-func EnsureMachineID() error {
-	if err := utils.ExecuteIfNotExist(machineIDFile, func() error {
+func (h *AlpineHost) EnsureMachineID() error {
+	if err := h.ExecuteIfNotExist(machineIDFile, func() error {
 		id := uuid.New()
 		log.WithFields(log.Fields{
 			"uuid":     id,
 			"filename": machineIDFile,
 		}).Info("Generating machine ID...")
 
-		if err := host.FS.WriteFile(
+		if err := h.FS.WriteFile(
 			machineIDFile,
 			[]byte(id.String()),
 			os.FileMode(int(0o644)),

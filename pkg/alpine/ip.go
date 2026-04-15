@@ -1,9 +1,8 @@
 package alpine
 
-// cSpell: words iface ifaces txeh
+// cSpell: words iface ifaces
 // cSpell: disable
 import (
-	"context"
 	"fmt"
 	"net"
 
@@ -15,38 +14,11 @@ import (
 
 // cSpell: enable
 
-func CheckIpExists(ip net.IP) (bool, error) {
-	result := false
-	ifaces, err := net.Interfaces()
-	if err != nil {
-		return result, fmt.Errorf("failed to get network interfaces: %w", err)
-	}
-	for _, i := range ifaces {
-		var addrs []net.Addr
-		addrs, err = i.Addrs()
-		if err != nil {
-			log.WithFields(log.Fields{
-				"interface": i,
-			}).Warn("Cannot get interface address")
-			continue
-		}
-		for _, a := range addrs {
-			if ipNet, ok := a.(*net.IPNet); ok {
-				if ipNet.IP.Equal(ip) {
-					result = true
-					return result, nil
-				}
-			}
-		}
-	}
-	return result, nil
-}
-
 // AddIpAddress adds the IP address to the interface iface.
 //
 // It uses the default mask of the IP address class as the mask, and the default
 // broadcast address as the broadcast address.
-func AddIpAddress(iface string, address net.IP) error {
+func AddIpAddress(exec host.Executor, iface string, address net.IP) error {
 	ones, _ := address.DefaultMask().Size()
 	ipWithMask := fmt.Sprintf("%v/%d", address, ones)
 
@@ -61,7 +33,7 @@ func AddIpAddress(iface string, address net.IP) error {
 		"broadcast", "+", // This will set the broadcast address automatically
 		"dev", iface,
 	}
-	if out, err := host.Exec.Run(true, "/sbin/ip", parameters...); err != nil {
+	if out, err := exec.Run(true, "/sbin/ip", parameters...); err != nil {
 		return fmt.Errorf("%s: %w", string(out), err)
 	}
 	return nil
@@ -87,12 +59,12 @@ func IpMappingForHost(hosts *txeh.Hosts, domainName string) (net.IP, error) {
 }
 
 func AddIpMapping(
-	hostConfig *txeh.HostsConfig,
+	hostsConfig *txeh.HostsConfig,
 	ip net.IP,
 	domainName string,
 	toRemove []net.IP,
 ) error {
-	hosts, err := txeh.NewHosts(hostConfig)
+	hosts, err := txeh.NewHosts(hostsConfig)
 	if err != nil {
 		return fmt.Errorf("failed to create hosts file handler: %w", err)
 	}
@@ -104,20 +76,4 @@ func AddIpMapping(
 		return fmt.Errorf("failed to save hosts file: %w", err)
 	}
 	return nil
-}
-
-func IsHostMapped(ctx context.Context, ip net.IP, domainName string) (bool, []net.IP) {
-	ips, err := net.DefaultResolver.LookupIP(ctx, "ip4", domainName)
-	contains := false
-	if err != nil {
-		ips = []net.IP{}
-	} else {
-		for _, existing := range ips {
-			if existing.Equal(ip) {
-				contains = true
-				break
-			}
-		}
-	}
-	return contains, ips
 }

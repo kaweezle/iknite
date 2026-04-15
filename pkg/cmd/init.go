@@ -60,6 +60,7 @@ import (
 	configUtil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	kubeConfigUtil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 
+	"github.com/kaweezle/iknite/pkg/alpine"
 	ikniteApi "github.com/kaweezle/iknite/pkg/apis/iknite"
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
 	"github.com/kaweezle/iknite/pkg/config"
@@ -138,6 +139,7 @@ type initData struct {
 	ctx                         context.Context //nolint:containedctx // passed around but not stored
 	ctxCancel                   context.CancelFunc
 	kustomizeOptions            *utils.KustomizeOptions
+	alpineHost                  *alpine.AlpineHost
 }
 
 // compile-time assert that the local data object satisfies the IkniteInitData interface, that extends the kubeadm
@@ -560,6 +562,7 @@ func newInitData(
 			options.DryRun,
 			cfg.DryRun,
 			initOptions.dryRun).(bool),
+		alpineHost: alpine.NewDefaultAlpineHost(),
 	}, nil
 }
 
@@ -853,6 +856,10 @@ func (d *initData) ContextWithCancel() (context.Context, context.CancelFunc) {
 
 func (d *initData) KustomizeOptions() *utils.KustomizeOptions {
 	return d.kustomizeOptions
+}
+
+func (d *initData) AlpineHost() *alpine.AlpineHost {
+	return d.alpineHost
 }
 
 func PhaseName(

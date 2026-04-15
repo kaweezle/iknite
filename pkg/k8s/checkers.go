@@ -53,12 +53,13 @@ func SystemFileCheck(name, description, path, expectedContent string) *Check {
 }
 
 func CheckService(
+	host *alpine.AlpineHost,
 	serviceName string,
 	checkOpenRC, checkPidFile bool,
 ) (bool, string, error) {
 	pid := 0
 	if checkOpenRC {
-		success, err := alpine.IsServiceStarted(serviceName)
+		success, err := host.IsServiceStarted(serviceName)
 		if err != nil {
 			return false, "", fmt.Errorf(
 				"failed to check if service %s is started: %w",
@@ -72,7 +73,7 @@ func CheckService(
 	}
 	if checkPidFile {
 		var err error
-		pid, err = CheckPidFile(serviceName, nil)
+		pid, _, err = CheckPidFile(serviceName)
 		if err != nil {
 			return false, "", err
 		}
@@ -89,8 +90,12 @@ func ServiceCheck(name, serviceName string) *Check {
 		Name:        name,
 		DependsOn:   []string{"openrc"},
 		Description: fmt.Sprintf("Check if %s service is running", serviceName),
-		CheckFn: func(_ context.Context, _ CheckData) (bool, string, error) {
-			return CheckService(serviceName, true, true)
+		CheckFn: func(_ context.Context, checkData CheckData) (bool, string, error) {
+			data, ok := checkData.(CheckWorkloadData)
+			if !ok {
+				return false, "", fmt.Errorf("invalid check data type")
+			}
+			return CheckService(data.AlpineHost(), serviceName, true, true)
 		},
 	}
 }
@@ -266,11 +271,13 @@ type CheckWorkloadData interface {
 	ApiAdvertiseAddress() string
 	ManifestDir() string
 	WaitOptions() *utils.WaitOptions
+	AlpineHost() *alpine.AlpineHost
 }
 
 type checkWorkloadData struct {
 	startTime           time.Time
 	waitOptions         *utils.WaitOptions
+	alpineHost          *alpine.AlpineHost
 	apiAdvertiseAddress string
 	readyWorkloads      []*v1alpha1.WorkloadState
 	notReadyWorkloads   []*v1alpha1.WorkloadState
@@ -279,6 +286,8 @@ type checkWorkloadData struct {
 	okIterations        int
 	ok                  bool
 }
+
+var _ CheckWorkloadData = (*checkWorkloadData)(nil)
 
 func (c *checkWorkloadData) IsOk() bool {
 	return c.ok
@@ -351,10 +360,19 @@ func (c *checkWorkloadData) WaitOptions() *utils.WaitOptions {
 	return c.waitOptions
 }
 
-func CreateCheckWorkloadData(apiAdvertiseAddress string, waitOptions *utils.WaitOptions) CheckData {
+func (c *checkWorkloadData) AlpineHost() *alpine.AlpineHost {
+	return c.alpineHost
+}
+
+func CreateCheckWorkloadData(
+	apiAdvertiseAddress string,
+	waitOptions *utils.WaitOptions,
+	alpineHost *alpine.AlpineHost,
+) CheckData {
 	return &checkWorkloadData{
 		apiAdvertiseAddress: apiAdvertiseAddress,
 		waitOptions:         waitOptions,
+		alpineHost:          alpineHost,
 	}
 }
 

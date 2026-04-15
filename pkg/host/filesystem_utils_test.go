@@ -1,23 +1,18 @@
-//nolint:gosec // test reads temp files using controlled paths
-package utils_test
+package host_test
 
 import (
 	"os"
-	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/kaweezle/iknite/pkg/utils"
+	"github.com/kaweezle/iknite/pkg/host"
 )
 
 func TestExecuteOnExistenceVariants(t *testing.T) {
 	t.Parallel()
 
-	tempDir := t.TempDir()
-	existingFile := filepath.Join(tempDir, "exists.txt")
-	req := require.New(t)
-	req.NoError(os.WriteFile(existingFile, []byte("ok"), 0o600))
+	existingFile := "exists.txt"
 
 	tests := []struct {
 		name         string
@@ -29,7 +24,7 @@ func TestExecuteOnExistenceVariants(t *testing.T) {
 		{name: "skip when file exists but expected missing", path: existingFile, existence: false, wantExecuted: false},
 		{
 			name:         "execute when file is missing",
-			path:         filepath.Join(tempDir, "missing.txt"),
+			path:         "missing.txt",
 			existence:    false,
 			wantExecuted: true,
 		},
@@ -39,9 +34,11 @@ func TestExecuteOnExistenceVariants(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			req := require.New(t)
+			fs := host.NewMemMapFS()
+			req.NoError(fs.WriteFile(existingFile, []byte("ok"), 0o600))
 
 			executed := false
-			err := utils.ExecuteOnExistence(tt.path, tt.existence, func() error {
+			err := host.ExecuteOnExistence(fs, tt.path, tt.existence, func() error {
 				executed = true
 				return nil
 			})
@@ -56,13 +53,13 @@ func TestExecuteIfExistAndNotExist(t *testing.T) {
 	t.Parallel()
 	req := require.New(t)
 
-	tempDir := t.TempDir()
-	present := filepath.Join(tempDir, "present.txt")
-	req.NoError(os.WriteFile(present, []byte("present"), 0o600))
-	absent := filepath.Join(tempDir, "absent.txt")
+	fs := host.NewMemMapFS()
+	present := "present.txt"
+	req.NoError(fs.WriteFile(present, []byte("present"), 0o600))
+	absent := "absent.txt"
 
 	executedExist := false
-	err := utils.ExecuteIfExist(present, func() error {
+	err := host.ExecuteIfExist(fs, present, func() error {
 		executedExist = true
 		return nil
 	})
@@ -70,7 +67,7 @@ func TestExecuteIfExistAndNotExist(t *testing.T) {
 	req.True(executedExist)
 
 	executedNotExist := false
-	err = utils.ExecuteIfNotExist(absent, func() error {
+	err = host.ExecuteIfNotExist(fs, absent, func() error {
 		executedNotExist = true
 		return nil
 	})
@@ -84,16 +81,16 @@ func TestMoveFileIfExists(t *testing.T) {
 	t.Run("move existing file", func(t *testing.T) {
 		t.Parallel()
 		req := require.New(t)
-		tempDir := t.TempDir()
-		src := filepath.Join(tempDir, "src.txt")
-		dst := filepath.Join(tempDir, "dst.txt")
-		req.NoError(os.WriteFile(src, []byte("payload"), 0o600))
+		fs := host.NewMemMapFS()
+		src := "src.txt"
+		dst := "dst.txt"
+		req.NoError(fs.WriteFile(src, []byte("payload"), 0o600))
 
-		err := utils.MoveFileIfExists(src, dst)
+		err := host.MoveFileIfExists(fs, src, dst)
 		req.NoError(err)
-		_, srcErr := os.Stat(src)
+		_, srcErr := fs.Stat(src)
 		req.Error(srcErr)
-		content, readErr := os.ReadFile(dst)
+		content, readErr := fs.ReadFile(dst)
 		req.NoError(readErr)
 		req.Equal("payload", string(content))
 	})
@@ -101,20 +98,32 @@ func TestMoveFileIfExists(t *testing.T) {
 	t.Run("missing source is no-op", func(t *testing.T) {
 		t.Parallel()
 		req := require.New(t)
-		tempDir := t.TempDir()
-		src := filepath.Join(tempDir, "missing.txt")
-		dst := filepath.Join(tempDir, "dst.txt")
+		fs := host.NewMemMapFS()
+		src := "missing.txt"
+		dst := "dst.txt"
 
-		err := utils.MoveFileIfExists(src, dst)
+		err := host.MoveFileIfExists(fs, src, dst)
 		req.NoError(err)
-		_, statErr := os.Stat(dst)
+		_, statErr := fs.Stat(dst)
 		req.ErrorIs(statErr, os.ErrNotExist)
 	})
 }
 
 func TestEnvironmentDetectionHelpers(t *testing.T) {
 	t.Parallel()
+	req := require.New(t)
+	fs := host.NewMemMapFS()
 
-	_ = utils.IsOnWSL()
-	_ = utils.IsOnIncus()
+	ok := host.IsOnWSL(fs)
+	req.False(ok)
+
+	req.NoError(fs.MkdirAll("/run/WSL", 0o755))
+	ok = host.IsOnWSL(fs)
+	req.True(ok)
+
+	ok = host.IsOnIncus(fs)
+	req.False(ok)
+	req.NoError(fs.MkdirAll("/dev/.lxc/proc", 0o755))
+	ok = host.IsOnIncus(fs)
+	req.True(ok)
 }

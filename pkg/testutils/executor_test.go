@@ -1,4 +1,4 @@
-// cSpell: words testutils stretchr
+// cSpell: words testutils
 package testutils_test
 
 import (

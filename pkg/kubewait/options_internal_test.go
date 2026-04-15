@@ -13,7 +13,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-// cSpell: words stretchr  paralleltest
+// cSpell: words paralleltest
 //nolint:gosec // in-package helpers, environment mutation, executable script fixture
 package kubewait
 

@@ -1,4 +1,4 @@
-// cSpell: words chmoded stretchr
+// cSpell: words chmoded
 package kubewait
 
 import (

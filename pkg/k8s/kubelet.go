@@ -47,7 +47,7 @@ var (
 
 // cSpell: enable
 
-func CheckPidFile(service string, cmd *exec.Cmd) (int, error) {
+func CheckPidFile(service string) (int, any, error) {
 	pidFilePath := fmt.Sprintf("/run/%s.pid", service)
 	logger := log.WithField("pidfile", pidFilePath)
 	pidBytes, err := os.ReadFile(pidFilePath) //nolint:gosec // Controlled file path
@@ -58,9 +58,9 @@ func CheckPidFile(service string, cmd *exec.Cmd) (int, error) {
 	if err != nil {
 		if !errors.Is(err, os.ErrNotExist) {
 			// only return error is the error is not a file not found error
-			return 0, fmt.Errorf("failed to read pid file: %w", err)
+			return 0, nil, fmt.Errorf("failed to read pid file: %w", err)
 		}
-		return 0, nil
+		return 0, nil, nil
 	}
 
 	pidStr := strings.TrimSpace(string(pidBytes))
@@ -68,23 +68,20 @@ func CheckPidFile(service string, cmd *exec.Cmd) (int, error) {
 	pid, err = strconv.Atoi(pidStr)
 	if err != nil {
 		logger.WithField("content", pidStr).Warn("Failed to convert pid file to integer")
-		return 0, fmt.Errorf("Failed to convert pid file to integer: %w", err)
+		return 0, nil, fmt.Errorf("Failed to convert pid file to integer: %w", err)
 	}
 	var process *os.Process
 	process, err = os.FindProcess(pid)
 	if err == nil && process.Signal(syscall.Signal(0)) == nil {
-		if cmd != nil {
-			cmd.Process = process
-		}
-		return pid, nil
+		return pid, process, nil
 	}
 	logger.WithField("pid", pid).Warn("Pidfile contained an invalid pid")
 	// remove kubeletPidFile
 	err = os.Remove(pidFilePath)
 	if err != nil {
-		return 0, fmt.Errorf("failed to remove pid file: %w", err)
+		return 0, nil, fmt.Errorf("failed to remove pid file: %w", err)
 	}
-	return 0, nil
+	return 0, nil, nil
 }
 
 // IsKubeletRunning checks if the kubelet process is running.
@@ -151,13 +148,18 @@ func StartKubelet() (*exec.Cmd, error) {
 
 	// Check if a process with the value contained in kubeletPidFile exists
 	// ignore the error if for some reason the pid file is not found
-	kubeletPid, err := CheckPidFile("kubelet", cmd)
+	kubeletPid, p, err := CheckPidFile("kubelet")
 	if err != nil {
 		return nil, fmt.Errorf("failed to check kubelet pid file %s: %w", kubeletPidFile, err)
 	}
 	if kubeletPid > 0 {
 		log.WithField("pid", kubeletPid).
 			Warnf("Kubelet is already running with pid: %d. Swallowing...", kubeletPid)
+		process, ok := p.(*os.Process)
+		if !ok {
+			return nil, fmt.Errorf("failed to assert kubelet process type")
+		}
+		cmd.Process = process
 		return cmd, nil
 	}
 

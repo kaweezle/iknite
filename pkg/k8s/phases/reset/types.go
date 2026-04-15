@@ -8,6 +8,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	kubeadmApi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 
+	"github.com/kaweezle/iknite/pkg/alpine"
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
 )
 
@@ -27,4 +28,5 @@ type IkniteResetData interface {
 	CleanupTmpDir() bool
 
 	IkniteCluster() *v1alpha1.IkniteCluster
+	AlpineHost() *alpine.AlpineHost
 }

@@ -87,6 +87,9 @@ type FileSystem interface {
 
 	// Rename moves a file from oldPath to newPath.
 	Rename(oldPath, newPath string) error
+
+	// EvalSymlinks evaluates symbolic links in the given path and returns the actual path.
+	EvalSymlinks(path string) (string, error)
 }
 
 // aferoFS is a concrete implementation of the FileSystem interface using afero.Fs.
@@ -95,9 +98,7 @@ type aferoFS struct {
 	fs afero.Fs
 }
 
-// FS is the global FileSystem instance used throughout the application.
-// It defaults to a real filesystem (NewOsFs) but can be swapped for testing purposes.
-var FS FileSystem = &aferoFS{fs: afero.NewOsFs()}
+var _ FileSystem = (*aferoFS)(nil)
 
 func (a *aferoFS) ReadFile(path string) ([]byte, error) {
 	return afero.ReadFile(a.fs, path)
@@ -196,6 +197,14 @@ func (a *aferoFS) Rename(oldPath, newPath string) error {
 	return a.fs.Rename(oldPath, newPath)
 }
 
+func (a *aferoFS) EvalSymlinks(path string) (string, error) {
+	evalLinker, ok := a.fs.(afero.LinkReader)
+	if !ok {
+		return "", fmt.Errorf("filesystem does not support evaluating symlinks")
+	}
+	return evalLinker.ReadlinkIfPossible(path) //nolint:wrapcheck // preserve the original error type.
+}
+
 // NewMemMapFS creates in-memory filesystem for tests.
 func NewMemMapFS() FileSystem {
 	return &aferoFS{fs: afero.NewMemMapFs()}
@@ -206,3 +215,12 @@ func NewMemMapFS() FileSystem {
 func NewBasePathFS(baseFS afero.Fs, basePath string) FileSystem {
 	return &aferoFS{fs: afero.NewBasePathFs(baseFS, basePath)}
 }
+
+func NewOsFS() FileSystem {
+	return &aferoFS{fs: afero.NewOsFs()}
+}
+
+// FS is the global FileSystem instance used throughout the application.
+// It defaults to a real filesystem (NewOsFs) but can be swapped for testing purposes.
+// TODO: Remove this.
+var FS FileSystem = NewOsFS()

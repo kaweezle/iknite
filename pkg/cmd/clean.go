@@ -97,7 +97,8 @@ This command must be run as root.
 				os.Exit(1)
 			}
 
-			performClean(ikniteConfig, cleanOptions)
+			alpineHost := alpine.NewDefaultAlpineHost()
+			performClean(alpineHost, ikniteConfig, cleanOptions)
 		},
 	}
 
@@ -146,7 +147,7 @@ func initializeClean(flags *flag.FlagSet, cleanOptions *cleanOptions) {
 }
 
 //nolint:gocyclo // TODO: Should use a runner pattern to reduce complexity
-func performClean(ikniteConfig *v1alpha1.IkniteClusterSpec, cleanOptions *cleanOptions) {
+func performClean(alpineHost *alpine.AlpineHost, ikniteConfig *v1alpha1.IkniteClusterSpec, cleanOptions *cleanOptions) {
 	dryRun := cleanOptions.dryRun
 	logger := log.WithField("isDryRun", dryRun)
 
@@ -163,14 +164,14 @@ func performClean(ikniteConfig *v1alpha1.IkniteClusterSpec, cleanOptions *cleanO
 		logger.WithField("serviceName", constants.IkniteService).Info("Stopping iknite service...")
 		if !dryRun {
 			// TODO: if reset kubelet, remove his node from etcd cluster
-			cobra.CheckErr(alpine.StopService(constants.IkniteService))
+			cobra.CheckErr(alpineHost.StopService(constants.IkniteService))
 		}
 	}
 
 	// we assume that starting from here, we are in a stopped state
 	if cleanOptions.stopContainers {
 		logger.Info("Stopping all containers...")
-		if err = k8s.StopAllContainers(dryRun); err != nil {
+		if err = k8s.StopAllContainers(alpineHost.Exec, dryRun); err != nil {
 			log.WithError(err).Warn("Error stopping all containers")
 		}
 	}
@@ -179,28 +180,28 @@ func performClean(ikniteConfig *v1alpha1.IkniteClusterSpec, cleanOptions *cleanO
 		logger.WithField("serviceName", constants.ContainerServiceName).
 			Info("Stopping container service...")
 		if !dryRun {
-			cobra.CheckErr(alpine.StopService(constants.ContainerServiceName))
+			cobra.CheckErr(alpineHost.StopService(constants.ContainerServiceName))
 		}
 	}
 
 	if cleanOptions.unmountPaths {
 		logger.Info("Unmounting paths...")
-		cobra.CheckErr(k8s.UnmountPaths(true, dryRun))
+		cobra.CheckErr(k8s.UnmountPaths(alpineHost, true, dryRun))
 		logger.Info("Removing kubelet runtime files...")
-		cobra.CheckErr(k8s.RemoveKubeletFiles(dryRun))
+		cobra.CheckErr(k8s.RemoveKubeletFiles(alpineHost.Exec, dryRun))
 	}
 
 	if cleanOptions.cleanCni {
-		cobra.CheckErr(k8s.DeleteCniNamespaces(dryRun))
-		cobra.CheckErr(k8s.DeleteNetworkInterfaces(dryRun))
+		cobra.CheckErr(k8s.DeleteCniNamespaces(alpineHost.Exec, dryRun))
+		cobra.CheckErr(k8s.DeleteNetworkInterfaces(alpineHost.Exec, dryRun))
 	}
 
 	if cleanOptions.cleanIptables {
-		cobra.CheckErr(k8s.ResetIPTables(dryRun))
+		cobra.CheckErr(k8s.ResetIPTables(alpineHost.Exec, dryRun))
 	}
 
 	if cleanOptions.cleanIpAddress {
-		err = k8s.ResetIPAddress(ikniteConfig, dryRun)
+		err = k8s.ResetIPAddress(alpineHost, ikniteConfig, dryRun)
 		if err != nil {
 			log.WithError(err).Warn("Error resetting IP address")
 		}

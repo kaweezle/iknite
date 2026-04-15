@@ -1,4 +1,4 @@
-// cSpell: words paralleltest stretchr apimachinery metav1 ikniteapi
+// cSpell: words paralleltest apimachinery metav1 ikniteapi
 package v1alpha1
 
 import (

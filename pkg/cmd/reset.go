@@ -45,6 +45,7 @@ import (
 	configUtil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	kubeconfigUtil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 
+	"github.com/kaweezle/iknite/pkg/alpine"
 	ikniteApi "github.com/kaweezle/iknite/pkg/apis/iknite"
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
 	"github.com/kaweezle/iknite/pkg/config"
@@ -89,7 +90,10 @@ type resetData struct {
 	dryRun                bool
 	cleanupTmpDir         bool
 	ikniteCluster         *v1alpha1.IkniteCluster
+	alpineHost            *alpine.AlpineHost
 }
+
+var _ iknitePhases.IkniteResetData = (*resetData)(nil)
 
 // newResetOptions returns a struct ready for being used for creating cmd join flags.
 func newResetOptions() *resetOptions {
@@ -239,6 +243,7 @@ func newResetData(
 			cmd.Flags(), options.CleanupTmpDir, resetCfg.CleanupTmpDir,
 			opts.externalCfg.CleanupTmpDir).(bool),
 		ikniteCluster: ikniteCluster,
+		alpineHost:    alpine.NewDefaultAlpineHost(),
 	}, nil
 }
 
@@ -359,4 +364,8 @@ func (r *resetData) CRISocketPath() string {
 // IkniteCluster returns the IkniteCluster.
 func (r *resetData) IkniteCluster() *v1alpha1.IkniteCluster {
 	return r.ikniteCluster
+}
+
+func (r *resetData) AlpineHost() *alpine.AlpineHost {
+	return r.alpineHost
 }

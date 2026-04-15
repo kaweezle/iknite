@@ -1,4 +1,4 @@
-// cSpell: words stretchr kyaml
+// cSpell: words kyaml
 package config
 
 import (

@@ -1,4 +1,3 @@
-// cSpell: words stretchr
 package secrets
 
 import (

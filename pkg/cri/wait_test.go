@@ -1,28 +1,23 @@
-// cSpell: words paralleltest stretchr testutils
+// cSpell: words paralleltest testutils
 //
 //nolint:paralleltest,lll // uses package globals and long mocked JSON payloads
 package cri_test
 
 import (
 	"errors"
-	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
 	"github.com/kaweezle/iknite/pkg/constants"
 	"github.com/kaweezle/iknite/pkg/cri"
-	tu "github.com/kaweezle/iknite/pkg/testutils"
+	"github.com/kaweezle/iknite/pkg/host"
+	"github.com/kaweezle/iknite/pkg/testutils"
 )
 
-var waitForContainerServiceTestMu sync.Mutex
-
 func TestWaitForContainerService(t *testing.T) {
-	waitForContainerServiceTestMu.Lock()
-	defer waitForContainerServiceTestMu.Unlock()
-
 	tests := []struct {
-		prepareExec  func(m *tu.MockExecutor)
+		prepareExec  func(m *host.MockExecutor)
 		name         string
 		wantReady    bool
 		wantErr      bool
@@ -30,15 +25,17 @@ func TestWaitForContainerService(t *testing.T) {
 	}{
 		{
 			name: "service becomes ready",
-			prepareExec: func(m *tu.MockExecutor) {
+			prepareExec: func(m *host.MockExecutor) {
 				m.On(
 					"Run",
 					false,
 					"/usr/bin/crictl",
-					"--runtime-endpoint",
-					"unix://"+constants.ContainerServiceSock,
-					"info",
-				).Return(`{"status":{"conditions":[{"type":"RuntimeReady","status":true},{"type":"NetworkReady","status":true}]}}`, nil).Once()
+					[]string{
+						"--runtime-endpoint",
+						"unix://" + constants.ContainerServiceSock,
+						"info",
+					},
+				).Return([]byte(`{"status":{"conditions":[{"type":"RuntimeReady","status":true},{"type":"NetworkReady","status":true}]}}`), nil).Once()
 			},
 			wantReady:    true,
 			wantErr:      false,
@@ -46,15 +43,17 @@ func TestWaitForContainerService(t *testing.T) {
 		},
 		{
 			name: "service not ready after retries",
-			prepareExec: func(m *tu.MockExecutor) {
+			prepareExec: func(m *host.MockExecutor) {
 				m.On(
 					"Run",
 					false,
 					"/usr/bin/crictl",
-					"--runtime-endpoint",
-					"unix://"+constants.ContainerServiceSock,
-					"info",
-				).Return(`{"status":{"conditions":[{"type":"RuntimeReady","status":false}]}}`, nil).Times(3)
+					[]string{
+						"--runtime-endpoint",
+						"unix://" + constants.ContainerServiceSock,
+						"info",
+					},
+				).Return([]byte(`{"status":{"conditions":[{"type":"RuntimeReady","status":false}]}}`), nil).Times(3)
 			},
 			wantReady:    false,
 			wantErr:      false,
@@ -66,7 +65,7 @@ func TestWaitForContainerService(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			req := require.New(t)
 
-			fs, mockExec, cleanup := tu.CreateTestFSAndExecutor()
+			fs, mockExec, cleanup := testutils.CreateTestFSAndExecutor(t)
 			t.Cleanup(cleanup)
 			tt.prepareExec(mockExec)
 

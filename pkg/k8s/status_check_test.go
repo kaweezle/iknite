@@ -1,4 +1,4 @@
-// cSpell: words paralleltest testpackage stretchr
+// cSpell: words paralleltest testpackage
 package k8s_test
 
 import (
@@ -21,7 +21,7 @@ func TestCheck_NewResultAndFillDependencies(t *testing.T) {
 		{Name: "dependent", Description: "dep", DependsOn: []string{"leaf"}},
 	}
 
-	results := k8s.PrepareChecks(checks)
+	results := k8s.PrepareChecks(checks, nil)
 	req.Len(results, 2)
 	req.Equal("leaf", results[0].SubResults[0].Name())
 	req.NotNil(results[0].Done)
@@ -80,7 +80,7 @@ func TestCheckResult_CheckFn(t *testing.T) {
 			t.Parallel()
 			req := require.New(t)
 
-			result := tt.check.NewResult().CheckFn(context.Background())
+			result := tt.check.NewResult(nil).CheckFn(context.Background())
 			if tt.wantError {
 				req.Error(result.Error)
 			} else {
@@ -111,7 +111,7 @@ func TestCheckResult_RunAndDependencies(t *testing.T) {
 		},
 	}
 
-	results := k8s.PrepareChecks([]*k8s.Check{parent, child})
+	results := k8s.PrepareChecks([]*k8s.Check{parent, child}, nil)
 	k8s.RunChecks(context.Background(), results)
 
 	for _, result := range results {
@@ -144,7 +144,7 @@ func TestCheckResult_RunWithSubChecks(t *testing.T) {
 		},
 	}
 
-	result := check.NewResult()
+	result := check.NewResult(nil)
 	result.Run(context.Background())
 	<-result.Done
 
@@ -167,14 +167,14 @@ func TestFormattingHelpers(t *testing.T) {
 		t.Run(st.String(), func(t *testing.T) {
 			t.Parallel()
 			req := require.New(t)
-			result := (&k8s.Check{Name: "name", Description: "desc"}).NewResult()
+			result := (&k8s.Check{Name: "name", Description: "desc"}).NewResult(nil)
 			result.Status = st
 			statusText := result.StatusString("spinner")
 			req.NotEmpty(statusText)
 		})
 	}
 
-	result := (&k8s.Check{Name: "name", Description: "desc"}).NewResult()
+	result := (&k8s.Check{Name: "name", Description: "desc"}).NewResult(nil)
 	req := require.New(t)
 
 	result.Status = k8s.StatusSuccess
@@ -203,7 +203,7 @@ func TestCheckExecutor_Run(t *testing.T) {
 		},
 	}
 
-	executor := k8s.NewCheckExecutor(checks)
+	executor := k8s.NewCheckExecutor(checks, nil)
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 

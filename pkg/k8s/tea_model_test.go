@@ -1,4 +1,4 @@
-// cSpell: words charmbracelet stretchr bubbletea
+// cSpell: words charmbracelet bubbletea
 package k8s_test
 
 import (

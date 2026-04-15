@@ -1,4 +1,3 @@
-// cSpell: words stretchr
 package utils_test
 
 import (

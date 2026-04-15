@@ -1,4 +1,4 @@
-// cSpell: words kstatus sirupsen stretchr apimachinery
+// cSpell: words kstatus sirupsen apimachinery
 package kubewait
 
 import (

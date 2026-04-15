@@ -3,6 +3,7 @@ package cmd
 import (
 	"github.com/spf13/cobra"
 
+	"github.com/kaweezle/iknite/pkg/alpine"
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
 	"github.com/kaweezle/iknite/pkg/config"
 	"github.com/kaweezle/iknite/pkg/k8s"
@@ -32,6 +33,7 @@ The kubelet is started and monitored. The following operations are performed:
 }
 
 func performKubelet(ikniteConfig *v1alpha1.IkniteClusterSpec, kustomizeOptions *utils.KustomizeOptions) {
-	cobra.CheckErr(k8s.PrepareKubernetesEnvironment(ikniteConfig))
+	alpineHost := alpine.NewDefaultAlpineHost()
+	cobra.CheckErr(k8s.PrepareKubernetesEnvironment(alpineHost, ikniteConfig))
 	cobra.CheckErr(k8s.StartAndConfigureKubelet(ikniteConfig, kustomizeOptions))
 }

@@ -1,4 +1,4 @@
-// cSpell: words stretchr paralleltest
+// cSpell: words paralleltest
 package cmd
 
 import (

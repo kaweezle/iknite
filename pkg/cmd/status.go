@@ -94,10 +94,8 @@ func NewStatusCmd(ikniteConfig *v1alpha1.IkniteClusterSpec, waitOptions *utils.W
 
 //nolint:gocognit,gocyclo // TODO: Should use a runner pattern to reduce complexity
 func performStatus(ikniteConfig *v1alpha1.IkniteClusterSpec, waitOptions *utils.WaitOptions) {
-	checkData := k8s.CreateCheckWorkloadData(ikniteConfig.GetApiEndPoint(), waitOptions)
-	checkDataBuilder := func() k8s.CheckData {
-		return checkData
-	}
+	alpineHost := alpine.NewDefaultAlpineHost()
+	checkData := k8s.CreateCheckWorkloadData(ikniteConfig.GetApiEndPoint(), waitOptions, alpineHost)
 
 	var apiBackendName string
 	if ikniteConfig.UseEtcd {
@@ -133,8 +131,12 @@ func performStatus(ikniteConfig *v1alpha1.IkniteClusterSpec, waitOptions *utils.
 			{
 				Name:        "kubelet_service",
 				Description: "Check if the kubelet service is not runnable",
-				CheckFn: func(_ context.Context, _ k8s.CheckData) (bool, string, error) {
-					runnable, err := k8s.IsKubeletServiceRunnable(constants.RcConfFile)
+				CheckFn: func(_ context.Context, checkData k8s.CheckData) (bool, string, error) {
+					data, ok := checkData.(k8s.CheckWorkloadData)
+					if !ok {
+						return false, "", fmt.Errorf("invalid check data type")
+					}
+					runnable, err := k8s.IsKubeletServiceRunnable(data.AlpineHost().FS, constants.RcConfFile)
 					if err != nil {
 						return false, "", fmt.Errorf(
 							"failed to check if kubelet service is runnable: %w",
@@ -154,9 +156,13 @@ func performStatus(ikniteConfig *v1alpha1.IkniteClusterSpec, waitOptions *utils.
 			{
 				Name:        "ip_bound",
 				Description: "Check if the IP address is bound to an interface",
-				CheckFn: func(_ context.Context, _ k8s.CheckData) (bool, string, error) {
+				CheckFn: func(_ context.Context, checkData k8s.CheckData) (bool, string, error) {
+					data, ok := checkData.(k8s.CheckWorkloadData)
+					if !ok {
+						return false, "", fmt.Errorf("invalid check data type")
+					}
 					if ikniteConfig.CreateIp {
-						result, err := alpine.CheckIpExists(ikniteConfig.Ip)
+						result, err := data.AlpineHost().Network.CheckIpExists(ikniteConfig.Ip)
 						switch {
 						case err != nil:
 							return false, "", fmt.Errorf("failed to check if IP exists: %w", err)
@@ -180,12 +186,16 @@ func performStatus(ikniteConfig *v1alpha1.IkniteClusterSpec, waitOptions *utils.
 			{
 				Name:        "domain_name",
 				Description: "Check if the domain name is set",
-				CheckFn: func(ctx context.Context, _ k8s.CheckData) (bool, string, error) {
+				CheckFn: func(ctx context.Context, checkData k8s.CheckData) (bool, string, error) {
+					data, ok := checkData.(k8s.CheckWorkloadData)
+					if !ok {
+						return false, "", fmt.Errorf("invalid check data type")
+					}
 					if ikniteConfig.DomainName == "" {
 						return true, "Domain name is not set", nil
 					}
 					ipString := ikniteConfig.Ip.String()
-					if contains, ips := alpine.IsHostMapped(
+					if contains, ips := data.AlpineHost().Network.IsHostMapped(
 						ctx,
 						ikniteConfig.Ip,
 						ikniteConfig.DomainName,
@@ -303,8 +313,12 @@ func performStatus(ikniteConfig *v1alpha1.IkniteClusterSpec, waitOptions *utils.
 				Name:        "kubelet_running",
 				DependsOn:   []string{"iknite_running"},
 				Description: "Check if the kubelet process is running",
-				CheckFn: func(_ context.Context, _ k8s.CheckData) (bool, string, error) {
-					return k8s.CheckService("kubelet", false, true)
+				CheckFn: func(_ context.Context, checkData k8s.CheckData) (bool, string, error) {
+					data, ok := checkData.(k8s.CheckWorkloadData)
+					if !ok {
+						return false, "", fmt.Errorf("invalid check data type")
+					}
+					return k8s.CheckService(data.AlpineHost(), "kubelet", false, true)
 				},
 			},
 			//   - Check if the kubelet api endpoint (socket) is reachable and healthy
@@ -324,7 +338,6 @@ func performStatus(ikniteConfig *v1alpha1.IkniteClusterSpec, waitOptions *utils.
 				CheckFn: func(_ context.Context, data k8s.CheckData) (bool, string, error) {
 					return k8s.CheckApiServerHealth(waitOptions.CheckTimeout, data)
 				},
-				CheckDataBuilder: checkDataBuilder,
 			},
 			//   - Check if the iknite status server is healthy
 			{
@@ -341,18 +354,17 @@ func performStatus(ikniteConfig *v1alpha1.IkniteClusterSpec, waitOptions *utils.
 			},
 		}),
 		{
-			Name:             "workload_status",
-			Description:      "Check Workload Status",
-			DependsOn:        []string{"runtime"},
-			CheckFn:          k8s.CheckWorkloads,
-			CheckDataBuilder: checkDataBuilder,
-			CustomPrinter:    k8s.CheckWorkloadResultPrinter,
+			Name:          "workload_status",
+			Description:   "Check Workload Status",
+			DependsOn:     []string{"runtime"},
+			CheckFn:       k8s.CheckWorkloads,
+			CustomPrinter: k8s.CheckWorkloadResultPrinter,
 		},
 	}
 
 	// Run all checks
 	ctx := context.Background()
-	executor := k8s.NewCheckExecutor(checks)
+	executor := k8s.NewCheckExecutor(checks, checkData)
 	logrus.SetLevel(logrus.FatalLevel)
 
 	p := tea.NewProgram(k8s.NewCheckModel(ctx, executor))

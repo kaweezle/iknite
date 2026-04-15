@@ -1,4 +1,4 @@
-// cSpell: words kstatus apimachinery stretchr
+// cSpell: words kstatus apimachinery
 package k8s
 
 import (

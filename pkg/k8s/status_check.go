@@ -47,14 +47,13 @@ type CheckFn func(ctx context.Context, data CheckData) (bool, string, error)
 type CustomResultPrinter func(result *CheckResult, prefix string, spinView string) string
 
 type Check struct {
-	CheckFn          CheckFn
-	CheckDataBuilder CheckDataBuilder
-	CustomPrinter    CustomResultPrinter
-	Name             string
-	Description      string
-	Message          string
-	DependsOn        []string
-	SubChecks        []*Check
+	CheckFn       CheckFn
+	CustomPrinter CustomResultPrinter
+	Name          string
+	Description   string
+	Message       string
+	DependsOn     []string
+	SubChecks     []*Check
 }
 
 type CheckResult struct {
@@ -74,15 +73,10 @@ type CheckExecutor struct {
 	Results       []*CheckResult
 }
 
-func (c *Check) NewResult() *CheckResult {
+func (c *Check) NewResult(checkData CheckData) *CheckResult {
 	subResults := make([]*CheckResult, 0, len(c.SubChecks))
 	for _, subCheck := range c.SubChecks {
-		subResults = append(subResults, subCheck.NewResult())
-	}
-
-	var checkData CheckData
-	if c.CheckDataBuilder != nil {
-		checkData = c.CheckDataBuilder()
+		subResults = append(subResults, subCheck.NewResult(checkData))
 	}
 
 	return &CheckResult{
@@ -231,10 +225,10 @@ func FillResultNameMap(
 }
 
 // PrepareChecks prepares the checks for running.
-func PrepareChecks(checks []*Check) []*CheckResult {
+func PrepareChecks(checks []*Check, checkData CheckData) []*CheckResult {
 	results := make([]*CheckResult, 0, len(checks))
 	for _, check := range checks {
-		results = append(results, check.NewResult())
+		results = append(results, check.NewResult(checkData))
 	}
 
 	resultNameMap := FillResultNameMap(results, nil)
@@ -254,10 +248,10 @@ func RunChecks(ctx context.Context, results []*CheckResult) []*CheckResult {
 }
 
 // NewCheckExecutor creates a new CheckExecutor.
-func NewCheckExecutor(checks []*Check) *CheckExecutor {
+func NewCheckExecutor(checks []*Check, checkData CheckData) *CheckExecutor {
 	e := &CheckExecutor{
 		Checks:        checks,
-		Results:       PrepareChecks(checks),
+		Results:       PrepareChecks(checks, checkData),
 		resultNameMap: nil,
 	}
 	e.resultNameMap = FillResultNameMap(e.Results, e.resultNameMap)

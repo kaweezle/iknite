@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"io"
 	"os/exec"
+
+	"github.com/bitfield/script"
 )
 
 // ExecutorFunction is a function that executes a command and returns its input.
@@ -14,6 +16,8 @@ type ExecutorFunction = func(cmd string, arguments ...string) ([]byte, error)
 type Executor interface {
 	Run(combined bool, cmd string, arguments ...string) ([]byte, error)
 	Pipe(stdin io.Reader, combined bool, cmd string, arguments ...string) ([]byte, error)
+	ExecPipe(stdin *script.Pipe, cmd string) *script.Pipe
+	ExecForEach(stdin *script.Pipe, cmd string) *script.Pipe
 }
 
 // CommandExecutor executes commands on host environment.
@@ -56,6 +60,20 @@ func (c *CommandExecutor) Pipe(
 		return output, fmt.Errorf("failed to pipe command %s: %w", cmd, err)
 	}
 	return output, nil
+}
+
+func (c *CommandExecutor) ExecPipe(stdin *script.Pipe, cmd string) *script.Pipe {
+	if stdin == nil {
+		stdin = script.NewPipe()
+	}
+	return stdin.Exec(cmd)
+}
+
+func (c *CommandExecutor) ExecForEach(stdin *script.Pipe, cmd string) *script.Pipe {
+	if stdin == nil {
+		return script.NewPipe().WithError(fmt.Errorf("stdin pipe cannot be nil"))
+	}
+	return stdin.ExecForEach(cmd)
 }
 
 // Exec is shared command executor used by code interacting with host system.

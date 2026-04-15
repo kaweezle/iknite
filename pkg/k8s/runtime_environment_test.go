@@ -10,26 +10,16 @@ import (
 
 	"github.com/kaweezle/iknite/pkg/host"
 	"github.com/kaweezle/iknite/pkg/k8s"
-	"github.com/kaweezle/iknite/pkg/testutils"
 )
 
 // cSpell: enable
 
 // cSpell: words paralleltest
 
-func setupExecutor(t *testing.T) func() {
-	t.Helper()
-	_, _, cleanup := testutils.CreateTestFSAndExecutor()
-	return cleanup
-}
-
 const confFilePath = "/etc/rc.conf"
 
-//nolint:paralleltest // Using a global variable util.Exec
 func TestPreventKubeletServiceFromStarting(t *testing.T) {
-	teardown := setupExecutor(t)
-	defer teardown()
-
+	t.Parallel()
 	// cSpell: disable
 	rcConfFileContent := dedent.Dedent(`
     rc_sys="prefix"
@@ -40,23 +30,21 @@ func TestPreventKubeletServiceFromStarting(t *testing.T) {
 	// cSpell: enable
 
 	req := require.New(t)
+	fs := host.NewMemMapFS()
 
-	err := host.FS.WriteFile(confFilePath, []byte(rcConfFileContent), 0o644)
+	err := fs.WriteFile(confFilePath, []byte(rcConfFileContent), 0o644)
 	req.NoError(err)
 
-	err = k8s.PreventKubeletServiceFromStarting(confFilePath)
+	err = k8s.PreventKubeletServiceFromStarting(fs, confFilePath)
 	req.NoError(err)
 
-	content, err := host.FS.ReadFile(confFilePath)
+	content, err := fs.ReadFile(confFilePath)
 	req.NoError(err)
 	req.Equal(rcConfFileContent+k8s.RcConfPreventKubeletRunning+"\n", string(content))
 }
 
 //nolint:paralleltest // Using a global variable util.Exec
 func TestPreventKubeletServiceFromStarting_WhenLineIsPresent(t *testing.T) {
-	teardown := setupExecutor(t)
-	defer teardown()
-
 	// cSpell: disable
 	existingContent := dedent.Dedent(`
     rc_sys="prefix"
@@ -68,23 +56,21 @@ func TestPreventKubeletServiceFromStarting_WhenLineIsPresent(t *testing.T) {
 	// cSpell: enable
 
 	req := require.New(t)
+	fs := host.NewMemMapFS()
 
-	err := host.FS.WriteFile(confFilePath, []byte(existingContent), 0o644)
+	err := fs.WriteFile(confFilePath, []byte(existingContent), 0o644)
 	req.NoError(err)
 
-	err = k8s.PreventKubeletServiceFromStarting(confFilePath)
+	err = k8s.PreventKubeletServiceFromStarting(fs, confFilePath)
 	req.NoError(err)
 
-	content, err := host.FS.ReadFile(confFilePath)
+	content, err := fs.ReadFile(confFilePath)
 	req.NoError(err)
 	req.Equal(existingContent, string(content))
 }
 
 //nolint:paralleltest // Using a global variable util.Exec
 func TestMakeIkniteServiceNeedNetworking(t *testing.T) {
-	teardown := setupExecutor(t)
-	defer teardown()
-
 	// cSpell: disable
 	rcConfFileContent := dedent.Dedent(`
     rc_sys="prefix"
@@ -95,23 +81,21 @@ func TestMakeIkniteServiceNeedNetworking(t *testing.T) {
 	// cSpell: enable
 
 	req := require.New(t)
+	fs := host.NewMemMapFS()
 
-	err := host.FS.WriteFile(confFilePath, []byte(rcConfFileContent), 0o644)
+	err := fs.WriteFile(confFilePath, []byte(rcConfFileContent), 0o644)
 	req.NoError(err)
 
-	err = k8s.MakeIkniteServiceNeedNetworking(confFilePath)
+	err = k8s.MakeIkniteServiceNeedNetworking(fs, confFilePath)
 	req.NoError(err)
 
-	content, err := host.FS.ReadFile(confFilePath)
+	content, err := fs.ReadFile(confFilePath)
 	req.NoError(err)
 	req.Equal(rcConfFileContent+k8s.RcConfIkniteNeedsNetworking+"\n", string(content))
 }
 
 //nolint:paralleltest // Using a global variable util.Exec
 func TestMakeIkniteServiceNeedNetworking_WhenLineIsPresent(t *testing.T) {
-	teardown := setupExecutor(t)
-	defer teardown()
-
 	// cSpell: disable
 	existingContent := dedent.Dedent(`
     rc_sys="prefix"
@@ -123,14 +107,15 @@ func TestMakeIkniteServiceNeedNetworking_WhenLineIsPresent(t *testing.T) {
 	// cSpell: enable
 
 	req := require.New(t)
+	fs := host.NewMemMapFS()
 
-	err := host.FS.WriteFile(confFilePath, []byte(existingContent), 0o644)
+	err := fs.WriteFile(confFilePath, []byte(existingContent), 0o644)
 	req.NoError(err)
 
-	err = k8s.MakeIkniteServiceNeedNetworking(confFilePath)
+	err = k8s.MakeIkniteServiceNeedNetworking(fs, confFilePath)
 	req.NoError(err)
 
-	content, err := host.FS.ReadFile(confFilePath)
+	content, err := fs.ReadFile(confFilePath)
 	req.NoError(err)
 	req.Equal(existingContent, string(content))
 }

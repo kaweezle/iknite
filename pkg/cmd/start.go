@@ -93,7 +93,8 @@ func IsIkniteReady(_ context.Context) (bool, error) {
 }
 
 func performStart(ikniteConfig *v1alpha1.IkniteClusterSpec, waitOptions *utils.WaitOptions) {
-	cobra.CheckErr(k8s.PrepareKubernetesEnvironment(ikniteConfig))
+	alpineHost := alpine.NewDefaultAlpineHost()
+	cobra.CheckErr(k8s.PrepareKubernetesEnvironment(alpineHost, ikniteConfig))
 
 	// If Kubernetes is already installed, check that the configuration has not
 	// Changed.
@@ -117,7 +118,7 @@ func performStart(ikniteConfig *v1alpha1.IkniteClusterSpec, waitOptions *utils.W
 	}
 
 	// Start OpenRC. This will perform `iknite init`.
-	cobra.CheckErr(alpine.EnsureOpenRC("default"))
+	cobra.CheckErr(alpineHost.EnsureOpenRC("default"))
 	cobra.CheckErr(waitOptions.Poll(context.Background(), IsIkniteReady))
 	log.Info("Cluster is ready")
 }
