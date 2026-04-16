@@ -7,8 +7,8 @@ import (
 	"github.com/pion/mdns"
 	initPhases "k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/init"
 
-	"github.com/kaweezle/iknite/pkg/alpine"
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
+	"github.com/kaweezle/iknite/pkg/host"
 	"github.com/kaweezle/iknite/pkg/server"
 	"github.com/kaweezle/iknite/pkg/utils"
 )
@@ -25,5 +25,5 @@ type IkniteInitData interface {
 	SetStatusServer(srv *server.IkniteServer)
 	StatusServer() *server.IkniteServer
 	KustomizeOptions() *utils.KustomizeOptions
-	AlpineHost() *alpine.AlpineHost
+	Host() host.Host
 }

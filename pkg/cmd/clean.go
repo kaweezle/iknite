@@ -17,6 +17,7 @@ import (
 	"github.com/kaweezle/iknite/pkg/cmd/options"
 	"github.com/kaweezle/iknite/pkg/config"
 	"github.com/kaweezle/iknite/pkg/constants"
+	"github.com/kaweezle/iknite/pkg/host"
 	"github.com/kaweezle/iknite/pkg/k8s"
 	"github.com/kaweezle/iknite/pkg/k8s/phases/reset"
 )
@@ -97,7 +98,7 @@ This command must be run as root.
 				os.Exit(1)
 			}
 
-			alpineHost := alpine.NewDefaultAlpineHost()
+			alpineHost := host.NewDefaultHost()
 			performClean(alpineHost, ikniteConfig, cleanOptions)
 		},
 	}
@@ -147,7 +148,7 @@ func initializeClean(flags *flag.FlagSet, cleanOptions *cleanOptions) {
 }
 
 //nolint:gocyclo // TODO: Should use a runner pattern to reduce complexity
-func performClean(alpineHost *alpine.AlpineHost, ikniteConfig *v1alpha1.IkniteClusterSpec, cleanOptions *cleanOptions) {
+func performClean(alpineHost host.Host, ikniteConfig *v1alpha1.IkniteClusterSpec, cleanOptions *cleanOptions) {
 	dryRun := cleanOptions.dryRun
 	logger := log.WithField("isDryRun", dryRun)
 
@@ -164,14 +165,14 @@ func performClean(alpineHost *alpine.AlpineHost, ikniteConfig *v1alpha1.IkniteCl
 		logger.WithField("serviceName", constants.IkniteService).Info("Stopping iknite service...")
 		if !dryRun {
 			// TODO: if reset kubelet, remove his node from etcd cluster
-			cobra.CheckErr(alpineHost.StopService(constants.IkniteService))
+			cobra.CheckErr(alpine.StopService(alpineHost, constants.IkniteService))
 		}
 	}
 
 	// we assume that starting from here, we are in a stopped state
 	if cleanOptions.stopContainers {
 		logger.Info("Stopping all containers...")
-		if err = k8s.StopAllContainers(alpineHost.Exec, dryRun); err != nil {
+		if err = k8s.StopAllContainers(alpineHost, dryRun); err != nil {
 			log.WithError(err).Warn("Error stopping all containers")
 		}
 	}
@@ -180,7 +181,7 @@ func performClean(alpineHost *alpine.AlpineHost, ikniteConfig *v1alpha1.IkniteCl
 		logger.WithField("serviceName", constants.ContainerServiceName).
 			Info("Stopping container service...")
 		if !dryRun {
-			cobra.CheckErr(alpineHost.StopService(constants.ContainerServiceName))
+			cobra.CheckErr(alpine.StopService(alpineHost, constants.ContainerServiceName))
 		}
 	}
 
@@ -188,16 +189,16 @@ func performClean(alpineHost *alpine.AlpineHost, ikniteConfig *v1alpha1.IkniteCl
 		logger.Info("Unmounting paths...")
 		cobra.CheckErr(k8s.UnmountPaths(alpineHost, true, dryRun))
 		logger.Info("Removing kubelet runtime files...")
-		cobra.CheckErr(k8s.RemoveKubeletFiles(alpineHost.Exec, dryRun))
+		cobra.CheckErr(k8s.RemoveKubeletFiles(alpineHost, dryRun))
 	}
 
 	if cleanOptions.cleanCni {
-		cobra.CheckErr(k8s.DeleteCniNamespaces(alpineHost.Exec, dryRun))
-		cobra.CheckErr(k8s.DeleteNetworkInterfaces(alpineHost.Exec, dryRun))
+		cobra.CheckErr(k8s.DeleteCniNamespaces(alpineHost, dryRun))
+		cobra.CheckErr(k8s.DeleteNetworkInterfaces(alpineHost, dryRun))
 	}
 
 	if cleanOptions.cleanIptables {
-		cobra.CheckErr(k8s.ResetIPTables(alpineHost.Exec, dryRun))
+		cobra.CheckErr(k8s.ResetIPTables(alpineHost, dryRun))
 	}
 
 	if cleanOptions.cleanIpAddress {

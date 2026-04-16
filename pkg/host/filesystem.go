@@ -102,53 +102,51 @@ type FileSystem interface {
 	Abs(path string) (string, error)
 }
 
-// aferoFS is a concrete implementation of the FileSystem interface using afero.Fs.
-// It wraps an afero filesystem backend and delegates all operations to it.
-type aferoFS struct {
+type hostImpl struct {
 	fs afero.Fs
 }
 
-var _ FileSystem = (*aferoFS)(nil)
+var _ FileSystem = (*hostImpl)(nil)
 
-func (a *aferoFS) ReadFile(path string) ([]byte, error) {
+func (a *hostImpl) ReadFile(path string) ([]byte, error) {
 	return afero.ReadFile(a.fs, path)
 }
 
-func (a *aferoFS) WriteFile(path string, data []byte, perm os.FileMode) error {
+func (a *hostImpl) WriteFile(path string, data []byte, perm os.FileMode) error {
 	return afero.WriteFile(a.fs, path, data, perm)
 }
 
-func (a *aferoFS) Stat(path string) (os.FileInfo, error) {
+func (a *hostImpl) Stat(path string) (os.FileInfo, error) {
 	return a.fs.Stat(path)
 }
 
-func (a *aferoFS) Create(path string) (afero.File, error) {
+func (a *hostImpl) Create(path string) (afero.File, error) {
 	return a.fs.Create(path)
 }
 
-func (a *aferoFS) Open(path string) (afero.File, error) {
+func (a *hostImpl) Open(path string) (afero.File, error) {
 	return a.fs.Open(path)
 }
 
-func (a *aferoFS) OpenFile(path string, flag int, perm os.FileMode) (afero.File, error) {
+func (a *hostImpl) OpenFile(path string, flag int, perm os.FileMode) (afero.File, error) {
 	return a.fs.OpenFile(path, flag, perm)
 }
 
-func (a *aferoFS) Remove(path string) error {
+func (a *hostImpl) Remove(path string) error {
 	return a.fs.Remove(path)
 }
 
-func (a *aferoFS) RemoveAll(path string) error {
+func (a *hostImpl) RemoveAll(path string) error {
 	return a.fs.RemoveAll(path)
 }
 
-func (a *aferoFS) MkdirAll(path string, perm os.FileMode) error {
+func (a *hostImpl) MkdirAll(path string, perm os.FileMode) error {
 	return a.fs.MkdirAll(path, perm)
 }
 
 // Symlink creates a symbolic link at newName pointing to oldName.
 // It returns an error if the underlying filesystem does not support symlinks.
-func (a *aferoFS) Symlink(oldName, newName string) error {
+func (a *hostImpl) Symlink(oldName, newName string) error {
 	linker, ok := a.fs.(afero.Linker)
 	if !ok { // coverage-ignore
 		return fmt.Errorf("filesystem does not support symlinks")
@@ -156,15 +154,15 @@ func (a *aferoFS) Symlink(oldName, newName string) error {
 	return linker.SymlinkIfPossible(oldName, newName)
 }
 
-func (a *aferoFS) ReadDir(dirname string) ([]os.FileInfo, error) {
+func (a *hostImpl) ReadDir(dirname string) ([]os.FileInfo, error) {
 	return afero.ReadDir(a.fs, dirname)
 }
 
-func (a *aferoFS) Exists(path string) (bool, error) {
+func (a *hostImpl) Exists(path string) (bool, error) {
 	return afero.Exists(a.fs, path)
 }
 
-func (a *aferoFS) Pipe(path string) *script.Pipe {
+func (a *hostImpl) Pipe(path string) *script.Pipe {
 	result := script.NewPipe()
 	file, err := a.Open(path)
 	if err != nil {
@@ -174,7 +172,7 @@ func (a *aferoFS) Pipe(path string) *script.Pipe {
 	return result.WithReader(file)
 }
 
-func (a *aferoFS) WritePipe(
+func (a *hostImpl) WritePipe(
 	path string,
 	p *script.Pipe,
 	flag int,
@@ -199,15 +197,15 @@ func (a *aferoFS) WritePipe(
 	return wrote, p.Error()
 }
 
-func (a *aferoFS) DirExists(path string) (bool, error) {
+func (a *hostImpl) DirExists(path string) (bool, error) {
 	return afero.DirExists(a.fs, path)
 }
 
-func (a *aferoFS) Rename(oldPath, newPath string) error {
+func (a *hostImpl) Rename(oldPath, newPath string) error {
 	return a.fs.Rename(oldPath, newPath)
 }
 
-func (a *aferoFS) EvalSymlinks(path string) (string, error) {
+func (a *hostImpl) EvalSymlinks(path string) (string, error) {
 	evalLinker, ok := a.fs.(afero.LinkReader)
 	if !ok {
 		return "", fmt.Errorf("filesystem does not support evaluating symlinks")
@@ -215,15 +213,15 @@ func (a *aferoFS) EvalSymlinks(path string) (string, error) {
 	return evalLinker.ReadlinkIfPossible(path) //nolint:wrapcheck // preserve the original error type.
 }
 
-func (a *aferoFS) Glob(pattern string) ([]string, error) {
+func (a *hostImpl) Glob(pattern string) ([]string, error) {
 	return afero.Glob(a.fs, pattern)
 }
 
-func (a *aferoFS) Walk(root string, walkFn filepath.WalkFunc) error {
+func (a *hostImpl) Walk(root string, walkFn filepath.WalkFunc) error {
 	return afero.Walk(a.fs, root, walkFn)
 }
 
-func (a *aferoFS) Abs(path string) (string, error) {
+func (a *hostImpl) Abs(path string) (string, error) {
 	aBase := afero.NewBasePathFs(a.fs, string([]rune{filepath.Separator}))
 	base, ok := aBase.(*afero.BasePathFs)
 	if !ok {
@@ -235,15 +233,15 @@ func (a *aferoFS) Abs(path string) (string, error) {
 
 // NewMemMapFS creates in-memory filesystem for tests.
 func NewMemMapFS() FileSystem {
-	return &aferoFS{fs: afero.NewMemMapFs()}
+	return &hostImpl{fs: afero.NewMemMapFs()}
 }
 
 // NewBasePathFS creates a FileSystem that is rooted at the given basePath.
 // All file operations will be relative to this base path.
 func NewBasePathFS(baseFS afero.Fs, basePath string) FileSystem {
-	return &aferoFS{fs: afero.NewBasePathFs(baseFS, basePath)}
+	return &hostImpl{fs: afero.NewBasePathFs(baseFS, basePath)}
 }
 
 func NewOsFS() FileSystem {
-	return &aferoFS{fs: afero.NewOsFs()}
+	return &hostImpl{fs: afero.NewOsFs()}
 }

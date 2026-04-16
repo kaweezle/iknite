@@ -13,30 +13,30 @@ import (
 func TestEnsureNetFilter(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
-		prepare func(t *testing.T, fs *host.MockFileSystem, mockExec *host.MockExecutor)
+		prepare func(t *testing.T, mockExec *host.MockFileExecutor)
 		name    string
 		wantErr bool
 	}{
 		{
 			name: "directory exists skips modprobe",
-			prepare: func(_ *testing.T, fs *host.MockFileSystem, _ *host.MockExecutor) {
+			prepare: func(_ *testing.T, fs *host.MockFileExecutor) {
 				fs.On("Exists", brNetfilterDir).Return(true, nil).Once()
 			},
 			wantErr: false,
 		},
 		{
 			name: "missing directory runs modprobe",
-			prepare: func(_ *testing.T, fs *host.MockFileSystem, mockExec *host.MockExecutor) {
-				fs.On("Exists", brNetfilterDir).Return(false, nil).Once()
-				mockExec.On("Run", true, "/sbin/modprobe", []string{netfilter_module}).Return([]byte("ok"), nil).Once()
+			prepare: func(_ *testing.T, mockExec *host.MockFileExecutor) {
+				mockExec.On("Exists", brNetfilterDir).Return(false, nil).Once()
+				mockExec.On("Run", true, modProbeCmd, []string{netfilter_module}).Return([]byte("ok"), nil).Once()
 			},
 			wantErr: false,
 		},
 		{
 			name: "modprobe error is returned",
-			prepare: func(_ *testing.T, fs *host.MockFileSystem, mockExec *host.MockExecutor) {
-				fs.On("Exists", brNetfilterDir).Return(false, nil).Once()
-				mockExec.On("Run", true, "/sbin/modprobe", []string{netfilter_module}).
+			prepare: func(_ *testing.T, mockExec *host.MockFileExecutor) {
+				mockExec.On("Exists", brNetfilterDir).Return(false, nil).Once()
+				mockExec.On("Run", true, modProbeCmd, []string{netfilter_module}).
 					Return([]byte("boom"), errors.New("failed")).
 					Once()
 			},
@@ -49,13 +49,11 @@ func TestEnsureNetFilter(t *testing.T) {
 			t.Parallel()
 			req := require.New(t)
 
-			mockExec := host.NewMockExecutor(t)
-			mockFs := host.NewMockFileSystem(t)
-			h := NewAlpineHost(mockFs, mockExec, host.NewMockNetworkHost(t), host.NewMockSystem(t))
+			mockFileExec := host.NewMockFileExecutor(t)
 
-			tt.prepare(t, mockFs, mockExec)
+			tt.prepare(t, mockFileExec)
 
-			err := h.EnsureNetFilter()
+			err := EnsureNetFilter(mockFileExec)
 			if tt.wantErr {
 				req.Error(err)
 				return
@@ -70,11 +68,10 @@ func TestEnsureMachineID(t *testing.T) {
 	req := require.New(t)
 
 	fs := host.NewMemMapFS()
-	h := NewAlpineHost(fs, host.NewMockExecutor(t), host.NewMockNetworkHost(t), host.NewMockSystem(t))
 
 	req.NoError(fs.MkdirAll("/etc", 0o755))
 
-	req.NoError(h.EnsureMachineID())
+	req.NoError(EnsureMachineID(fs))
 
 	exists, err := fs.Exists(machineIDFile)
 	req.NoError(err)
@@ -84,7 +81,7 @@ func TestEnsureMachineID(t *testing.T) {
 	req.NoError(err)
 	req.NotEmpty(before)
 
-	req.NoError(h.EnsureMachineID())
+	req.NoError(EnsureMachineID(fs))
 	after, err := fs.ReadFile(machineIDFile)
 	req.NoError(err)
 	req.Equal(string(before), string(after))

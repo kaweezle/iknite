@@ -20,13 +20,13 @@ type NetworkHost interface {
 
 type NetworkHostImpl struct{}
 
-var _ NetworkHost = (*NetworkHostImpl)(nil)
+var _ NetworkHost = (*hostImpl)(nil)
 
 func NewDefaultNetworkHost() NetworkHost {
-	return &NetworkHostImpl{}
+	return NewOsFS().(*hostImpl) //nolint:errcheck,forcetypeassert // Good type
 }
 
-func (h *NetworkHostImpl) GetOutboundIP( /* ctx context.Context */ ) (net.IP, error) {
+func (h *hostImpl) GetOutboundIP( /* ctx context.Context */ ) (net.IP, error) {
 	var d net.Dialer
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -47,7 +47,7 @@ func (h *NetworkHostImpl) GetOutboundIP( /* ctx context.Context */ ) (net.IP, er
 	return localAddr.IP, nil
 }
 
-func (h *NetworkHostImpl) CheckIpExists(ip net.IP) (bool, error) {
+func (h *hostImpl) CheckIpExists(ip net.IP) (bool, error) {
 	result := false
 	ifaces, err := net.Interfaces()
 	if err != nil {
@@ -74,11 +74,11 @@ func (h *NetworkHostImpl) CheckIpExists(ip net.IP) (bool, error) {
 	return result, nil
 }
 
-func (h *NetworkHostImpl) GetHostsConfig() *txeh.HostsConfig {
+func (h *hostImpl) GetHostsConfig() *txeh.HostsConfig {
 	return &txeh.HostsConfig{}
 }
 
-func (h *NetworkHostImpl) IsHostMapped(ctx context.Context, ip net.IP, domainName string) (bool, []net.IP) {
+func (h *hostImpl) IsHostMapped(ctx context.Context, ip net.IP, domainName string) (bool, []net.IP) {
 	ips, err := net.DefaultResolver.LookupIP(ctx, "ip4", domainName)
 	contains := false
 	if err != nil {

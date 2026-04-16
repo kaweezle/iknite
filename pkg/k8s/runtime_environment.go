@@ -122,24 +122,24 @@ func EnsureNetworkInterfacesConfiguration(fs host.FileSystem) error {
 }
 
 // ensureIpConfiguration checks if an outbound IP is available and configures the cluster IP accordingly.
-func ensureIpConfiguration(ikniteConfig *v1alpha1.IkniteClusterSpec, alpineHost *alpine.AlpineHost) error {
-	_, err := alpineHost.Network.GetOutboundIP()
+func ensureIpConfiguration(ikniteConfig *v1alpha1.IkniteClusterSpec, alpineHost host.Host) error {
+	_, err := alpineHost.GetOutboundIP()
 	if err != nil {
 		log.WithError(err).Warn("Could not get current IP")
-		if err = MakeIkniteServiceNeedNetworking(alpineHost.FS, constants.RcConfFile); err != nil {
+		if err = MakeIkniteServiceNeedNetworking(alpineHost, constants.RcConfFile); err != nil {
 			return fmt.Errorf("while making iknite service need networking: %w", err)
 		}
 		return nil
 	}
 
 	// Check that the IP address we are targeting is bound to an interface
-	ipExists, err := alpineHost.Network.CheckIpExists(ikniteConfig.Ip)
+	ipExists, err := alpineHost.CheckIpExists(ikniteConfig.Ip)
 	if err != nil {
 		return fmt.Errorf("while getting local ip addresses: %w", err)
 	}
 	if !ipExists {
 		if ikniteConfig.CreateIp {
-			if err := alpine.AddIpAddress(alpineHost.Exec, ikniteConfig.NetworkInterface, ikniteConfig.Ip); err != nil {
+			if err := alpine.AddIpAddress(alpineHost, ikniteConfig.NetworkInterface, ikniteConfig.Ip); err != nil {
 				return fmt.Errorf("while adding ip address %v to interface %v: %w",
 					ikniteConfig.Ip, ikniteConfig.NetworkInterface, err)
 			}
@@ -219,7 +219,7 @@ func EnableCGroupSubtreeControl(fs host.FileSystem) error {
 // checks that the target IP address is available and adds it if necessary.
 //
 
-func PrepareKubernetesEnvironment(alpineHost *alpine.AlpineHost, ikniteConfig *v1alpha1.IkniteClusterSpec) error {
+func PrepareKubernetesEnvironment(alpineHost host.Host, ikniteConfig *v1alpha1.IkniteClusterSpec) error {
 	log.WithFields(log.Fields{
 		"ip":                 ikniteConfig.Ip.String(),
 		"kubernetes_version": ikniteConfig.KubernetesVersion,
@@ -233,7 +233,7 @@ func PrepareKubernetesEnvironment(alpineHost *alpine.AlpineHost, ikniteConfig *v
 
 	// Allow forwarding (kubeadm requirement)
 	log.Info("Ensuring basic settings...")
-	err := alpineHost.FS.WriteFile(
+	err := alpineHost.WriteFile(
 		"/proc/sys/net/ipv4/ip_forward",
 		[]byte("1\n"),
 		os.FileMode(int(0o644)),
@@ -242,12 +242,12 @@ func PrepareKubernetesEnvironment(alpineHost *alpine.AlpineHost, ikniteConfig *v
 		log.WithError(err).Info("Could not write to /proc/sys/net/ipv4/ip_forward")
 	}
 
-	if err = alpineHost.EnsureNetFilter(); err != nil {
+	if err = alpine.EnsureNetFilter(alpineHost); err != nil {
 		return fmt.Errorf("while ensuring netfilter: %w", err)
 	}
 
 	// Make bridge use ip-tables
-	err = alpineHost.FS.WriteFile(
+	err = alpineHost.WriteFile(
 		"/proc/sys/net/bridge/bridge-nf-call-iptables",
 		[]byte("1\n"),
 		os.FileMode(int(0o644)),
@@ -257,7 +257,7 @@ func PrepareKubernetesEnvironment(alpineHost *alpine.AlpineHost, ikniteConfig *v
 	}
 
 	// Setting loose mode on reverse path forwarding because of VIP addresses
-	err = alpineHost.FS.WriteFile(
+	err = alpineHost.WriteFile(
 		"/proc/sys/net/ipv4/conf/default/rp_filter",
 		[]byte("2\n"),
 		os.FileMode(int(0o644)),
@@ -266,11 +266,11 @@ func PrepareKubernetesEnvironment(alpineHost *alpine.AlpineHost, ikniteConfig *v
 		log.WithError(err).Info("While enabling loose mode on reverse path forwarding (rp_filter=2)")
 	}
 
-	if err = EnableCGroupSubtreeControl(alpineHost.FS); err != nil {
+	if err = EnableCGroupSubtreeControl(alpineHost); err != nil {
 		return fmt.Errorf("while enabling cgroup subtree control: %w", err)
 	}
 
-	if err = alpineHost.EnsureMachineID(); err != nil {
+	if err = alpine.EnsureMachineID(alpineHost); err != nil {
 		return fmt.Errorf("while ensuring machine ID: %w", err)
 	}
 
@@ -285,7 +285,7 @@ func PrepareKubernetesEnvironment(alpineHost *alpine.AlpineHost, ikniteConfig *v
 			"domainName": ikniteConfig.DomainName,
 		}).Info("Check domain name to IP mapping...")
 
-		if contains, ips := alpineHost.Network.IsHostMapped(
+		if contains, ips := alpineHost.IsHostMapped(
 			context.Background(),
 			ikniteConfig.Ip,
 			ikniteConfig.DomainName,
@@ -296,7 +296,7 @@ func PrepareKubernetesEnvironment(alpineHost *alpine.AlpineHost, ikniteConfig *v
 			}).Info("Mapping not found, creating...")
 
 			err := alpine.AddIpMapping(
-				alpineHost.Network.GetHostsConfig(),
+				alpineHost.GetHostsConfig(),
 				ikniteConfig.Ip,
 				ikniteConfig.DomainName,
 				ips,
@@ -313,18 +313,18 @@ func PrepareKubernetesEnvironment(alpineHost *alpine.AlpineHost, ikniteConfig *v
 	}
 
 	log.Info("Preventing Kubelet from being started by OpenRC...")
-	if err := PreventKubeletServiceFromStarting(alpineHost.FS, constants.RcConfFile); err != nil {
+	if err := PreventKubeletServiceFromStarting(alpineHost, constants.RcConfFile); err != nil {
 		return fmt.Errorf("while preventing kubelet service from starting: %w", err)
 	}
 
 	log.Info("Ensuring Iknite is launched by OpenRC...")
-	if err := alpineHost.EnableService(constants.IkniteService); err != nil {
+	if err := alpine.EnableService(alpineHost, constants.IkniteService); err != nil {
 		return fmt.Errorf("while enabling iknite service: %w", err)
 	}
 
 	log.Infof("Ensuring %s existence...", constants.CrictlYaml)
-	if err := alpineHost.ExecuteIfNotExist(constants.CrictlYaml, func() error {
-		return alpineHost.FS.WriteFile(
+	if err := host.ExecuteIfNotExist(alpineHost, constants.CrictlYaml, func() error {
+		return alpineHost.WriteFile(
 			constants.CrictlYaml,
 			[]byte("runtime-endpoint: unix://"+constants.ContainerServiceSock+"\n"),
 			os.FileMode(int(0o644)))

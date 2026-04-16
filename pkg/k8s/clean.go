@@ -21,13 +21,13 @@ import (
 
 // cSpell: enable
 
-func ResetIPAddress(alpineHost *alpine.AlpineHost, ikniteConfig *v1alpha1.IkniteClusterSpec, isDryRun bool) error {
+func ResetIPAddress(alpineHost host.Host, ikniteConfig *v1alpha1.IkniteClusterSpec, isDryRun bool) error {
 	if !ikniteConfig.CreateIp {
 		return nil
 	}
 
 	log.WithField("isDryRun", isDryRun).Info("Resetting IP address...")
-	hosts, err := txeh.NewHosts(alpineHost.Network.GetHostsConfig())
+	hosts, err := txeh.NewHosts(alpineHost.GetHostsConfig())
 	if err != nil {
 		return fmt.Errorf("failed to create hosts file handler: %w", err)
 	}
@@ -45,11 +45,11 @@ func ResetIPAddress(alpineHost *alpine.AlpineHost, ikniteConfig *v1alpha1.Iknite
 		prefix = "echo "
 	}
 
-	p := alpineHost.Exec.ExecPipe(nil, "ip -br -4 a sh").Match(ipWithMask).Column(1).FilterLine(func(s string) string {
+	p := alpineHost.ExecPipe(nil, "ip -br -4 a sh").Match(ipWithMask).Column(1).FilterLine(func(s string) string {
 		log.WithField("interface", s).WithField("ip", ipWithMask).Debug("Deleting IP address...")
 		return s
 	})
-	p = alpineHost.Exec.ExecForEach(p, fmt.Sprintf("%sip addr del %s dev {{.}}", prefix, ipWithMask))
+	p = alpineHost.ExecForEach(p, fmt.Sprintf("%sip addr del %s dev {{.}}", prefix, ipWithMask))
 	_ = p.Wait() //nolint:errcheck // we check p.Error() instead
 	if p.Error() != nil {
 		return fmt.Errorf("failed to delete IP address: %w", p.Error())
@@ -127,7 +127,7 @@ func StopAllContainers(exec host.Executor, isDryRun bool) error {
 	return nil
 }
 
-func UnmountPaths(alpineHost *alpine.AlpineHost, failOnError, isDryRun bool) error {
+func UnmountPaths(alpineHost host.Host, failOnError, isDryRun bool) error {
 	var err error
 	for _, path := range pathsToUnmount {
 		err = processMounts(alpineHost, path, false, "Unmounting", isDryRun)
@@ -153,12 +153,12 @@ func UnmountPaths(alpineHost *alpine.AlpineHost, failOnError, isDryRun bool) err
 
 //nolint:gocyclo // TODO: Should use a runner pattern to reduce complexity
 func CleanAll(
-	alpineHost *alpine.AlpineHost,
+	alpineHost host.Host,
 	ikniteConfig *v1alpha1.IkniteClusterSpec,
 	resetIpAddress, resetIpTables, failOnError, isDryRun bool,
 ) error {
 	var err error
-	if err = StopAllContainers(alpineHost.Exec, isDryRun); err != nil {
+	if err = StopAllContainers(alpineHost, isDryRun); err != nil {
 		log.WithError(err).Warn("Error stopping all containers")
 		if failOnError {
 			return err
@@ -173,7 +173,7 @@ func CleanAll(
 		}
 	}
 
-	err = RemoveKubeletFiles(alpineHost.Exec, isDryRun)
+	err = RemoveKubeletFiles(alpineHost, isDryRun)
 	if err != nil {
 		log.WithError(err).Warn("Error removing kubelet files")
 		if failOnError {
@@ -181,7 +181,7 @@ func CleanAll(
 		}
 	}
 
-	err = DeleteCniNamespaces(alpineHost.Exec, isDryRun)
+	err = DeleteCniNamespaces(alpineHost, isDryRun)
 	if err != nil {
 		log.WithError(err).Warn("Error deleting CNI namespaces")
 		if failOnError {
@@ -189,7 +189,7 @@ func CleanAll(
 		}
 	}
 
-	err = DeleteNetworkInterfaces(alpineHost.Exec, isDryRun)
+	err = DeleteNetworkInterfaces(alpineHost, isDryRun)
 	if err != nil {
 		log.WithError(err).Warn("Error deleting network interfaces")
 		if failOnError {
@@ -199,7 +199,7 @@ func CleanAll(
 
 	if resetIpTables {
 		log.Info("Cleaning up iptables rules...")
-		err = ResetIPTables(alpineHost.Exec, isDryRun)
+		err = ResetIPTables(alpineHost, isDryRun)
 		if err != nil {
 			log.WithError(err).Warn("Error cleaning up iptables rules")
 			if failOnError {
@@ -220,7 +220,7 @@ func CleanAll(
 	return nil
 }
 
-func processMounts(alpineHost *alpine.AlpineHost, path string, remove bool, message string, isDryRun bool) error {
+func processMounts(alpineHost host.Host, path string, remove bool, message string, isDryRun bool) error {
 	fields := log.Fields{
 		"path":     path,
 		"remove":   remove,
@@ -229,7 +229,7 @@ func processMounts(alpineHost *alpine.AlpineHost, path string, remove bool, mess
 	log.WithFields(fields).Info(message)
 	logger := log.WithField("isDryRun", isDryRun)
 	var err error
-	path, err = alpineHost.FS.EvalSymlinks(path)
+	path, err = alpineHost.EvalSymlinks(path)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			return nil
@@ -237,16 +237,16 @@ func processMounts(alpineHost *alpine.AlpineHost, path string, remove bool, mess
 		return fmt.Errorf("failed to evaluate symlinks for path %s: %w", path, err)
 	}
 
-	p := alpineHost.FS.Pipe("/proc/self/mounts").Column(2).Match(path).FilterLine(func(s string) string {
+	p := alpineHost.Pipe("/proc/self/mounts").Column(2).Match(path).FilterLine(func(s string) string {
 		logger.WithField("mount", s).Debug(message)
 		if !isDryRun {
-			err = alpineHost.System.Unmount(s)
+			err = alpineHost.Unmount(s)
 			if err != nil {
 				logger.WithField("mount", s).WithError(err).Warn("Error unmounting path")
 				return s
 			}
 			if remove {
-				err = alpineHost.FS.RemoveAll(s)
+				err = alpineHost.RemoveAll(s)
 				if err != nil {
 					logger.WithField("path", s).WithError(err).Warn("Error removing path")
 					return s

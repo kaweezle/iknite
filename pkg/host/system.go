@@ -7,14 +7,12 @@ type System interface {
 	Unmount(path string) error
 }
 
-type SystemHost struct{}
+var _ System = (*hostImpl)(nil)
 
-var _ System = (*SystemHost)(nil)
-
-func NewDefaultSystemHost() *SystemHost {
-	return &SystemHost{}
+func NewDefaultSystemHost() System {
+	return NewOsFS().(*hostImpl) //nolint:errcheck,forcetypeassert // Good type
 }
 
-func (s *SystemHost) Unmount(path string) error {
+func (s *hostImpl) Unmount(path string) error {
 	return syscall.Unmount(path, 0) //nolint:wrapcheck // preserve the original error type.
 }

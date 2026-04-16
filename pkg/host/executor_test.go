@@ -13,7 +13,7 @@ func TestCommandExecutor_Run(t *testing.T) {
 	t.Parallel()
 	req := require.New(t)
 
-	exec := &host.CommandExecutor{}
+	exec := host.NewDefaultExecutor()
 
 	out, err := exec.Run(false, "/bin/echo", "hello")
 	req.NoError(err)
@@ -29,12 +29,12 @@ func TestCommandExecutor_Pipe(t *testing.T) {
 	t.Parallel()
 	req := require.New(t)
 
-	exec := &host.CommandExecutor{}
-	out, err := exec.Pipe(strings.NewReader("abc"), false, "/bin/cat")
+	exec := host.NewDefaultExecutor()
+	out, err := exec.PipeRun(strings.NewReader("abc"), false, "/bin/cat")
 	req.NoError(err)
 	req.Equal("abc", string(out))
 
-	out, err = exec.Pipe(strings.NewReader("abc"), true, "/bin/sh", "-c", "cat >/dev/null; echo bad >&2; exit 3")
+	out, err = exec.PipeRun(strings.NewReader("abc"), true, "/bin/sh", "-c", "cat >/dev/null; echo bad >&2; exit 3")
 	req.Error(err)
 	req.Contains(err.Error(), "failed to pipe command /bin/sh")
 	req.Equal("bad", strings.TrimSpace(string(out)))

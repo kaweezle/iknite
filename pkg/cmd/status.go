@@ -27,10 +27,10 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
-	"github.com/kaweezle/iknite/pkg/alpine"
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
 	"github.com/kaweezle/iknite/pkg/config"
 	"github.com/kaweezle/iknite/pkg/constants"
+	"github.com/kaweezle/iknite/pkg/host"
 	"github.com/kaweezle/iknite/pkg/k8s"
 	"github.com/kaweezle/iknite/pkg/utils"
 )
@@ -93,7 +93,7 @@ func NewStatusCmd(ikniteConfig *v1alpha1.IkniteClusterSpec, waitOptions *utils.W
 
 //nolint:gocognit,gocyclo // TODO: Should use a runner pattern to reduce complexity
 func performStatus(ikniteConfig *v1alpha1.IkniteClusterSpec, waitOptions *utils.WaitOptions) {
-	alpineHost := alpine.NewDefaultAlpineHost()
+	alpineHost := host.NewDefaultHost()
 	checkData := k8s.CreateCheckWorkloadData(ikniteConfig.GetApiEndPoint(), waitOptions, alpineHost)
 
 	var apiBackendName string
@@ -135,7 +135,7 @@ func performStatus(ikniteConfig *v1alpha1.IkniteClusterSpec, waitOptions *utils.
 					if !ok {
 						return false, "", fmt.Errorf("invalid check data type")
 					}
-					runnable, err := k8s.IsKubeletServiceRunnable(data.AlpineHost().FS, constants.RcConfFile)
+					runnable, err := k8s.IsKubeletServiceRunnable(data.Host(), constants.RcConfFile)
 					if err != nil {
 						return false, "", fmt.Errorf(
 							"failed to check if kubelet service is runnable: %w",
@@ -161,7 +161,7 @@ func performStatus(ikniteConfig *v1alpha1.IkniteClusterSpec, waitOptions *utils.
 						return false, "", fmt.Errorf("invalid check data type")
 					}
 					if ikniteConfig.CreateIp {
-						result, err := data.AlpineHost().Network.CheckIpExists(ikniteConfig.Ip)
+						result, err := data.Host().CheckIpExists(ikniteConfig.Ip)
 						switch {
 						case err != nil:
 							return false, "", fmt.Errorf("failed to check if IP exists: %w", err)
@@ -194,7 +194,7 @@ func performStatus(ikniteConfig *v1alpha1.IkniteClusterSpec, waitOptions *utils.
 						return true, "Domain name is not set", nil
 					}
 					ipString := ikniteConfig.Ip.String()
-					if contains, ips := data.AlpineHost().Network.IsHostMapped(
+					if contains, ips := data.Host().IsHostMapped(
 						ctx,
 						ikniteConfig.Ip,
 						ikniteConfig.DomainName,
@@ -295,7 +295,7 @@ func performStatus(ikniteConfig *v1alpha1.IkniteClusterSpec, waitOptions *utils.
 					if !ok {
 						return false, "", fmt.Errorf("invalid check data type")
 					}
-					exists, err := data.AlpineHost().FS.Exists(constants.SoftLevelPath)
+					exists, err := data.Host().Exists(constants.SoftLevelPath)
 					if err != nil {
 						return false, "", fmt.Errorf(
 							"failed to check if OpenRC is started: %w",
@@ -321,7 +321,7 @@ func performStatus(ikniteConfig *v1alpha1.IkniteClusterSpec, waitOptions *utils.
 					if !ok {
 						return false, "", fmt.Errorf("invalid check data type")
 					}
-					return k8s.CheckService(data.AlpineHost(), "kubelet", false, true)
+					return k8s.CheckService(data.Host(), "kubelet", false, true)
 				},
 			},
 			//   - Check if the kubelet api endpoint (socket) is reachable and healthy

@@ -156,8 +156,8 @@ func (_c *MockExecutor_ExecPipe_Call) RunAndReturn(run func(stdin *script.Pipe, 
 	return _c
 }
 
-// Pipe provides a mock function for the type MockExecutor
-func (_mock *MockExecutor) Pipe(stdin io.Reader, combined bool, cmd string, arguments ...string) ([]byte, error) {
+// PipeRun provides a mock function for the type MockExecutor
+func (_mock *MockExecutor) PipeRun(stdin io.Reader, combined bool, cmd string, arguments ...string) ([]byte, error) {
 	var tmpRet mock.Arguments
 	if len(arguments) > 0 {
 		tmpRet = _mock.Called(stdin, combined, cmd, arguments)
@@ -167,7 +167,7 @@ func (_mock *MockExecutor) Pipe(stdin io.Reader, combined bool, cmd string, argu
 	ret := tmpRet
 
 	if len(ret) == 0 {
-		panic("no return value specified for Pipe")
+		panic("no return value specified for PipeRun")
 	}
 
 	var r0 []byte
@@ -190,22 +190,22 @@ func (_mock *MockExecutor) Pipe(stdin io.Reader, combined bool, cmd string, argu
 	return r0, r1
 }
 
-// MockExecutor_Pipe_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Pipe'
-type MockExecutor_Pipe_Call struct {
+// MockExecutor_PipeRun_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'PipeRun'
+type MockExecutor_PipeRun_Call struct {
 	*mock.Call
 }
 
-// Pipe is a helper method to define mock.On call
+// PipeRun is a helper method to define mock.On call
 //   - stdin io.Reader
 //   - combined bool
 //   - cmd string
 //   - arguments ...string
-func (_e *MockExecutor_Expecter) Pipe(stdin interface{}, combined interface{}, cmd interface{}, arguments ...interface{}) *MockExecutor_Pipe_Call {
-	return &MockExecutor_Pipe_Call{Call: _e.mock.On("Pipe",
+func (_e *MockExecutor_Expecter) PipeRun(stdin interface{}, combined interface{}, cmd interface{}, arguments ...interface{}) *MockExecutor_PipeRun_Call {
+	return &MockExecutor_PipeRun_Call{Call: _e.mock.On("PipeRun",
 		append([]interface{}{stdin, combined, cmd}, arguments...)...)}
 }
 
-func (_c *MockExecutor_Pipe_Call) Run(run func(stdin io.Reader, combined bool, cmd string, arguments ...string)) *MockExecutor_Pipe_Call {
+func (_c *MockExecutor_PipeRun_Call) Run(run func(stdin io.Reader, combined bool, cmd string, arguments ...string)) *MockExecutor_PipeRun_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 io.Reader
 		if args[0] != nil {
@@ -235,12 +235,12 @@ func (_c *MockExecutor_Pipe_Call) Run(run func(stdin io.Reader, combined bool, c
 	return _c
 }
 
-func (_c *MockExecutor_Pipe_Call) Return(bytes []byte, err error) *MockExecutor_Pipe_Call {
+func (_c *MockExecutor_PipeRun_Call) Return(bytes []byte, err error) *MockExecutor_PipeRun_Call {
 	_c.Call.Return(bytes, err)
 	return _c
 }
 
-func (_c *MockExecutor_Pipe_Call) RunAndReturn(run func(stdin io.Reader, combined bool, cmd string, arguments ...string) ([]byte, error)) *MockExecutor_Pipe_Call {
+func (_c *MockExecutor_PipeRun_Call) RunAndReturn(run func(stdin io.Reader, combined bool, cmd string, arguments ...string) ([]byte, error)) *MockExecutor_PipeRun_Call {
 	_c.Call.Return(run)
 	return _c
 }

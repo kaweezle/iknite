@@ -24,6 +24,7 @@ import (
 	"github.com/kaweezle/iknite/pkg/alpine"
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
 	"github.com/kaweezle/iknite/pkg/constants"
+	"github.com/kaweezle/iknite/pkg/host"
 	"github.com/kaweezle/iknite/pkg/utils"
 )
 
@@ -53,13 +54,13 @@ func SystemFileCheck(name, description, path, expectedContent string) *Check {
 }
 
 func CheckService(
-	host *alpine.AlpineHost,
+	alpineHost host.Host,
 	serviceName string,
 	checkOpenRC, checkPidFile bool,
 ) (bool, string, error) {
 	pid := 0
 	if checkOpenRC {
-		success, err := host.IsServiceStarted(serviceName)
+		success, err := alpine.IsServiceStarted(alpineHost, serviceName)
 		if err != nil {
 			return false, "", fmt.Errorf(
 				"failed to check if service %s is started: %w",
@@ -95,7 +96,7 @@ func ServiceCheck(name, serviceName string) *Check {
 			if !ok {
 				return false, "", fmt.Errorf("invalid check data type")
 			}
-			return CheckService(data.AlpineHost(), serviceName, true, true)
+			return CheckService(data.Host(), serviceName, true, true)
 		},
 	}
 }
@@ -271,13 +272,13 @@ type CheckWorkloadData interface {
 	ApiAdvertiseAddress() string
 	ManifestDir() string
 	WaitOptions() *utils.WaitOptions
-	AlpineHost() *alpine.AlpineHost
+	Host() host.Host
 }
 
 type checkWorkloadData struct {
 	startTime           time.Time
 	waitOptions         *utils.WaitOptions
-	alpineHost          *alpine.AlpineHost
+	alpineHost          host.Host
 	apiAdvertiseAddress string
 	readyWorkloads      []*v1alpha1.WorkloadState
 	notReadyWorkloads   []*v1alpha1.WorkloadState
@@ -360,14 +361,14 @@ func (c *checkWorkloadData) WaitOptions() *utils.WaitOptions {
 	return c.waitOptions
 }
 
-func (c *checkWorkloadData) AlpineHost() *alpine.AlpineHost {
+func (c *checkWorkloadData) Host() host.Host {
 	return c.alpineHost
 }
 
 func CreateCheckWorkloadData(
 	apiAdvertiseAddress string,
 	waitOptions *utils.WaitOptions,
-	alpineHost *alpine.AlpineHost,
+	alpineHost host.Host,
 ) CheckData {
 	return &checkWorkloadData{
 		apiAdvertiseAddress: apiAdvertiseAddress,

@@ -23,7 +23,7 @@ func runPrepareHost(c workflow.RunData) error {
 		return fmt.Errorf("prepare phase invoked with an invalid data struct. ")
 	}
 	ikniteConfig := &data.IkniteCluster().Spec
-	alpineHost := data.AlpineHost()
+	alpineHost := data.Host()
 
 	if err := k8s.PrepareKubernetesEnvironment(alpineHost, ikniteConfig); err != nil {
 		return fmt.Errorf("failed to prepare kubernetes environment: %w", err)

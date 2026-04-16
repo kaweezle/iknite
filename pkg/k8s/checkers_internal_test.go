@@ -9,8 +9,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/kaweezle/iknite/pkg/alpine"
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
+	"github.com/kaweezle/iknite/pkg/host"
 	"github.com/kaweezle/iknite/pkg/utils"
 )
 
@@ -81,7 +81,7 @@ func TestCheckWorkloadDataAccessors(t *testing.T) {
 	req := require.New(t)
 
 	waitOptions := utils.NewWaitOptions()
-	raw := CreateCheckWorkloadData("10.0.0.1", waitOptions, alpine.NewDefaultAlpineHost())
+	raw := CreateCheckWorkloadData("10.0.0.1", waitOptions, host.NewDefaultHost())
 	data, ok := raw.(*checkWorkloadData)
 	req.True(ok)
 
@@ -147,7 +147,7 @@ func TestAdditionalCheckerPaths(t *testing.T) {
 	req := require.New(t)
 
 	// TODO: Use mocks and make a full test of CheckService.
-	h := alpine.NewDefaultAlpineHost()
+	h := host.NewDefaultHost()
 
 	ok, msg, err := CheckService(h, "ignored", false, false)
 	req.NoError(err)

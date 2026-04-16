@@ -45,10 +45,10 @@ import (
 	configUtil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	kubeconfigUtil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 
-	"github.com/kaweezle/iknite/pkg/alpine"
 	ikniteApi "github.com/kaweezle/iknite/pkg/apis/iknite"
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
 	"github.com/kaweezle/iknite/pkg/config"
+	"github.com/kaweezle/iknite/pkg/host"
 	iknitePhases "github.com/kaweezle/iknite/pkg/k8s/phases/reset"
 )
 
@@ -90,7 +90,7 @@ type resetData struct {
 	dryRun                bool
 	cleanupTmpDir         bool
 	ikniteCluster         *v1alpha1.IkniteCluster
-	alpineHost            *alpine.AlpineHost
+	alpineHost            host.Host
 }
 
 var _ iknitePhases.IkniteResetData = (*resetData)(nil)
@@ -243,7 +243,7 @@ func newResetData(
 			cmd.Flags(), options.CleanupTmpDir, resetCfg.CleanupTmpDir,
 			opts.externalCfg.CleanupTmpDir).(bool),
 		ikniteCluster: ikniteCluster,
-		alpineHost:    alpine.NewDefaultAlpineHost(),
+		alpineHost:    host.NewDefaultHost(),
 	}, nil
 }
 
@@ -366,6 +366,6 @@ func (r *resetData) IkniteCluster() *v1alpha1.IkniteCluster {
 	return r.ikniteCluster
 }
 
-func (r *resetData) AlpineHost() *alpine.AlpineHost {
+func (r *resetData) Host() host.Host {
 	return r.alpineHost
 }
