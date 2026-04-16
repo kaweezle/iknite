@@ -44,6 +44,7 @@ func runKustomize(c workflow.RunData) error {
 	kustomizeOptions := data.KustomizeOptions()
 	if err := k8sConfig.Kustomize(
 		ctx,
+		data.AlpineHost().FS,
 		ikniteConfig.Kustomization,
 		kustomizeOptions,
 	); err != nil {

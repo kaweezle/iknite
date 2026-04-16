@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
+	"github.com/kaweezle/iknite/pkg/host"
 	"github.com/kaweezle/iknite/pkg/utils"
 )
 
@@ -74,7 +75,9 @@ func TestCommandConstructors(t *testing.T) {
 		{name: "kustomize", fn: func() *cobra.Command { return NewKustomizeCmd(spec, nil, nil) }},
 		{
 			name: "print-kustomize",
-			fn:   func() *cobra.Command { return NewPrintKustomizeCmd(spec, utils.NewKustomizeOptions()) },
+			fn: func() *cobra.Command {
+				return NewPrintKustomizeCmd(host.NewMemMapFS(), spec, utils.NewKustomizeOptions())
+			},
 		},
 		{name: "clean", fn: func() *cobra.Command { return NewCmdClean(spec, nil) }},
 	}

@@ -19,6 +19,7 @@ import (
 	"github.com/joho/godotenv"
 	log "github.com/sirupsen/logrus"
 
+	"github.com/kaweezle/iknite/pkg/alpine"
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
 	"github.com/kaweezle/iknite/pkg/utils"
 )
@@ -225,7 +226,11 @@ func RemovePidFiles() {
 	}
 }
 
-func StartAndConfigureKubelet(kubeConfig *v1alpha1.IkniteClusterSpec, kustomizeOptions *utils.KustomizeOptions) error {
+func StartAndConfigureKubelet(
+	alpineHost *alpine.AlpineHost,
+	kubeConfig *v1alpha1.IkniteClusterSpec,
+	kustomizeOptions *utils.KustomizeOptions,
+) error {
 	apiConfig, err := LoadFromDefault()
 	if err != nil {
 		return fmt.Errorf("failed to load kubeconfig: %w", err)
@@ -300,6 +305,7 @@ func StartAndConfigureKubelet(kubeConfig *v1alpha1.IkniteClusterSpec, kustomizeO
 				go func() {
 					configErr <- apiConfig.Kustomize(
 						cancelCtx,
+						alpineHost.FS,
 						kubeConfig.Kustomization,
 						kustomizeOptions,
 					)

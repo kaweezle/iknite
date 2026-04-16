@@ -68,13 +68,13 @@ func createTempKustomizeDirectory(content *embed.FS, fs filesys.FileSystem, outD
 
 // isBaseKustomizationAvailable checks if a kustomization.yaml file is available
 // in the specified directory or if the directory is a URL.
-func isBaseKustomizationAvailable(dirname string) (bool, error) {
+func isBaseKustomizationAvailable(fs host.FileSystem, dirname string) (bool, error) {
 	var exists bool
 	kustomizationURl, err := url.Parse(dirname)
 	if err == nil && kustomizationURl.Scheme != "" && kustomizationURl.Host != "" {
 		exists = true
 	} else {
-		exists, err = host.FS.Exists(path.Join(dirname, "kustomization.yaml"))
+		exists, err = fs.Exists(path.Join(dirname, "kustomization.yaml"))
 		if err != nil {
 			return false, fmt.Errorf("while testing for directory: %w", err)
 		}
@@ -84,26 +84,26 @@ func isBaseKustomizationAvailable(dirname string) (bool, error) {
 
 // GetBaseKustomizationResources applies the kustomizations located in the specified
 // directory if available, otherwise returns the embedded kustomizations.
-func GetBaseKustomizationResources(dirname string, forceEmbedded bool) (resmap.ResMap, error) {
-	ok, err := isBaseKustomizationAvailable(dirname)
+func GetBaseKustomizationResources(fs host.FileSystem, dirname string, forceEmbedded bool) (resmap.ResMap, error) {
+	ok, err := isBaseKustomizationAvailable(fs, dirname)
 	if err != nil {
 		return nil, fmt.Errorf("while checking for base kustomization: %w", err)
 	}
-	fs := filesys.MakeFsOnDisk()
+	kustomizeFs := host.NewKustomizeFSWrapper(fs)
 	if !ok || forceEmbedded {
 		log.WithFields(log.Fields{
 			"directory":      dirname,
 			"force_embedded": forceEmbedded,
 			"exists":         ok,
 		}).Debug("Using embedded kustomization.")
-		fs = filesys.MakeFsInMemory()
+		kustomizeFs = filesys.MakeFsInMemory()
 		dirname = "base"
-		err = createTempKustomizeDirectory(&content, fs, dirname, dirname)
+		err = createTempKustomizeDirectory(&content, kustomizeFs, dirname, dirname)
 		if err != nil {
 			return nil, fmt.Errorf("while creating temporary kustomization directory: %w", err)
 		}
 	} else {
 		log.WithField("directory", dirname).Debug("Base kustomization found, applying it...")
 	}
-	return kustomize.BuildOnFileSystem(fs, dirname) //nolint:wrapcheck // No need to wrap here.
+	return kustomize.BuildOnFileSystem(kustomizeFs, dirname) //nolint:wrapcheck // No need to wrap here.
 }

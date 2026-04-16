@@ -10,7 +10,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 
 	ikniteapi "github.com/kaweezle/iknite/pkg/apis/iknite"
-	"github.com/kaweezle/iknite/pkg/utils"
+	"github.com/kaweezle/iknite/pkg/host"
 )
 
 func TestSetDefaults_IkniteClusterSpec(t *testing.T) {
@@ -26,8 +26,9 @@ func TestSetDefaults_IkniteClusterSpec(t *testing.T) {
 	req.NotEmpty(spec.Kustomization)
 	req.NotEmpty(spec.APIBackendDatabaseDirectory)
 	req.NotZero(spec.StatusServerPort)
-	req.Equal(utils.IsOnWSL(), spec.EnableMDNS)
-	req.Equal(utils.IsOnWSL() || utils.IsOnIncus(), spec.CreateIp)
+	fs := host.NewOsFS()
+	req.Equal(host.IsOnWSL(fs), spec.EnableMDNS)
+	req.Equal(host.IsOnWSL(fs) || host.IsOnIncus(fs), spec.CreateIp)
 }
 
 func TestSetDefaults_IkniteClusterStatusAndCluster(t *testing.T) {

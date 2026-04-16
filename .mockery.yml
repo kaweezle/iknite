@@ -1,18 +1,18 @@
-// cSpell: words mockery structname pkgname
+# cSpell: words mockery structname pkgname
 all: false
 dir: "{{.InterfaceDir}}"
 filename: "{{.InterfaceName | lower }}_mock.go"
 force-file-write: true
 formatter: goimports
 formatter-options:
-  goimports:
-    all-errors: false
-    comments: true
-    format-only: true
-    fragment: false
-    local-prefix: ""
-    tab-indent: true
-    tab-width: 8
+    goimports:
+        all-errors: false
+        comments: true
+        format-only: true
+        fragment: false
+        local-prefix: ""
+        tab-indent: true
+        tab-width: 8
 generate: true
 include-auto-generated: false
 log-level: info
@@ -23,6 +23,6 @@ require-template-schema-exists: true
 template: testify
 template-schema: "{{.Template}}.schema.json"
 packages:
-  github.com/kaweezle/iknite/pkg/host:
-    config:
-      all: true
+    github.com/kaweezle/iknite/pkg/host:
+        config:
+            all: true

@@ -43,6 +43,7 @@ import (
 	"github.com/kaweezle/iknite/pkg/cmd/options"
 	"github.com/kaweezle/iknite/pkg/cmd/util"
 	"github.com/kaweezle/iknite/pkg/constants"
+	"github.com/kaweezle/iknite/pkg/host"
 	"github.com/kaweezle/iknite/pkg/provision"
 )
 
@@ -302,9 +303,9 @@ var workloadKinds = []resid.Gvk{
 	{Group: "batch", Kind: "CronJob"},
 }
 
-func getKustomizationImages(kustomization string, forceEmbedded bool) ([]string, error) {
+func getKustomizationImages(fs host.FileSystem, kustomization string, forceEmbedded bool) ([]string, error) {
 	var containerImages []string
-	resources, err := provision.GetBaseKustomizationResources(kustomization, forceEmbedded)
+	resources, err := provision.GetBaseKustomizationResources(fs, kustomization, forceEmbedded)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get resources from base kustomizations: %w", err)
 	}
@@ -337,7 +338,7 @@ func getKustomizationImages(kustomization string, forceEmbedded bool) ([]string,
 }
 
 // GetIkniteImages returns the list of container images used by iknite.
-func GetIkniteImages(ikniteConfig *v1alpha1.IkniteClusterSpec, embedded bool) ([]string, error) {
+func GetIkniteImages(fs host.FileSystem, ikniteConfig *v1alpha1.IkniteClusterSpec, embedded bool) ([]string, error) {
 	// Load default kubeadm configuration to get the list of control plane images
 	externalInitCfg := &kubeadmApiV1.InitConfiguration{}
 	kubeadmScheme.Scheme.Default(externalInitCfg)
@@ -376,7 +377,7 @@ func GetIkniteImages(ikniteConfig *v1alpha1.IkniteClusterSpec, embedded bool) ([
 	}
 
 	// Now let's perform the default kustomization to add images.
-	kustomizationImages, err := getKustomizationImages(ikniteConfig.Kustomization, embedded)
+	kustomizationImages, err := getKustomizationImages(fs, ikniteConfig.Kustomization, embedded)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get images from kustomization: %w", err)
 	}

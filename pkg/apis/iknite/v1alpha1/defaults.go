@@ -1,7 +1,6 @@
 package v1alpha1
 
-// cSpell: words metav1
-// cSpell: disable
+// cSpell: words metav1 apimachinery
 import (
 	"net"
 
@@ -10,25 +9,28 @@ import (
 
 	"github.com/kaweezle/iknite/pkg/apis/iknite"
 	"github.com/kaweezle/iknite/pkg/constants"
-	"github.com/kaweezle/iknite/pkg/utils"
+	"github.com/kaweezle/iknite/pkg/host"
 )
 
 var KubernetesVersionDefault = constants.KubernetesVersion
-
-// cSpell: enable
 
 func addDefaultingFuncs(scheme *runtime.Scheme) error {
 	return RegisterDefaults(scheme)
 }
 
 func SetDefaults_IkniteClusterSpec(obj *IkniteClusterSpec) {
-	wsl := utils.IsOnWSL()
-	incus := utils.IsOnIncus()
+	// TODO: The defaults should be static and there should be another method
+	// that sets dynamic defaults like IPs. This is because the defaulting
+	// method is called multiple times and we don't want to override user-set
+	// values with defaults on subsequent calls.
+	fs := host.NewOsFS()
+	wsl := host.IsOnWSL(fs)
+	incus := host.IsOnIncus(fs)
 	if obj.Ip == nil {
 		if wsl || incus {
 			obj.Ip = net.ParseIP(constants.WslIPAddress)
 		} else {
-			obj.Ip, _ = utils.GetOutboundIP() //nolint:errcheck // it fails, no default
+			obj.Ip, _ = host.NewDefaultNetworkHost().GetOutboundIP() //nolint:errcheck // it fails, no default
 		}
 	}
 	if obj.DomainName == "" && wsl {

@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 
 	"github.com/bitfield/script"
 	"github.com/spf13/afero"
@@ -90,6 +91,15 @@ type FileSystem interface {
 
 	// EvalSymlinks evaluates symbolic links in the given path and returns the actual path.
 	EvalSymlinks(path string) (string, error)
+
+	// Glob returns the list of matching files for the given pattern.
+	Glob(pattern string) (matches []string, err error)
+
+	// Walk walks the file tree rooted at root, calling walkFn for each file or directory in the tree, including root.
+	Walk(root string, walkFn filepath.WalkFunc) error
+
+	// Abs returns the absolute path for the given path, resolving any symbolic links.
+	Abs(path string) (string, error)
 }
 
 // aferoFS is a concrete implementation of the FileSystem interface using afero.Fs.
@@ -205,6 +215,24 @@ func (a *aferoFS) EvalSymlinks(path string) (string, error) {
 	return evalLinker.ReadlinkIfPossible(path) //nolint:wrapcheck // preserve the original error type.
 }
 
+func (a *aferoFS) Glob(pattern string) ([]string, error) {
+	return afero.Glob(a.fs, pattern)
+}
+
+func (a *aferoFS) Walk(root string, walkFn filepath.WalkFunc) error {
+	return afero.Walk(a.fs, root, walkFn)
+}
+
+func (a *aferoFS) Abs(path string) (string, error) {
+	aBase := afero.NewBasePathFs(a.fs, string([]rune{filepath.Separator}))
+	base, ok := aBase.(*afero.BasePathFs)
+	if !ok {
+		return "", fmt.Errorf("failed to assert BasePathFs")
+	}
+
+	return base.RealPath(path)
+}
+
 // NewMemMapFS creates in-memory filesystem for tests.
 func NewMemMapFS() FileSystem {
 	return &aferoFS{fs: afero.NewMemMapFs()}
@@ -219,8 +247,3 @@ func NewBasePathFS(baseFS afero.Fs, basePath string) FileSystem {
 func NewOsFS() FileSystem {
 	return &aferoFS{fs: afero.NewOsFs()}
 }
-
-// FS is the global FileSystem instance used throughout the application.
-// It defaults to a real filesystem (NewOsFs) but can be swapped for testing purposes.
-// TODO: Remove this.
-var FS FileSystem = NewOsFS()

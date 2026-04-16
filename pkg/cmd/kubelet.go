@@ -35,5 +35,5 @@ The kubelet is started and monitored. The following operations are performed:
 func performKubelet(ikniteConfig *v1alpha1.IkniteClusterSpec, kustomizeOptions *utils.KustomizeOptions) {
 	alpineHost := alpine.NewDefaultAlpineHost()
 	cobra.CheckErr(k8s.PrepareKubernetesEnvironment(alpineHost, ikniteConfig))
-	cobra.CheckErr(k8s.StartAndConfigureKubelet(ikniteConfig, kustomizeOptions))
+	cobra.CheckErr(k8s.StartAndConfigureKubelet(alpineHost, ikniteConfig, kustomizeOptions))
 }

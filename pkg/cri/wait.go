@@ -44,7 +44,7 @@ type CRIStatusResponse struct {
 	Status CRIStatus `json:"status"`
 }
 
-func WaitForContainerService() (bool, error) {
+func WaitForContainerService(fs host.FileSystem, exec host.Executor) (bool, error) {
 	retries := 3
 	first := true
 	serviceIsReady := false
@@ -55,7 +55,7 @@ func WaitForContainerService() (bool, error) {
 		}
 		first = false
 
-		exist, err := host.FS.Exists(constants.ContainerServiceSock)
+		exist, err := fs.Exists(constants.ContainerServiceSock)
 		if err != nil {
 			return false, fmt.Errorf(
 				"error while checking container service sock %s: %w",
@@ -70,7 +70,7 @@ func WaitForContainerService() (bool, error) {
 			)
 			continue
 		}
-		out, err := host.Exec.Run(false, "/usr/bin/crictl", "--runtime-endpoint",
+		out, err := exec.Run(false, "/usr/bin/crictl", "--runtime-endpoint",
 			"unix://"+constants.ContainerServiceSock, "info")
 		if err != nil {
 			log.WithError(err).Warn("Error while checking container service sock")

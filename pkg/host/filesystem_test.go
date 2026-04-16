@@ -6,6 +6,7 @@ package host_test
 import (
 	"os"
 	"path/filepath"
+	"sort"
 	"testing"
 
 	"github.com/bitfield/script"
@@ -811,4 +812,99 @@ func TestNewMemMapFS(t *testing.T) {
 	content, err := fs.ReadFile(basicTestPath)
 	require.NoError(t, err)
 	assert.Equal(t, testData, content)
+}
+
+func TestFileSystem_Glob(t *testing.T) {
+	t.Parallel()
+
+	for _, tt := range basicTests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			fs := tt.setupFS(t)
+
+			err := fs.MkdirAll("glob", 0o755)
+			require.NoError(t, err)
+
+			err = fs.WriteFile("glob/a.txt", []byte("a"), 0o644)
+			require.NoError(t, err)
+
+			err = fs.WriteFile("glob/b.txt", []byte("b"), 0o644)
+			require.NoError(t, err)
+
+			err = fs.WriteFile("glob/c.log", []byte("c"), 0o644)
+			require.NoError(t, err)
+
+			matches, err := fs.Glob("glob/*.txt")
+			require.NoError(t, err)
+
+			sort.Strings(matches)
+			assert.Equal(t, []string{"glob/a.txt", "glob/b.txt"}, matches)
+		})
+	}
+}
+
+func TestFileSystem_Walk(t *testing.T) {
+	t.Parallel()
+
+	for _, tt := range basicTests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			fs := tt.setupFS(t)
+
+			err := fs.MkdirAll("walk/sub", 0o755)
+			require.NoError(t, err)
+
+			err = fs.WriteFile("walk/root.txt", []byte("root"), 0o644)
+			require.NoError(t, err)
+
+			err = fs.WriteFile("walk/sub/child.txt", []byte("child"), 0o644)
+			require.NoError(t, err)
+
+			walked := make([]string, 0)
+			err = fs.Walk("walk", func(path string, _ os.FileInfo, walkErr error) error {
+				require.NoError(t, walkErr)
+				walked = append(walked, path)
+				return nil
+			})
+			require.NoError(t, err)
+
+			sort.Strings(walked)
+			assert.Equal(t, []string{"walk", "walk/root.txt", "walk/sub", "walk/sub/child.txt"}, walked)
+		})
+	}
+}
+
+func TestFileSystem_Abs(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		setupFS      func(t *testing.T) host.FileSystem
+		name         string
+		expectedBase string
+	}{
+		{
+			name:         "TempFS",
+			setupFS:      setupTempFS,
+			expectedBase: string(filepath.Separator),
+		},
+		{
+			name:         "MemFS",
+			setupFS:      setupMemFS,
+			expectedBase: string(filepath.Separator),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			fs := tt.setupFS(t)
+
+			absPath, err := fs.Abs("abs/path.txt")
+			require.NoError(t, err)
+			assert.NotEmpty(t, absPath)
+			assert.True(t, filepath.IsAbs(absPath))
+			assert.Contains(t, absPath, filepath.Join("abs", "path.txt"))
+			assert.GreaterOrEqual(t, len(absPath), len(tt.expectedBase))
+		})
+	}
 }

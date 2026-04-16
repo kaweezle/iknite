@@ -31,6 +31,7 @@ import (
 	"github.com/kaweezle/iknite/pkg/cmd/options"
 	"github.com/kaweezle/iknite/pkg/config"
 	"github.com/kaweezle/iknite/pkg/constants"
+	"github.com/kaweezle/iknite/pkg/host"
 	"github.com/kaweezle/iknite/pkg/k8s"
 	"github.com/kaweezle/iknite/pkg/kustomize"
 	"github.com/kaweezle/iknite/pkg/provision"
@@ -38,6 +39,7 @@ import (
 )
 
 func NewPrintKustomizeCmd(
+	fs host.FileSystem,
 	ikniteConfig *v1alpha1.IkniteClusterSpec,
 	kustomizeOptions *utils.KustomizeOptions,
 ) *cobra.Command {
@@ -56,7 +58,7 @@ prints the Embedded configuration that installs the following components:
 
 `,
 		Run: func(_ *cobra.Command, _ []string) {
-			performPrintKustomize(ikniteConfig, kustomizeOptions)
+			performPrintKustomize(fs, ikniteConfig, kustomizeOptions)
 		},
 	}
 	return printKustomizeCmd
@@ -76,6 +78,7 @@ func NewKustomizeCmd(
 		waitOptions.Immediate = false
 		waitOptions.Wait = false
 	}
+	fs := host.NewOsFS()
 	kustomizeCmd := &cobra.Command{
 		Use:   "kustomize",
 		Short: "Kustomize the cluster",
@@ -92,7 +95,7 @@ applies the Embedded configuration that installs the following components:
 
 `,
 		Run: func(_ *cobra.Command, _ []string) {
-			performKustomize(ikniteConfig, kustomizeOptions, waitOptions)
+			performKustomize(fs, ikniteConfig, kustomizeOptions, waitOptions)
 		},
 
 		PreRun: func(cmd *cobra.Command, _ []string) {
@@ -106,13 +109,14 @@ applies the Embedded configuration that installs the following components:
 	config.AddIkniteClusterFlags(kustomizeCmd.Flags(), ikniteConfig)
 	utils.AddKustomizeOptionsFlags(kustomizeCmd.Flags(), kustomizeOptions)
 
-	printCmd := NewPrintKustomizeCmd(ikniteConfig, kustomizeOptions)
+	printCmd := NewPrintKustomizeCmd(fs, ikniteConfig, kustomizeOptions)
 	inheritsFlags(kustomizeCmd.Flags(), printCmd.Flags(), options.Kustomization)
 	kustomizeCmd.AddCommand(printCmd)
 	return kustomizeCmd
 }
 
 func performKustomize(
+	fs host.FileSystem,
 	ikniteConfig *v1alpha1.IkniteClusterSpec,
 	kustomizeOptions *utils.KustomizeOptions,
 	waitOptions *utils.WaitOptions,
@@ -146,7 +150,7 @@ func performKustomize(
 	)
 	cobra.CheckErr(err)
 
-	cobra.CheckErr(kubeConfig.Kustomize(ctx, ikniteConfig.Kustomization, kustomizeOptions))
+	cobra.CheckErr(kubeConfig.Kustomize(ctx, fs, ikniteConfig.Kustomization, kustomizeOptions))
 
 	if waitOptions.HasLoop() {
 		logrus.Infof("Waiting for workloads with options: %s", waitOptions.String())
@@ -155,8 +159,13 @@ func performKustomize(
 	}
 }
 
-func performPrintKustomize(ikniteConfig *v1alpha1.IkniteClusterSpec, kustomizeOptions *utils.KustomizeOptions) {
+func performPrintKustomize(
+	fs host.FileSystem,
+	ikniteConfig *v1alpha1.IkniteClusterSpec,
+	kustomizeOptions *utils.KustomizeOptions,
+) {
 	resources, err := provision.GetBaseKustomizationResources(
+		fs,
 		ikniteConfig.Kustomization,
 		kustomizeOptions.ForceEmbedded,
 	)

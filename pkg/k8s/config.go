@@ -35,6 +35,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd/api"
 	kubeadmConstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 
+	"github.com/kaweezle/iknite/pkg/host"
 	"github.com/kaweezle/iknite/pkg/provision"
 	"github.com/kaweezle/iknite/pkg/utils"
 )
@@ -257,6 +258,7 @@ func (config *Config) RestartProxy() error {
 // the timeout period.
 func (config *Config) Kustomize(
 	ctx context.Context,
+	fs host.FileSystem,
 	kustomization string,
 	options *utils.KustomizeOptions,
 ) error {
@@ -283,7 +285,7 @@ func (config *Config) Kustomize(
 		"kustomization": kustomization,
 	}).Info("Performing configuration")
 
-	resources, err := provision.GetBaseKustomizationResources(kustomization, options.ForceEmbedded)
+	resources, err := provision.GetBaseKustomizationResources(fs, kustomization, options.ForceEmbedded)
 	if err != nil {
 		return fmt.Errorf("while getting kustomization resources: %w", err)
 	}

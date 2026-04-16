@@ -156,9 +156,9 @@ func ensureIpConfiguration(ikniteConfig *v1alpha1.IkniteClusterSpec, alpineHost 
 // controllers.
 // We assume that we are running in a privileged container and that we have access to the cgroup filesystem. If this is
 // not the case, this function will fail. We also assume that we are running with CGroups V2.
-func EnableCGroupSubtreeControl() error {
+func EnableCGroupSubtreeControl(fs host.FileSystem) error {
 	// Check if subtree control is already enabled
-	content, err := host.FS.ReadFile("/sys/fs/cgroup/cgroup.subtree_control")
+	content, err := fs.ReadFile("/sys/fs/cgroup/cgroup.subtree_control")
 	if err != nil {
 		return fmt.Errorf("while reading cgroup.subtree_control: %w", err)
 	}
@@ -170,14 +170,14 @@ func EnableCGroupSubtreeControl() error {
 	log.Infof("Enabling cgroup subtree control...")
 	// Create a group to move all current processes to, as enabling subtree control requires that no processes are in
 	// the root cgroup.
-	err = host.FS.MkdirAll("/sys/fs/cgroup/iknite_init", 0o755)
+	err = fs.MkdirAll("/sys/fs/cgroup/iknite_init", 0o755)
 	if err != nil {
 		return fmt.Errorf("while creating cgroup directory: %w", err)
 	}
 	// Move all processes to the new group
-	if processNumbers, procErr := host.FS.Pipe("/sys/fs/cgroup/cgroup.procs").Slice(); procErr == nil {
+	if processNumbers, procErr := fs.Pipe("/sys/fs/cgroup/cgroup.procs").Slice(); procErr == nil {
 		for _, processNumber := range processNumbers {
-			if procErr = host.FS.WriteFile(
+			if procErr = fs.WriteFile(
 				"/sys/fs/cgroup/iknite_init/cgroup.procs",
 				[]byte(processNumber),
 				0o644,
@@ -194,7 +194,7 @@ func EnableCGroupSubtreeControl() error {
 	}
 
 	// Now read the current controllers and create the string to enable all of them in the subtree control
-	controllersContent, err := host.FS.ReadFile("/sys/fs/cgroup/cgroup.controllers")
+	controllersContent, err := fs.ReadFile("/sys/fs/cgroup/cgroup.controllers")
 	if err != nil {
 		return fmt.Errorf("while reading cgroup.controllers: %w", err)
 	}
@@ -206,7 +206,7 @@ func EnableCGroupSubtreeControl() error {
 	}
 
 	// Enable subtree control
-	err = host.FS.WriteFile("/sys/fs/cgroup/cgroup.subtree_control", []byte(enableControllers.String()+"\n"), 0o644)
+	err = fs.WriteFile("/sys/fs/cgroup/cgroup.subtree_control", []byte(enableControllers.String()+"\n"), 0o644)
 	if err != nil {
 		return fmt.Errorf("while enabling cgroup subtree control: %w", err)
 	}
@@ -266,7 +266,7 @@ func PrepareKubernetesEnvironment(alpineHost *alpine.AlpineHost, ikniteConfig *v
 		log.WithError(err).Info("While enabling loose mode on reverse path forwarding (rp_filter=2)")
 	}
 
-	if err = EnableCGroupSubtreeControl(); err != nil {
+	if err = EnableCGroupSubtreeControl(alpineHost.FS); err != nil {
 		return fmt.Errorf("while enabling cgroup subtree control: %w", err)
 	}
 

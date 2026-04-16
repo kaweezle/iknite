@@ -12,7 +12,6 @@ import (
 	"github.com/kaweezle/iknite/pkg/constants"
 	"github.com/kaweezle/iknite/pkg/cri"
 	"github.com/kaweezle/iknite/pkg/host"
-	"github.com/kaweezle/iknite/pkg/testutils"
 )
 
 func TestWaitForContainerService(t *testing.T) {
@@ -65,22 +64,21 @@ func TestWaitForContainerService(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			req := require.New(t)
 
-			fs, mockExec, cleanup := testutils.CreateTestFSAndExecutor(t)
-			t.Cleanup(cleanup)
+			fs := host.NewMemMapFS()
+			mockExec := host.NewMockExecutor(t)
 			tt.prepareExec(mockExec)
 
 			if tt.expectSocket {
 				req.NoError(fs.WriteFile(constants.ContainerServiceSock, []byte(""), 0o600))
 			}
 
-			ready, err := cri.WaitForContainerService()
+			ready, err := cri.WaitForContainerService(fs, mockExec)
 			if tt.wantErr {
 				req.Error(err)
 			} else {
 				req.NoError(err)
 			}
 			req.Equal(tt.wantReady, ready)
-			mockExec.AssertExpectations(t)
 		})
 	}
 }

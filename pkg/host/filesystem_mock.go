@@ -6,6 +6,7 @@ package host
 
 import (
 	"os"
+	"path/filepath"
 
 	"github.com/bitfield/script"
 	"github.com/spf13/afero"
@@ -37,6 +38,66 @@ type MockFileSystem_Expecter struct {
 
 func (_m *MockFileSystem) EXPECT() *MockFileSystem_Expecter {
 	return &MockFileSystem_Expecter{mock: &_m.Mock}
+}
+
+// Abs provides a mock function for the type MockFileSystem
+func (_mock *MockFileSystem) Abs(path string) (string, error) {
+	ret := _mock.Called(path)
+
+	if len(ret) == 0 {
+		panic("no return value specified for Abs")
+	}
+
+	var r0 string
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(string) (string, error)); ok {
+		return returnFunc(path)
+	}
+	if returnFunc, ok := ret.Get(0).(func(string) string); ok {
+		r0 = returnFunc(path)
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+	if returnFunc, ok := ret.Get(1).(func(string) error); ok {
+		r1 = returnFunc(path)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockFileSystem_Abs_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Abs'
+type MockFileSystem_Abs_Call struct {
+	*mock.Call
+}
+
+// Abs is a helper method to define mock.On call
+//   - path string
+func (_e *MockFileSystem_Expecter) Abs(path interface{}) *MockFileSystem_Abs_Call {
+	return &MockFileSystem_Abs_Call{Call: _e.mock.On("Abs", path)}
+}
+
+func (_c *MockFileSystem_Abs_Call) Run(run func(path string)) *MockFileSystem_Abs_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 string
+		if args[0] != nil {
+			arg0 = args[0].(string)
+		}
+		run(
+			arg0,
+		)
+	})
+	return _c
+}
+
+func (_c *MockFileSystem_Abs_Call) Return(s string, err error) *MockFileSystem_Abs_Call {
+	_c.Call.Return(s, err)
+	return _c
+}
+
+func (_c *MockFileSystem_Abs_Call) RunAndReturn(run func(path string) (string, error)) *MockFileSystem_Abs_Call {
+	_c.Call.Return(run)
+	return _c
 }
 
 // Create provides a mock function for the type MockFileSystem
@@ -277,6 +338,68 @@ func (_c *MockFileSystem_Exists_Call) Return(b bool, err error) *MockFileSystem_
 }
 
 func (_c *MockFileSystem_Exists_Call) RunAndReturn(run func(path string) (bool, error)) *MockFileSystem_Exists_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// Glob provides a mock function for the type MockFileSystem
+func (_mock *MockFileSystem) Glob(pattern string) ([]string, error) {
+	ret := _mock.Called(pattern)
+
+	if len(ret) == 0 {
+		panic("no return value specified for Glob")
+	}
+
+	var r0 []string
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(string) ([]string, error)); ok {
+		return returnFunc(pattern)
+	}
+	if returnFunc, ok := ret.Get(0).(func(string) []string); ok {
+		r0 = returnFunc(pattern)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]string)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(string) error); ok {
+		r1 = returnFunc(pattern)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockFileSystem_Glob_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Glob'
+type MockFileSystem_Glob_Call struct {
+	*mock.Call
+}
+
+// Glob is a helper method to define mock.On call
+//   - pattern string
+func (_e *MockFileSystem_Expecter) Glob(pattern interface{}) *MockFileSystem_Glob_Call {
+	return &MockFileSystem_Glob_Call{Call: _e.mock.On("Glob", pattern)}
+}
+
+func (_c *MockFileSystem_Glob_Call) Run(run func(pattern string)) *MockFileSystem_Glob_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 string
+		if args[0] != nil {
+			arg0 = args[0].(string)
+		}
+		run(
+			arg0,
+		)
+	})
+	return _c
+}
+
+func (_c *MockFileSystem_Glob_Call) Return(matches []string, err error) *MockFileSystem_Glob_Call {
+	_c.Call.Return(matches, err)
+	return _c
+}
+
+func (_c *MockFileSystem_Glob_Call) RunAndReturn(run func(pattern string) ([]string, error)) *MockFileSystem_Glob_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -925,6 +1048,63 @@ func (_c *MockFileSystem_Symlink_Call) Return(err error) *MockFileSystem_Symlink
 }
 
 func (_c *MockFileSystem_Symlink_Call) RunAndReturn(run func(oldName string, newName string) error) *MockFileSystem_Symlink_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// Walk provides a mock function for the type MockFileSystem
+func (_mock *MockFileSystem) Walk(root string, walkFn filepath.WalkFunc) error {
+	ret := _mock.Called(root, walkFn)
+
+	if len(ret) == 0 {
+		panic("no return value specified for Walk")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(string, filepath.WalkFunc) error); ok {
+		r0 = returnFunc(root, walkFn)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockFileSystem_Walk_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Walk'
+type MockFileSystem_Walk_Call struct {
+	*mock.Call
+}
+
+// Walk is a helper method to define mock.On call
+//   - root string
+//   - walkFn filepath.WalkFunc
+func (_e *MockFileSystem_Expecter) Walk(root interface{}, walkFn interface{}) *MockFileSystem_Walk_Call {
+	return &MockFileSystem_Walk_Call{Call: _e.mock.On("Walk", root, walkFn)}
+}
+
+func (_c *MockFileSystem_Walk_Call) Run(run func(root string, walkFn filepath.WalkFunc)) *MockFileSystem_Walk_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 string
+		if args[0] != nil {
+			arg0 = args[0].(string)
+		}
+		var arg1 filepath.WalkFunc
+		if args[1] != nil {
+			arg1 = args[1].(filepath.WalkFunc)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockFileSystem_Walk_Call) Return(err error) *MockFileSystem_Walk_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockFileSystem_Walk_Call) RunAndReturn(run func(root string, walkFn filepath.WalkFunc) error) *MockFileSystem_Walk_Call {
 	_c.Call.Return(run)
 	return _c
 }
