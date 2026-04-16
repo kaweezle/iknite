@@ -74,7 +74,7 @@ func CheckService(
 	}
 	if checkPidFile {
 		var err error
-		pid, _, err = CheckPidFile(serviceName)
+		pid, _, err = CheckPidFile(alpineHost, serviceName)
 		if err != nil {
 			return false, "", err
 		}

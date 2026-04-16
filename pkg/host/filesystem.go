@@ -206,6 +206,11 @@ func (a *hostImpl) Rename(oldPath, newPath string) error {
 }
 
 func (a *hostImpl) EvalSymlinks(path string) (string, error) {
+	_, ok := a.fs.(*afero.OsFs)
+	if ok {
+		// If it's an OsFs, we can use the standard library's EvalSymlinks which is more robust.
+		return filepath.EvalSymlinks(path)
+	}
 	evalLinker, ok := a.fs.(afero.LinkReader)
 	if !ok {
 		return "", fmt.Errorf("filesystem does not support evaluating symlinks")

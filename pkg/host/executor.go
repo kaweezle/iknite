@@ -1,13 +1,32 @@
+// cSpell: words wrapcheck
 package host
 
 import (
 	"context"
 	"fmt"
 	"io"
+	"os"
 	"os/exec"
 
 	"github.com/bitfield/script"
 )
+
+type CommandOptions struct {
+	Stdout io.Writer
+	Stderr io.Writer
+	Stdin  io.Reader
+	Cmd    string
+	Dir    string
+	Args   []string
+	Env    []string
+}
+
+type Process interface {
+	Pid() int
+	Signal(signal os.Signal) error
+	Wait() error
+	State() *os.ProcessState
+}
 
 // ExecutorFunction is a function that executes a command and returns its input.
 type ExecutorFunction = func(cmd string, arguments ...string) ([]byte, error)
@@ -18,6 +37,8 @@ type Executor interface {
 	PipeRun(stdin io.Reader, combined bool, cmd string, arguments ...string) ([]byte, error)
 	ExecPipe(stdin *script.Pipe, cmd string) *script.Pipe
 	ExecForEach(stdin *script.Pipe, cmd string) *script.Pipe
+	FindProcess(pid int) (Process, error)
+	StartCommand(ctx context.Context, options *CommandOptions) (Process, error)
 }
 
 var _ Executor = (*hostImpl)(nil)
@@ -77,4 +98,50 @@ func (c *hostImpl) ExecForEach(stdin *script.Pipe, cmd string) *script.Pipe {
 		return script.NewPipe().WithError(fmt.Errorf("stdin pipe cannot be nil"))
 	}
 	return stdin.ExecForEach(cmd)
+}
+
+type processImpl struct {
+	process *os.Process
+	state   *os.ProcessState
+}
+
+func (p *processImpl) Pid() int {
+	return p.process.Pid
+}
+
+func (p *processImpl) Signal(signal os.Signal) error {
+	return p.process.Signal(signal) //nolint:wrapcheck // Want to return original error
+}
+
+func (p *processImpl) Wait() error {
+	var err error
+	p.state, err = p.process.Wait()
+	return err //nolint:wrapcheck // Want to return original error
+}
+
+func (p *processImpl) State() *os.ProcessState {
+	return p.state
+}
+
+func (c *hostImpl) FindProcess(pid int) (Process, error) {
+	process, err := os.FindProcess(pid)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find process with pid %d: %w", pid, err)
+	}
+	return &processImpl{process: process}, nil
+}
+
+//nolint:gosec // Harness done upstream
+func (c *hostImpl) StartCommand(ctx context.Context, options *CommandOptions) (Process, error) {
+	cmd := exec.CommandContext(ctx, options.Cmd, options.Args...)
+	cmd.Env = options.Env
+	cmd.Dir = options.Dir
+	cmd.Stdout = options.Stdout
+	cmd.Stderr = options.Stderr
+	cmd.Stdin = options.Stdin
+	err := cmd.Start()
+	if err != nil {
+		return nil, fmt.Errorf("failed to start command %s: %w", options.Cmd, err)
+	}
+	return &processImpl{process: cmd.Process}, nil
 }

@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"os/exec"
 	"os/signal"
 	"syscall"
 
@@ -14,6 +13,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 
 	"github.com/kaweezle/iknite/pkg/apis/iknite"
+	"github.com/kaweezle/iknite/pkg/host"
 	"github.com/kaweezle/iknite/pkg/k8s"
 )
 
@@ -27,14 +27,15 @@ func NewDaemonizePhase() workflow.Phase {
 	}
 }
 
-func WaitForKubelet(cmd *exec.Cmd, conn *mdns.Conn, cancel context.CancelFunc) error {
+func WaitForKubelet(process host.Process, conn *mdns.Conn, cancel context.CancelFunc) error {
 	// Wait for SIGTERM and SIGKILL signals
+	// TODO: Should replace that with a context passed as a parameter with the signal handling done upstream.
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, syscall.SIGTERM)
 
 	cmdDone := make(chan error, 1)
 	go func() {
-		cmdDone <- cmd.Wait()
+		cmdDone <- process.Wait()
 	}()
 
 	var err error
@@ -45,9 +46,9 @@ func WaitForKubelet(cmd *exec.Cmd, conn *mdns.Conn, cancel context.CancelFunc) e
 		case <-stop:
 			// Stop the cmd process
 			log.Info("Received TERM Signal. Stopping kubelet...")
-			err = cmd.Process.Signal(syscall.SIGTERM)
+			err = process.Signal(syscall.SIGTERM)
 			if err == nil {
-				err = cmd.Wait()
+				err = process.Wait()
 				if err != nil {
 					log.WithError(err).Warn("Error while waiting for kubelet to stop")
 				}
@@ -56,7 +57,7 @@ func WaitForKubelet(cmd *exec.Cmd, conn *mdns.Conn, cancel context.CancelFunc) e
 			alive = false
 		case <-cmdDone:
 			// Child process has stopped
-			log.Infof("Kubelet stopped with state: %s", cmd.ProcessState.String())
+			log.Infof("Kubelet stopped with state: %s", process.State().String())
 			alive = false
 		}
 	}
@@ -83,19 +84,19 @@ func runDaemonize(c workflow.RunData) error {
 	if !ok {
 		return fmt.Errorf("prepare phase invoked with an invalid data struct. ")
 	}
-	cmd := data.KubeletCmd()
-	if cmd == nil {
+	kubeletProcess := data.KubeletProcess()
+	if kubeletProcess == nil {
 		return nil
 	}
 	conn := data.MDnsConn()
 	_, cancel := data.ContextWithCancel()
 
-	err := WaitForKubelet(cmd, conn, cancel)
+	err := WaitForKubelet(kubeletProcess, conn, cancel)
 
 	data.IkniteCluster().Update(iknite.Stopping, "stop", nil, nil)
 	if err == nil {
 		// Prevent double stop
-		data.SetKubeletCmd(nil)
+		data.SetKubeletProcess(nil)
 	}
 
 	ensureServerStopped(data)

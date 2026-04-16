@@ -169,7 +169,7 @@ type SyncStatus struct {
 
 type HealthStatus struct {
 	// Status holds the status code of the application or resource
-	Status string `json:"status,omitempty"  protobuf:"bytes,1,opt,name=status"`
+	Status string `json:"status,omitempty" protobuf:"bytes,1,opt,name=status"`
 	// Message is a human-readable informational message describing the health status
 	Message string `json:"message,omitempty" protobuf:"bytes,2,opt,name=message"`
 }

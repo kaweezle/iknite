@@ -16,14 +16,14 @@ limitations under the License.
 package init
 
 import (
-	"context"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
+
+	"github.com/kaweezle/iknite/pkg/host"
 )
 
 func TestPhaseConstructors(t *testing.T) {
@@ -149,11 +149,12 @@ func TestWaitForKubelet(t *testing.T) {
 	t.Parallel()
 	req := require.New(t)
 
-	cmd := exec.CommandContext(context.Background(), "/bin/sh", "-c", "exit 0")
-	req.NoError(cmd.Start())
+	process := host.NewMockProcess(t)
+	process.On("Wait").Return(nil).Once()
+	process.On("State").Return(&os.ProcessState{})
 
 	canceled := false
-	err := WaitForKubelet(cmd, nil, func() { canceled = true })
+	err := WaitForKubelet(process, nil, func() { canceled = true })
 	req.Error(err)
 	req.Contains(err.Error(), "failed to wait for kubelet")
 	req.True(canceled)

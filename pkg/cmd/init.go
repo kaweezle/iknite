@@ -25,7 +25,6 @@ import (
 	"io"
 	"net"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strconv"
 	"syscall"
@@ -133,7 +132,7 @@ type initData struct {
 	patchesDir                  string
 	adminKubeConfigBootstrapped bool
 	ikniteCluster               *v1alpha1.IkniteCluster
-	kubeletCmd                  *exec.Cmd
+	kubeletProcess              host.Process
 	mdnsConn                    *mdns.Conn
 	statusServer                *ikniteServer.IkniteServer
 	ctx                         context.Context //nolint:containedctx // passed around but not stored
@@ -160,6 +159,7 @@ func getDryRunClient(d *initData) (clientset.Interface, error)
 // NB. InitOptions is exposed as parameter for allowing unit testing of the newInitOptions method, that implements all
 // the command options validation logic.
 func newCmdInit(out io.Writer, initOptions *initOptions) *cobra.Command {
+	alpineHost := host.NewDefaultHost()
 	if initOptions == nil {
 		initOptions = newInitOptions()
 	}
@@ -199,25 +199,25 @@ func newCmdInit(out io.Writer, initOptions *initOptions) *cobra.Command {
 				log.WithError(shutdownErr).Warn("Failed to stop iknite status server")
 			}
 			// Stop the kubelet process if it was started
-			kubeletCmd := data.KubeletCmd()
-			if kubeletCmd != nil {
-				err = kubeletCmd.Process.Signal(syscall.SIGTERM)
+			kubeletProcess := data.KubeletProcess()
+			if kubeletProcess != nil {
+				err = kubeletProcess.Signal(syscall.SIGTERM)
 				if err != nil {
 					return fmt.Errorf(
 						"failed to terminate the kubelet process %d: %w",
-						kubeletCmd.Process.Pid,
+						kubeletProcess.Pid(),
 						err,
 					)
 				}
-				if err = kubeletCmd.Wait(); err != nil {
+				if err = kubeletProcess.Wait(); err != nil {
 					return fmt.Errorf(
 						"kubelet process %d exited with error: %w",
-						kubeletCmd.Process.Pid,
+						kubeletProcess.Pid(),
 						err,
 					)
 				}
 			}
-			k8s.RemovePidFiles()
+			k8s.RemovePidFiles(alpineHost)
 
 			return nil
 		},
@@ -826,12 +826,12 @@ func (d *initData) IkniteCluster() *v1alpha1.IkniteCluster {
 	return d.ikniteCluster
 }
 
-func (d *initData) KubeletCmd() *exec.Cmd {
-	return d.kubeletCmd
+func (d *initData) KubeletProcess() host.Process {
+	return d.kubeletProcess
 }
 
-func (d *initData) SetKubeletCmd(cmd *exec.Cmd) {
-	d.kubeletCmd = cmd
+func (d *initData) SetKubeletProcess(process host.Process) {
+	d.kubeletProcess = process
 }
 
 func (d *initData) SetMDnsConn(conn *mdns.Conn) {

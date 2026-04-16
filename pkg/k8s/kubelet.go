@@ -7,9 +7,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"net/http"
 	"os"
-	"os/exec"
 	"os/signal"
 	"strconv"
 	"strings"
@@ -48,13 +48,13 @@ var (
 
 // cSpell: enable
 
-func CheckPidFile(service string) (int, any, error) {
+func CheckPidFile(h host.FileExecutor, service string) (int, host.Process, error) {
 	pidFilePath := fmt.Sprintf("/run/%s.pid", service)
 	logger := log.WithField("pidfile", pidFilePath)
-	pidBytes, err := os.ReadFile(pidFilePath) //nolint:gosec // Controlled file path
+	pidBytes, err := h.ReadFile(pidFilePath)
 	if err != nil && errors.Is(err, os.ErrNotExist) {
 		pidFilePath = fmt.Sprintf("/var/run/supervise-%s.pid", service)
-		pidBytes, err = os.ReadFile(pidFilePath) //nolint:gosec // Controlled file path
+		pidBytes, err = h.ReadFile(pidFilePath)
 	}
 	if err != nil {
 		if !errors.Is(err, os.ErrNotExist) {
@@ -71,14 +71,14 @@ func CheckPidFile(service string) (int, any, error) {
 		logger.WithField("content", pidStr).Warn("Failed to convert pid file to integer")
 		return 0, nil, fmt.Errorf("Failed to convert pid file to integer: %w", err)
 	}
-	var process *os.Process
-	process, err = os.FindProcess(pid)
+	var process host.Process
+	process, err = h.FindProcess(pid)
 	if err == nil && process.Signal(syscall.Signal(0)) == nil {
 		return pid, process, nil
 	}
 	logger.WithField("pid", pid).Warn("Pidfile contained an invalid pid")
 	// remove kubeletPidFile
-	err = os.Remove(pidFilePath)
+	err = h.Remove(pidFilePath)
 	if err != nil {
 		return 0, nil, fmt.Errorf("failed to remove pid file: %w", err)
 	}
@@ -119,11 +119,43 @@ func IsKubeletRunning() (*os.Process, error) {
 	return nil, nil //nolint:nilnil // means not running (old pid file)
 }
 
-func StartKubelet() (*exec.Cmd, error) {
+func ReadEnvFiles(fs host.FileSystem, paths ...string) (map[string]string, error) {
+	envData := make(map[string]string)
+	for _, path := range paths {
+		data, err := fs.ReadFile(path)
+		if err != nil {
+			if errors.Is(err, os.ErrNotExist) {
+				log.WithField("path", path).Info("Environment file not found, skipping")
+				continue
+			}
+			return nil, fmt.Errorf("failed to read environment file %s: %w", path, err)
+		}
+		fileEnvData, err := godotenv.UnmarshalBytes(data)
+		if err != nil {
+			return nil, fmt.Errorf("failed to unmarshal environment file %s: %w", path, err)
+		}
+		maps.Copy(envData, fileEnvData)
+	}
+	return envData, nil
+}
+
+func StartKubelet(h host.FileExecutor) (host.Process, error) {
 	// Read the environment variables from /var/lib/kubelet/kubeadm-flags.env
 	log.WithField("kubeletEnvFile", kubeletEnvFile).Info("Reading kubelet environment file")
 
-	envData, err := godotenv.Read(kubeletEnvFile, kubeAdmFlagsFile)
+	// Check if a process with the value contained in kubeletPidFile exists
+	// ignore the error if for some reason the pid file is not found
+	kubeletPid, p, err := CheckPidFile(h, "kubelet")
+	if err != nil {
+		return nil, fmt.Errorf("failed to check kubelet pid file %s: %w", kubeletPidFile, err)
+	}
+	if kubeletPid > 0 {
+		log.WithField("pid", kubeletPid).
+			Warnf("Kubelet is already running with pid: %d. Swallowing...", kubeletPid)
+		return p, nil
+	}
+
+	envData, err := ReadEnvFiles(h, kubeletEnvFile, kubeAdmFlagsFile)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read environment file %s: %w", kubeletEnvFile, err)
 	}
@@ -142,30 +174,15 @@ func StartKubelet() (*exec.Cmd, error) {
 	}
 
 	// Run the command in a subprocess
-	cmd := exec.CommandContext(context.Background(), "/usr/bin/kubelet")
-	cmd.Args = append(cmd.Args, args...)
-	cmd.Env = os.Environ()
+	cmd := &host.CommandOptions{
+		Cmd:  "/usr/bin/kubelet",
+		Args: args,
+		Env:  os.Environ(),
+	}
 	cmd.Env = append(cmd.Env, env...)
 
-	// Check if a process with the value contained in kubeletPidFile exists
-	// ignore the error if for some reason the pid file is not found
-	kubeletPid, p, err := CheckPidFile("kubelet")
-	if err != nil {
-		return nil, fmt.Errorf("failed to check kubelet pid file %s: %w", kubeletPidFile, err)
-	}
-	if kubeletPid > 0 {
-		log.WithField("pid", kubeletPid).
-			Warnf("Kubelet is already running with pid: %d. Swallowing...", kubeletPid)
-		process, ok := p.(*os.Process)
-		if !ok {
-			return nil, fmt.Errorf("failed to assert kubelet process type")
-		}
-		cmd.Process = process
-		return cmd, nil
-	}
-
 	// Create the kubelet log directory if it doesn't exist
-	err = os.MkdirAll(kubeletLogDir, 0o755) //nolint:gosec // Want read access
+	err = h.MkdirAll(kubeletLogDir, 0o755)
 	if err != nil {
 		return nil, fmt.Errorf(
 			"failed to create kubelet log directory %s: %w",
@@ -175,7 +192,7 @@ func StartKubelet() (*exec.Cmd, error) {
 	}
 
 	// Open the kubelet log file for writing
-	logFile, err := os.OpenFile( //nolint:gosec // Want read access
+	logFile, err := h.OpenFile(
 		kubeletLogFile, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0o644)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open kubelet log file %s: %w", kubeletLogFile, err)
@@ -197,27 +214,27 @@ func StartKubelet() (*exec.Cmd, error) {
 	}).Info("Starting kubelet...")
 
 	// Start the subprocess and get the PID
-	err = cmd.Start()
+	p, err = h.StartCommand(context.Background(), cmd)
 	if err != nil {
 		return nil, fmt.Errorf("failed to start subprocess: %w", err)
 	}
 
 	// Write the PID to the /run/kubelet.pid file
 	err = os.WriteFile( //nolint:gosec // Want read access
-		kubeletPidFile, fmt.Appendf(nil, "%d", cmd.Process.Pid), 0o644)
+		kubeletPidFile, fmt.Appendf(nil, "%d", p.Pid()), 0o644)
 	if err != nil {
 		log.WithFields(log.Fields{
-			"pid":     cmd.Process.Pid,
+			"pid":     p.Pid(),
 			"err":     err,
 			"pidFile": kubeletPidFile,
 		}).Warn("Failed to write kubelet PID file")
 	}
 
-	return cmd, nil
+	return p, nil
 }
 
-func RemovePidFiles() {
-	err := os.Remove(kubeletPidFile)
+func RemovePidFiles(h host.FileSystem) {
+	err := h.Remove(kubeletPidFile)
 	if err != nil {
 		log.WithFields(log.Fields{
 			"err":     err,
@@ -236,7 +253,7 @@ func StartAndConfigureKubelet(
 		return fmt.Errorf("failed to load kubeconfig: %w", err)
 	}
 
-	cmd, err := StartKubelet()
+	cmd, err := StartKubelet(alpineHost)
 	if err != nil {
 		return fmt.Errorf("failed to start kubelet: %w", err)
 	}
@@ -255,7 +272,7 @@ func StartAndConfigureKubelet(
 		kubeletHealthz <- CheckKubeletRunning(10, 3, 1000)
 	}()
 
-	defer RemovePidFiles()
+	defer RemovePidFiles(alpineHost)
 
 	alive := true
 	// Cancellable context for kustomization
@@ -264,7 +281,7 @@ func StartAndConfigureKubelet(
 
 	killKubelet := func() {
 		cancel()
-		err = cmd.Process.Signal(syscall.SIGTERM)
+		err = cmd.Signal(syscall.SIGTERM)
 		if err != nil {
 			log.Fatalf("Failed to stop subprocess: %v", err)
 		}
@@ -284,7 +301,7 @@ func StartAndConfigureKubelet(
 			killKubelet()
 		case <-cmdDone:
 			// Child process has stopped
-			log.Infof("Kubelet stopped with state: %s", cmd.ProcessState.String())
+			log.Infof("Kubelet stopped with state: %s", cmd.State().String())
 			alive = false
 		case isKubeletHealthy := <-kubeletHealthz:
 			if isKubeletHealthy != nil {

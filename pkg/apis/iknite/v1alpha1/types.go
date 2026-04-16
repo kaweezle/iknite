@@ -22,7 +22,7 @@ import (
 type IkniteCluster struct {
 	metaV1.TypeMeta `json:",inline"`
 
-	Spec IkniteClusterSpec `json:"spec"             protobuf:"bytes,2,opt,name=spec"`
+	Spec IkniteClusterSpec `json:"spec" protobuf:"bytes,2,opt,name=spec"`
 	// +optional
 	Status IkniteClusterStatus `json:"status,omitempty" protobuf:"bytes,3,opt,name=status"`
 }
