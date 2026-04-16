@@ -75,6 +75,3 @@ func (c *CommandExecutor) ExecForEach(stdin *script.Pipe, cmd string) *script.Pi
 	}
 	return stdin.ExecForEach(cmd)
 }
-
-// Exec is shared command executor used by code interacting with host system.
-var Exec Executor = &CommandExecutor{}
