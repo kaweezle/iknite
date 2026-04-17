@@ -10,3 +10,4 @@ ignore:
   - "**/*_string.go"
   - "hack/nocov.go"
   - "**/*_mock.go"
+  - "**/zz_generated.*.go"
