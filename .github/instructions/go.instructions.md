@@ -1,6 +1,6 @@
 ---
 description: Instructions for writing Go code following idiomatic Go practices and community standards
-applyTo: "pkg/**/*, cmd/**/*, hack/iknidev/**/*"
+applyTo: "pkg/**/*, cmd/**/*, hack/*.go, *.go"
 ---
 
 # Go Development Instructions
@@ -36,7 +36,8 @@ These instructions are based on [Effective Go](https://go.dev/doc/effective_go),
   construction)
 - Prefer standard library solutions over custom implementations when
   functionality exists
-- Write comments in English by default;
+- Write comments in American English by default
+- Avoid using global variables; prefer passing dependencies explicitly
 - Avoid using emoji in code and comments
 - Always check errors and handle them appropriately; don't ignore errors unless
   you have a good reason (document why)
@@ -113,7 +114,7 @@ These instructions are based on [Effective Go](https://go.dev/doc/effective_go),
 
 - Always use `gofmt` to format code
 - Use `goimports` to manage imports automatically
-- Keep line length reasonable (no hard limit, but consider readability)
+- Keep line length BELOW 120 characters; break long lines appropriately
 - Add blank lines to separate logical groups of code
 
 ### Comments
@@ -137,7 +138,8 @@ These instructions are based on [Effective Go](https://go.dev/doc/effective_go),
 - Don't ignore errors using `_` unless you have a good reason (document why)
 - Wrap errors with context using `fmt.Errorf` with `%w` verb
 - Create custom error types when you need to check for specific errors
-- Place error returns as the last return value
+- Place error returns as the last return value (e.g.,
+  `func foo() (string, error)`, not `func foo() (error, string)`)
 - Name error variables `err`
 - Keep error messages lowercase and don't end with punctuation
 
@@ -184,8 +186,10 @@ These instructions are based on [Effective Go](https://go.dev/doc/effective_go),
 
 ### Interfaces and Composition
 
+- Define dependency contracts with interfaces
+- Use interfaces to abstract behavior, not data
 - Accept interfaces, return concrete types
-- Keep interfaces small (1-3 methods is ideal)
+- Keep interfaces small (<5 methods is ideal)
 - Use embedding for composition
 - Define interfaces close to where they're used, not where they're implemented
 - Don't export interfaces unless necessary
@@ -255,11 +259,8 @@ These instructions are based on [Effective Go](https://go.dev/doc/effective_go),
 - Use middleware for cross-cutting concerns
 - Set appropriate status codes and headers
 - Handle errors gracefully and return appropriate error responses
-- Router usage by Go version:
-  - If `go >= 1.22`, prefer the enhanced `net/http` `ServeMux` with
-    pattern-based routing and method matching
-  - If `go < 1.22`, use the classic `ServeMux` and handle methods/paths manually
-    (or use a third-party router when justified)
+- Prefer the enhanced `net/http` `ServeMux` with pattern-based routing and
+  method matching
 
 ### JSON APIs
 
@@ -370,8 +371,29 @@ These instructions are based on [Effective Go](https://go.dev/doc/effective_go),
 - Use subtests with `t.Run` for better organization
 - Use `t.Parallel()` for independent test cases to speed up test execution
 - Test both success and error cases
-- Consider using `testify` or similar libraries when they add value, but don't
-  over-complicate simple tests
+- Use `testify/require` for assertions:
+  ```go
+  req := require.New(t)
+  ```
+- Use `testify/mock` for mocking dependencies when necessary. The project uses
+  mockery for generating mocks; Add the package containing the interfaces to be
+  mocked to the `.mockery.yml` configuration file, and run `mockery --all` to
+  generate mocks for all interfaces in that package. Use mocks in tests by
+  importing the package and creating instances of the mock types:
+
+  ```go
+  import "github.com/kaweezle/iknite/pkg/host"
+  ...
+  func TestSomething(t *testing.T) {
+      mockExecutor := host.NewMockExecutor(t)
+      // Set up expectations on mockExecutor
+      call := mockExec.On("Run",...)..Return([]byte("ok"), nil)
+      ...
+      // Use mockExecutor in the code being tested
+      // The expectations will be automatically asserted at the end of the test, and any failures
+      //will be reported by the testing framework
+  }
+  ```
 
 ### Test Helpers
 
@@ -397,7 +419,7 @@ These instructions are based on [Effective Go](https://go.dev/doc/effective_go),
 - Prioritize self-documenting code through clear naming and structure
 - Document all exported symbols with clear, concise explanations
 - Start documentation with the symbol name
-- Write documentation in English by default
+- Write documentation in American English
 - Use examples in documentation when helpful
 - Keep documentation close to code
 - Update documentation when code changes
@@ -413,8 +435,27 @@ These instructions are based on [Effective Go](https://go.dev/doc/effective_go),
 
 ### Development Practices
 
-- Run tests before committing
-- Use pre-commit hooks for formatting and linting
+- Run tests before committing:
+
+  ```console
+  go test -v -race -covermode=atomic -coverprofile=coverage.out  ./...
+  ```
+
+- Run linters before committing:
+
+  ```console
+  golangci-lint run --fix
+  ```
+
+- Use pre-commit hooks for formatting and linting:
+
+  ```console
+  git add -A
+  pre-commit run
+  # Check all files to ensure no issues remain before committing
+  pre-commit run --all-files
+  ```
+
 - Keep commits focused and atomic
 - Write meaningful commit messages
 - Review diffs before committing
@@ -426,7 +467,13 @@ These instructions are based on [Effective Go](https://go.dev/doc/effective_go),
 - Creating goroutine leaks
 - Not using defer for cleanup
 - Modifying maps concurrently
-- Not understanding nil interfaces vs nil pointers
+- Not understanding nil interfaces vs nil pointers:
+  ```go
+  var p *T = nil
+  var i interface{} = p
+  fmt.Println(p == nil) // true
+  fmt.Println(i == nil) // false, because i holds a non-nil interface value
+  ```
 - Forgetting to close resources (files, connections)
 - Using global variables unnecessarily
 - Over-using unconstrained types (e.g., `any`); prefer specific types or generic

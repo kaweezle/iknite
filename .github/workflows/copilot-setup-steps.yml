@@ -60,6 +60,12 @@ jobs:
           helmfile init --force
           helm plugin install https://github.com/mumoshu/helm-x
       -
+        name: Install golangci-lint
+        uses: golangci/golangci-lint-action@v9
+        with:
+          version: v2.5.0
+          install-only: true
+      -
         name: Import Signature key
         id: import-signing-key
         shell: bash
