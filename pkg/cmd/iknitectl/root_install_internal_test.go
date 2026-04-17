@@ -22,8 +22,8 @@ func TestCreateInstallCmd(t *testing.T) {
 	req.Equal("signing-key", signingKeyCmd.Name())
 }
 
+//nolint:paralleltest // Finding subcommands is not thread-safe, so we cannot run these tests in parallel.
 func TestRootOptionsAndCreateRootCmd(t *testing.T) {
-	t.Parallel()
 	req := require.New(t)
 
 	opts := NewRootOptions()
