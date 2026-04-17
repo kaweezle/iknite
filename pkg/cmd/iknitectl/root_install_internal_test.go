@@ -1,3 +1,4 @@
+// cSpell: words paralleltest
 package iknitectl
 
 import (
@@ -35,9 +36,9 @@ func TestRootOptionsAndCreateRootCmd(t *testing.T) {
 	req.NotNil(root.PersistentPreRunE)
 
 	expectedSubcommands := []string{"install", "kustomize", "application", "secrets"}
+	//nolint:paralleltest // Finding subcommands is not thread-safe, so we cannot run these tests in parallel.
 	for _, name := range expectedSubcommands {
 		t.Run(name, func(t *testing.T) {
-			t.Parallel()
 			req := require.New(t)
 			sub, _, err := root.Find([]string{name})
 			req.NoError(err)
