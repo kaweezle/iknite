@@ -1,0 +1,90 @@
+# cSpell: words aquaproj slsa genisoimage
+name: "Copilot Setup Steps"
+
+# Automatically run the setup steps when they are changed to allow for easy validation, and
+# allow manual testing through the repository's "Actions" tab
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - .github/workflows/copilot-setup-steps.yml
+  pull_request:
+    paths:
+      - .github/workflows/copilot-setup-steps.yml
+
+jobs:
+  # The job MUST be called `copilot-setup-steps` or it will not be picked up by Copilot.
+  copilot-setup-steps:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+
+    steps:
+      -
+        name: Checkout
+        uses: actions/checkout@v6
+      -
+        name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: ^1
+      - name: Set up Aqua cache
+        uses: actions/cache@v5
+        with:
+          path: ~/.local/share/aquaproj-aqua
+          key: v2-aqua-installer-${{runner.os}}-${{runner.arch}}-${{hashFiles('aqua.yaml')}}
+          restore-keys: |
+            v2-aqua-installer-${{runner.os}}-${{runner.arch}}-
+      -
+        name: Install aqua dependencies
+        uses: aquaproj/aqua-installer@11dd79b4e498d471a9385aa9fb7f62bb5f52a73c # v4.0.4
+        with:
+          aqua_version: v2.56.6
+          aqua_opts: "" # Unset `-l` option
+        env:
+          AQUA_DISABLE_COSIGN: "true"
+          AQUA_DISABLE_SLSA: "true"
+      -
+        name: Install image building dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends qemu-utils qemu-guest-agent genisoimage libarchive-tools
+          # Install buildctl
+          BUILDKIT_VERSION=0.28.0
+          curl -L -o buildkit.tar.gz https://github.com/moby/buildkit/releases/download/v${BUILDKIT_VERSION}/buildkit-v${BUILDKIT_VERSION}.linux-amd64.tar.gz
+          tar -xzf buildkit.tar.gz -C /usr/local/bin --strip-components=1 bin/buildctl
+          rm buildkit.tar.gz
+          buildctl --version
+          make info
+          helmfile init --force
+          helm plugin install https://github.com/mumoshu/helm-x
+      -
+        name: Import Signature key
+        id: import-signing-key
+        shell: bash
+        run: |
+          mkdir -p ~/.config/sops/age
+          echo -e "$AGE_PRIVATE_KEY" > ~/.config/sops/age/keys.txt
+          chmod 600 ~/.config/sops/age/keys.txt
+          make ci-extract-key
+        env:
+          AGE_PRIVATE_KEY: ${{ secrets.AGE_PRIVATE_KEY }}
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+      -
+        name: Install pre-commit
+        run: |
+          python -m pip install pre-commit
+          python -m pip freeze --local
+      -
+        name: Cache pre-commit hooks
+        uses: actions/cache@v5
+        with:
+          path: ~/.cache/pre-commit
+          key: pre-commit-3|${{ env.pythonLocation }}|${{ hashFiles('.pre-commit-config.yaml') }}
+      -
+        name: Install pre-commit hooks
+        run: pre-commit install-hooks
