@@ -10,13 +10,12 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"github.com/txn2/txeh"
-	resetPhases "k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/reset"
 	kubeadmConstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	utilStaticPod "k8s.io/kubernetes/cmd/kubeadm/app/util/staticpod"
 
 	"github.com/kaweezle/iknite/pkg/alpine"
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
 	"github.com/kaweezle/iknite/pkg/host"
+	"github.com/kaweezle/iknite/pkg/k8s/util"
 )
 
 // cSpell: enable
@@ -165,7 +164,7 @@ func CleanAll(
 		}
 	}
 
-	err = UnmountPaths(alpineHost, false, isDryRun)
+	err = UnmountPaths(alpineHost, failOnError, isDryRun)
 	if err != nil {
 		log.WithError(err).Warn("Error unmounting paths")
 		if failOnError {
@@ -311,15 +310,15 @@ func DeleteNetworkInterfaces(exec host.Executor, isDryRun bool) error {
 }
 
 // DeleteAPIBackendData deletes the API backend data directory.
-func DeleteAPIBackendData(isDryRun bool, apiBackendName, apiBackendDatabaseDirectory string) error {
+func DeleteAPIBackendData(fs host.FileSystem, isDryRun bool, apiBackendName, apiBackendDatabaseDirectory string) error {
 	apiBackendManifestPath := filepath.Join(
 		kubeadmConstants.KubernetesDir,
 		kubeadmConstants.ManifestsSubDirName,
 		apiBackendName+".yaml",
 	)
-	pod, err := utilStaticPod.ReadStaticPodFromDisk(apiBackendManifestPath)
+	pod, err := util.ReadStaticPodFromDisk(fs, apiBackendManifestPath)
 	if err != nil {
-		if !os.IsNotExist(err) {
+		if !errors.Is(err, os.ErrNotExist) {
 			return fmt.Errorf("failed to read API backend pod from disk: %w", err)
 		}
 		// If the API backend manifest does not exist, we assume the default data directory.
@@ -335,7 +334,7 @@ func DeleteAPIBackendData(isDryRun bool, apiBackendName, apiBackendDatabaseDirec
 		log.WithField("path", apiBackendDatabaseDirectory).Info("Dry run: would delete API backend data...")
 	} else {
 		log.WithField("path", apiBackendDatabaseDirectory).Info("Deleting API backend data...")
-		err = resetPhases.CleanDir(apiBackendDatabaseDirectory)
+		err = host.CleanDir(fs, apiBackendDatabaseDirectory)
 		if err != nil {
 			return fmt.Errorf("failed to delete API backend data: %w", err)
 		}

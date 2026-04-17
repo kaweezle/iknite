@@ -214,7 +214,9 @@ func performClean(alpineHost host.Host, ikniteConfig *v1alpha1.IkniteClusterSpec
 		if ikniteConfig.UseEtcd {
 			apiBackendName = constants.EtcdBackendName
 		}
-		cobra.CheckErr(k8s.DeleteAPIBackendData(dryRun, apiBackendName, ikniteConfig.APIBackendDatabaseDirectory))
+		cobra.CheckErr(
+			k8s.DeleteAPIBackendData(alpineHost, dryRun, apiBackendName, ikniteConfig.APIBackendDatabaseDirectory),
+		)
 	}
 
 	if cleanOptions.cleanClusterConfig {

@@ -43,6 +43,10 @@ type Executor interface {
 
 var _ Executor = (*hostImpl)(nil)
 
+// findProcessFn wraps os.FindProcess so it can be replaced in tests to
+// simulate errors (os.FindProcess never fails on Linux).
+var findProcessFn = os.FindProcess
+
 func NewDefaultExecutor() Executor {
 	return NewOsFS().(*hostImpl) //nolint:errcheck,forcetypeassert // Good type
 }
@@ -124,7 +128,7 @@ func (p *processImpl) State() *os.ProcessState {
 }
 
 func (c *hostImpl) FindProcess(pid int) (Process, error) {
-	process, err := os.FindProcess(pid)
+	process, err := findProcessFn(pid)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find process with pid %d: %w", pid, err)
 	}

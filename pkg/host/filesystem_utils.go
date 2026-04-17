@@ -2,6 +2,7 @@ package host
 
 import (
 	"fmt"
+	"path/filepath"
 )
 
 func IsOnWSL(fs FileSystem) bool {
@@ -59,6 +60,28 @@ func MoveFileIfExists(fs FileSystem, src, dst string) error {
 
 	if err := fs.Rename(src, dst); err != nil {
 		return fmt.Errorf("failed to move file from %s to %s: %w", src, dst, err)
+	}
+	return nil
+}
+
+// CleanDir removes everything in a directory, but not the directory itself.
+func CleanDir(fs FileSystem, dir string) error {
+	exists, err := fs.DirExists(dir)
+	if err != nil {
+		return fmt.Errorf("error while checking existence of directory %s: %w", dir, err)
+	}
+	if !exists {
+		return nil
+	}
+
+	files, err := fs.ReadDir(dir)
+	if err != nil {
+		return fmt.Errorf("error while reading directory %s: %w", dir, err)
+	}
+	for _, file := range files {
+		if err := fs.RemoveAll(filepath.Join(dir, file.Name())); err != nil {
+			return fmt.Errorf("error while removing file %s: %w", filepath.Join(dir, file.Name()), err)
+		}
 	}
 	return nil
 }

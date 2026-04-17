@@ -12,6 +12,7 @@ import (
 
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
 	ikniteConfig "github.com/kaweezle/iknite/pkg/config"
+	"github.com/kaweezle/iknite/pkg/host"
 )
 
 func NewKubeVipControlPlanePhase() workflow.Phase {
@@ -45,7 +46,7 @@ func CreateKubeVipConfiguration(wr io.Writer, config *v1alpha1.IkniteClusterSpec
 
 // WriteKubeVipConfiguration creates the kube-vip manifest file in manifestDir.
 func WriteKubeVipConfiguration(
-	fs afero.Fs, manifestDir string, config *v1alpha1.IkniteClusterSpec,
+	fs host.FileSystem, manifestDir string, config *v1alpha1.IkniteClusterSpec,
 ) (afero.File, error) {
 	return writeStaticPodManifest(
 		fs, manifestDir, "kube-vip.yaml", config, CreateKubeVipConfiguration,
@@ -62,7 +63,7 @@ func runKubeVipControlPlane(c workflow.RunData) error {
 	currentConfig := data.IkniteCluster().Spec
 
 	// Write the kube-vip configuration
-	_, err := WriteKubeVipConfiguration(afero.NewOsFs(), data.ManifestDir(), &currentConfig)
+	_, err := WriteKubeVipConfiguration(data.Host(), data.ManifestDir(), &currentConfig)
 
 	return err
 }

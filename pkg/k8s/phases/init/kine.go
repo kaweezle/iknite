@@ -12,6 +12,7 @@ import (
 
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
 	ikniteConfig "github.com/kaweezle/iknite/pkg/config"
+	"github.com/kaweezle/iknite/pkg/host"
 )
 
 // NewKineControlPlanePhase returns a new kine phase.
@@ -47,7 +48,7 @@ func CreateKineConfiguration(wr io.Writer, config *v1alpha1.IkniteClusterSpec) e
 
 // WriteKineConfiguration creates the kine manifest file in manifestDir.
 func WriteKineConfiguration(
-	fs afero.Fs, manifestDir string, config *v1alpha1.IkniteClusterSpec,
+	fs host.FileSystem, manifestDir string, config *v1alpha1.IkniteClusterSpec,
 ) (afero.File, error) {
 	return writeStaticPodManifest(
 		fs, manifestDir, "kine.yaml", config, CreateKineConfiguration,
@@ -62,6 +63,6 @@ func runKineControlPlane(c workflow.RunData) error {
 
 	currentConfig := data.IkniteCluster().Spec
 
-	_, err := WriteKineConfiguration(afero.NewOsFs(), data.ManifestDir(), &currentConfig)
+	_, err := WriteKineConfiguration(data.Host(), data.ManifestDir(), &currentConfig)
 	return err
 }
