@@ -11,6 +11,10 @@ type Host interface {
 	System
 }
 
+type HostProvider interface {
+	Host() Host
+}
+
 func NewDefaultHost() Host {
 	return NewOsFS().(*hostImpl) //nolint:errcheck,forcetypeassert // Good type
 }

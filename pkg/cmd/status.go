@@ -28,6 +28,8 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
+	"github.com/kaweezle/iknite/pkg/check"
+	"github.com/kaweezle/iknite/pkg/checkers"
 	"github.com/kaweezle/iknite/pkg/config"
 	"github.com/kaweezle/iknite/pkg/constants"
 	"github.com/kaweezle/iknite/pkg/host"
@@ -81,7 +83,9 @@ func NewStatusCmd(ikniteConfig *v1alpha1.IkniteClusterSpec, waitOptions *utils.W
 - Daemonsets
 - Statefulsets
 `,
-		Run: func(_ *cobra.Command, _ []string) { performStatus(ikniteConfig, waitOptions) },
+		Run: func(_ *cobra.Command, _ []string) {
+			performStatus(host.NewDefaultHost(), ikniteConfig, waitOptions)
+		},
 	}
 
 	flags := statusCmd.Flags()
@@ -92,9 +96,8 @@ func NewStatusCmd(ikniteConfig *v1alpha1.IkniteClusterSpec, waitOptions *utils.W
 }
 
 //nolint:gocognit,gocyclo // TODO: Should use a runner pattern to reduce complexity
-func performStatus(ikniteConfig *v1alpha1.IkniteClusterSpec, waitOptions *utils.WaitOptions) {
-	alpineHost := host.NewDefaultHost()
-	checkData := k8s.CreateCheckWorkloadData(ikniteConfig.GetApiEndPoint(), waitOptions, alpineHost)
+func performStatus(alpineHost host.Host, ikniteConfig *v1alpha1.IkniteClusterSpec, waitOptions *utils.WaitOptions) {
+	checkData := checkers.CreateCheckWorkloadData(ikniteConfig.GetApiEndPoint(), waitOptions, alpineHost)
 
 	var apiBackendName string
 	if ikniteConfig.UseEtcd {
@@ -102,36 +105,36 @@ func performStatus(ikniteConfig *v1alpha1.IkniteClusterSpec, waitOptions *utils.
 	} else {
 		apiBackendName = constants.KineBackendName
 	}
-	dBManifestCheck := k8s.KubernetesFileCheck(
+	dBManifestCheck := checkers.SimpleFileCheck(
 		fmt.Sprintf("manifest_%s", apiBackendName),
 		fmt.Sprintf("/etc/kubernetes/manifests/%s.yaml", apiBackendName),
 	)
 
 	// Create all checks
-	checks := []*k8s.Check{
+	checks := []*check.Check{
 		// Phase 1: Environment
-		k8s.NewPhase("environment", "Environment configuration", []*k8s.Check{
-			k8s.SystemFileCheck(
+		check.NewPhase("environment", "Environment configuration",
+			checkers.FileCheck(
 				"ip_forward",
 				"Check IP forwarding is enabled",
 				"/proc/sys/net/ipv4/ip_forward",
 				"1\n",
 			),
-			k8s.SystemFileCheck("bridge_nf_call_iptables", "Check IP Tables is active for bridges",
+			checkers.FileCheck("bridge_nf_call_iptables", "Check IP Tables is active for bridges",
 				"/proc/sys/net/bridge/bridge-nf-call-iptables", "1\n"),
-			k8s.SystemFileCheck("machine_id", "Check machine id is defined", "/etc/machine-id", ""),
-			k8s.SystemFileCheck(
+			checkers.FileCheck("machine_id", "Check machine id is defined", "/etc/machine-id", ""),
+			checkers.FileCheck(
 				"crictl_yaml",
 				"Check crictl configuration is defined",
 				"/etc/crictl.yaml",
 				"",
 			),
 			//   - Check if the kubelet service is not runnable
-			{
+			&check.Check{
 				Name:        "kubelet_service",
 				Description: "Check if the kubelet service is not runnable",
-				CheckFn: func(_ context.Context, checkData k8s.CheckData) (bool, string, error) {
-					data, ok := checkData.(k8s.CheckWorkloadData)
+				CheckFn: func(_ context.Context, checkData check.CheckData) (bool, string, error) {
+					data, ok := checkData.(checkers.CheckWorkloadData)
 					if !ok {
 						return false, "", fmt.Errorf("invalid check data type")
 					}
@@ -149,14 +152,14 @@ func performStatus(ikniteConfig *v1alpha1.IkniteClusterSpec, waitOptions *utils.
 				},
 			},
 			//   - Check if the iknite service is set to run in default mode
-			k8s.SystemFileCheck("iknite_service", "Check if iknite is active on default runlevel",
+			checkers.FileCheck("iknite_service", "Check if iknite is active on default runlevel",
 				"/etc/runlevels/default/iknite", ""),
 			//   - Check if the IP address we are targeting is bound to an interface
-			{
+			&check.Check{
 				Name:        "ip_bound",
 				Description: "Check if the IP address is bound to an interface",
-				CheckFn: func(_ context.Context, checkData k8s.CheckData) (bool, string, error) {
-					data, ok := checkData.(k8s.CheckWorkloadData)
+				CheckFn: func(_ context.Context, checkData check.CheckData) (bool, string, error) {
+					data, ok := checkData.(checkers.CheckWorkloadData)
 					if !ok {
 						return false, "", fmt.Errorf("invalid check data type")
 					}
@@ -182,195 +185,92 @@ func performStatus(ikniteConfig *v1alpha1.IkniteClusterSpec, waitOptions *utils.
 				},
 			},
 			//   - Check if the domain name is set
-			{
-				Name:        "domain_name",
-				Description: "Check if the domain name is set",
-				CheckFn: func(ctx context.Context, checkData k8s.CheckData) (bool, string, error) {
-					data, ok := checkData.(k8s.CheckWorkloadData)
-					if !ok {
-						return false, "", fmt.Errorf("invalid check data type")
-					}
-					if ikniteConfig.DomainName == "" {
-						return true, "Domain name is not set", nil
-					}
-					ipString := ikniteConfig.Ip.String()
-					if contains, ips := data.Host().IsHostMapped(
-						ctx,
-						ikniteConfig.Ip,
-						ikniteConfig.DomainName,
-					); contains {
-						mapped := func() bool {
-							for _, ip := range ips {
-								if ip.String() == ipString {
-									return true
-								}
-							}
-							return false
-						}()
-						if mapped {
-							return true, fmt.Sprintf(
-								"Domain name %s is mapped to IP %s",
-								ikniteConfig.DomainName,
-								ipString,
-							), nil
-						}
-					}
-					return false, fmt.Sprintf(
-						"Domain name %s is not mapped to IP %s",
-						ikniteConfig.DomainName,
-						ipString,
-					), nil
-				},
-			},
-		}),
+			checkers.DomainNameCheck(ikniteConfig.DomainName, ikniteConfig.Ip),
+		),
 
 		// Phase 2: Kubernetes configuration
-		k8s.NewPhase("configuration", "Kubernetes configuration", []*k8s.Check{
-			k8s.FileTreeCheck("pki", "Check PKI files", "/etc/kubernetes/pki", pkiFiles),
-			k8s.NewPhase("manifests", "Kubernetes manifests", []*k8s.Check{
+		check.NewPhase("configuration", "Kubernetes configuration",
+			checkers.FileTreeCheck("pki", "Check PKI files", "/etc/kubernetes/pki", pkiFiles),
+			check.NewPhase("manifests", "Kubernetes manifests",
 				dBManifestCheck,
-				k8s.KubernetesFileCheck(
+				checkers.SimpleFileCheck(
 					"manifest_apiserver",
 					"/etc/kubernetes/manifests/kube-apiserver.yaml",
 				),
-				k8s.KubernetesFileCheck(
+				checkers.SimpleFileCheck(
 					"manifest_controller",
 					"/etc/kubernetes/manifests/kube-controller-manager.yaml",
 				),
-				k8s.KubernetesFileCheck(
+				checkers.SimpleFileCheck(
 					"manifest_scheduler",
 					"/etc/kubernetes/manifests/kube-scheduler.yaml",
 				),
-			}),
-			k8s.KubernetesFileCheck("kubelet_conf", "/etc/kubernetes/kubelet.conf"),
-			k8s.KubernetesFileCheck("admin_conf", "/etc/kubernetes/admin.conf"),
-			k8s.KubernetesFileCheck("kubelet_config", "/var/lib/kubelet/config.yaml"),
-			k8s.KubernetesFileCheck("kubeadm_flags", "/var/lib/kubelet/kubeadm-flags.env"),
-			k8s.KubernetesFileCheck("iknite_conf", "/etc/kubernetes/iknite.conf"),
+			),
+			checkers.SimpleFileCheck("kubelet_conf", "/etc/kubernetes/kubelet.conf"),
+			checkers.SimpleFileCheck("admin_conf", "/etc/kubernetes/admin.conf"),
+			checkers.SimpleFileCheck("kubelet_config", "/var/lib/kubelet/config.yaml"),
+			checkers.SimpleFileCheck("kubeadm_flags", "/var/lib/kubelet/kubeadm-flags.env"),
+			checkers.SimpleFileCheck("iknite_conf", "/etc/kubernetes/iknite.conf"),
 			// Check that the etcd data directory is present and contains data
-			{
-				Name: fmt.Sprintf("api_backend_%s_data", apiBackendName),
-				Description: fmt.Sprintf(
-					"Check that the %s data directory (/var/lib/%s) is present and contains data",
-					apiBackendName,
-					apiBackendName,
-				),
-				CheckFn: func(_ context.Context, _ k8s.CheckData) (bool, string, error) {
-					var expectedFiles []string
-					if apiBackendName == constants.EtcdBackendName {
-						expectedFiles = []string{"member/snap/db"}
-					} else {
-						expectedFiles = []string{"kine.db"}
-					}
-					missingFiles, _, err := k8s.FileTreeDifference(
-						fmt.Sprintf("/var/lib/%s", apiBackendName),
-						expectedFiles,
-					)
-					if err != nil {
-						return false, "", fmt.Errorf(
-							"failed to check %s file tree: %w",
-							apiBackendName,
-							err,
-						)
-					}
-					if len(missingFiles) > 0 {
-						return false, fmt.Sprintf(
-							"/var/lib/%s has no data file",
-							apiBackendName,
-						), nil
-					}
-					return true, fmt.Sprintf("/var/lib/%s has data files", apiBackendName), nil
-				},
-			},
-		}),
+			checkers.APIBackendDataCheck(apiBackendName),
+		),
 
 		// Phase 3: Runtime status
-		k8s.NewPhase("runtime", "Runtime status", []*k8s.Check{
+		check.NewPhase("runtime", "Runtime status",
 			// Check that openrc is started
-			{
-				Name:        "openrc",
-				Description: "Check that OpenRC is started",
-				CheckFn: func(_ context.Context, checkData k8s.CheckData) (bool, string, error) {
-					data, ok := checkData.(k8s.CheckWorkloadData)
-					if !ok {
-						return false, "", fmt.Errorf("invalid check data type")
-					}
-					exists, err := data.Host().Exists(constants.SoftLevelPath)
-					if err != nil {
-						return false, "", fmt.Errorf(
-							"failed to check if OpenRC is started: %w",
-							err,
-						)
-					}
-					if !exists {
-						return false, "OpenRC is not started", nil
-					}
-					return true, "OpenRC is started", nil
-				},
-			},
-			k8s.ServiceCheck("iknite_running", "iknite"),
-			k8s.ServiceCheck("containerd_running", "containerd"),
-			k8s.ServiceCheck("buildkitd_running", "buildkitd"),
+			checkers.OpenRCCheck(),
+			checkers.ServiceCheck("iknite_running", "iknite", checkers.ServiceTypeOpenRC),
+			checkers.ServiceCheck("containerd_running", "containerd", checkers.ServiceTypeOpenRC),
+			checkers.ServiceCheck("buildkitd_running", "buildkitd", checkers.ServiceTypeOpenRC),
 			//  - Check if the kubelet process is running
-			{
-				Name:        "kubelet_running",
-				DependsOn:   []string{"iknite_running"},
-				Description: "Check if the kubelet process is running",
-				CheckFn: func(_ context.Context, checkData k8s.CheckData) (bool, string, error) {
-					data, ok := checkData.(k8s.CheckWorkloadData)
-					if !ok {
-						return false, "", fmt.Errorf("invalid check data type")
-					}
-					return k8s.CheckService(data.Host(), "kubelet", false, true)
-				},
-			},
+			checkers.ServiceCheck("kubelet_running", "kubelet", checkers.ServiceTypePidFile, "iknite_running"),
 			//   - Check if the kubelet api endpoint (socket) is reachable and healthy
-			{
+			&check.Check{
 				Name:        "kubelet_health",
 				DependsOn:   []string{"kubelet_running"},
 				Description: "Check if the kubelet is reachable and healthy",
-				CheckFn: func(_ context.Context, _ k8s.CheckData) (bool, string, error) {
-					return k8s.CheckKubeletHealth(waitOptions.CheckTimeout)
+				CheckFn: func(_ context.Context, _ check.CheckData) (bool, string, error) {
+					return checkers.CheckKubeletHealth(waitOptions.CheckTimeout)
 				},
 			},
 			//   - Check if the kube-apiserver is healthy
-			{
+			&check.Check{
 				Name:        "apiserver_health",
 				DependsOn:   []string{"kubelet_running"},
 				Description: "Check if the kube-apiserver is healthy",
-				CheckFn: func(_ context.Context, data k8s.CheckData) (bool, string, error) {
-					return k8s.CheckApiServerHealth(waitOptions.CheckTimeout, data)
+				CheckFn: func(_ context.Context, data check.CheckData) (bool, string, error) {
+					return checkers.CheckApiServerHealth(waitOptions.CheckTimeout, data)
 				},
 			},
 			//   - Check if the iknite status server is healthy
-			{
+			&check.Check{
 				Name:        "iknite_server_health",
 				DependsOn:   []string{"apiserver_health"},
 				Description: "Check if the iknite status server is healthy",
-				CheckFn: func(ctx context.Context, _ k8s.CheckData) (bool, string, error) {
+				CheckFn: func(ctx context.Context, _ check.CheckData) (bool, string, error) {
 					waitOptions := utils.NewWaitOptions()
 					waitOptions.Retries = 3
 					waitOptions.Timeout = 15 * time.Second
 
-					return k8s.CheckIkniteServerHealth(ctx, waitOptions)
+					return checkers.CheckIkniteServerHealth(ctx, waitOptions)
 				},
 			},
-		}),
+		),
 		{
 			Name:          "workload_status",
 			Description:   "Check Workload Status",
 			DependsOn:     []string{"runtime"},
-			CheckFn:       k8s.CheckWorkloads,
-			CustomPrinter: k8s.CheckWorkloadResultPrinter,
+			CheckFn:       checkers.CheckWorkloads,
+			CustomPrinter: checkers.CheckWorkloadResultPrinter,
 		},
 	}
 
 	// Run all checks
 	ctx := context.Background()
-	executor := k8s.NewCheckExecutor(checks, checkData)
+	executor := check.NewCheckExecutor(checks, checkData)
 	logrus.SetLevel(logrus.FatalLevel)
 
-	p := tea.NewProgram(k8s.NewCheckModel(ctx, executor))
+	p := tea.NewProgram(check.NewCheckModel(ctx, executor))
 	tmp := os.Stdout
 	defer func() { os.Stdout = tmp }()
 	os.Stdout = nil
@@ -378,48 +278,3 @@ func performStatus(ikniteConfig *v1alpha1.IkniteClusterSpec, waitOptions *utils.
 		cobra.CheckErr(fmt.Errorf("error running checks: %w", err))
 	}
 }
-
-// We should check the following:
-// - Phase 1: Environment
-//   - Check if /proc/sys/net/ipv4/ip_forward is set to 1
-//   - Check if /proc/sys/net/bridge/bridge-nf-call-iptables is set to 1
-//   - Check if the machine ID is set
-//   - Check if the IP address we are targeting is bound to an interface
-//   - Check if the domain name is set
-//   - Check if the kubelet service is not runnable
-//   - Check if the iknite service is set to run in default mode
-//   - Check if /etc/crictl.yaml exists
-// - Phase 2: Kubernetes configuration
-//   - Check if /etc/kubernetes/pki contains the certificates
-//   - Check if /etc/kubernetes/manifests contains the manifests
-//   - Check if /etc/kubernetes/{kubelet,scheduler,controller-manager}.conf exists
-//   - Check if /etc/kubernetes/{admin,super-admin}.conf exists
-//   - Check if /var/lib/etcd contains the etcd data (not empty)
-//   - Check if /var/lib/kubelet/config.yaml exists
-//   - Check if /var/lib/kubelet/kubeadm-flags.env exists
-// - Phase 3: Runtime status
-//   - Check if the iknite service is running
-//   - Check if the containerd process is running
-//   - Check if the kubelet process is running
-//   - Check if the kubelet api endpoint (socket) is reachable and healthy
-//   - Check if the etcd, kube-apiserver, kube-controller-manager, kube-scheduler pods are running
-//   - Check if etcd is healthy
-//   - Check if the kube-apiserver is healthy
-//  - Phase 4: Workload status
-//    - Check if all workloads are ready
-/*
-We want the checks to be run in parallel, so we will use goroutines to run them concurrently. Some checks may depend on
-the output of other checks, so we will need to wait for the dependent checks to complete before running the dependent
-checks.
-We want the status of each task to be displayed in the terminal while running the checks.
-The status needs to be displayed to the left of the check name. While running the checks, we will display a spinner to
-indicate that the checks are running.
-If a check fails, we will display an error message to the right of the check name and the spinner will be replaced with
-a red cross.
-If a check passes, we will display a success message to the right of the check name and the spinner will be replaced
-with a green tick.
-If a check is skipped, we will display a message to the right of the check name and the spinner will be replaced with a
-yellow exclamation mark.
-If a check is waiting for another check to complete, we will display a message to the right of the check name and the
-spinner will be replaced with a blue ellipsis.
-*/

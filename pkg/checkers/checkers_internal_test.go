@@ -1,4 +1,4 @@
-package k8s
+package checkers
 
 import (
 	"context"
@@ -7,9 +7,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
+	"github.com/kaweezle/iknite/pkg/check"
 	"github.com/kaweezle/iknite/pkg/host"
 	"github.com/kaweezle/iknite/pkg/utils"
 )
@@ -26,25 +28,41 @@ func TestFileTreeDifferenceAndCheck(t *testing.T) {
 	t.Parallel()
 	req := require.New(t)
 
-	dir := t.TempDir()
-	req.NoError(os.WriteFile(filepath.Join(dir, "a.txt"), []byte("a"), 0o600))
-	req.NoError(os.MkdirAll(filepath.Join(dir, "sub"), 0o700))
-	req.NoError(os.WriteFile(filepath.Join(dir, "sub", "b.txt"), []byte("b"), 0o600))
+	dir := "base"
+	fs := host.NewMemMapFS()
+	req.NoError(fs.WriteFile(filepath.Join(dir, "a.txt"), []byte("a"), 0o600))
+	req.NoError(fs.MkdirAll(filepath.Join(dir, "sub"), 0o700))
+	req.NoError(fs.WriteFile(filepath.Join(dir, "sub", "b.txt"), []byte("b"), 0o600))
 
 	expected := []string{"a.txt", filepath.Join("sub", "b.txt")}
-	missing, extra, err := FileTreeDifference(dir, expected)
+	missing, extra, err := FileTreeDifference(fs, dir, expected)
 	req.NoError(err)
 	req.Empty(missing)
 	req.Empty(extra)
 
+	mockHost := host.NewMockHost(t)
+	mockProvider := host.NewMockHostProvider(t)
+	mockProvider.On("Host").Return(mockHost).Twice()
+
+	mockHost.On("EvalSymlinks", mock.Anything).Return(dir, nil).Twice()
+	mockHost.On("Walk", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
+		path := args.Get(0).(string)              //nolint:errcheck,forcetypeassert // No need
+		walkFn := args.Get(1).(filepath.WalkFunc) //nolint:errcheck,forcetypeassert // No need
+		//nolint:errcheck // WalkFunc does not return an error.
+		_ = fs.Walk(
+			path,
+			walkFn,
+		)
+	}).Return(nil).Twice()
+
 	check := FileTreeCheck("tree", "tree check", dir, expected)
-	ok, msg, err := check.CheckFn(context.Background(), nil)
+	ok, msg, err := check.CheckFn(context.Background(), mockProvider)
 	req.NoError(err)
 	req.True(ok)
 	req.Contains(msg, "All expected")
 
 	badCheck := FileTreeCheck("tree", "tree check", dir, []string{"missing"})
-	ok, msg, err = badCheck.CheckFn(context.Background(), nil)
+	ok, msg, err = badCheck.CheckFn(context.Background(), mockProvider)
 	req.NoError(err)
 	req.False(ok)
 	req.Contains(msg, "Missing files")
@@ -57,21 +75,24 @@ func TestKubernetesFileCheckAndSystemFileCheck(t *testing.T) {
 	dir := t.TempDir()
 	file := filepath.Join(dir, "conf.txt")
 	req.NoError(os.WriteFile(file, []byte("ok\n"), 0o600))
+	h := host.NewDefaultHost()
+	mockProvider := host.NewMockHostProvider(t)
+	mockProvider.On("Host").Return(h).Times(3)
 
-	kubeCheck := KubernetesFileCheck("kube-file", file)
-	ok, msg, err := kubeCheck.CheckFn(context.Background(), nil)
+	kubeCheck := SimpleFileCheck("kube-file", file)
+	ok, msg, err := kubeCheck.CheckFn(context.Background(), mockProvider)
 	req.NoError(err)
 	req.True(ok)
 	req.Contains(msg, "exists and is a file")
 
-	contentCheck := SystemFileCheck("sys-file", "desc", file, "ok")
-	ok, msg, err = contentCheck.CheckFn(context.Background(), nil)
+	contentCheck := FileCheck("sys-file", "desc", file, "ok")
+	ok, msg, err = contentCheck.CheckFn(context.Background(), mockProvider)
 	req.NoError(err)
 	req.True(ok)
 	req.Contains(msg, "expected content")
 
-	badeCheck := SystemFileCheck("sys-file", "desc", file, "bad")
-	ok, _, err = badeCheck.CheckFn(context.Background(), nil)
+	badeCheck := FileCheck("sys-file", "desc", file, "bad")
+	ok, _, err = badeCheck.CheckFn(context.Background(), mockProvider)
 	req.Error(err)
 	req.False(ok)
 }
@@ -124,9 +145,9 @@ func TestWorkloadResultPrinters(t *testing.T) {
 	data.SetNotReadyWorkloads([]*v1alpha1.WorkloadState{{Namespace: "ns", Name: "b", Ok: false, Message: "pending"}})
 	data.Start()
 
-	result := &CheckResult{
-		Check:     &Check{Name: "workloads", Description: "workloads"},
-		Status:    StatusRunning,
+	result := &check.CheckResult{
+		Check:     &check.Check{Name: "workloads", Description: "workloads"},
+		Status:    check.StatusRunning,
 		CheckData: data,
 	}
 
@@ -134,11 +155,15 @@ func TestWorkloadResultPrinters(t *testing.T) {
 	req.Contains(out, "workloads")
 	req.Contains(out, "ns")
 
-	result.Status = StatusSkipped
+	result.Status = check.StatusSkipped
 	out = CheckWorkloadResultPrinter(result, "", "*")
 	req.Contains(out, "workloads")
 
-	fallback := &CheckResult{Check: &Check{Name: "x", Description: "x"}, Status: StatusSuccess, CheckData: "bad-data"}
+	fallback := &check.CheckResult{
+		Check:     &check.Check{Name: "x", Description: "x"},
+		Status:    check.StatusSuccess,
+		CheckData: "bad-data",
+	}
 	req.Contains(CheckWorkloadResultPrinter(fallback, "", "*"), "x")
 }
 
@@ -149,10 +174,17 @@ func TestAdditionalCheckerPaths(t *testing.T) {
 	// TODO: Use mocks and make a full test of CheckService.
 	h := host.NewDefaultHost()
 
-	ok, msg, err := CheckService(h, "ignored", false, false)
-	req.NoError(err)
-	req.True(ok)
-	req.Contains(msg, "Service ignored is running")
+	ok, msg, err := CheckService(h, "ignored", ServiceTypeOpenRC)
+	req.Error(err)
+	req.Empty(msg)
+	req.False(ok)
+	req.ErrorContains(err, "service ignored is not running")
+
+	ok, msg, err = CheckService(h, "ignored", ServiceTypePidFile)
+	req.Error(err)
+	req.Empty(msg)
+	req.False(ok)
+	req.ErrorContains(err, "service ignored is not running")
 
 	ok, _, err = CheckApiServerHealth(time.Millisecond, "invalid")
 	req.Error(err)
@@ -170,7 +202,7 @@ func TestAdditionalCheckerPaths(t *testing.T) {
 	req.Error(err)
 	req.False(ok)
 
-	serviceCheck := ServiceCheck("svc", "containerd")
+	serviceCheck := ServiceCheck("svc", "containerd", ServiceTypeOpenRC)
 	req.NotNil(serviceCheck)
 	req.Equal("svc", serviceCheck.Name)
 }

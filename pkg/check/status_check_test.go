@@ -1,5 +1,5 @@
 // cSpell: words paralleltest testpackage
-package k8s_test
+package check_test
 
 import (
 	"context"
@@ -9,24 +9,24 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/kaweezle/iknite/pkg/k8s"
+	"github.com/kaweezle/iknite/pkg/check"
 )
 
 func TestCheck_NewResultAndFillDependencies(t *testing.T) {
 	t.Parallel()
 	req := require.New(t)
 
-	checks := []*k8s.Check{
-		{Name: "root", Description: "root", SubChecks: []*k8s.Check{{Name: "leaf", Description: "leaf"}}},
+	checks := []*check.Check{
+		{Name: "root", Description: "root", SubChecks: []*check.Check{{Name: "leaf", Description: "leaf"}}},
 		{Name: "dependent", Description: "dep", DependsOn: []string{"leaf"}},
 	}
 
-	results := k8s.PrepareChecks(checks, nil)
+	results := check.PrepareChecks(checks, nil)
 	req.Len(results, 2)
 	req.Equal("leaf", results[0].SubResults[0].Name())
 	req.NotNil(results[0].Done)
 
-	nameMap := k8s.FillResultNameMap(results, nil)
+	nameMap := check.FillResultNameMap(results, nil)
 	req.Contains(nameMap, "root")
 	req.Contains(nameMap, "leaf")
 	req.Contains(nameMap, "dependent")
@@ -38,17 +38,17 @@ func TestCheck_NewResultAndFillDependencies(t *testing.T) {
 func TestCheckResult_CheckFn(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
-		check     *k8s.Check
+		check     *check.Check
 		name      string
 		wantError bool
 		wantOK    bool
 	}{
 		{
 			name: "success result",
-			check: &k8s.Check{
+			check: &check.Check{
 				Name:        "ok",
 				Description: "ok",
-				CheckFn: func(_ context.Context, _ k8s.CheckData) (bool, string, error) {
+				CheckFn: func(_ context.Context, _ check.CheckData) (bool, string, error) {
 					return true, "done", nil
 				},
 			},
@@ -57,10 +57,10 @@ func TestCheckResult_CheckFn(t *testing.T) {
 		},
 		{
 			name: "failed result",
-			check: &k8s.Check{
+			check: &check.Check{
 				Name:        "failed",
 				Description: "failed",
-				CheckFn: func(_ context.Context, _ k8s.CheckData) (bool, string, error) {
+				CheckFn: func(_ context.Context, _ check.CheckData) (bool, string, error) {
 					return false, "bad", errors.New("boom")
 				},
 			},
@@ -69,7 +69,7 @@ func TestCheckResult_CheckFn(t *testing.T) {
 		},
 		{
 			name:      "missing check function",
-			check:     &k8s.Check{Name: "missing", Description: "missing"},
+			check:     &check.Check{Name: "missing", Description: "missing"},
 			wantError: true,
 			wantOK:    false,
 		},
@@ -95,31 +95,31 @@ func TestCheckResult_RunAndDependencies(t *testing.T) {
 	t.Parallel()
 	req := require.New(t)
 
-	parent := &k8s.Check{
+	parent := &check.Check{
 		Name:        "parent",
 		Description: "parent",
-		CheckFn: func(_ context.Context, _ k8s.CheckData) (bool, string, error) {
+		CheckFn: func(_ context.Context, _ check.CheckData) (bool, string, error) {
 			return false, "", errors.New("no")
 		},
 	}
-	child := &k8s.Check{
+	child := &check.Check{
 		Name:        "child",
 		Description: "child",
 		DependsOn:   []string{"parent"},
-		CheckFn: func(_ context.Context, _ k8s.CheckData) (bool, string, error) {
+		CheckFn: func(_ context.Context, _ check.CheckData) (bool, string, error) {
 			return true, "", nil
 		},
 	}
 
-	results := k8s.PrepareChecks([]*k8s.Check{parent, child}, nil)
-	k8s.RunChecks(context.Background(), results)
+	results := check.PrepareChecks([]*check.Check{parent, child}, nil)
+	check.RunChecks(context.Background(), results)
 
 	for _, result := range results {
 		<-result.Done
 	}
 
-	req.Equal(k8s.StatusFailed, results[0].Status)
-	req.Equal(k8s.StatusSkipped, results[1].Status)
+	req.Equal(check.StatusFailed, results[0].Status)
+	req.Equal(check.StatusSkipped, results[1].Status)
 	req.Contains(results[1].Message, "Skipped due to failure")
 }
 
@@ -127,28 +127,32 @@ func TestCheckResult_RunWithSubChecks(t *testing.T) {
 	t.Parallel()
 	req := require.New(t)
 
-	check := &k8s.Check{
+	c := &check.Check{
 		Name:        "phase",
 		Description: "phase",
-		SubChecks: []*k8s.Check{
+		SubChecks: []*check.Check{
 			{
 				Name:        "ok",
 				Description: "ok",
-				CheckFn:     func(_ context.Context, _ k8s.CheckData) (bool, string, error) { return true, "", nil },
+				CheckFn: func(_ context.Context, _ check.CheckData) (bool, string, error) {
+					return true, "", nil
+				},
 			},
 			{
 				Name:        "ko",
 				Description: "ko",
-				CheckFn:     func(_ context.Context, _ k8s.CheckData) (bool, string, error) { return false, "", errors.New("bad") },
+				CheckFn: func(_ context.Context, _ check.CheckData) (bool, string, error) {
+					return false, "", errors.New("bad")
+				},
 			},
 		},
 	}
 
-	result := check.NewResult(nil)
+	result := c.NewResult(nil)
 	result.Run(context.Background())
 	<-result.Done
 
-	req.Equal(k8s.StatusFailed, result.Status)
+	req.Equal(check.StatusFailed, result.Status)
 	req.Error(result.Error)
 	req.Contains(result.Error.Error(), "subChecks failed")
 }
@@ -156,32 +160,32 @@ func TestCheckResult_RunWithSubChecks(t *testing.T) {
 func TestFormattingHelpers(t *testing.T) {
 	t.Parallel()
 
-	statuses := []k8s.CheckStatus{
-		k8s.StatusPending,
-		k8s.StatusRunning,
-		k8s.StatusSkipped,
-		k8s.StatusSuccess,
-		k8s.StatusFailed,
+	statuses := []check.CheckStatus{
+		check.StatusPending,
+		check.StatusRunning,
+		check.StatusSkipped,
+		check.StatusSuccess,
+		check.StatusFailed,
 	}
 	for _, st := range statuses {
 		t.Run(st.String(), func(t *testing.T) {
 			t.Parallel()
 			req := require.New(t)
-			result := (&k8s.Check{Name: "name", Description: "desc"}).NewResult(nil)
+			result := (&check.Check{Name: "name", Description: "desc"}).NewResult(nil)
 			result.Status = st
 			statusText := result.StatusString("spinner")
 			req.NotEmpty(statusText)
 		})
 	}
 
-	result := (&k8s.Check{Name: "name", Description: "desc"}).NewResult(nil)
+	result := (&check.Check{Name: "name", Description: "desc"}).NewResult(nil)
 	req := require.New(t)
 
-	result.Status = k8s.StatusSuccess
+	result.Status = check.StatusSuccess
 	result.Message = "all good"
 	req.Contains(result.FormatResult("", "-"), "all good")
 
-	result.Status = k8s.StatusFailed
+	result.Status = check.StatusFailed
 	result.Error = errors.New("broken")
 	req.Contains(result.Format("", "-"), "broken")
 }
@@ -190,26 +194,26 @@ func TestCheckExecutor_Run(t *testing.T) {
 	t.Parallel()
 	req := require.New(t)
 
-	checks := []*k8s.Check{
+	checks := []*check.Check{
 		{
 			Name:        "a",
 			Description: "a",
-			CheckFn:     func(_ context.Context, _ k8s.CheckData) (bool, string, error) { return true, "", nil },
+			CheckFn:     func(_ context.Context, _ check.CheckData) (bool, string, error) { return true, "", nil },
 		},
 		{
 			Name:        "b",
 			Description: "b",
-			CheckFn:     func(_ context.Context, _ k8s.CheckData) (bool, string, error) { return true, "", nil },
+			CheckFn:     func(_ context.Context, _ check.CheckData) (bool, string, error) { return true, "", nil },
 		},
 	}
 
-	executor := k8s.NewCheckExecutor(checks, nil)
+	executor := check.NewCheckExecutor(checks, nil)
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 
 	results := executor.Run(ctx)
 	req.Len(results, 2)
 	for _, result := range results {
-		req.Equal(k8s.StatusSuccess, result.Status)
+		req.Equal(check.StatusSuccess, result.Status)
 	}
 }

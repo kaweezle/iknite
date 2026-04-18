@@ -508,11 +508,19 @@ func deleteAPIBackendDataNominalAssertions(
 	req.Equal(shouldExist, exists)
 }
 
-func deleteAPIBackendDataNominalAssertionsDeleted(req *require.Assertions, fs host.FileSystem, backendName, defaultDatadir, manifestDir string) {
+func deleteAPIBackendDataNominalAssertionsDeleted(
+	req *require.Assertions,
+	fs host.FileSystem,
+	backendName, defaultDatadir, manifestDir string,
+) {
 	deleteAPIBackendDataNominalAssertions(req, fs, backendName, defaultDatadir, manifestDir, false)
 }
 
-func deleteAPIBackendDataNominalAssertionsNotDeleted(req *require.Assertions, fs host.FileSystem, backendName, defaultDatadir, manifestDir string) {
+func deleteAPIBackendDataNominalAssertionsNotDeleted(
+	req *require.Assertions,
+	fs host.FileSystem,
+	backendName, defaultDatadir, manifestDir string,
+) {
 	deleteAPIBackendDataNominalAssertions(req, fs, backendName, defaultDatadir, manifestDir, true)
 }
 

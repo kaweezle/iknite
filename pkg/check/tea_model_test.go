@@ -1,5 +1,5 @@
 // cSpell: words charmbracelet bubbletea
-package k8s_test
+package check_test
 
 import (
 	"context"
@@ -9,15 +9,15 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/stretchr/testify/require"
 
-	"github.com/kaweezle/iknite/pkg/k8s"
+	"github.com/kaweezle/iknite/pkg/check"
 )
 
 func TestCheckModelInitAndView(t *testing.T) {
 	t.Parallel()
 	req := require.New(t)
 
-	executor := &k8s.CheckExecutor{Results: []*k8s.CheckResult{}}
-	model := k8s.NewCheckModel(context.Background(), executor)
+	executor := &check.CheckExecutor{Results: []*check.CheckResult{}}
+	model := check.NewCheckModel(context.Background(), executor)
 
 	cmd := model.Init()
 	req.NotNil(cmd)
@@ -31,13 +31,13 @@ func TestCheckModelView(t *testing.T) {
 	done := make(chan struct{})
 	close(done)
 
-	executor := &k8s.CheckExecutor{Results: []*k8s.CheckResult{{
-		Check:   &k8s.Check{Name: "a", Description: "check-a"},
+	executor := &check.CheckExecutor{Results: []*check.CheckResult{{
+		Check:   &check.Check{Name: "a", Description: "check-a"},
 		Done:    done,
-		Status:  k8s.StatusSuccess,
+		Status:  check.StatusSuccess,
 		Message: "ok",
 	}}}
-	model := k8s.NewCheckModel(context.Background(), executor)
+	model := check.NewCheckModel(context.Background(), executor)
 
 	view := model.View()
 	req.Contains(view, "check-a")
@@ -47,8 +47,8 @@ func TestCheckModelUpdateKeyCancelsContext(t *testing.T) {
 	t.Parallel()
 	req := require.New(t)
 
-	executor := &k8s.CheckExecutor{Results: []*k8s.CheckResult{}}
-	model := k8s.NewCheckModel(context.Background(), executor)
+	executor := &check.CheckExecutor{Results: []*check.CheckResult{}}
+	model := check.NewCheckModel(context.Background(), executor)
 
 	_, cmd := model.Update(tea.KeyMsg{})
 	req.NotNil(cmd)
@@ -73,11 +73,11 @@ func TestCheckModelUpdateDefaultBranches(t *testing.T) {
 
 		done := make(chan struct{})
 		close(done)
-		executor := &k8s.CheckExecutor{Results: []*k8s.CheckResult{{
-			Check: &k8s.Check{Name: "a", Description: "a"},
+		executor := &check.CheckExecutor{Results: []*check.CheckResult{{
+			Check: &check.Check{Name: "a", Description: "a"},
 			Done:  done,
 		}}}
-		model := k8s.NewCheckModel(context.Background(), executor)
+		model := check.NewCheckModel(context.Background(), executor)
 
 		_, cmd := model.Update(struct{}{})
 		req.NotNil(cmd)
@@ -90,11 +90,11 @@ func TestCheckModelUpdateDefaultBranches(t *testing.T) {
 		t.Parallel()
 		req := require.New(t)
 
-		executor := &k8s.CheckExecutor{Results: []*k8s.CheckResult{{
-			Check: &k8s.Check{Name: "a", Description: "a"},
+		executor := &check.CheckExecutor{Results: []*check.CheckResult{{
+			Check: &check.Check{Name: "a", Description: "a"},
 			Done:  make(chan struct{}),
 		}}}
-		model := k8s.NewCheckModel(context.Background(), executor)
+		model := check.NewCheckModel(context.Background(), executor)
 
 		_, cmd := model.Update(spinner.TickMsg{})
 		req.NotNil(cmd)

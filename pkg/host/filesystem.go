@@ -211,6 +211,10 @@ func (a *hostImpl) EvalSymlinks(path string) (string, error) {
 		// If it's an OsFs, we can use the standard library's EvalSymlinks which is more robust.
 		return filepath.EvalSymlinks(path)
 	}
+	_, ok = a.fs.(*afero.MemMapFs)
+	if ok {
+		return path, nil // MemMapFs does not support symlinks, so we can return the original path.
+	}
 	evalLinker, ok := a.fs.(afero.LinkReader)
 	if !ok {
 		return "", fmt.Errorf("filesystem does not support evaluating symlinks")

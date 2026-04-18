@@ -1,4 +1,4 @@
-package k8s
+package check
 
 // cSpell: words lipgloss
 // cSpell: disable

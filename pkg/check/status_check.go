@@ -1,10 +1,11 @@
-package k8s
+package check
 
 // cSpell: words termenv lipgloss
 // cSpell: disable
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/charmbracelet/lipgloss"
 )
@@ -199,7 +200,7 @@ func (c *CheckResult) Run(ctx context.Context) {
 	}()
 }
 
-func NewPhase(name, description string, subChecks []*Check) *Check {
+func NewPhase(name, description string, subChecks ...*Check) *Check {
 	return &Check{
 		Name:        name,
 		Description: description,
@@ -263,9 +264,9 @@ func NewCheckExecutor(checks []*Check, checkData CheckData) *CheckExecutor {
 }
 
 var (
-	successStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("46"))  // Green
-	errorStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("196")) // Red
-	grayStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("240")) // Gray
+	SuccessStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("46"))  // Green
+	ErrorStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("196")) // Red
+	GrayStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("240")) // Gray
 )
 
 func (result *CheckResult) StatusString(spinView string) string {
@@ -275,18 +276,18 @@ func (result *CheckResult) StatusString(spinView string) string {
 	switch result.Status {
 	case StatusPending:
 		status = "⋯"
-		statusStyle = grayStyle
+		statusStyle = GrayStyle
 	case StatusRunning:
 		return spinView
 	case StatusSkipped:
 		status = "⊝"
-		statusStyle = grayStyle
+		statusStyle = GrayStyle
 	case StatusSuccess:
 		status = "✓"
-		statusStyle = successStyle
+		statusStyle = SuccessStyle
 	case StatusFailed:
 		status = "✗"
-		statusStyle = errorStyle
+		statusStyle = ErrorStyle
 	}
 
 	return statusStyle.Render(status)
@@ -297,25 +298,26 @@ func (result *CheckResult) FormatResult(prefix, spinView string) string {
 
 	description := result.Check.Description
 	if result.Error != nil || result.Status == StatusFailed {
-		description = errorStyle.Render(description)
+		description = ErrorStyle.Render(description)
 	}
 
-	output := fmt.Sprintf("%s%s %s", prefix, status, description)
+	var output strings.Builder
+	fmt.Fprintf(&output, "%s%s %s", prefix, status, description)
 
 	if result.Error != nil {
-		output += fmt.Sprintf(" - %s", errorStyle.Render(result.Error.Error()))
+		fmt.Fprintf(&output, " - %s", ErrorStyle.Render(result.Error.Error()))
 	} else if result.Message != "" {
-		output += fmt.Sprintf(" - %s", grayStyle.Render(result.Message))
+		fmt.Fprintf(&output, " - %s", GrayStyle.Render(result.Message))
 	}
-	output += "\n"
+	output.WriteString("\n")
 
 	if len(result.SubResults) > 0 {
 		for _, subResult := range result.SubResults {
-			output += subResult.Format(prefix+"  ", spinView)
+			output.WriteString(subResult.Format(prefix+"  ", spinView))
 		}
 	}
 
-	return output
+	return output.String()
 }
 
 func (result *CheckResult) Format(prefix, spinView string) string {

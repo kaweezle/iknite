@@ -18,8 +18,13 @@ package alpine
 // cSpell: words runlevel runlevels softlevel
 // cSpell: disable
 import (
+	"errors"
 	"fmt"
+	"os"
 	"path"
+	"strconv"
+	"strings"
+	"syscall"
 
 	log "github.com/sirupsen/logrus"
 
@@ -60,6 +65,7 @@ func StartOpenRC(h host.FileExecutor) error {
 	return nil
 }
 
+// IsServiceStarted checks if the service named serviceName is started.
 func IsServiceStarted(h host.FileSystem, serviceName string) (bool, error) {
 	serviceLink := path.Join(startedServicesDir, serviceName)
 	exists, err := h.Exists(serviceLink)
@@ -162,4 +168,41 @@ func EnsureOpenRCDirectory(h host.FileSystem) error {
 		return fmt.Errorf("failed to ensure OpenRC directory: %w", err)
 	}
 	return nil
+}
+
+func CheckPidFile(h host.FileExecutor, service string) (int, host.Process, error) {
+	pidFilePath := fmt.Sprintf("/run/%s.pid", service)
+	logger := log.WithField("pidfile", pidFilePath)
+	pidBytes, err := h.ReadFile(pidFilePath)
+	if err != nil && errors.Is(err, os.ErrNotExist) {
+		pidFilePath = fmt.Sprintf("/var/run/supervise-%s.pid", service)
+		pidBytes, err = h.ReadFile(pidFilePath)
+	}
+	if err != nil {
+		if !errors.Is(err, os.ErrNotExist) {
+			// only return error is the error is not a file not found error
+			return 0, nil, fmt.Errorf("failed to read pid file: %w", err)
+		}
+		return 0, nil, nil
+	}
+
+	pidStr := strings.TrimSpace(string(pidBytes))
+	var pid int
+	pid, err = strconv.Atoi(pidStr)
+	if err != nil {
+		logger.WithField("content", pidStr).Warn("Failed to convert pid file to integer")
+		return 0, nil, fmt.Errorf("failed to convert pid file to integer: %w", err)
+	}
+	var process host.Process
+	process, err = h.FindProcess(pid)
+	if err == nil && process.Signal(syscall.Signal(0)) == nil {
+		return pid, process, nil
+	}
+	logger.WithField("pid", pid).Warn("Pidfile contained an invalid pid")
+	// remove kubeletPidFile
+	err = h.Remove(pidFilePath)
+	if err != nil {
+		return 0, nil, fmt.Errorf("failed to remove pid file: %w", err)
+	}
+	return 0, nil, nil
 }
