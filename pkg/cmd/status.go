@@ -95,7 +95,6 @@ func NewStatusCmd(ikniteConfig *v1alpha1.IkniteClusterSpec, waitOptions *utils.W
 	return statusCmd
 }
 
-//nolint:gocognit,gocyclo // TODO: Should use a runner pattern to reduce complexity
 func performStatus(alpineHost host.Host, ikniteConfig *v1alpha1.IkniteClusterSpec, waitOptions *utils.WaitOptions) {
 	checkData := checkers.CreateCheckWorkloadData(ikniteConfig.GetApiEndPoint(), waitOptions, alpineHost)
 

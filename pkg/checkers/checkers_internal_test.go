@@ -28,7 +28,7 @@ func (f *fakefi) Size() int64        { return 0 }
 func (f *fakefi) Mode() os.FileMode  { return 0 }
 func (f *fakefi) ModTime() time.Time { return time.Time{} }
 func (f *fakefi) IsDir() bool        { return f.dir }
-func (f *fakefi) Sys() interface{}   { return nil }
+func (f *fakefi) Sys() any           { return nil }
 
 func TestDifference(t *testing.T) {
 	t.Parallel()

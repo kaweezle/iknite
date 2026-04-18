@@ -65,7 +65,7 @@ func IsKubeletRunning() (*os.Process, error) {
 	if err != nil {
 		log.WithField("pidfile", kubeletPidFile).
 			Warnf("Failed to convert kubelet PID to integer: %s", pidStr)
-		return nil, fmt.Errorf("Failed to convert kubelet PID to integer: %s: %w", pidStr, err)
+		return nil, fmt.Errorf("failed to convert kubelet PID to integer: %s: %w", pidStr, err)
 	}
 	var process *os.Process
 	process, err = os.FindProcess(pid)

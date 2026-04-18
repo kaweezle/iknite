@@ -358,7 +358,7 @@ func TestDeleteNetworkInterfaces_Success(t *testing.T) {
 	req.NoError(err)
 }
 
-func TestDeleteNetworkInterfaces_Error(t *testing.T) {
+func TestDeleteNetworkInterfaces_Error(t *testing.T) { //nolint:dupl // same structure, different function under test
 	t.Parallel()
 	req := require.New(t)
 
