@@ -105,7 +105,7 @@ func CheckService(
 		var err error
 		pid, _, err = alpine.CheckPidFile(fileExec, serviceName)
 		if err != nil {
-			return false, "", err
+			return false, "", fmt.Errorf("failed to check PID file for service %s: %w", serviceName, err)
 		}
 		if pid == 0 {
 			return false, "", fmt.Errorf("service %s is not running", serviceName)
@@ -181,7 +181,7 @@ func FileTreeDifference(
 		}
 		if !info.IsDir() {
 			relativePath, err := filepath.Rel(actualPath, filePath)
-			if err != nil {
+			if err != nil { // nocov -- filepath.Rel only fails on cross-drive paths (Windows)
 				return fmt.Errorf("failed to get relative path: %w", err)
 			}
 			foundFiles = append(foundFiles, relativePath)
@@ -243,9 +243,17 @@ func CheckKubeletHealth(timeout time.Duration) (bool, string, error) {
 			err,
 		)
 	}
+	// nocov -- requires a running kubelet and valid kubeconfig
+	return checkKubeletHealthWithClient(client, timeout)
+}
 
+// checkKubeletHealthWithClient performs the actual kubelet health check using an existing client.
+func checkKubeletHealthWithClient(
+	client clientset.Interface,
+	timeout time.Duration,
+) (bool, string, error) { // nocov -- requires a running kubelet and valid kubeconfig
 	waiter := apiclient.NewKubeWaiter(client, timeout, io.Discard)
-	err = waiter.WaitForKubelet("127.0.0.1", 10248)
+	err := waiter.WaitForKubelet("127.0.0.1", 10248)
 	if err != nil {
 		return false, "", fmt.Errorf("kubelet health check failed: %w", err)
 	}
@@ -273,6 +281,17 @@ func CheckApiServerHealth(
 		)
 	}
 
+	// nocov -- requires a running API server and valid kubeconfig
+	return checkAPIServerHealthWithClient(client, data, timeout)
+}
+
+// checkAPIServerHealthWithClient performs the API server health check using an existing client.
+func checkAPIServerHealthWithClient(
+	client clientset.Interface,
+	data *checkWorkloadData,
+	timeout time.Duration,
+) (bool, string, error) { // nocov -- requires a running API server and valid kubeconfig
+	var err error
 	waiter := apiclient.NewKubeWaiter(client, timeout, io.Discard)
 	var podMap map[string]*v1.Pod
 	podMap, err = staticPodUtil.ReadMultipleStaticPodsFromDisk(data.ManifestDir(),
@@ -375,9 +394,18 @@ func CheckWorkloads(ctx context.Context, data check.CheckData) (bool, string, er
 	if err != nil {
 		return false, "", fmt.Errorf("while loading local cluster configuration: %w", err)
 	}
-	workloadData.Start()
+	// nocov -- requires a running Kubernetes cluster
+	return checkWorkloadsWithConfig(ctx, workloadData, config)
+}
 
-	err = workloadData.WaitOptions().Poll(ctx, config.RESTClient().WorkloadsReadyConditionWithContextFunc(
+// checkWorkloadsWithConfig polls the cluster workloads status using a live cluster config.
+func checkWorkloadsWithConfig(
+	ctx context.Context,
+	workloadData CheckWorkloadData,
+	config *k8s.Config,
+) (bool, string, error) { // nocov -- requires a running Kubernetes cluster
+	workloadData.Start()
+	err := workloadData.WaitOptions().Poll(ctx, config.RESTClient().WorkloadsReadyConditionWithContextFunc(
 		func(allReady bool, total int, ready, unready []*v1alpha1.WorkloadState, iteration, okIterations int) bool {
 			workloadData.SetOk(allReady)
 			workloadData.SetWorkloadCount(total)
@@ -402,7 +430,18 @@ func CheckIkniteServerHealth(ctx context.Context, waitOptions *utils.WaitOptions
 		return false, "", fmt.Errorf("failed to load iknite config from %s: %w", constants.IkniteLocalConfPath, err)
 	}
 
+	// nocov -- requires a running iknite status server
+	return checkIkniteServerWithConfig(ctx, kubeConfig, waitOptions)
+}
+
+// checkIkniteServerWithConfig polls the iknite /healthz endpoint using an existing config.
+func checkIkniteServerWithConfig(
+	ctx context.Context,
+	kubeConfig *k8s.Config,
+	waitOptions *utils.WaitOptions,
+) (bool, string, error) { // nocov -- requires a running iknite status server
 	var restClient rest.Interface
+	var err error
 	if restClient, err = kubeConfig.NewRESTClient(); err != nil {
 		return false, "", fmt.Errorf("failed to create REST client: %w", err)
 	}
