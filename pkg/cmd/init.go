@@ -26,6 +26,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"syscall"
 	"time"
@@ -158,12 +159,14 @@ func getDryRunClient(d *initData) (clientset.Interface, error)
 //
 // NB. InitOptions is exposed as parameter for allowing unit testing of the newInitOptions method, that implements all
 // the command options validation logic.
-func newCmdInit(out io.Writer, initOptions *initOptions) *cobra.Command {
+func newCmdInit(out io.Writer, initOptions *initOptions, initRunner *workflow.Runner) *cobra.Command {
 	alpineHost := host.NewDefaultHost()
 	if initOptions == nil {
 		initOptions = newInitOptions()
 	}
-	initRunner := workflow.NewRunner()
+	if initRunner == nil {
+		initRunner = workflow.NewRunner()
+	}
 
 	cmd := &cobra.Command{
 		Use:   "init",
@@ -318,7 +321,7 @@ func newCmdInit(out io.Writer, initOptions *initOptions) *cobra.Command {
 			}
 
 			// Skip either kine or etcd based on UseEtcd setting.
-			if data.IkniteCluster().Spec.UseEtcd {
+			if data.ikniteCluster.Spec.UseEtcd {
 				initRunner.Options.SkipPhases = append(initRunner.Options.SkipPhases, constants.KineBackendName)
 				data.ikniteCluster.Spec.APIBackendDatabaseDirectory = data.cfg.Etcd.Local.DataDir
 			} else {
@@ -814,12 +817,7 @@ func manageSkippedAddons(cfg *kubeadmApi.ClusterConfiguration, skipPhases []stri
 }
 
 func isPhaseInSkipPhases(phase string, skipPhases []string) bool {
-	for _, item := range skipPhases {
-		if item == phase {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(skipPhases, phase)
 }
 
 func (d *initData) IkniteCluster() *v1alpha1.IkniteCluster {

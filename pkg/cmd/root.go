@@ -77,7 +77,7 @@ kubernetes.`,
 	util.AddConfigFlag(rootCmd)
 
 	rootCmd.AddCommand(NewKustomizeCmd(ikniteConfig, nil, nil))
-	rootCmd.AddCommand(newCmdInit(os.Stdout, nil))
+	rootCmd.AddCommand(newCmdInit(os.Stdout, nil, nil))
 	rootCmd.AddCommand(newCmdReset(os.Stdin, os.Stdout, nil))
 	rootCmd.AddCommand(NewCmdClean(ikniteConfig, nil))
 	rootCmd.AddCommand(NewKubeletCmd(ikniteConfig, nil))
