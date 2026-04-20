@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"syscall"
 
 	"github.com/bitfield/script"
 )
@@ -148,4 +149,25 @@ func (c *hostImpl) StartCommand(ctx context.Context, options *CommandOptions) (P
 		return nil, fmt.Errorf("failed to start command %s: %w", options.Cmd, err)
 	}
 	return &processImpl{process: cmd.Process}, nil
+}
+
+func TerminateProcess(p Process, alive *bool) error {
+	if p == nil {
+		return fmt.Errorf("process cannot be nil")
+	}
+	err := p.Signal(syscall.SIGTERM)
+
+	if alive != nil {
+		*alive = false
+	}
+
+	if err != nil {
+		return fmt.Errorf("failed to terminate process: %w", err)
+	}
+	err = p.Wait()
+	if err != nil {
+		return fmt.Errorf("failed to wait for process termination: %w", err)
+	}
+
+	return nil
 }

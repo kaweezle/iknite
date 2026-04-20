@@ -25,6 +25,7 @@ import (
 	"io"
 	"net"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"slices"
 	"strconv"
@@ -60,6 +61,7 @@ import (
 	configUtil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	kubeConfigUtil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 
+	"github.com/kaweezle/iknite/pkg/alpine"
 	ikniteApi "github.com/kaweezle/iknite/pkg/apis/iknite"
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
 	"github.com/kaweezle/iknite/pkg/config"
@@ -220,7 +222,7 @@ func newCmdInit(out io.Writer, initOptions *initOptions, initRunner *workflow.Ru
 					)
 				}
 			}
-			k8s.RemovePidFiles(alpineHost)
+			alpine.RemovePidFile(alpineHost, k8s.KubeletName)
 
 			return nil
 		},
@@ -541,7 +543,7 @@ func newInitData(
 	// Apply ikniteCluster spec to the internal InitConfiguration
 	config.ApplyIkniteClusterSpecToInitConfiguration(&(ikniteCluster.Spec), cfg)
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 
 	return &initData{
 		cfg:                     cfg,

@@ -2,6 +2,7 @@ package host_test
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"strings"
 	"syscall"
@@ -142,4 +143,45 @@ func TestCommandExecutor_StartCommand_Error(t *testing.T) {
 	})
 	req.Error(err)
 	req.Contains(err.Error(), "failed to start command")
+}
+
+func TestTerminateProcess(t *testing.T) {
+	t.Parallel()
+	req := require.New(t)
+
+	p := host.NewMockProcess(t)
+	p.On("Signal", syscall.SIGTERM).Return(nil).Once()
+	p.On("Wait").Return(nil).Once()
+
+	alive := true
+	err := host.TerminateProcess(p, &alive)
+	req.NoError(err)
+	req.False(alive)
+}
+
+func TestTerminateProcess_Error(t *testing.T) {
+	t.Parallel()
+	req := require.New(t)
+	p := host.NewMockProcess(t)
+	p.On("Signal", syscall.SIGTERM).Return(fmt.Errorf("signal error")).Once()
+
+	alive := true
+	err := host.TerminateProcess(p, &alive)
+	req.Error(err)
+	req.Contains(err.Error(), "failed to terminate process")
+	req.False(alive) // alive should remain true if termination failed
+}
+
+func TestTerminateProcess_WaitError(t *testing.T) {
+	t.Parallel()
+	req := require.New(t)
+	p := host.NewMockProcess(t)
+	p.On("Signal", syscall.SIGTERM).Return(nil).Once()
+	p.On("Wait").Return(fmt.Errorf("wait error")).Once()
+
+	alive := true
+	err := host.TerminateProcess(p, &alive)
+	req.Error(err)
+	req.Contains(err.Error(), "failed to wait for process termination")
+	req.False(alive) // alive should remain true if wait failed
 }

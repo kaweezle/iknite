@@ -170,8 +170,12 @@ func EnsureOpenRCDirectory(h host.FileSystem) error {
 	return nil
 }
 
+func ServicePidFilePath(serviceName string) string {
+	return fmt.Sprintf("/run/%s.pid", serviceName)
+}
+
 func CheckPidFile(h host.FileExecutor, service string) (int, host.Process, error) {
-	pidFilePath := fmt.Sprintf("/run/%s.pid", service)
+	pidFilePath := ServicePidFilePath(service)
 	logger := log.WithField("pidfile", pidFilePath)
 	pidBytes, err := h.ReadFile(pidFilePath)
 	if err != nil && errors.Is(err, os.ErrNotExist) {
@@ -205,4 +209,15 @@ func CheckPidFile(h host.FileExecutor, service string) (int, host.Process, error
 		return 0, nil, fmt.Errorf("failed to remove pid file: %w", err)
 	}
 	return 0, nil, nil
+}
+
+func RemovePidFile(h host.FileSystem, service string) {
+	pidFilePath := ServicePidFilePath(service)
+	err := h.Remove(pidFilePath)
+	if err != nil {
+		log.WithFields(log.Fields{
+			"err":     err,
+			"pidFile": pidFilePath,
+		}).Warn("Failed to remove PID file")
+	}
 }

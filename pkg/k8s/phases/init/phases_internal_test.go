@@ -16,10 +16,15 @@ limitations under the License.
 package init
 
 import (
+	"context"
+	"fmt"
 	"os"
 	"path/filepath"
+	"syscall"
 	"testing"
+	"time"
 
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 
@@ -145,7 +150,7 @@ func TestCopyFile(t *testing.T) {
 	}
 }
 
-func TestWaitForKubelet(t *testing.T) {
+func TestWaitForKubelet_ProcessStop(t *testing.T) {
 	t.Parallel()
 	req := require.New(t)
 
@@ -153,9 +158,83 @@ func TestWaitForKubelet(t *testing.T) {
 	process.On("Wait").Return(nil).Once()
 	process.On("State").Return(&os.ProcessState{})
 
-	canceled := false
-	err := WaitForKubelet(process, nil, func() { canceled = true })
+	err := WaitForKubelet(context.Background(), process, nil)
+	req.NoError(err)
+}
+
+func TestWaitForKubelet_CtxDone(t *testing.T) {
+	t.Parallel()
+	req := require.New(t)
+
+	process := host.NewMockProcess(t)
+	// First call wait
+	process.On("Wait").Run(func(_ mock.Arguments) {
+		time.Sleep(100 * time.Millisecond)
+	}).Return(nil).Once()
+	process.On("Signal", syscall.SIGTERM).Return(nil).Once()
+	// After SIGTERM, wait returns immediately
+	process.On("Wait").Return(nil).Once()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel() // Cancel the context immediately
+
+	err := WaitForKubelet(ctx, process, nil)
+	req.NoError(err)
+}
+
+func TestWaitForKubelet_CtxDoneWithWaitError(t *testing.T) {
+	t.Parallel()
+	req := require.New(t)
+
+	process := host.NewMockProcess(t)
+	process.On("Signal", syscall.SIGTERM).Return(nil).Once()
+	process.On("Wait").Run(func(_ mock.Arguments) {
+		time.Sleep(100 * time.Millisecond)
+	}).Return(fmt.Errorf("wait error")).Once()
+	process.On("Wait").Return(fmt.Errorf("wait error")).Once()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel() // Cancel the context immediately
+
+	err := WaitForKubelet(ctx, process, nil)
 	req.Error(err)
 	req.Contains(err.Error(), "failed to wait for kubelet")
-	req.True(canceled)
+}
+
+//nolint:dupl // different but structurally similar test cases
+func TestWaitForKubelet_CtxDoneWithSignalError(t *testing.T) {
+	t.Parallel()
+	req := require.New(t)
+
+	process := host.NewMockProcess(t)
+	process.On("Wait").Run(func(_ mock.Arguments) {
+		time.Sleep(100 * time.Millisecond)
+	}).Return(fmt.Errorf("wait error")).Maybe()
+	process.On("Signal", syscall.SIGTERM).Return(fmt.Errorf("signal error")).Once()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel() // Cancel the context immediately
+
+	err := WaitForKubelet(ctx, process, nil)
+	req.Error(err)
+	req.Contains(err.Error(), "failed to wait for kubelet")
+}
+
+//nolint:dupl // different but structurally similar test cases
+func TestWaitForKubelet_CtxDoneWithSignalAndWaitError(t *testing.T) {
+	t.Parallel()
+	req := require.New(t)
+
+	process := host.NewMockProcess(t)
+	process.On("Wait").Run(func(_ mock.Arguments) {
+		time.Sleep(100 * time.Millisecond)
+	}).Return(fmt.Errorf("wait error")).Maybe()
+	process.On("Signal", syscall.SIGTERM).Return(fmt.Errorf("signal error")).Once()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel() // Cancel the context immediately
+
+	err := WaitForKubelet(ctx, process, nil)
+	req.Error(err)
+	req.Contains(err.Error(), "failed to wait for kubelet")
 }

@@ -4,9 +4,6 @@ package init
 import (
 	"context"
 	"fmt"
-	"os"
-	"os/signal"
-	"syscall"
 
 	"github.com/pion/mdns"
 	log "github.com/sirupsen/logrus"
@@ -27,12 +24,7 @@ func NewDaemonizePhase() workflow.Phase {
 	}
 }
 
-func WaitForKubelet(process host.Process, conn *mdns.Conn, cancel context.CancelFunc) error {
-	// Wait for SIGTERM and SIGKILL signals
-	// TODO: Should replace that with a context passed as a parameter with the signal handling done upstream.
-	stop := make(chan os.Signal, 1)
-	signal.Notify(stop, syscall.SIGTERM)
-
+func WaitForKubelet(ctx context.Context, process host.Process, conn *mdns.Conn) error {
 	cmdDone := make(chan error, 1)
 	go func() {
 		cmdDone <- process.Wait()
@@ -43,19 +35,12 @@ func WaitForKubelet(process host.Process, conn *mdns.Conn, cancel context.Cancel
 	log.Info("Waiting for the kubelet to stop or receive a stop signal...")
 	for alive := true; alive; {
 		select {
-		case <-stop:
+		case <-ctx.Done():
 			// Stop the cmd process
 			log.Info("Received TERM Signal. Stopping kubelet...")
-			err = process.Signal(syscall.SIGTERM)
-			if err == nil {
-				err = process.Wait()
-				if err != nil {
-					log.WithError(err).Warn("Error while waiting for kubelet to stop")
-				}
-			}
+			err = host.TerminateProcess(process, &alive)
 
-			alive = false
-		case <-cmdDone:
+		case err = <-cmdDone:
 			// Child process has stopped
 			log.Infof("Kubelet stopped with state: %s", process.State().String())
 			alive = false
@@ -70,12 +55,11 @@ func WaitForKubelet(process host.Process, conn *mdns.Conn, cancel context.Cancel
 		}
 	}
 
-	if err == nil && cancel != nil {
-		log.Info("Canceling the context...")
-		cancel()
+	if err != nil {
+		return fmt.Errorf("failed to wait for kubelet: %w", err)
 	}
 
-	return fmt.Errorf("failed to wait for kubelet: %w", err)
+	return nil
 }
 
 // runPrepare executes the node initialization process.
@@ -89,9 +73,9 @@ func runDaemonize(c workflow.RunData) error {
 		return nil
 	}
 	conn := data.MDnsConn()
-	_, cancel := data.ContextWithCancel()
+	ctx, _ := data.ContextWithCancel()
 
-	err := WaitForKubelet(kubeletProcess, conn, cancel)
+	err := WaitForKubelet(ctx, kubeletProcess, conn)
 
 	data.IkniteCluster().Update(iknite.Stopping, "stop", nil, nil)
 	if err == nil {

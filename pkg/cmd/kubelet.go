@@ -1,6 +1,11 @@
 package cmd
 
 import (
+	"context"
+	"os"
+	"os/signal"
+	"syscall"
+
 	"github.com/spf13/cobra"
 
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
@@ -34,6 +39,9 @@ The kubelet is started and monitored. The following operations are performed:
 
 func performKubelet(ikniteConfig *v1alpha1.IkniteClusterSpec, kustomizeOptions *utils.KustomizeOptions) {
 	alpineHost := host.NewDefaultHost()
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer cancel()
+
 	cobra.CheckErr(k8s.PrepareKubernetesEnvironment(alpineHost, ikniteConfig))
-	cobra.CheckErr(k8s.StartAndConfigureKubelet(alpineHost, ikniteConfig, kustomizeOptions))
+	cobra.CheckErr(k8s.StartAndConfigureKubelet(ctx, alpineHost, ikniteConfig, kustomizeOptions))
 }

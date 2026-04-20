@@ -1,8 +1,15 @@
+// cSpell: words joho godotenv sirupsen
 package host
 
 import (
+	"errors"
 	"fmt"
+	"maps"
+	"os"
 	"path/filepath"
+
+	"github.com/joho/godotenv"
+	"github.com/sirupsen/logrus"
 )
 
 func IsOnWSL(fs FileSystem) bool {
@@ -84,4 +91,24 @@ func CleanDir(fs FileSystem, dir string) error {
 		}
 	}
 	return nil
+}
+
+func ReadEnvFiles(fs FileSystem, paths ...string) (map[string]string, error) {
+	envData := make(map[string]string)
+	for _, path := range paths {
+		data, err := fs.ReadFile(path)
+		if err != nil {
+			if errors.Is(err, os.ErrNotExist) {
+				logrus.WithField("path", path).Debug("Environment file not found, skipping")
+				continue
+			}
+			return nil, fmt.Errorf("failed to read environment file %s: %w", path, err)
+		}
+		fileEnvData, err := godotenv.UnmarshalBytes(data)
+		if err != nil {
+			return nil, fmt.Errorf("failed to unmarshal environment file %s: %w", path, err)
+		}
+		maps.Copy(envData, fileEnvData)
+	}
+	return envData, nil
 }
