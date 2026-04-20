@@ -20,10 +20,10 @@ import (
 
 const (
 	KubeletName           = "kubelet"
-	kubeletEnvFile        = "/etc/conf.d/kubelet"
-	kubeAdmFlagsFile      = "/var/lib/kubelet/kubeadm-flags.env"
-	kubeletLogDir         = "/var/log/kubelet"
-	kubeletLogFile        = "/var/log/kubelet/kubelet.log"
+	KubeletEnvFile        = "/etc/conf.d/kubelet"
+	KubeAdmFlagsFile      = "/var/lib/kubelet/kubeadm-flags.env"
+	KubeletLogDir         = "/var/log/kubelet"
+	KubeletLogFile        = "/var/log/kubelet/kubelet.log"
 	kubeletArgsEnv        = "command_args"
 	kubeletKubeadmArgsEnv = "KUBELET_KUBEADM_ARGS"
 )
@@ -39,7 +39,7 @@ var (
 
 func StartKubelet(ctx context.Context, h host.FileExecutor) (host.Process, error) {
 	// Read the environment variables from /var/lib/kubelet/kubeadm-flags.env
-	log.WithField("kubeletEnvFile", kubeletEnvFile).Info("Reading kubelet environment file")
+	log.WithField("kubeletEnvFile", KubeletEnvFile).Info("Reading kubelet environment file")
 
 	// Check if a process with the value contained in kubeletPidFile exists
 	// ignore the error if for some reason the pid file is not found
@@ -53,9 +53,9 @@ func StartKubelet(ctx context.Context, h host.FileExecutor) (host.Process, error
 		return p, nil
 	}
 
-	envData, err := host.ReadEnvFiles(h, kubeletEnvFile, kubeAdmFlagsFile)
+	envData, err := host.ReadEnvFiles(h, KubeletEnvFile, KubeAdmFlagsFile)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read environment file %s: %w", kubeletEnvFile, err)
+		return nil, fmt.Errorf("failed to read environment file %s: %w", KubeletEnvFile, err)
 	}
 
 	args := make([]string, 0)
@@ -80,20 +80,20 @@ func StartKubelet(ctx context.Context, h host.FileExecutor) (host.Process, error
 	cmd.Env = append(cmd.Env, env...)
 
 	// Create the kubelet log directory if it doesn't exist
-	err = h.MkdirAll(kubeletLogDir, 0o755)
+	err = h.MkdirAll(KubeletLogDir, 0o755)
 	if err != nil {
 		return nil, fmt.Errorf(
 			"failed to create kubelet log directory %s: %w",
-			kubeletLogDir,
+			KubeletLogDir,
 			err,
 		)
 	}
 
 	// Open the kubelet log file for writing
 	logFile, err := h.OpenFile(
-		kubeletLogFile, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0o644)
+		KubeletLogFile, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0o644)
 	if err != nil {
-		return nil, fmt.Errorf("failed to open kubelet log file %s: %w", kubeletLogFile, err)
+		return nil, fmt.Errorf("failed to open kubelet log file %s: %w", KubeletLogFile, err)
 	}
 	defer func() {
 		err = logFile.Close()
@@ -108,7 +108,7 @@ func StartKubelet(ctx context.Context, h host.FileExecutor) (host.Process, error
 		"args":    cmd.Args,
 		"argsLen": len(cmd.Args),
 		"env":     cmd.Env,
-		"logFile": kubeletLogFile,
+		"logFile": KubeletLogFile,
 		"pidFile": pidFilePath,
 	}).Info("Starting kubelet...")
 
@@ -119,7 +119,7 @@ func StartKubelet(ctx context.Context, h host.FileExecutor) (host.Process, error
 	}
 
 	// Write the PID to the /run/kubelet.pid file
-	err = os.WriteFile( //nolint:gosec // Want read access
+	err = h.WriteFile(
 		pidFilePath, fmt.Appendf(nil, "%d", p.Pid()), 0o644)
 	if err != nil {
 		log.WithFields(log.Fields{

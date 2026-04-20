@@ -3,13 +3,19 @@ package k8s_test
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
 	"time"
 
+	"github.com/spf13/afero/mem"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/kaweezle/iknite/pkg/alpine"
+	"github.com/kaweezle/iknite/pkg/host"
 	"github.com/kaweezle/iknite/pkg/k8s"
 )
 
@@ -97,4 +103,208 @@ func TestCheckServerRunning_BadServer(t *testing.T) {
 	err := k8s.CheckServerRunning(ctx, "http://127.0.0.2/foo", "ok", 1, 1, 1*time.Second)
 	req.Error(err)
 	req.Contains(err.Error(), "failed to make HTTP request")
+}
+
+const (
+	//nolint:lll // Ignore long line linter warning
+	kubeletEnvFileContent = `
+command_args="--bootstrap-kubeconfig=/etc/kubernetes/bootstrap-kubelet.conf --kubeconfig=/etc/kubernetes/kubelet.conf --cgroup-driver=cgroupfs --config=/var/lib/kubelet/config.yaml"
+`
+	kubeAdmFlagsFileContent = `
+KUBELET_KUBEADM_ARGS="--node-ip=192.168.99.2"
+`
+)
+
+func TestStarKubelet(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		prepareMock  func(t *testing.T, m *host.MockFileExecutor) error
+		expectations func(req *require.Assertions, process host.Process) error
+		name         string
+		wantErr      string
+	}{
+		{
+			name: "nominal case",
+			prepareMock: func(t *testing.T, m *host.MockFileExecutor) error {
+				t.Helper()
+				// Check if process is already running
+				m.On("ReadFile", "/run/kubelet.pid").Return(nil, os.ErrNotExist).Once()
+				m.On("ReadFile", "/var/run/supervise-kubelet.pid").Return(nil, os.ErrNotExist).Once()
+				// Read environment files
+				m.On("ReadFile", k8s.KubeletEnvFile).Return([]byte(kubeletEnvFileContent), nil).Once()
+				m.On("ReadFile", k8s.KubeAdmFlagsFile).Return([]byte(kubeAdmFlagsFileContent), nil).Once()
+				// Create log directory
+				m.On("MkdirAll", k8s.KubeletLogDir, os.FileMode(0o755)).Return(nil).Once()
+				// Create log file
+				m.On("OpenFile", k8s.KubeletLogFile, os.O_WRONLY|os.O_CREATE|os.O_APPEND, os.FileMode(0o644)).
+					Return(mem.NewFileHandle(mem.CreateFile("kubelet.log")), nil).
+					Once()
+				// Start kubelet process
+				mockProcess := host.NewMockProcess(t)
+				mockProcess.On("Pid").Return(1234).Twice()
+				m.On("StartCommand", mock.Anything, mock.Anything).Return(mockProcess, nil).Once()
+				pidFilePath := alpine.ServicePidFilePath(k8s.KubeletName)
+				m.On("WriteFile", pidFilePath, []byte("1234"), os.FileMode(0o644)).Return(nil).Once()
+				return nil
+			},
+			expectations: func(req *require.Assertions, process host.Process) error {
+				req.NotNil(process)
+				req.Equal(1234, process.Pid())
+				return nil
+			},
+		},
+		{
+			name: "kubelet already running",
+			prepareMock: func(t *testing.T, m *host.MockFileExecutor) error {
+				t.Helper()
+				// Check if process is already running
+				m.On("ReadFile", "/run/kubelet.pid").Return([]byte("1234"), nil).Once()
+				mockProcess := host.NewMockProcess(t)
+				mockProcess.On("Pid").Return(1234).Once()
+				mockProcess.On("Signal", mock.Anything).Return(nil).Once()
+				m.On("FindProcess", 1234).Return(mockProcess, nil).Once()
+				return nil
+			},
+			expectations: func(req *require.Assertions, process host.Process) error {
+				req.NotNil(process)
+				req.Equal(1234, process.Pid())
+				return nil
+			},
+		},
+		{
+			name: "Fail to read kubelet pid file",
+			prepareMock: func(t *testing.T, m *host.MockFileExecutor) error {
+				t.Helper()
+				// Check if process is already running
+				m.On("ReadFile", "/run/kubelet.pid").Return([]byte("abcd"), nil).Once()
+				return nil
+			},
+			wantErr: "failed to convert pid file to integer",
+		},
+		{
+			name: "Fail to read env files",
+			prepareMock: func(t *testing.T, m *host.MockFileExecutor) error {
+				t.Helper()
+				// Check if process is already running
+				m.On("ReadFile", "/run/kubelet.pid").Return(nil, os.ErrNotExist).Once()
+				m.On("ReadFile", "/var/run/supervise-kubelet.pid").Return(nil, os.ErrNotExist).Once()
+				m.On("ReadFile", k8s.KubeletEnvFile).Return(nil, errors.New("read error")).Once()
+				return nil
+			},
+			wantErr: "failed to read environment file",
+		},
+		{
+			name: "Fail to create log directory",
+			prepareMock: func(t *testing.T, m *host.MockFileExecutor) error {
+				t.Helper()
+				// Check if process is already running
+				m.On("ReadFile", "/run/kubelet.pid").Return(nil, os.ErrNotExist).Once()
+				m.On("ReadFile", "/var/run/supervise-kubelet.pid").Return(nil, os.ErrNotExist).Once()
+				// Read environment files
+				m.On("ReadFile", k8s.KubeletEnvFile).Return([]byte(kubeletEnvFileContent), nil).Once()
+				m.On("ReadFile", k8s.KubeAdmFlagsFile).Return([]byte(kubeAdmFlagsFileContent), nil).Once()
+				// Create log directory
+				m.On("MkdirAll", k8s.KubeletLogDir, os.FileMode(0o755)).Return(errors.New("mkdir error")).Once()
+				return nil
+			},
+			wantErr: "failed to create kubelet log directory",
+		},
+		{
+			name: "Fail to create log file",
+			prepareMock: func(t *testing.T, m *host.MockFileExecutor) error {
+				t.Helper()
+				// Check if process is already running
+				m.On("ReadFile", "/run/kubelet.pid").Return(nil, os.ErrNotExist).Once()
+				m.On("ReadFile", "/var/run/supervise-kubelet.pid").Return(nil, os.ErrNotExist).Once()
+				// Read environment files
+				m.On("ReadFile", k8s.KubeletEnvFile).Return([]byte(kubeletEnvFileContent), nil).Once()
+				m.On("ReadFile", k8s.KubeAdmFlagsFile).Return([]byte(kubeAdmFlagsFileContent), nil).Once()
+				// Create log directory
+				m.On("MkdirAll", k8s.KubeletLogDir, os.FileMode(0o755)).Return(nil).Once()
+				// Create log file
+				m.On("OpenFile", k8s.KubeletLogFile, os.O_WRONLY|os.O_CREATE|os.O_APPEND, os.FileMode(0o644)).
+					Return(nil, errors.New("open file error")).
+					Once()
+				return nil
+			},
+			wantErr: "failed to open kubelet log file",
+		},
+		{
+			name: "Fail to start kubelet process",
+			prepareMock: func(t *testing.T, m *host.MockFileExecutor) error {
+				t.Helper()
+				// Check if process is already running
+				m.On("ReadFile", "/run/kubelet.pid").Return(nil, os.ErrNotExist).Once()
+				m.On("ReadFile", "/var/run/supervise-kubelet.pid").Return(nil, os.ErrNotExist).Once()
+				// Read environment files
+				m.On("ReadFile", k8s.KubeletEnvFile).Return([]byte(kubeletEnvFileContent), nil).Once()
+				m.On("ReadFile", k8s.KubeAdmFlagsFile).Return([]byte(kubeAdmFlagsFileContent), nil).Once()
+				// Create log directory
+				m.On("MkdirAll", k8s.KubeletLogDir, os.FileMode(0o755)).Return(nil).Once()
+				// Create log file
+				m.On("OpenFile", k8s.KubeletLogFile, os.O_WRONLY|os.O_CREATE|os.O_APPEND, os.FileMode(0o644)).
+					Return(mem.NewFileHandle(mem.CreateFile("kubelet.log")), nil).
+					Once()
+				m.On("StartCommand", mock.Anything, mock.Anything).Return(nil, errors.New("start command error")).Once()
+				return nil
+			},
+			wantErr: "failed to start subprocess",
+		},
+		{
+			name: "fail to write pid file",
+			prepareMock: func(t *testing.T, m *host.MockFileExecutor) error {
+				t.Helper()
+				// Check if process is already running
+				m.On("ReadFile", "/run/kubelet.pid").Return(nil, os.ErrNotExist).Once()
+				m.On("ReadFile", "/var/run/supervise-kubelet.pid").Return(nil, os.ErrNotExist).Once()
+				// Read environment files
+				m.On("ReadFile", k8s.KubeletEnvFile).Return([]byte(kubeletEnvFileContent), nil).Once()
+				m.On("ReadFile", k8s.KubeAdmFlagsFile).Return([]byte(kubeAdmFlagsFileContent), nil).Once()
+				// Create log directory
+				m.On("MkdirAll", k8s.KubeletLogDir, os.FileMode(0o755)).Return(nil).Once()
+				// Create log file
+				m.On("OpenFile", k8s.KubeletLogFile, os.O_WRONLY|os.O_CREATE|os.O_APPEND, os.FileMode(0o644)).
+					Return(mem.NewFileHandle(mem.CreateFile("kubelet.log")), nil).
+					Once()
+				// Start kubelet process
+				mockProcess := host.NewMockProcess(t)
+				mockProcess.On("Pid").Return(1234).Times(3)
+				m.On("StartCommand", mock.Anything, mock.Anything).Return(mockProcess, nil).Once()
+				pidFilePath := alpine.ServicePidFilePath(k8s.KubeletName)
+				m.On("WriteFile", pidFilePath, []byte("1234"), os.FileMode(0o644)).
+					Return(errors.New("write file error")).
+					Once()
+				return nil
+			},
+			expectations: func(req *require.Assertions, process host.Process) error {
+				req.NotNil(process)
+				req.Equal(1234, process.Pid())
+				return nil
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			req := require.New(t)
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+
+			fileExec := host.NewMockFileExecutor(t)
+			err := tt.prepareMock(t, fileExec)
+			req.NoError(err)
+
+			process, err := k8s.StartKubelet(ctx, fileExec)
+			if tt.wantErr != "" {
+				req.Error(err)
+				req.Contains(err.Error(), tt.wantErr)
+			} else {
+				req.NoError(err)
+				err = tt.expectations(req, process)
+				req.NoError(err)
+			}
+		})
+	}
 }
