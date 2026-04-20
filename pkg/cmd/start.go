@@ -108,7 +108,7 @@ func performStart(ikniteConfig *v1alpha1.IkniteClusterSpec, waitOptions *utils.W
 			// that may be started and clean the configuration, i.e. delete
 			// certificates and manifests.
 			log.Info("Kubernetes configuration has changed. Resetting...")
-			cmd := newCmdReset(os.Stdin, os.Stdout, nil)
+			cmd := newCmdReset(os.Stdin, os.Stdout, nil, nil)
 			cobra.CheckErr(cmd.RunE(cmd, []string{}))
 		}
 	} else {

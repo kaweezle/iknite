@@ -248,11 +248,13 @@ func newResetData(
 }
 
 // newCmdReset returns the "kubeadm reset" command.
-func newCmdReset(in io.Reader, out io.Writer, resetOptions *resetOptions) *cobra.Command {
+func newCmdReset(in io.Reader, out io.Writer, resetOptions *resetOptions, resetRunner *workflow.Runner) *cobra.Command {
 	if resetOptions == nil {
 		resetOptions = newResetOptions()
 	}
-	resetRunner := workflow.NewRunner()
+	if resetRunner == nil {
+		resetRunner = workflow.NewRunner()
+	}
 
 	cmd := &cobra.Command{
 		Use:   "reset",
