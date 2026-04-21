@@ -20,7 +20,6 @@ package k8s
 import (
 	"context"
 	"fmt"
-	"net/http"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -28,9 +27,7 @@ import (
 	coreV1 "k8s.io/api/core/v1"
 	k8Errors "k8s.io/apimachinery/pkg/api/errors"
 	metaV1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/clientcmd/api"
 	kubeadmConstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
@@ -42,29 +39,65 @@ import (
 
 // cSpell: enable
 
-type Config api.Config
-
 const configuredValueTrue = "true"
 
 // LoadFromFile loads the configuration from the file specified by filename.
-func LoadFromFile(filename string) (*Config, error) {
-	_config, err := clientcmd.LoadFromFile(filename)
+func LoadFromFile(fs host.FileSystem, filename string) (*api.Config, error) {
+	content, err := fs.ReadFile(filename)
 	if err != nil {
-		return nil, fmt.Errorf("failed to load kubeconfig from file: %w", err)
+		return nil, fmt.Errorf("failed to read kubeconfig file: %w", err)
 	}
-	config := (*Config)(_config)
+
+	config, err := clientcmd.Load(content)
+	if err != nil {
+		return nil, fmt.Errorf("failed to ingest kubeconfig file %s content: %w", filename, err)
+	}
+
+	// set LocationOfOrigin on every Cluster, User, and Context
+	for key, obj := range config.AuthInfos {
+		obj.LocationOfOrigin = filename
+		config.AuthInfos[key] = obj
+	}
+	for key, obj := range config.Clusters {
+		obj.LocationOfOrigin = filename
+		config.Clusters[key] = obj
+	}
+	for key, obj := range config.Contexts {
+		obj.LocationOfOrigin = filename
+		config.Contexts[key] = obj
+	}
+
+	if config.AuthInfos == nil {
+		config.AuthInfos = map[string]*api.AuthInfo{}
+	}
+	if config.Clusters == nil {
+		config.Clusters = map[string]*api.Cluster{}
+	}
+	if config.Contexts == nil {
+		config.Contexts = map[string]*api.Context{}
+	}
+
 	return config, nil
 }
 
 // LoadFromDefault loads the configuration from the default admin.conf file,
 // usually located at /etc/kubernetes/admin.conf.
-func LoadFromDefault() (*Config, error) {
-	return LoadFromFile(kubeadmConstants.GetAdminKubeConfigPath())
+func LoadFromDefault(fs host.FileSystem) (*api.Config, error) {
+	return LoadFromFile(fs, kubeadmConstants.GetAdminKubeConfigPath())
+}
+
+// ClientSetFromFile returns a Kubernetes clientset for the configuration specified.
+func ClientSetFromFile(fs host.FileSystem, path string) (kubernetes.Interface, error) {
+	client, err := NewClientFromFile(fs, path)
+	if err != nil {
+		return nil, err
+	}
+	return client.ToKubernetesInterface()
 }
 
 // RenameConfig changes the name of the cluster and the context from the
 // default (kubernetes) to newName in c.
-func (c *Config) RenameConfig(newName string) *Config {
+func RenameConfig(c *api.Config, newName string) *api.Config {
 	newUsers := make(map[string]*api.AuthInfo)
 	for _, v := range c.AuthInfos {
 		newUsers[newName] = v
@@ -91,66 +124,29 @@ func (c *Config) RenameConfig(newName string) *Config {
 
 // IsConfigServerAddress checks that config points to the server at ip IP
 // address.
-func (config *Config) IsConfigServerAddress(address string) bool {
+func IsConfigServerAddress(c *Client, address string) bool {
 	expectedURL := fmt.Sprintf("https://%v:6443", address)
-	for _, cluster := range config.Clusters {
-		if cluster.Server != expectedURL {
-			return false
-		}
-	}
-	return true
-}
 
-// HTTPClient returns an HTTP client for config.
-func (config *Config) HTTPClient() (*http.Client, error) {
-	clientConfig := clientcmd.NewDefaultClientConfig(api.Config(*config), nil)
-	restConfig, err := clientConfig.ClientConfig()
+	restConfig, err := c.ToRESTConfig()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get client config: %w", err)
+		return false
 	}
-	httpClient, err := rest.HTTPClientFor(restConfig)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create HTTP client: %w", err)
-	}
-	return httpClient, nil
-}
-
-// Return a REST client for config. To make simple HTTP requests to the API server.
-func (config *Config) NewRESTClient() (rest.Interface, error) {
-	clientConfig := clientcmd.NewDefaultClientConfig(api.Config(*config), nil)
-	restConfig, err := clientConfig.ClientConfig()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get client config: %w", err)
-	}
-	dis, err := discovery.NewDiscoveryClientForConfig(restConfig)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create discovery client: %w", err)
-	}
-	return dis.RESTClient(), nil
-}
-
-// Client returns a clientset for config.
-func (config *Config) Client() (*kubernetes.Clientset, error) {
-	clientConfig := clientcmd.NewDefaultClientConfig(api.Config(*config), nil)
-	restConfig, err := clientConfig.ClientConfig()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get client config: %w", err)
-	}
-	client, err := kubernetes.NewForConfig(restConfig)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create kubernetes client: %w", err)
-	}
-	return client, nil
+	return restConfig.Host == expectedURL
 }
 
 // CheckClusterRunning checks that the cluster is running by requesting the
 // API server /readyz endpoint. It checks retries times and waits for waitTime
 // milliseconds between each check. It needs at least okResponses good responses
 // from the server.
-func (config *Config) CheckClusterRunning(ctx context.Context, retries, okResponses int, interval time.Duration) error {
-	client, err := config.NewRESTClient()
+func CheckClusterRunning(
+	ctx context.Context,
+	kubeClient *Client,
+	retries, okResponses int,
+	interval time.Duration,
+) error {
+	client, err := kubeClient.ToRESTClient()
 	if err != nil {
-		return err
+		return fmt.Errorf("error getting rest interface: %w", err)
 	}
 
 	okTries := 0
@@ -199,9 +195,13 @@ func (config *Config) CheckClusterRunning(ctx context.Context, retries, okRespon
 
 // WriteToFile writes the config configuration to the file pointed by filename.
 // It returns the appropriate error in case of failure.
-func (config *Config) WriteToFile(filename string) error {
-	if err := clientcmd.WriteToFile(*(*api.Config)(config), filename); err != nil {
-		return fmt.Errorf("failed to write kubeconfig to file: %w", err)
+func WriteToFile(config *api.Config, fs host.FileSystem, filename string) error {
+	content, err := clientcmd.Write(*config)
+	if err != nil {
+		return fmt.Errorf("failed to serialize kubeconfig: %w", err)
+	}
+	if err := fs.WriteFile(filename, content, 0o644); err != nil {
+		return fmt.Errorf("failed to write kubeconfig file: %w", err)
 	}
 	return nil
 }
@@ -211,19 +211,12 @@ func (config *Config) WriteToFile(filename string) error {
 // The restart method is taken from kubectl:
 // https://github.com/kubernetes/kubectl/blob/
 // 652881798563c00c1895ded6ced819030bfaa4d7/pkg/polymorphichelpers/objectrestarter.go#L81.
-func (config *Config) RestartProxy() error {
-	var client *kubernetes.Clientset
+func RestartProxy(ctx context.Context, client kubernetes.Interface) error {
+	dsi := client.AppsV1().DaemonSets("kube-system")
 	var err error
-	if client, err = config.Client(); err != nil {
-		return err
-	}
-
-	ctx := context.Background()
-
 	var ds *appsV1.DaemonSet
-	if ds, err = client.AppsV1().
-		DaemonSets("kube-system").
-		Get(ctx, "kube-proxy", metaV1.GetOptions{}); err != nil {
+
+	if ds, err = dsi.Get(ctx, "kube-proxy", metaV1.GetOptions{}); err != nil {
 		return fmt.Errorf("failed to get kube-proxy daemonset: %w", err)
 	}
 
@@ -233,7 +226,7 @@ func (config *Config) RestartProxy() error {
 	ds.Spec.Template.Annotations["kubectl.kubernetes.io/restartedAt"] = time.Now().
 		Format(time.RFC3339)
 
-	_, err = client.AppsV1().DaemonSets("kube-system").Update(ctx, ds, metaV1.UpdateOptions{})
+	_, err = dsi.Update(ctx, ds, metaV1.UpdateOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to update kube-proxy daemonset: %w", err)
 	}
@@ -256,8 +249,9 @@ func (config *Config) RestartProxy() error {
 // Returns an error if the client cannot be created, the ConfigMap cannot be read
 // or written, kustomizations fail to apply, or workloads don't become ready within
 // the timeout period.
-func (config *Config) Kustomize(
+func Kustomize(
 	ctx context.Context,
+	kubeClient *Client,
 	fs host.FileSystem,
 	kustomization string,
 	options *utils.KustomizeOptions,
@@ -267,7 +261,7 @@ func (config *Config) Kustomize(
 		return nil
 	}
 
-	client, err := config.Client()
+	client, err := kubeClient.ToKubernetesInterface()
 	if err != nil {
 		return err
 	}
@@ -291,7 +285,7 @@ func (config *Config) Kustomize(
 	}
 	log.WithField("resourceCount", resources.Size()).Info("Applying base kustomization resources")
 
-	ids, err := config.RESTClient().ApplyResMapWithServerSideApply(resources)
+	ids, err := kubeClient.ApplyResMapWithServerSideApply(resources)
 	if err != nil {
 		return fmt.Errorf("while applying kustomization resources server side: %w", err)
 	}

@@ -18,7 +18,6 @@ import (
 	"k8s.io/client-go/rest"
 	kubeadmConstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
-	kubeConfigUtil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 	staticPodUtil "k8s.io/kubernetes/cmd/kubeadm/app/util/staticpod"
 
 	"github.com/kaweezle/iknite/pkg/alpine"
@@ -234,9 +233,9 @@ func FileTreeCheck(name, description, path string, expectedFiles []string) *chec
 	}
 }
 
-func CheckKubeletHealth(timeout time.Duration) (bool, string, error) {
+func CheckKubeletHealth(fs host.FileSystem, timeout time.Duration) (bool, string, error) {
 	var client clientset.Interface
-	client, err := kubeConfigUtil.ClientSetFromFile(kubeadmConstants.GetAdminKubeConfigPath())
+	client, err := k8s.ClientSetFromFile(fs, kubeadmConstants.GetAdminKubeConfigPath())
 	if err != nil {
 		return false, "", fmt.Errorf(
 			"failed to create client set for kubelet health check: %w",
@@ -273,7 +272,7 @@ func CheckApiServerHealth(
 		)
 	}
 
-	client, err := kubeConfigUtil.ClientSetFromFile(kubeadmConstants.GetAdminKubeConfigPath())
+	client, err := k8s.ClientSetFromFile(data.Host(), kubeadmConstants.GetAdminKubeConfigPath())
 	if err != nil {
 		return false, "", fmt.Errorf(
 			"failed to create client set for API server health check: %w",
@@ -390,22 +389,22 @@ func CheckWorkloads(ctx context.Context, data check.CheckData) (bool, string, er
 	if !ok {
 		return false, "", errors.New("invalid check data type")
 	}
-	config, err := k8s.LoadFromDefault()
+	kubeClient, err := k8s.NewDefaultClient(workloadData.Host())
 	if err != nil {
 		return false, "", fmt.Errorf("while loading local cluster configuration: %w", err)
 	}
 	// nocov -- requires a running Kubernetes cluster
-	return checkWorkloadsWithConfig(ctx, workloadData, config)
+	return checkWorkloadsWithConfig(ctx, workloadData, kubeClient)
 }
 
 // checkWorkloadsWithConfig polls the cluster workloads status using a live cluster config.
 func checkWorkloadsWithConfig(
 	ctx context.Context,
 	workloadData CheckWorkloadData,
-	config *k8s.Config,
+	kubeClient *k8s.Client,
 ) (bool, string, error) { // nocov -- requires a running Kubernetes cluster
 	workloadData.Start()
-	err := workloadData.WaitOptions().Poll(ctx, config.RESTClient().WorkloadsReadyConditionWithContextFunc(
+	err := workloadData.WaitOptions().Poll(ctx, kubeClient.WorkloadsReadyConditionWithContextFunc(
 		func(allReady bool, total int, ready, unready []*v1alpha1.WorkloadState, iteration, okIterations int) bool {
 			workloadData.SetOk(allReady)
 			workloadData.SetWorkloadCount(total)
@@ -424,29 +423,33 @@ func checkWorkloadsWithConfig(
 // CheckIkniteServerHealth checks the /healthz endpoint of the iknite status
 // server using the mTLS client configuration stored in constants.IkniteLocalConfPath
 // (/root/.kube/iknite.conf). It returns true when the server responds with "ok".
-func CheckIkniteServerHealth(ctx context.Context, waitOptions *utils.WaitOptions) (bool, string, error) {
-	kubeConfig, err := k8s.LoadFromFile(constants.IkniteLocalConfPath)
+func CheckIkniteServerHealth(
+	ctx context.Context,
+	fs host.FileSystem,
+	waitOptions *utils.WaitOptions,
+) (bool, string, error) {
+	kubeClient, err := k8s.NewClientFromFile(fs, constants.IkniteLocalConfPath)
 	if err != nil {
 		return false, "", fmt.Errorf("failed to load iknite config from %s: %w", constants.IkniteLocalConfPath, err)
 	}
 
+	restClient, err := kubeClient.ToRESTClient()
+	if err != nil {
+		return false, "", fmt.Errorf("failed to create REST client: %w", err)
+	}
+
 	// nocov -- requires a running iknite status server
-	return checkIkniteServerWithConfig(ctx, kubeConfig, waitOptions)
+	return checkIkniteServerWithConfig(ctx, restClient, waitOptions)
 }
 
 // checkIkniteServerWithConfig polls the iknite /healthz endpoint using an existing config.
 func checkIkniteServerWithConfig(
 	ctx context.Context,
-	kubeConfig *k8s.Config,
+	restClient rest.Interface,
 	waitOptions *utils.WaitOptions,
 ) (bool, string, error) { // nocov -- requires a running iknite status server
-	var restClient rest.Interface
-	var err error
-	if restClient, err = kubeConfig.NewRESTClient(); err != nil {
-		return false, "", fmt.Errorf("failed to create REST client: %w", err)
-	}
 
-	err = waitOptions.Poll(ctx, func(ctx context.Context) (bool, error) {
+	err := waitOptions.Poll(ctx, func(ctx context.Context) (bool, error) {
 		body, healthzErr := restClient.Get().AbsPath("/healthz").Timeout(waitOptions.CheckTimeout).DoRaw(ctx)
 		if healthzErr != nil {
 			return false, fmt.Errorf("failed to call /healthz endpoint: %w", healthzErr)

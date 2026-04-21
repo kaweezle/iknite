@@ -27,26 +27,21 @@ import (
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
 )
 
-// NewRESTClientGetterFromKubeconfig creates a RESTClientGetter using the default kubeconfig
+// NewClientFromKubeconfig creates a RESTClientGetter using the default kubeconfig
 // loading rules. If kubeconfigPath is non-empty it is used directly; otherwise KUBECONFIG
 // env var and ~/.kube/config are tried in turn, with a final fall-back to in-cluster config.
-func NewRESTClientGetterFromKubeconfig(kubeconfigPath string) *RESTClientGetter {
+func NewClientFromKubeconfig(kubeconfigPath string) *Client {
 	restConfig, err := clientRest.InClusterConfig()
 	if err == nil {
 		log.Info("Using in-cluster configuration")
-		return &RESTClientGetter{
-			clientconfig: nil, // Not needed for in-cluster config
-			restConfig:   restConfig,
-		}
+		return NewClientFromRestConfig(restConfig)
 	}
 	loadingRules := clientcmd.NewDefaultClientConfigLoadingRules()
 	if kubeconfigPath != "" {
 		loadingRules.ExplicitPath = kubeconfigPath
 	}
 	overrides := &clientcmd.ConfigOverrides{}
-	return &RESTClientGetter{
-		clientconfig: clientcmd.NewNonInteractiveDeferredLoadingClientConfig(loadingRules, overrides),
-	}
+	return NewClientFromClientConfig(clientcmd.NewNonInteractiveDeferredLoadingClientConfig(loadingRules, overrides))
 }
 
 // workloadStatesToSlice converts resource.Info objects to WorkloadState using kstatus.
@@ -87,7 +82,7 @@ func workloadStatesToSlice(infos []*resource.Info) ([]*v1alpha1.WorkloadState, e
 // ValidateResourceTypes checks if the provided resource types are valid by attempting to find their corresponding
 // GroupVersionKind in the REST mapper. It returns a slice of valid resource types and an error if the
 // validation process encounters an issue.
-func (client *RESTClientGetter) ValidateResourceTypes(types []string) ([]string, error) {
+func (client *Client) ValidateResourceTypes(types []string) ([]string, error) {
 	restMapper, err := client.ToRESTMapper()
 	if err != nil {
 		return nil, fmt.Errorf("while getting REST mapper: %w", err)
@@ -126,7 +121,7 @@ func (client *RESTClientGetter) ValidateResourceTypes(types []string) ([]string,
 }
 
 // ResourceInfosForNamespace returns resource.Info objects for the given namespace and resource types.
-func (client *RESTClientGetter) ResourceInfosForNamespace(
+func (client *Client) ResourceInfosForNamespace(
 	namespace string,
 	resourceTypes []string,
 ) ([]*resource.Info, error) {
@@ -165,7 +160,7 @@ func infosToObjectMetadataSet(infos []*resource.Info) object.ObjMetadataSet {
 	return set
 }
 
-func (client *RESTClientGetter) ObjectMetadataSetForNamespace(
+func (client *Client) ObjectMetadataSetForNamespace(
 	namespace string, resourceTypes []string,
 ) (object.ObjMetadataSet, error) {
 	const maxAttempts = 3
@@ -189,7 +184,7 @@ func (client *RESTClientGetter) ObjectMetadataSetForNamespace(
 
 // WorkloadStatesForNamespace returns the readiness state of deployments, statefulsets, and
 // daemonsets in a single namespace using kstatus to evaluate each resource.
-func (client *RESTClientGetter) WorkloadStatesForNamespace(
+func (client *Client) WorkloadStatesForNamespace(
 	namespace string, resourceTypes []string,
 ) ([]*v1alpha1.WorkloadState, error) {
 	infos, err := client.ResourceInfosForNamespace(namespace, resourceTypes)

@@ -344,7 +344,8 @@ func TestAdditionalCheckerPaths(t *testing.T) {
 	req.False(ok)
 
 	// Pass a valid *checkWorkloadData to cover the kubeconfig-load error path.
-	ok, _, err = CheckApiServerHealth(time.Millisecond, &checkWorkloadData{})
+	mockOkHost.On("ReadFile", mock.Anything).Return(nil, os.ErrNotExist)
+	ok, _, err = CheckApiServerHealth(time.Millisecond, &checkWorkloadData{alpineHost: mockOkHost})
 	req.Error(err)
 	req.False(ok)
 
@@ -361,11 +362,15 @@ func TestAdditionalCheckerPaths(t *testing.T) {
 	req.Error(err)
 	req.False(ok)
 
-	ok, _, err = CheckIkniteServerHealth(context.Background(), &utils.WaitOptions{Wait: false, Watch: false})
+	ok, _, err = CheckIkniteServerHealth(
+		context.Background(),
+		mockOkHost,
+		&utils.WaitOptions{Wait: false, Watch: false},
+	)
 	req.Error(err)
 	req.False(ok)
 
-	ok, _, err = CheckKubeletHealth(time.Millisecond)
+	ok, _, err = CheckKubeletHealth(mockOkHost, time.Millisecond)
 	req.Error(err)
 	req.False(ok)
 

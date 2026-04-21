@@ -23,7 +23,7 @@ func TestNewInfoStatusCmd(t *testing.T) {
 	t.Parallel()
 	req := require.New(t)
 
-	cmd := NewInfoStatusCmd()
+	cmd := NewInfoStatusCmd(nil)
 	req.NotNil(cmd)
 	req.Equal("status", cmd.Name())
 	flag := cmd.Flags().Lookup(ikniteConfigFlag)

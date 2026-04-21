@@ -15,7 +15,7 @@ func TestRESTClientGetter_BasicHelpers(t *testing.T) {
 	t.Parallel()
 	req := require.New(t)
 
-	r := &k8s.RESTClientGetter{}
+	r := &k8s.Client{}
 	_, err := r.ToRESTConfig()
 	req.Error(err)
 	req.Contains(err.Error(), "client configuration is not set")

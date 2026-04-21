@@ -228,8 +228,12 @@ func performStatus(alpineHost host.Host, ikniteConfig *v1alpha1.IkniteClusterSpe
 				Name:        "kubelet_health",
 				DependsOn:   []string{"kubelet_running"},
 				Description: "Check if the kubelet is reachable and healthy",
-				CheckFn: func(_ context.Context, _ check.CheckData) (bool, string, error) {
-					return checkers.CheckKubeletHealth(waitOptions.CheckTimeout)
+				CheckFn: func(_ context.Context, checkData check.CheckData) (bool, string, error) {
+					data, ok := checkData.(checkers.CheckWorkloadData)
+					if !ok {
+						return false, "", fmt.Errorf("invalid check data type")
+					}
+					return checkers.CheckKubeletHealth(data.Host(), waitOptions.CheckTimeout)
 				},
 			},
 			//   - Check if the kube-apiserver is healthy
@@ -246,12 +250,16 @@ func performStatus(alpineHost host.Host, ikniteConfig *v1alpha1.IkniteClusterSpe
 				Name:        "iknite_server_health",
 				DependsOn:   []string{"apiserver_health"},
 				Description: "Check if the iknite status server is healthy",
-				CheckFn: func(ctx context.Context, _ check.CheckData) (bool, string, error) {
+				CheckFn: func(ctx context.Context, checkData check.CheckData) (bool, string, error) {
+					data, ok := checkData.(checkers.CheckWorkloadData)
+					if !ok {
+						return false, "", fmt.Errorf("invalid check data type")
+					}
 					waitOptions := utils.NewWaitOptions()
 					waitOptions.Retries = 3
 					waitOptions.Timeout = 15 * time.Second
 
-					return checkers.CheckIkniteServerHealth(ctx, waitOptions)
+					return checkers.CheckIkniteServerHealth(ctx, data.Host(), waitOptions)
 				},
 			},
 		),

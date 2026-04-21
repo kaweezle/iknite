@@ -712,7 +712,7 @@ func (d *initData) Client() (clientset.Interface, error) {
 		d.adminKubeConfigBootstrapped = true
 	} else {
 		// Alternatively, just load the config pointed at the --kubeconfig path
-		d.client, err = kubeConfigUtil.ClientSetFromFile(d.KubeConfigPath())
+		d.client, err = k8s.ClientSetFromFile(d.Host(), d.KubeConfigPath())
 		if err != nil {
 			return nil, fmt.Errorf("failed to create client set from file: %w", err)
 		}
@@ -758,7 +758,7 @@ func (d *initData) ClientWithoutBootstrap() (clientset.Interface, error) {
 			return nil, err
 		}
 	} else { // Use a real client
-		client, err = kubeConfigUtil.ClientSetFromFile(d.KubeConfigPath())
+		client, err = k8s.ClientSetFromFile(d.Host(), d.KubeConfigPath())
 		if err != nil {
 			return nil, fmt.Errorf("failed to create client without bootstrap: %w", err)
 		}

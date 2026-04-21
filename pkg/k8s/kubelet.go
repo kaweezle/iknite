@@ -138,7 +138,7 @@ func StartAndConfigureKubelet(
 	kubeConfig *v1alpha1.IkniteClusterSpec,
 	kustomizeOptions *utils.KustomizeOptions,
 ) error {
-	apiConfig, err := LoadFromDefault()
+	kubeClient, err := NewDefaultClient(alpineHost)
 	if err != nil {
 		return fmt.Errorf("failed to load kubeconfig: %w", err)
 	}
@@ -177,7 +177,7 @@ func StartAndConfigureKubelet(
 			} else {
 				log.Info("Kubelet is healthy. Waiting for API server to be healthy...")
 				go func() {
-					apiServerHealthz <- apiConfig.CheckClusterRunning(ctx, 30, 2, 10*time.Second)
+					apiServerHealthz <- CheckClusterRunning(ctx, kubeClient, 30, 2, 10*time.Second)
 				}()
 			}
 		case isApiServerHealthy := <-apiServerHealthz:
@@ -187,8 +187,9 @@ func StartAndConfigureKubelet(
 			} else {
 				log.Info("API server is healthy")
 				go func() {
-					configErr <- apiConfig.Kustomize(
+					configErr <- Kustomize(
 						ctx,
+						kubeClient,
 						alpineHost,
 						kubeConfig.Kustomization,
 						kustomizeOptions,

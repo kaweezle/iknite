@@ -75,7 +75,7 @@ func NewInfoCmd(ikniteConfig *v1alpha1.IkniteClusterSpec) *cobra.Command {
 
 	infoCmd.AddCommand(NewImagesCmd(ikniteConfig))
 	infoCmd.AddCommand(NewVersionsCmd())
-	infoCmd.AddCommand(NewInfoStatusCmd())
+	infoCmd.AddCommand(NewInfoStatusCmd(nil))
 
 	return infoCmd
 }

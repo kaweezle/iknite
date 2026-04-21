@@ -36,14 +36,15 @@ func runKustomize(c workflow.RunData) error {
 		"kustomization": ikniteConfig.Kustomization,
 	}).Info("Performing kustomize configuration")
 
-	k8sConfig, err := k8s.LoadFromDefault()
+	kubeClient, err := k8s.NewDefaultClient(data.Host())
 	if err != nil {
 		return fmt.Errorf("failed to load configuration: %w", err)
 	}
 	ctx, _ := data.ContextWithCancel()
 	kustomizeOptions := data.KustomizeOptions()
-	if err := k8sConfig.Kustomize(
+	if err := k8s.Kustomize(
 		ctx,
+		kubeClient,
 		data.Host(),
 		ikniteConfig.Kustomization,
 		kustomizeOptions,

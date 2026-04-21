@@ -31,7 +31,7 @@ func TestClientDependentHelpersReturnErrors(t *testing.T) {
 		{
 			name: "list namespaces with invalid kubeconfig",
 			run: func() error {
-				client := k8s.NewRESTClientGetterFromKubeconfig(missingKubeconfig)
+				client := k8s.NewClientFromKubeconfig(missingKubeconfig)
 				_, err := listNamespaces(context.Background(), client, time.Millisecond)
 				return err
 			},
@@ -39,7 +39,7 @@ func TestClientDependentHelpersReturnErrors(t *testing.T) {
 		{
 			name: "wait namespace resources with invalid kubeconfig",
 			run: func() error {
-				client := k8s.NewRESTClientGetterFromKubeconfig(missingKubeconfig)
+				client := k8s.NewClientFromKubeconfig(missingKubeconfig)
 				opts := NewOptions()
 				opts.StatusUpdateInterval = time.Millisecond
 				return waitNamespaceResources(context.Background(), client, "default", opts)

@@ -34,11 +34,11 @@ func runMonitorWorkloads(c workflow.RunData) error {
 	ctx, _ := data.ContextWithCancel()
 
 	ticker := time.NewTicker(5 * time.Second)
-	config, err := k8s.LoadFromFile(constants.KubernetesRootConfig)
+	kubeClient, err := k8s.NewClientFromFile(data.Host(), constants.KubernetesRootConfig)
 	if err != nil {
 		return fmt.Errorf("cannot load the kubernetes configuration: %w", err)
 	}
-	updateWorkloads := config.RESTClient().WorkloadsReadyConditionWithContextFunc(
+	updateWorkloads := kubeClient.WorkloadsReadyConditionWithContextFunc(
 		func(allReady bool, _ int, ready, unready []*v1alpha1.WorkloadState, _, _ int) bool {
 			var status iknite.ClusterState
 			if allReady && cluster.Status.State != iknite.Running {

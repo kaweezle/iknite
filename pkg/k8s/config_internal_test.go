@@ -13,31 +13,34 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/tools/clientcmd/api"
+
+	"github.com/kaweezle/iknite/pkg/host"
 )
 
 func TestConfigRenameAndAddressHelpers(t *testing.T) {
 	req := require.New(t)
 
-	config := &Config{
+	config := &api.Config{
 		Clusters:       map[string]*api.Cluster{"kubernetes": {Server: "https://10.0.0.2:6443"}},
 		Contexts:       map[string]*api.Context{"kubernetes": {Cluster: "kubernetes", AuthInfo: "kubernetes"}},
 		AuthInfos:      map[string]*api.AuthInfo{"kubernetes": {}},
 		CurrentContext: "kubernetes",
 	}
 
-	config.RenameConfig("iknite")
+	RenameConfig(config, "iknite")
 	req.Contains(config.Clusters, "iknite")
 	req.Contains(config.Contexts, "iknite")
 	req.Contains(config.AuthInfos, "iknite")
 	req.Equal("iknite", config.CurrentContext)
-	req.True(config.IsConfigServerAddress("10.0.0.2"))
-	req.False(config.IsConfigServerAddress("10.0.0.9"))
+	client := NewClientFromConfig(config)
+	req.True(IsConfigServerAddress(client, "10.0.0.2"))
+	req.False(IsConfigServerAddress(client, "10.0.0.9"))
 }
 
 func TestConfigWriteToFileAndLoadFromFile(t *testing.T) {
 	req := require.New(t)
 
-	config := &Config{
+	config := &api.Config{
 		Clusters:       map[string]*api.Cluster{"iknite": {Server: "https://127.0.0.1:6443"}},
 		Contexts:       map[string]*api.Context{"iknite": {Cluster: "iknite", AuthInfo: "iknite"}},
 		AuthInfos:      map[string]*api.AuthInfo{"iknite": {}},
@@ -45,12 +48,15 @@ func TestConfigWriteToFileAndLoadFromFile(t *testing.T) {
 	}
 
 	path := filepath.Join(t.TempDir(), "config")
-	req.NoError(config.WriteToFile(path))
+	fs := host.NewOsFS()
+	req.NoError(WriteToFile(config, fs, path))
 
-	loaded, err := LoadFromFile(path)
+	loaded, err := LoadFromFile(fs, path)
 	req.NoError(err)
 	req.Equal("iknite", loaded.CurrentContext)
-	req.True(loaded.IsConfigServerAddress("127.0.0.1"))
+	client, err := NewClientFromFile(fs, path)
+	req.NoError(err)
+	req.True(IsConfigServerAddress(client, "127.0.0.1"))
 }
 
 func TestGetAndWriteIkniteConfigMap(t *testing.T) {

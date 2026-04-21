@@ -122,7 +122,7 @@ func performKustomize(
 	waitOptions *utils.WaitOptions,
 ) {
 	// We need to get it from root as we will apply configuration
-	kubeConfig, err := k8s.LoadFromFile(constants.KubernetesRootConfig)
+	kubeClient, err := k8s.NewClientFromFile(fs, constants.KubernetesRootConfig)
 	if err != nil {
 		cobra.CheckErr(fmt.Errorf("while loading local cluster configuration: %w", err))
 	}
@@ -142,20 +142,21 @@ func performKustomize(
 		}
 	}()
 
-	err = kubeConfig.CheckClusterRunning(
+	err = k8s.CheckClusterRunning(
 		ctx,
+		kubeClient,
 		waitOptions.Retries,
 		waitOptions.OkResponses,
 		waitOptions.Interval,
 	)
 	cobra.CheckErr(err)
 
-	cobra.CheckErr(kubeConfig.Kustomize(ctx, fs, ikniteConfig.Kustomization, kustomizeOptions))
+	cobra.CheckErr(k8s.Kustomize(ctx, kubeClient, fs, ikniteConfig.Kustomization, kustomizeOptions))
 
 	if waitOptions.HasLoop() {
 		logrus.Infof("Waiting for workloads with options: %s", waitOptions.String())
 		runtime.ErrorHandlers = runtime.ErrorHandlers[:0] //nolint:reassign // disabling printing of errors to stderr
-		cobra.CheckErr(waitOptions.Poll(ctx, kubeConfig.RESTClient().WorkloadsReadyConditionWithContextFunc(nil)))
+		cobra.CheckErr(waitOptions.Poll(ctx, kubeClient.WorkloadsReadyConditionWithContextFunc(nil)))
 	}
 }
 

@@ -24,8 +24,8 @@ import (
 	"path/filepath"
 
 	"github.com/spf13/cobra"
-	"k8s.io/client-go/rest"
 
+	"github.com/kaweezle/iknite/pkg/host"
 	"github.com/kaweezle/iknite/pkg/k8s"
 )
 
@@ -45,8 +45,11 @@ func defaultIkniteConf() string {
 // NewInfoStatusCmd returns the "info status" subcommand. It retrieves the
 // cluster status from the running iknite HTTPS server using the mTLS client
 // configuration written to /etc/kubernetes/iknite.conf during initialization.
-func NewInfoStatusCmd() *cobra.Command {
+func NewInfoStatusCmd(fs host.FileSystem) *cobra.Command {
 	var configPath string
+	if fs == nil {
+		fs = host.NewOsFS()
+	}
 
 	statusCmd := &cobra.Command{
 		Use:   "status",
@@ -58,7 +61,7 @@ cluster initialization at /etc/kubernetes/iknite.conf. Copy that file to
 $HOME/.kube/iknite.conf (or point --config at it) to use this command from
 a remote host.`,
 		RunE: func(_ *cobra.Command, _ []string) error {
-			return performInfoStatus(configPath)
+			return performInfoStatus(fs, configPath)
 		},
 	}
 
@@ -75,14 +78,14 @@ a remote host.`,
 // performInfoStatus loads the iknite client configuration from configPath,
 // builds an mTLS HTTP client from the embedded credentials, and prints the
 // JSON response from the /status endpoint.
-func performInfoStatus(configPath string) error {
-	kubeConfig, err := k8s.LoadFromFile(configPath)
+func performInfoStatus(fs host.FileSystem, configPath string) error {
+	kubeClient, err := k8s.NewClientFromFile(fs, configPath)
 	if err != nil {
 		return fmt.Errorf("failed to load iknite config from %s: %w", configPath, err)
 	}
 
-	var restClient rest.Interface
-	if restClient, err = kubeConfig.NewRESTClient(); err != nil {
+	restClient, err := kubeClient.ToRESTClient()
+	if err != nil {
 		return fmt.Errorf("failed to create REST client: %w", err)
 	}
 

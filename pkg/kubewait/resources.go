@@ -109,7 +109,7 @@ func waitForResources(ctx context.Context, opts *Options, namespaces []string) e
 		defer cancel()
 	}
 
-	client := k8s.NewRESTClientGetterFromKubeconfig(opts.Kubeconfig)
+	client := k8s.NewClientFromKubeconfig(opts.Kubeconfig)
 
 	// Validate that the requested resource types are supported by the cluster before starting the wait loops.
 	validTypes, err := client.ValidateResourceTypes(opts.ResourceTypes)
@@ -170,7 +170,7 @@ func waitForResources(ctx context.Context, opts *Options, namespaces []string) e
 // listNamespaces polls the API server until it can list all namespaces.
 func listNamespaces(
 	ctx context.Context,
-	client *k8s.RESTClientGetter,
+	client *k8s.Client,
 	interval time.Duration,
 ) ([]string, error) {
 	log.Info("No namespaces specified, listing all namespaces from the cluster...")
@@ -202,7 +202,7 @@ func listNamespaces(
 
 type resourceWaiter struct {
 	logger             log.FieldLogger
-	client             *k8s.RESTClientGetter
+	client             *k8s.Client
 	poller             *polling.StatusPoller
 	pollCancel         context.CancelFunc
 	watchDatasetCancel context.CancelFunc
@@ -215,7 +215,7 @@ type resourceWaiter struct {
 }
 
 func newResourceWaiter(
-	client *k8s.RESTClientGetter,
+	client *k8s.Client,
 	namespace string,
 	opts *Options,
 ) (*resourceWaiter, error) {
@@ -477,7 +477,7 @@ func (w *resourceWaiter) Start(ctx context.Context) error {
 // then polls until every resource in that namespace is ready.
 func waitNamespaceResources(
 	ctx context.Context,
-	client *k8s.RESTClientGetter,
+	client *k8s.Client,
 	namespace string,
 	opts *Options,
 ) error {

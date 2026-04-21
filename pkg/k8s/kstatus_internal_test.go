@@ -17,7 +17,7 @@ func TestNewRESTClientGetterFromKubeconfig(t *testing.T) {
 	t.Parallel()
 	req := require.New(t)
 
-	getter := NewRESTClientGetterFromKubeconfig("/tmp/nonexistent-kubeconfig")
+	getter := NewClientFromKubeconfig("/tmp/nonexistent-kubeconfig")
 	req.NotNil(getter)
 	req.NotNil(getter.ToRawKubeConfigLoader())
 }
@@ -59,7 +59,7 @@ func TestRESTClientGetterKStatusErrorPaths(t *testing.T) {
 	t.Parallel()
 	req := require.New(t)
 
-	getter := &RESTClientGetter{}
+	getter := &Client{}
 	_, err := getter.ValidateResourceTypes([]string{"deployments"})
 	req.Error(err)
 

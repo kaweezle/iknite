@@ -135,15 +135,16 @@ func TestCopyFile(t *testing.T) {
 			t.Parallel()
 			req := require.New(t)
 
+			fs := host.NewOsFS()
 			src, dst := tt.prepare(t)
-			err := copyFile(src, dst)
+			err := copyFile(fs, src, dst)
 			if tt.wantErr {
 				req.Error(err)
 				return
 			}
 
 			req.NoError(err)
-			content, readErr := os.ReadFile(dst) //nolint:gosec // test temp path
+			content, readErr := fs.ReadFile(dst)
 			req.NoError(readErr)
 			req.Equal("payload", string(content))
 		})

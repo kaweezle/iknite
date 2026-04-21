@@ -1,6 +1,6 @@
 package k8s
 
-// cSpell: words clientcmd clientconfig restconfig casttype metav1 polymorphichelpers restmapper
+// cSpell: words clientcmd clientconfig restconfig casttype metav1 polymorphichelpers restmapper genericclioptions
 // cSpell: disable
 import (
 	"bytes"
@@ -18,6 +18,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	k8sTypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/discovery/cached/memory"
@@ -27,25 +28,53 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/kubectl/pkg/polymorphichelpers"
+	kubeadmConstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"sigs.k8s.io/kustomize/api/provider"
 	"sigs.k8s.io/kustomize/api/resmap"
 	"sigs.k8s.io/kustomize/kyaml/resid"
 
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
+	"github.com/kaweezle/iknite/pkg/host"
 )
 
 // cSpell: enable
 
-type RESTClientGetter struct {
+type Client struct {
 	clientconfig clientcmd.ClientConfig
 	restConfig   *rest.Config
 }
 
-func (config *Config) RESTClient() *RESTClientGetter {
-	return &RESTClientGetter{clientconfig: clientcmd.NewDefaultClientConfig(api.Config(*config), nil)}
+var _ genericclioptions.RESTClientGetter = (*Client)(nil)
+
+func NewClientFromFile(fs host.FileSystem, path string) (*Client, error) {
+	content, err := fs.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read kubeconfig file: %w", err)
+	}
+	clientconfig, err := clientcmd.NewClientConfigFromBytes(content)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create client config from bytes: %w", err)
+	}
+	return NewClientFromClientConfig(clientconfig), nil
 }
 
-func (r *RESTClientGetter) ToRESTConfig() (*rest.Config, error) {
+func NewDefaultClient(fs host.Host) (*Client, error) {
+	return NewClientFromFile(fs, kubeadmConstants.GetAdminKubeConfigPath())
+}
+
+func NewClientFromConfig(config *api.Config) *Client {
+	return NewClientFromClientConfig(clientcmd.NewDefaultClientConfig(*config, nil))
+}
+
+func NewClientFromClientConfig(config clientcmd.ClientConfig) *Client {
+	return &Client{clientconfig: config}
+}
+
+func NewClientFromRestConfig(restConfig *rest.Config) *Client {
+	return &Client{restConfig: restConfig}
+}
+
+func (r *Client) ToRESTConfig() (*rest.Config, error) {
 	if r.restConfig != nil {
 		result := *r.restConfig
 		return &result, nil
@@ -62,7 +91,7 @@ func (r *RESTClientGetter) ToRESTConfig() (*rest.Config, error) {
 	return restConfig, nil
 }
 
-func (r *RESTClientGetter) ToDiscoveryClient() (discovery.CachedDiscoveryInterface, error) {
+func (r *Client) ToDiscoveryClient() (discovery.CachedDiscoveryInterface, error) {
 	restconfig, err := r.ToRESTConfig()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get REST config for discovery: %w", err)
@@ -74,7 +103,7 @@ func (r *RESTClientGetter) ToDiscoveryClient() (discovery.CachedDiscoveryInterfa
 	return memory.NewMemCacheClient(dc), nil
 }
 
-func (r *RESTClientGetter) ToKubernetesInterface() (kubernetes.Interface, error) {
+func (r *Client) ToKubernetesInterface() (kubernetes.Interface, error) {
 	restconfig, err := r.ToRESTConfig()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get REST config for Kubernetes client: %w", err)
@@ -86,7 +115,7 @@ func (r *RESTClientGetter) ToKubernetesInterface() (kubernetes.Interface, error)
 	return client, nil
 }
 
-func (r *RESTClientGetter) ToRESTMapper() (meta.RESTMapper, error) {
+func (r *Client) ToRESTMapper() (meta.RESTMapper, error) {
 	dc, err := r.ToDiscoveryClient()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get discovery client for REST mapper: %w", err)
@@ -94,7 +123,19 @@ func (r *RESTClientGetter) ToRESTMapper() (meta.RESTMapper, error) {
 	return restmapper.NewDeferredDiscoveryRESTMapper(dc), nil
 }
 
-func (r *RESTClientGetter) ToRawKubeConfigLoader() clientcmd.ClientConfig {
+func (r *Client) ToRESTClient() (rest.Interface, error) {
+	restconfig, err := r.ToRESTConfig()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get REST config for discovery: %w", err)
+	}
+	dc, err := discovery.NewDiscoveryClientForConfig(restconfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create discovery client: %w", err)
+	}
+	return dc.RESTClient(), nil
+}
+
+func (r *Client) ToRawKubeConfigLoader() clientcmd.ClientConfig {
 	if r.clientconfig != nil {
 		return r.clientconfig
 	}
@@ -108,7 +149,7 @@ func (r *RESTClientGetter) ToRawKubeConfigLoader() clientcmd.ClientConfig {
 	return clientcmd.NewNonInteractiveDeferredLoadingClientConfig(loadingRules, overrides)
 }
 
-func (r *RESTClientGetter) ResourceInfosFromResMap(resources resmap.ResMap) ([]*resource.Info, error) {
+func (r *Client) ResourceInfosFromResMap(resources resmap.ResMap) ([]*resource.Info, error) {
 	rawResources, err := resources.AsYaml()
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert resources to YAML: %w", err)
@@ -222,7 +263,7 @@ func (s *ApplicationStatusViewer) Status(
 
 // ApplyResMapWithServerSideApply applies the given resources to the cluster using server-side apply. It returns the
 // IDs of the applied resources or an error if the operation fails.
-func (client *RESTClientGetter) ApplyResMapWithServerSideApply(resources resmap.ResMap) ([]resid.ResId, error) {
+func (client *Client) ApplyResMapWithServerSideApply(resources resmap.ResMap) ([]resid.ResId, error) {
 	ids := resources.AllIds()
 
 	// Separate cluster-scoped resources from namespace-scoped ones, as the former need to be applied before the latter
@@ -260,7 +301,7 @@ func (client *RESTClientGetter) ApplyResMapWithServerSideApply(resources resmap.
 	return ids, nil
 }
 
-func (client *RESTClientGetter) HasApplications() (bool, error) {
+func (client *Client) HasApplications() (bool, error) {
 	var mapper meta.RESTMapper
 	var err error
 	if mapper, err = client.ToRESTMapper(); err != nil {
@@ -281,7 +322,7 @@ func (client *RESTClientGetter) HasApplications() (bool, error) {
 	return true, nil
 }
 
-func (client *RESTClientGetter) AllWorkloadStates() ([]*v1alpha1.WorkloadState, error) {
+func (client *Client) AllWorkloadStates() ([]*v1alpha1.WorkloadState, error) {
 	resourceTypes := []string{"deployments", "statefulsets", "daemonsets"}
 	hasApplications, err := client.HasApplications()
 	if err != nil {
@@ -342,7 +383,7 @@ func (client *RESTClientGetter) AllWorkloadStates() ([]*v1alpha1.WorkloadState, 
 type WorkloadStateCallbackFunc func(allReady bool, total int, ready []*v1alpha1.WorkloadState,
 	unready []*v1alpha1.WorkloadState, iteration, okIterations int) bool
 
-func (client *RESTClientGetter) WorkloadsReadyConditionWithContextFunc(
+func (client *Client) WorkloadsReadyConditionWithContextFunc(
 	callback WorkloadStateCallbackFunc,
 ) wait.ConditionWithContextFunc {
 	iteration := 0
