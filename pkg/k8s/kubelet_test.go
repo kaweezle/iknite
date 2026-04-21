@@ -1,4 +1,4 @@
-// cSpell: words cgroupfs
+// cSpell: words cgroupfs mockk8s
 package k8s_test
 
 import (
@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"os/exec"
 	"testing"
 	"time"
 
@@ -14,9 +15,12 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	mockk8s "github.com/kaweezle/iknite/mocks/github.com/kaweezle/iknite/pkg/k8s"
 	"github.com/kaweezle/iknite/pkg/alpine"
+	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
 	"github.com/kaweezle/iknite/pkg/host"
 	"github.com/kaweezle/iknite/pkg/k8s"
+	"github.com/kaweezle/iknite/pkg/utils"
 )
 
 func TestCheckServerRunning(t *testing.T) {
@@ -307,4 +311,215 @@ func TestStarKubelet(t *testing.T) {
 			}
 		})
 	}
+}
+
+func exitedProcessState(t *testing.T) *os.ProcessState {
+	t.Helper()
+	cmd := exec.CommandContext(context.Background(), "true")
+	req := require.New(t)
+	req.NoError(cmd.Run())
+	return cmd.ProcessState
+}
+
+func TestStartAndConfigureKubelet_NilRuntime(t *testing.T) {
+	t.Parallel()
+	req := require.New(t)
+
+	err := k8s.StartAndConfigureKubelet(
+		context.Background(),
+		nil,
+		&v1alpha1.IkniteClusterSpec{},
+		&utils.KustomizeOptions{},
+	)
+
+	req.Error(err)
+	req.Contains(err.Error(), "kubelet runtime cannot be nil")
+}
+
+func TestStartAndConfigureKubelet_StartKubeletError(t *testing.T) {
+	t.Parallel()
+	req := require.New(t)
+
+	runtime := mockk8s.NewMockKubeletRuntime(t)
+	runtime.EXPECT().StartKubelet(mock.Anything).Return(nil, errors.New("start kubelet error")).Once()
+
+	err := k8s.StartAndConfigureKubelet(
+		context.Background(),
+		runtime,
+		&v1alpha1.IkniteClusterSpec{},
+		&utils.KustomizeOptions{},
+	)
+
+	req.Error(err)
+	req.Contains(err.Error(), "failed to start kubelet")
+}
+
+func TestStartAndConfigureKubelet_KubeletHealthError(t *testing.T) {
+	t.Parallel()
+	req := require.New(t)
+
+	runtime := mockk8s.NewMockKubeletRuntime(t)
+	process := host.NewMockProcess(t)
+	process.On("Wait").Run(func(_ mock.Arguments) {
+		time.Sleep(30 * time.Millisecond)
+	}).Return(nil).Maybe()
+	process.On("State").Return(exitedProcessState(t)).Maybe()
+	process.EXPECT().Signal(mock.Anything).Return(errors.New("signal error")).Once()
+
+	runtime.EXPECT().StartKubelet(mock.Anything).Return(process, nil).Once()
+	runtime.EXPECT().
+		CheckKubeletRunning(mock.Anything, 10, 3, time.Second).
+		Return(errors.New("kubelet unhealthy")).
+		Once()
+	runtime.EXPECT().RemovePidFile().Once()
+
+	err := k8s.StartAndConfigureKubelet(
+		context.Background(),
+		runtime,
+		&v1alpha1.IkniteClusterSpec{},
+		&utils.KustomizeOptions{},
+	)
+
+	req.Error(err)
+	req.Contains(err.Error(), "error while waiting for kubelet to stop")
+	req.Contains(err.Error(), "failed to terminate process")
+}
+
+func TestStartAndConfigureKubelet_APIServerHealthError(t *testing.T) {
+	t.Parallel()
+	req := require.New(t)
+
+	runtime := mockk8s.NewMockKubeletRuntime(t)
+	process := host.NewMockProcess(t)
+	process.On("Wait").Run(func(_ mock.Arguments) {
+		time.Sleep(30 * time.Millisecond)
+	}).Return(nil).Maybe()
+	process.On("State").Return(exitedProcessState(t)).Maybe()
+	process.EXPECT().Signal(mock.Anything).Return(errors.New("signal error")).Once()
+
+	runtime.EXPECT().StartKubelet(mock.Anything).Return(process, nil).Once()
+	runtime.EXPECT().CheckKubeletRunning(mock.Anything, 10, 3, time.Second).Return(nil).Once()
+	runtime.EXPECT().
+		CheckClusterRunning(mock.Anything, 30, 2, 10*time.Second).
+		Return(errors.New("api unhealthy")).
+		Once()
+	runtime.EXPECT().RemovePidFile().Once()
+
+	err := k8s.StartAndConfigureKubelet(
+		context.Background(),
+		runtime,
+		&v1alpha1.IkniteClusterSpec{},
+		&utils.KustomizeOptions{},
+	)
+
+	req.Error(err)
+	req.Contains(err.Error(), "error while waiting for kubelet to stop")
+	req.Contains(err.Error(), "failed to terminate process")
+}
+
+func TestStartAndConfigureKubelet_KustomizeError(t *testing.T) {
+	t.Parallel()
+	req := require.New(t)
+
+	runtime := mockk8s.NewMockKubeletRuntime(t)
+	process := host.NewMockProcess(t)
+	process.On("Wait").Run(func(_ mock.Arguments) {
+		time.Sleep(30 * time.Millisecond)
+	}).Return(nil).Maybe()
+	process.On("State").Return(exitedProcessState(t)).Maybe()
+	process.EXPECT().Signal(mock.Anything).Return(errors.New("signal error")).Once()
+
+	clusterSpec := &v1alpha1.IkniteClusterSpec{Kustomization: "test-kustomization"}
+	kustomizeOptions := &utils.KustomizeOptions{}
+	runtime.EXPECT().StartKubelet(mock.Anything).Return(process, nil).Once()
+	runtime.EXPECT().CheckKubeletRunning(mock.Anything, 10, 3, time.Second).Return(nil).Once()
+	runtime.EXPECT().CheckClusterRunning(mock.Anything, 30, 2, 10*time.Second).Return(nil).Once()
+	runtime.EXPECT().
+		Kustomize(mock.Anything, "test-kustomization", kustomizeOptions).
+		Return(errors.New("kustomize error")).
+		Once()
+	runtime.EXPECT().RemovePidFile().Once()
+
+	err := k8s.StartAndConfigureKubelet(
+		context.Background(),
+		runtime,
+		clusterSpec,
+		kustomizeOptions,
+	)
+
+	req.Error(err)
+	req.Contains(err.Error(), "error while waiting for kubelet to stop")
+	req.Contains(err.Error(), "failed to terminate process")
+}
+
+func TestStartAndConfigureKubelet_Success(t *testing.T) {
+	t.Parallel()
+	req := require.New(t)
+
+	runtime := mockk8s.NewMockKubeletRuntime(t)
+	waitRelease := make(chan struct{})
+	process := host.NewMockProcess(t)
+	process.EXPECT().Wait().RunAndReturn(func() error {
+		<-waitRelease
+		return nil
+	}).Once()
+	process.EXPECT().State().Return(exitedProcessState(t)).Once()
+
+	clusterSpec := &v1alpha1.IkniteClusterSpec{Kustomization: "test-kustomization"}
+	kustomizeOptions := &utils.KustomizeOptions{}
+	runtime.EXPECT().StartKubelet(mock.Anything).Return(process, nil).Once()
+	runtime.EXPECT().CheckKubeletRunning(mock.Anything, 10, 3, time.Second).Return(nil).Once()
+	runtime.EXPECT().CheckClusterRunning(mock.Anything, 30, 2, 10*time.Second).Return(nil).Once()
+	runtime.EXPECT().Kustomize(mock.Anything, "test-kustomization", kustomizeOptions).
+		Run(func(_ context.Context, _ string, _ *utils.KustomizeOptions) {
+			close(waitRelease)
+		}).
+		Return(nil).
+		Once()
+	runtime.EXPECT().RemovePidFile().Once()
+
+	err := k8s.StartAndConfigureKubelet(
+		context.Background(),
+		runtime,
+		clusterSpec,
+		kustomizeOptions,
+	)
+
+	req.NoError(err)
+}
+
+func TestStartAndConfigureKubelet_ContextCanceled(t *testing.T) {
+	t.Parallel()
+	req := require.New(t)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	runtime := mockk8s.NewMockKubeletRuntime(t)
+	process := host.NewMockProcess(t)
+	process.On("Wait").Run(func(_ mock.Arguments) {
+		time.Sleep(30 * time.Millisecond)
+	}).Return(nil).Maybe()
+	process.On("State").Return(exitedProcessState(t)).Maybe()
+	process.EXPECT().Signal(mock.Anything).Return(errors.New("signal error")).Once()
+
+	runtime.EXPECT().StartKubelet(mock.Anything).Return(process, nil).Once()
+	runtime.EXPECT().CheckKubeletRunning(mock.Anything, 10, 3, time.Second).Return(nil).Maybe()
+	runtime.EXPECT().RemovePidFile().Once()
+
+	err := k8s.StartAndConfigureKubelet(
+		ctx,
+		runtime,
+		&v1alpha1.IkniteClusterSpec{},
+		&utils.KustomizeOptions{},
+	)
+
+	req.Error(err)
+	req.Contains(err.Error(), "error while waiting for kubelet to stop")
+	req.Contains(err.Error(), "failed to terminate process")
+}
+
+func TestStartAndConfigureKubelet_RuntimeMethodSignatures(t *testing.T) {
+	t.Parallel()
+	var _ k8s.KubeletRuntime = &mockk8s.MockKubeletRuntime{}
 }

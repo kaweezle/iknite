@@ -27,6 +27,8 @@ packages:
     config:
       all: true
       dir: "{{.InterfaceDir}}"
+  github.com/kaweezle/iknite/pkg/k8s:
+    interfaces: { KubeletRuntime }
   k8s.io/cli-runtime/pkg/genericclioptions:
     interfaces: { RESTClientGetter }
   k8s.io/client-go/rest:

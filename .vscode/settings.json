@@ -25,6 +25,10 @@
     "*.gotmpl": "helm"
   },
   "chat.tools.terminal.autoApprove": {
-    "go": true
+    "go": true,
+    "golangci-lint": true,
+    "pre-commit": true,
+    "git add": true,
+    "/home/alpine/go/bin/mockery": true
   }
 }

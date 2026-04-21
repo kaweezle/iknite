@@ -449,7 +449,6 @@ func checkIkniteServerWithConfig(
 	restClient rest.Interface,
 	waitOptions *utils.WaitOptions,
 ) (bool, string, error) { // nocov -- requires a running iknite status server
-
 	err := waitOptions.Poll(ctx, func(ctx context.Context) (bool, error) {
 		body, healthzErr := restClient.Get().AbsPath("/healthz").Timeout(waitOptions.CheckTimeout).DoRaw(ctx)
 		if healthzErr != nil {

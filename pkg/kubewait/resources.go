@@ -128,28 +128,9 @@ func waitForResources(ctx context.Context, opts *Options, namespaces []string) e
 	}
 	opts.ResourceTypes = validTypes
 
-	// If no namespaces were given, list all that exist right now.
-	if len(namespaces) == 0 { //nolint:nestif // this is clearer as a single if block
-		if info, err := os.Stat(currentNamespaceFile); err == nil && !info.IsDir() && !opts.AllNamespaces {
-			log.Infof("Getting namespace from %s", currentNamespaceFile)
-			namespaceBytes, readErr := os.ReadFile(currentNamespaceFile)
-			if readErr != nil {
-				return fmt.Errorf("failed to read namespace from file %s: %w", currentNamespaceFile, readErr)
-			}
-			namespace := string(namespaceBytes)
-			log.Infof("Watching current namespace: %s", namespace)
-			namespaces = []string{namespace}
-		} else {
-			k8sInterface, err := k8s.ClientSet(client)
-			if err != nil {
-				return fmt.Errorf("failed to create Kubernetes client: %w", err)
-			}
-
-			namespaces, err = listNamespaces(ctx, k8sInterface, opts.StatusUpdateInterval)
-			if err != nil {
-				return fmt.Errorf("failed to list namespaces: %w", err)
-			}
-		}
+	namespaces, err = resolveNamespaces(ctx, client, opts, namespaces)
+	if err != nil {
+		return err
 	}
 
 	log.Infof("Watching %d namespace(s) concurrently: %v", len(namespaces), namespaces)
@@ -177,6 +158,40 @@ func waitForResources(ctx context.Context, opts *Options, namespaces []string) e
 
 	log.Info("All resources in all namespaces are ready")
 	return nil
+}
+
+func resolveNamespaces(
+	ctx context.Context,
+	client genericclioptions.RESTClientGetter,
+	opts *Options,
+	namespaces []string,
+) ([]string, error) {
+	if len(namespaces) != 0 {
+		return namespaces, nil
+	}
+
+	if info, err := os.Stat(currentNamespaceFile); err == nil && !info.IsDir() && !opts.AllNamespaces {
+		log.Infof("Getting namespace from %s", currentNamespaceFile)
+		namespaceBytes, readErr := os.ReadFile(currentNamespaceFile)
+		if readErr != nil {
+			return nil, fmt.Errorf("failed to read namespace from file %s: %w", currentNamespaceFile, readErr)
+		}
+		namespace := string(namespaceBytes)
+		log.Infof("Watching current namespace: %s", namespace)
+		return []string{namespace}, nil
+	}
+
+	k8sInterface, err := k8s.ClientSet(client)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create Kubernetes client: %w", err)
+	}
+
+	namespaces, err = listNamespaces(ctx, k8sInterface, opts.StatusUpdateInterval)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list namespaces: %w", err)
+	}
+
+	return namespaces, nil
 }
 
 // listNamespaces polls the API server until it can list all namespaces.

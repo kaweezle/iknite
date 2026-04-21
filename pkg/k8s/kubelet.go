@@ -37,6 +37,18 @@ var (
 	pathsToUnmountAndRemove = []string{"/run/containerd", "/run/netns", "/run/ipcns", "/run/utsns"}
 )
 
+type KubeletRuntime interface {
+	StartKubelet(ctx context.Context) (host.Process, error)
+	CheckKubeletRunning(ctx context.Context, retries, okResponses int, waitTime time.Duration) error
+	CheckClusterRunning(
+		ctx context.Context,
+		retries, okResponses int,
+		interval time.Duration,
+	) error
+	Kustomize(ctx context.Context, kustomization string, options *utils.KustomizeOptions) error
+	RemovePidFile()
+}
+
 func StartKubelet(ctx context.Context, h host.FileExecutor) (host.Process, error) {
 	// Read the environment variables from /var/lib/kubelet/kubeadm-flags.env
 	log.WithField("kubeletEnvFile", KubeletEnvFile).Info("Reading kubelet environment file")
@@ -134,20 +146,15 @@ func StartKubelet(ctx context.Context, h host.FileExecutor) (host.Process, error
 
 func StartAndConfigureKubelet(
 	ctx context.Context,
-	alpineHost host.Host,
+	runtime KubeletRuntime,
 	kubeConfig *v1alpha1.IkniteClusterSpec,
 	kustomizeOptions *utils.KustomizeOptions,
 ) error {
-	kubeClient, err := NewDefaultClient(alpineHost)
-	if err != nil {
-		return fmt.Errorf("failed to load kubeconfig: %w", err)
-	}
-	restClient, err := RESTClient(kubeClient)
-	if err != nil {
-		return fmt.Errorf("failed to create REST client: %w", err)
+	if runtime == nil {
+		return fmt.Errorf("kubelet runtime cannot be nil")
 	}
 
-	process, err := StartKubelet(ctx, alpineHost)
+	process, err := runtime.StartKubelet(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to start kubelet: %w", err)
 	}
@@ -159,10 +166,10 @@ func StartAndConfigureKubelet(
 
 	kubeletHealthz, apiServerHealthz, configErr := make(chan error, 1), make(chan error, 1), make(chan error, 1)
 	go func() {
-		kubeletHealthz <- CheckKubeletRunning(ctx, 10, 3, 1*time.Second)
+		kubeletHealthz <- runtime.CheckKubeletRunning(ctx, 10, 3, 1*time.Second)
 	}()
 
-	defer alpine.RemovePidFile(alpineHost, KubeletName)
+	defer runtime.RemovePidFile()
 
 	// Wait for the signals or for the child process to stop
 	for alive := true; alive; {
@@ -181,7 +188,7 @@ func StartAndConfigureKubelet(
 			} else {
 				log.Info("Kubelet is healthy. Waiting for API server to be healthy...")
 				go func() {
-					apiServerHealthz <- CheckClusterRunning(ctx, restClient, 30, 2, 10*time.Second)
+					apiServerHealthz <- runtime.CheckClusterRunning(ctx, 30, 2, 10*time.Second)
 				}()
 			}
 		case isApiServerHealthy := <-apiServerHealthz:
@@ -191,10 +198,8 @@ func StartAndConfigureKubelet(
 			} else {
 				log.Info("API server is healthy")
 				go func() {
-					configErr <- Kustomize(
+					configErr <- runtime.Kustomize(
 						ctx,
-						kubeClient,
-						alpineHost,
 						kubeConfig.Kustomization,
 						kustomizeOptions,
 					)

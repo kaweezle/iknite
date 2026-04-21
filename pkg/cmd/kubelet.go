@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"os/signal"
 	"syscall"
@@ -28,7 +29,7 @@ The kubelet is started and monitored. The following operations are performed:
 - Starts the kubelet,
 - Monitors the kubelet,
 `,
-		Run: func(_ *cobra.Command, _ []string) { performKubelet(ikniteConfig, kustomizeOptions) },
+		RunE: func(_ *cobra.Command, _ []string) error { return performKubelet(ikniteConfig, kustomizeOptions) },
 	}
 
 	config.AddIkniteClusterFlags(kubeletCmd.Flags(), ikniteConfig)
@@ -37,11 +38,24 @@ The kubelet is started and monitored. The following operations are performed:
 	return kubeletCmd
 }
 
-func performKubelet(ikniteConfig *v1alpha1.IkniteClusterSpec, kustomizeOptions *utils.KustomizeOptions) {
+func performKubelet(ikniteConfig *v1alpha1.IkniteClusterSpec, kustomizeOptions *utils.KustomizeOptions) error {
 	alpineHost := host.NewDefaultHost()
+	kubeClient, err := k8s.NewDefaultClient(alpineHost)
+	if err != nil {
+		return fmt.Errorf("failed to create kube client: %w", err)
+	}
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 
-	cobra.CheckErr(k8s.PrepareKubernetesEnvironment(alpineHost, ikniteConfig))
-	cobra.CheckErr(k8s.StartAndConfigureKubelet(ctx, alpineHost, ikniteConfig, kustomizeOptions))
+	err = k8s.PrepareKubernetesEnvironment(alpineHost, ikniteConfig)
+	if err != nil {
+		return fmt.Errorf("failed to prepare Kubernetes environment: %w", err)
+	}
+
+	runtime := k8s.NewKubeletRuntime(alpineHost, kubeClient)
+	err = k8s.StartAndConfigureKubelet(ctx, runtime, ikniteConfig, kustomizeOptions)
+	if err != nil {
+		return fmt.Errorf("failed to start and configure kubelet: %w", err)
+	}
+	return nil
 }
