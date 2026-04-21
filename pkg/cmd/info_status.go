@@ -84,7 +84,7 @@ func performInfoStatus(fs host.FileSystem, configPath string) error {
 		return fmt.Errorf("failed to load iknite config from %s: %w", configPath, err)
 	}
 
-	restClient, err := kubeClient.ToRESTClient()
+	restClient, err := k8s.RESTClient(kubeClient)
 	if err != nil {
 		return fmt.Errorf("failed to create REST client: %w", err)
 	}

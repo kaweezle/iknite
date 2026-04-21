@@ -103,16 +103,16 @@ func (r *Client) ToDiscoveryClient() (discovery.CachedDiscoveryInterface, error)
 	return memory.NewMemCacheClient(dc), nil
 }
 
-func (r *Client) ToKubernetesInterface() (kubernetes.Interface, error) {
-	restconfig, err := r.ToRESTConfig()
+func ClientSet(client resource.RESTClientGetter) (kubernetes.Interface, error) {
+	restconfig, err := client.ToRESTConfig()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get REST config for Kubernetes client: %w", err)
 	}
-	client, err := kubernetes.NewForConfig(restconfig)
+	k8sClient, err := kubernetes.NewForConfig(restconfig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Kubernetes client: %w", err)
 	}
-	return client, nil
+	return k8sClient, nil
 }
 
 func (r *Client) ToRESTMapper() (meta.RESTMapper, error) {
@@ -123,7 +123,7 @@ func (r *Client) ToRESTMapper() (meta.RESTMapper, error) {
 	return restmapper.NewDeferredDiscoveryRESTMapper(dc), nil
 }
 
-func (r *Client) ToRESTClient() (rest.Interface, error) {
+func RESTClient(r resource.RESTClientGetter) (rest.Interface, error) {
 	restconfig, err := r.ToRESTConfig()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get REST config for discovery: %w", err)
@@ -149,13 +149,13 @@ func (r *Client) ToRawKubeConfigLoader() clientcmd.ClientConfig {
 	return clientcmd.NewNonInteractiveDeferredLoadingClientConfig(loadingRules, overrides)
 }
 
-func (r *Client) ResourceInfosFromResMap(resources resmap.ResMap) ([]*resource.Info, error) {
+func ResourceInfosFromResMap(client resource.RESTClientGetter, resources resmap.ResMap) ([]*resource.Info, error) {
 	rawResources, err := resources.AsYaml()
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert resources to YAML: %w", err)
 	}
 
-	result := resource.NewBuilder(r).
+	result := resource.NewBuilder(client).
 		Unstructured().
 		ContinueOnError().
 		Stream(bytes.NewBufferString(string(rawResources)), "kustomize").
@@ -263,7 +263,7 @@ func (s *ApplicationStatusViewer) Status(
 
 // ApplyResMapWithServerSideApply applies the given resources to the cluster using server-side apply. It returns the
 // IDs of the applied resources or an error if the operation fails.
-func (client *Client) ApplyResMapWithServerSideApply(resources resmap.ResMap) ([]resid.ResId, error) {
+func ApplyResMapWithServerSideApply(client resource.RESTClientGetter, resources resmap.ResMap) ([]resid.ResId, error) {
 	ids := resources.AllIds()
 
 	// Separate cluster-scoped resources from namespace-scoped ones, as the former need to be applied before the latter
@@ -271,7 +271,7 @@ func (client *Client) ApplyResMapWithServerSideApply(resources resmap.ResMap) ([
 	clusterResources := resmap.NewFactory(provider.NewDefaultDepProvider().GetResourceFactory()).
 		FromResourceSlice(resources.ClusterScoped())
 	if clusterResources.Size() != 0 {
-		clusterInfos, err := client.ResourceInfosFromResMap(clusterResources)
+		clusterInfos, err := ResourceInfosFromResMap(client, clusterResources)
 		if err != nil {
 			return nil, fmt.Errorf("failed to build cluster resource infos: %w", err)
 		}
@@ -289,7 +289,7 @@ func (client *Client) ApplyResMapWithServerSideApply(resources resmap.ResMap) ([
 
 	// Apply namespace-scoped resources after cluster-scoped ones.
 	if resources.Size() != 0 {
-		resourceInfos, err := client.ResourceInfosFromResMap(resources)
+		resourceInfos, err := ResourceInfosFromResMap(client, resources)
 		if err != nil {
 			return nil, fmt.Errorf("failed to build resource infos: %w", err)
 		}
@@ -301,14 +301,8 @@ func (client *Client) ApplyResMapWithServerSideApply(resources resmap.ResMap) ([
 	return ids, nil
 }
 
-func (client *Client) HasApplications() (bool, error) {
-	var mapper meta.RESTMapper
-	var err error
-	if mapper, err = client.ToRESTMapper(); err != nil {
-		return false, fmt.Errorf("failed to get REST mapper: %w", err)
-	}
-
-	_, err = mapper.RESTMapping(
+func HasApplications(mapper meta.RESTMapper) (bool, error) {
+	_, err := mapper.RESTMapping(
 		ApplicationSchemaGroupVersionKind.GroupKind(),
 		ApplicationSchemaGroupVersionKind.Version,
 	)
@@ -322,9 +316,14 @@ func (client *Client) HasApplications() (bool, error) {
 	return true, nil
 }
 
-func (client *Client) AllWorkloadStates() ([]*v1alpha1.WorkloadState, error) {
+func AllWorkloadStates(client resource.RESTClientGetter) ([]*v1alpha1.WorkloadState, error) {
 	resourceTypes := []string{"deployments", "statefulsets", "daemonsets"}
-	hasApplications, err := client.HasApplications()
+
+	mapper, err := client.ToRESTMapper()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get REST mapper: %w", err)
+	}
+	hasApplications, err := HasApplications(mapper)
 	if err != nil {
 		return nil, err
 	}
@@ -383,13 +382,14 @@ func (client *Client) AllWorkloadStates() ([]*v1alpha1.WorkloadState, error) {
 type WorkloadStateCallbackFunc func(allReady bool, total int, ready []*v1alpha1.WorkloadState,
 	unready []*v1alpha1.WorkloadState, iteration, okIterations int) bool
 
-func (client *Client) WorkloadsReadyConditionWithContextFunc(
+func WorkloadsReadyConditionWithContextFunc(
+	client resource.RESTClientGetter,
 	callback WorkloadStateCallbackFunc,
 ) wait.ConditionWithContextFunc {
 	iteration := 0
 	okIterations := 0
 	return func(_ context.Context) (bool, error) {
-		states, err := client.AllWorkloadStates()
+		states, err := AllWorkloadStates(client)
 		if err != nil {
 			return false, err
 		}

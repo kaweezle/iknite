@@ -20,7 +20,7 @@ limitations under the License.
 // a bootstrap repository script.
 package kubewait
 
-// cSpell: words godotenv clientcmd apimachinery kstatus errorf sirupsen joho metav1 serviceaccount
+// cSpell: words godotenv clientcmd apimachinery kstatus errorf sirupsen joho metav1 serviceaccount genericclioptions
 
 import (
 	"context"
@@ -36,6 +36,8 @@ import (
 	k8errors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/client-go/kubernetes"
 	kubeUtil "k8s.io/kubectl/pkg/cmd/util"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling/aggregator"
@@ -111,8 +113,13 @@ func waitForResources(ctx context.Context, opts *Options, namespaces []string) e
 
 	client := k8s.NewClientFromKubeconfig(opts.Kubeconfig)
 
+	mapper, err := client.ToRESTMapper()
+	if err != nil {
+		return fmt.Errorf("failed to create REST mapper: %w", err)
+	}
+
 	// Validate that the requested resource types are supported by the cluster before starting the wait loops.
-	validTypes, err := client.ValidateResourceTypes(opts.ResourceTypes)
+	validTypes, err := k8s.ValidateResourceTypes(mapper, opts.ResourceTypes)
 	if err != nil {
 		return fmt.Errorf("resource type validation failed: %w", err)
 	}
@@ -133,7 +140,12 @@ func waitForResources(ctx context.Context, opts *Options, namespaces []string) e
 			log.Infof("Watching current namespace: %s", namespace)
 			namespaces = []string{namespace}
 		} else {
-			namespaces, err = listNamespaces(ctx, client, opts.StatusUpdateInterval)
+			k8sInterface, err := k8s.ClientSet(client)
+			if err != nil {
+				return fmt.Errorf("failed to create Kubernetes client: %w", err)
+			}
+
+			namespaces, err = listNamespaces(ctx, k8sInterface, opts.StatusUpdateInterval)
 			if err != nil {
 				return fmt.Errorf("failed to list namespaces: %w", err)
 			}
@@ -170,15 +182,10 @@ func waitForResources(ctx context.Context, opts *Options, namespaces []string) e
 // listNamespaces polls the API server until it can list all namespaces.
 func listNamespaces(
 	ctx context.Context,
-	client *k8s.Client,
+	k8sInterface kubernetes.Interface,
 	interval time.Duration,
 ) ([]string, error) {
 	log.Info("No namespaces specified, listing all namespaces from the cluster...")
-
-	k8sInterface, err := client.ToKubernetesInterface()
-	if err != nil {
-		return nil, fmt.Errorf("failed to create Kubernetes client: %w", err)
-	}
 
 	var names []string
 	if err := wait.PollUntilContextCancel(ctx, interval, true, func(ctx context.Context) (bool, error) {
@@ -202,7 +209,7 @@ func listNamespaces(
 
 type resourceWaiter struct {
 	logger             log.FieldLogger
-	client             *k8s.Client
+	client             genericclioptions.RESTClientGetter
 	poller             *polling.StatusPoller
 	pollCancel         context.CancelFunc
 	watchDatasetCancel context.CancelFunc
@@ -215,7 +222,7 @@ type resourceWaiter struct {
 }
 
 func newResourceWaiter(
-	client *k8s.Client,
+	client genericclioptions.RESTClientGetter,
 	namespace string,
 	opts *Options,
 ) (*resourceWaiter, error) {
@@ -354,7 +361,7 @@ func (w *resourceWaiter) startPolling(ctx context.Context, dataSet object.ObjMet
 }
 
 func (w *resourceWaiter) refreshDataSet() (object.ObjMetadataSet, error) {
-	dataSet, err := w.client.ObjectMetadataSetForNamespace(w.namespace, w.opts.ResourceTypes)
+	dataSet, err := k8s.ObjectMetadataSetForNamespace(w.client, w.namespace, w.opts.ResourceTypes)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get object metadata set for namespace %s: %w", w.namespace, err)
 	}
@@ -477,7 +484,7 @@ func (w *resourceWaiter) Start(ctx context.Context) error {
 // then polls until every resource in that namespace is ready.
 func waitNamespaceResources(
 	ctx context.Context,
-	client *k8s.Client,
+	client genericclioptions.RESTClientGetter,
 	namespace string,
 	opts *Options,
 ) error {
@@ -485,7 +492,7 @@ func waitNamespaceResources(
 	// 1. Wait for the namespace to exist.
 	logger.Infof("Waiting for namespace to exist...")
 	var ns *coreV1.Namespace
-	k8sInterface, err := client.ToKubernetesInterface()
+	k8sInterface, err := k8s.ClientSet(client)
 	if err != nil {
 		return fmt.Errorf("failed to create Kubernetes client: %w", err)
 	}

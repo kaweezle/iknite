@@ -142,6 +142,10 @@ func StartAndConfigureKubelet(
 	if err != nil {
 		return fmt.Errorf("failed to load kubeconfig: %w", err)
 	}
+	restClient, err := RESTClient(kubeClient)
+	if err != nil {
+		return fmt.Errorf("failed to create REST client: %w", err)
+	}
 
 	process, err := StartKubelet(ctx, alpineHost)
 	if err != nil {
@@ -177,7 +181,7 @@ func StartAndConfigureKubelet(
 			} else {
 				log.Info("Kubelet is healthy. Waiting for API server to be healthy...")
 				go func() {
-					apiServerHealthz <- CheckClusterRunning(ctx, kubeClient, 30, 2, 10*time.Second)
+					apiServerHealthz <- CheckClusterRunning(ctx, restClient, 30, 2, 10*time.Second)
 				}()
 			}
 		case isApiServerHealthy := <-apiServerHealthz:

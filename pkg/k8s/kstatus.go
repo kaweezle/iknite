@@ -82,12 +82,7 @@ func workloadStatesToSlice(infos []*resource.Info) ([]*v1alpha1.WorkloadState, e
 // ValidateResourceTypes checks if the provided resource types are valid by attempting to find their corresponding
 // GroupVersionKind in the REST mapper. It returns a slice of valid resource types and an error if the
 // validation process encounters an issue.
-func (client *Client) ValidateResourceTypes(types []string) ([]string, error) {
-	restMapper, err := client.ToRESTMapper()
-	if err != nil {
-		return nil, fmt.Errorf("while getting REST mapper: %w", err)
-	}
-
+func ValidateResourceTypes(restMapper meta.RESTMapper, types []string) ([]string, error) {
 	validTypes := make([]string, 0, len(types))
 	noMatchError := &meta.NoResourceMatchError{}
 	for _, t := range types {
@@ -121,7 +116,8 @@ func (client *Client) ValidateResourceTypes(types []string) ([]string, error) {
 }
 
 // ResourceInfosForNamespace returns resource.Info objects for the given namespace and resource types.
-func (client *Client) ResourceInfosForNamespace(
+func ResourceInfosForNamespace(
+	client resource.RESTClientGetter,
 	namespace string,
 	resourceTypes []string,
 ) ([]*resource.Info, error) {
@@ -160,13 +156,14 @@ func infosToObjectMetadataSet(infos []*resource.Info) object.ObjMetadataSet {
 	return set
 }
 
-func (client *Client) ObjectMetadataSetForNamespace(
+func ObjectMetadataSetForNamespace(
+	client resource.RESTClientGetter,
 	namespace string, resourceTypes []string,
 ) (object.ObjMetadataSet, error) {
 	const maxAttempts = 3
 	const retryDelay = 2 * time.Second
 
-	infos, err := client.ResourceInfosForNamespace(namespace, resourceTypes)
+	infos, err := ResourceInfosForNamespace(client, namespace, resourceTypes)
 	for attempt := 2; err != nil && attempt <= maxAttempts; attempt++ {
 		log.WithError(err).WithFields(log.Fields{
 			"resourceTypes": resourceTypes,
@@ -174,7 +171,7 @@ func (client *Client) ObjectMetadataSetForNamespace(
 			"namespace":     namespace,
 		}).Warn("Failed to get resource infos, retrying")
 		time.Sleep(retryDelay)
-		infos, err = client.ResourceInfosForNamespace(namespace, resourceTypes)
+		infos, err = ResourceInfosForNamespace(client, namespace, resourceTypes)
 	}
 	if err != nil {
 		return nil, fmt.Errorf("while getting object metadata set for namespace %s: %w", namespace, err)
@@ -184,10 +181,11 @@ func (client *Client) ObjectMetadataSetForNamespace(
 
 // WorkloadStatesForNamespace returns the readiness state of deployments, statefulsets, and
 // daemonsets in a single namespace using kstatus to evaluate each resource.
-func (client *Client) WorkloadStatesForNamespace(
+func WorkloadStatesForNamespace(
+	client resource.RESTClientGetter,
 	namespace string, resourceTypes []string,
 ) ([]*v1alpha1.WorkloadState, error) {
-	infos, err := client.ResourceInfosForNamespace(namespace, resourceTypes)
+	infos, err := ResourceInfosForNamespace(client, namespace, resourceTypes)
 	if err != nil {
 		return nil, fmt.Errorf("while getting workload states for namespace %s: %w", namespace, err)
 	}

@@ -14,6 +14,7 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/cli-runtime/pkg/resource"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	kubeadmConstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
@@ -401,10 +402,10 @@ func CheckWorkloads(ctx context.Context, data check.CheckData) (bool, string, er
 func checkWorkloadsWithConfig(
 	ctx context.Context,
 	workloadData CheckWorkloadData,
-	kubeClient *k8s.Client,
+	kubeClient resource.RESTClientGetter,
 ) (bool, string, error) { // nocov -- requires a running Kubernetes cluster
 	workloadData.Start()
-	err := workloadData.WaitOptions().Poll(ctx, kubeClient.WorkloadsReadyConditionWithContextFunc(
+	err := workloadData.WaitOptions().Poll(ctx, k8s.WorkloadsReadyConditionWithContextFunc(kubeClient,
 		func(allReady bool, total int, ready, unready []*v1alpha1.WorkloadState, iteration, okIterations int) bool {
 			workloadData.SetOk(allReady)
 			workloadData.SetWorkloadCount(total)
@@ -433,7 +434,7 @@ func CheckIkniteServerHealth(
 		return false, "", fmt.Errorf("failed to load iknite config from %s: %w", constants.IkniteLocalConfPath, err)
 	}
 
-	restClient, err := kubeClient.ToRESTClient()
+	restClient, err := k8s.RESTClient(kubeClient)
 	if err != nil {
 		return false, "", fmt.Errorf("failed to create REST client: %w", err)
 	}

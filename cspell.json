@@ -20,7 +20,9 @@
     "packaging/apk/iknite/**",
     ".gitattributes",
     "checkmake.ini",
-    "deploy/k8s/hack/schemas/**/*.json"
+    "deploy/k8s/hack/schemas/**/*.json",
+    "**/*_mock.go",
+    "**/mocks/**",
   ],
   "dictionaryDefinitions": [],
   "dictionaries": [

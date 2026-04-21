@@ -3,6 +3,7 @@ package kubewait
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -32,7 +33,11 @@ func TestClientDependentHelpersReturnErrors(t *testing.T) {
 			name: "list namespaces with invalid kubeconfig",
 			run: func() error {
 				client := k8s.NewClientFromKubeconfig(missingKubeconfig)
-				_, err := listNamespaces(context.Background(), client, time.Millisecond)
+				clientset, err := k8s.ClientSet(client)
+				if err != nil {
+					return fmt.Errorf("failed to create clientset: %w", err)
+				}
+				_, err = listNamespaces(context.Background(), clientset, time.Millisecond)
 				return err
 			},
 		},

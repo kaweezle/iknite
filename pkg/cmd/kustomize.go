@@ -142,9 +142,14 @@ func performKustomize(
 		}
 	}()
 
+	restClient, err := k8s.RESTClient(kubeClient)
+	if err != nil {
+		cobra.CheckErr(fmt.Errorf("failed to create REST client: %w", err))
+	}
+
 	err = k8s.CheckClusterRunning(
 		ctx,
-		kubeClient,
+		restClient,
 		waitOptions.Retries,
 		waitOptions.OkResponses,
 		waitOptions.Interval,
@@ -156,7 +161,7 @@ func performKustomize(
 	if waitOptions.HasLoop() {
 		logrus.Infof("Waiting for workloads with options: %s", waitOptions.String())
 		runtime.ErrorHandlers = runtime.ErrorHandlers[:0] //nolint:reassign // disabling printing of errors to stderr
-		cobra.CheckErr(waitOptions.Poll(ctx, kubeClient.WorkloadsReadyConditionWithContextFunc(nil)))
+		cobra.CheckErr(waitOptions.Poll(ctx, k8s.WorkloadsReadyConditionWithContextFunc(kubeClient, nil)))
 	}
 }
 

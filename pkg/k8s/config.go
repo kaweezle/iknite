@@ -27,7 +27,9 @@ import (
 	coreV1 "k8s.io/api/core/v1"
 	k8Errors "k8s.io/apimachinery/pkg/api/errors"
 	metaV1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/clientcmd/api"
 	kubeadmConstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
@@ -92,7 +94,7 @@ func ClientSetFromFile(fs host.FileSystem, path string) (kubernetes.Interface, e
 	if err != nil {
 		return nil, err
 	}
-	return client.ToKubernetesInterface()
+	return ClientSet(client)
 }
 
 // RenameConfig changes the name of the cluster and the context from the
@@ -124,7 +126,7 @@ func RenameConfig(c *api.Config, newName string) *api.Config {
 
 // IsConfigServerAddress checks that config points to the server at ip IP
 // address.
-func IsConfigServerAddress(c *Client, address string) bool {
+func IsConfigServerAddress(c resource.RESTClientGetter, address string) bool {
 	expectedURL := fmt.Sprintf("https://%v:6443", address)
 
 	restConfig, err := c.ToRESTConfig()
@@ -140,15 +142,11 @@ func IsConfigServerAddress(c *Client, address string) bool {
 // from the server.
 func CheckClusterRunning(
 	ctx context.Context,
-	kubeClient *Client,
+	client rest.Interface,
 	retries, okResponses int,
 	interval time.Duration,
 ) error {
-	client, err := kubeClient.ToRESTClient()
-	if err != nil {
-		return fmt.Errorf("error getting rest interface: %w", err)
-	}
-
+	var err error
 	okTries := 0
 	query := client.Get().AbsPath("/readyz")
 	first := true
@@ -251,7 +249,7 @@ func RestartProxy(ctx context.Context, client kubernetes.Interface) error {
 // the timeout period.
 func Kustomize(
 	ctx context.Context,
-	kubeClient *Client,
+	kubeClient resource.RESTClientGetter,
 	fs host.FileSystem,
 	kustomization string,
 	options *utils.KustomizeOptions,
@@ -261,7 +259,7 @@ func Kustomize(
 		return nil
 	}
 
-	client, err := kubeClient.ToKubernetesInterface()
+	client, err := ClientSet(kubeClient)
 	if err != nil {
 		return err
 	}
@@ -285,7 +283,7 @@ func Kustomize(
 	}
 	log.WithField("resourceCount", resources.Size()).Info("Applying base kustomization resources")
 
-	ids, err := kubeClient.ApplyResMapWithServerSideApply(resources)
+	ids, err := ApplyResMapWithServerSideApply(kubeClient, resources)
 	if err != nil {
 		return fmt.Errorf("while applying kustomization resources server side: %w", err)
 	}
