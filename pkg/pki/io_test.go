@@ -19,6 +19,7 @@ import (
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	pkiutil "k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
 
+	mockHost "github.com/kaweezle/iknite/mocks/github.com/kaweezle/iknite/pkg/host"
 	"github.com/kaweezle/iknite/pkg/host"
 	"github.com/kaweezle/iknite/pkg/pki"
 )
@@ -227,7 +228,7 @@ func TestWrite_MkdirAllError(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			mockFS := host.NewMockFileSystem(t)
+			mockFS := mockHost.NewMockFileSystem(t)
 			mockFS.EXPECT().MkdirAll(mock.Anything, mock.Anything).Return(fmt.Errorf("mkdir failed"))
 			require.ErrorContains(t, tt.fn(mockFS), tt.wantErr)
 		})

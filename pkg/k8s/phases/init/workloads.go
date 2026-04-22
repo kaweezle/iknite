@@ -11,6 +11,7 @@ import (
 	"github.com/kaweezle/iknite/pkg/apis/iknite"
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
 	"github.com/kaweezle/iknite/pkg/constants"
+	"github.com/kaweezle/iknite/pkg/host"
 	"github.com/kaweezle/iknite/pkg/k8s"
 )
 
@@ -24,14 +25,21 @@ func NewWorkloadsPhase() workflow.Phase {
 	}
 }
 
+type monitorData interface {
+	ContextProvider
+	StatusServerProvider
+	IkniteClusterProvider
+	host.HostProvider
+}
+
 // runPrepare executes the node initialization process.
 func runMonitorWorkloads(c workflow.RunData) error {
-	data, ok := c.(IkniteInitData)
+	data, ok := c.(monitorData)
 	if !ok {
 		return fmt.Errorf("prepare phase invoked with an invalid data struct. ")
 	}
 	cluster := data.IkniteCluster()
-	ctx, _ := data.ContextWithCancel()
+	ctx := data.Context()
 
 	ticker := time.NewTicker(5 * time.Second)
 	kubeClient, err := k8s.NewClientFromFile(data.Host(), constants.KubernetesRootConfig)

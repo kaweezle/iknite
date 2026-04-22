@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	mockHost "github.com/kaweezle/iknite/mocks/github.com/kaweezle/iknite/pkg/host"
 	"github.com/kaweezle/iknite/pkg/host"
 )
 
@@ -158,7 +159,7 @@ func TestKustomizeFSWrapper_Exists(t *testing.T) {
 
 	t.Run("error returns false", func(t *testing.T) {
 		t.Parallel()
-		mockFS := host.NewMockFileSystem(t)
+		mockFS := mockHost.NewMockFileSystem(t)
 		mockFS.On("Exists", "test.txt").Return(false, assert.AnError).Once()
 
 		kfs := host.NewKustomizeFSWrapper(mockFS)
@@ -222,7 +223,7 @@ func TestKustomizeFSWrapper_CleanedAbs(t *testing.T) {
 
 	t.Run("abs error", func(t *testing.T) {
 		t.Parallel()
-		mockFS := host.NewMockFileSystem(t)
+		mockFS := mockHost.NewMockFileSystem(t)
 		mockFS.On("Abs", "mypath").Return("", assert.AnError).Once()
 
 		kfs := host.NewKustomizeFSWrapper(mockFS)
@@ -233,7 +234,7 @@ func TestKustomizeFSWrapper_CleanedAbs(t *testing.T) {
 
 	t.Run("dirExists error", func(t *testing.T) {
 		t.Parallel()
-		mockFS := host.NewMockFileSystem(t)
+		mockFS := mockHost.NewMockFileSystem(t)
 		mockFS.On("Abs", "mypath").Return("/mypath", nil).Once()
 		mockFS.On("DirExists", "/mypath").Return(false, assert.AnError).Once()
 
@@ -288,7 +289,7 @@ func TestKustomizeFSWrapper_IsDir(t *testing.T) {
 
 	t.Run("error returns false", func(t *testing.T) {
 		t.Parallel()
-		mockFS := host.NewMockFileSystem(t)
+		mockFS := mockHost.NewMockFileSystem(t)
 		mockFS.On("DirExists", "mydir").Return(false, assert.AnError).Once()
 
 		kfs := host.NewKustomizeFSWrapper(mockFS)

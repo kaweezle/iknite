@@ -53,7 +53,7 @@ func NewStartCmd(ikniteConfig *v1alpha1.IkniteClusterSpec, waitOptions *utils.Wa
 - Allows the use of kubectl from the root account,
 - Installs flannel, metal-lb and local-path-provisioner.
 `,
-		Run: func(_ *cobra.Command, _ []string) { performStart(ikniteConfig, waitOptions) },
+		Run: func(cmd *cobra.Command, _ []string) { performStart(cmd.Context(), ikniteConfig, waitOptions) },
 	}
 	flags := startCmd.Flags()
 
@@ -93,9 +93,9 @@ func IsIkniteReady(_ context.Context, fs host.FileSystem) (bool, error) {
 	return false, nil
 }
 
-func performStart(ikniteConfig *v1alpha1.IkniteClusterSpec, waitOptions *utils.WaitOptions) {
+func performStart(ctx context.Context, ikniteConfig *v1alpha1.IkniteClusterSpec, waitOptions *utils.WaitOptions) {
 	alpineHost := host.NewDefaultHost()
-	cobra.CheckErr(k8s.PrepareKubernetesEnvironment(alpineHost, ikniteConfig))
+	cobra.CheckErr(k8s.PrepareKubernetesEnvironment(ctx, alpineHost, ikniteConfig))
 
 	// If Kubernetes is already installed, check that the configuration has not
 	// Changed.
@@ -120,7 +120,7 @@ func performStart(ikniteConfig *v1alpha1.IkniteClusterSpec, waitOptions *utils.W
 
 	// Start OpenRC. This will perform `iknite init`.
 	cobra.CheckErr(alpine.EnsureOpenRC(alpineHost, "default"))
-	cobra.CheckErr(waitOptions.Poll(context.Background(), func(ctx context.Context) (bool, error) {
+	cobra.CheckErr(waitOptions.Poll(ctx, func(ctx context.Context) (bool, error) {
 		return IsIkniteReady(ctx, alpineHost)
 	}))
 	log.Info("Cluster is ready")

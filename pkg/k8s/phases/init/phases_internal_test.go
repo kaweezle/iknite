@@ -28,6 +28,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 
+	mockHost "github.com/kaweezle/iknite/mocks/github.com/kaweezle/iknite/pkg/host"
 	"github.com/kaweezle/iknite/pkg/host"
 )
 
@@ -155,7 +156,7 @@ func TestWaitForKubelet_ProcessStop(t *testing.T) {
 	t.Parallel()
 	req := require.New(t)
 
-	process := host.NewMockProcess(t)
+	process := mockHost.NewMockProcess(t)
 	process.On("Wait").Return(nil).Once()
 	process.On("State").Return(&os.ProcessState{})
 
@@ -167,7 +168,7 @@ func TestWaitForKubelet_CtxDone(t *testing.T) {
 	t.Parallel()
 	req := require.New(t)
 
-	process := host.NewMockProcess(t)
+	process := mockHost.NewMockProcess(t)
 	// First call wait
 	process.On("Wait").Run(func(_ mock.Arguments) {
 		time.Sleep(100 * time.Millisecond)
@@ -187,7 +188,7 @@ func TestWaitForKubelet_CtxDoneWithWaitError(t *testing.T) {
 	t.Parallel()
 	req := require.New(t)
 
-	process := host.NewMockProcess(t)
+	process := mockHost.NewMockProcess(t)
 	process.On("Signal", syscall.SIGTERM).Return(nil).Once()
 	process.On("Wait").Run(func(_ mock.Arguments) {
 		time.Sleep(100 * time.Millisecond)
@@ -207,7 +208,7 @@ func TestWaitForKubelet_CtxDoneWithSignalError(t *testing.T) {
 	t.Parallel()
 	req := require.New(t)
 
-	process := host.NewMockProcess(t)
+	process := mockHost.NewMockProcess(t)
 	process.On("Wait").Run(func(_ mock.Arguments) {
 		time.Sleep(100 * time.Millisecond)
 	}).Return(fmt.Errorf("wait error")).Maybe()
@@ -226,7 +227,7 @@ func TestWaitForKubelet_CtxDoneWithSignalAndWaitError(t *testing.T) {
 	t.Parallel()
 	req := require.New(t)
 
-	process := host.NewMockProcess(t)
+	process := mockHost.NewMockProcess(t)
 	process.On("Wait").Run(func(_ mock.Arguments) {
 		time.Sleep(100 * time.Millisecond)
 	}).Return(fmt.Errorf("wait error")).Maybe()

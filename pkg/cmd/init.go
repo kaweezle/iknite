@@ -25,7 +25,6 @@ import (
 	"io"
 	"net"
 	"os"
-	"os/signal"
 	"path/filepath"
 	"slices"
 	"strconv"
@@ -142,7 +141,6 @@ type initData struct {
 	mdnsConn                    *mdns.Conn
 	statusServer                *ikniteServer.IkniteServer
 	ctx                         context.Context //nolint:containedctx // passed around but not stored
-	ctxCancel                   context.CancelFunc
 	kustomizeOptions            *utils.KustomizeOptions
 	alpineHost                  host.Host
 }
@@ -581,8 +579,6 @@ func newInitData(
 	// Apply ikniteCluster spec to the internal InitConfiguration
 	config.ApplyIkniteClusterSpecToInitConfiguration(&(ikniteCluster.Spec), cfg)
 
-	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-
 	return &initData{
 		cfg:                     cfg,
 		certificatesDir:         cfg.CertificatesDir,
@@ -597,8 +593,7 @@ func newInitData(
 		skipCertificateKeyPrint: initOptions.skipCertificateKeyPrint,
 		patchesDir:              initOptions.patchesDir,
 		ikniteCluster:           ikniteCluster,
-		ctx:                     ctx,
-		ctxCancel:               cancel,
+		ctx:                     cmd.Context(),
 		kustomizeOptions:        initOptions.kustomizeOptions,
 		dryRun: cmdUtil.ValueFromFlagsOrConfig( //nolint:errcheck,forcetypeassert // default value is false
 			cmd.Flags(),
@@ -884,8 +879,8 @@ func (d *initData) StatusServer() *ikniteServer.IkniteServer {
 	return d.statusServer
 }
 
-func (d *initData) ContextWithCancel() (context.Context, context.CancelFunc) {
-	return d.ctx, d.ctxCancel
+func (d *initData) Context() context.Context {
+	return d.ctx
 }
 
 func (d *initData) KustomizeOptions() *utils.KustomizeOptions {

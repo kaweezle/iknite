@@ -3,9 +3,6 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"os"
-	"os/signal"
-	"syscall"
 
 	"github.com/spf13/cobra"
 
@@ -36,8 +33,8 @@ The kubelet is started and monitored. The following operations are performed:
 - Starts the kubelet,
 - Monitors the kubelet,
 `,
-		RunE: func(_ *cobra.Command, _ []string) error {
-			return performKubelet(ikniteConfig, kustomizeOptions, alpineHost)
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			return performKubelet(cmd.Context(), ikniteConfig, kustomizeOptions, alpineHost)
 		},
 	}
 
@@ -48,6 +45,7 @@ The kubelet is started and monitored. The following operations are performed:
 }
 
 func performKubelet(
+	ctx context.Context,
 	ikniteConfig *v1alpha1.IkniteClusterSpec,
 	kustomizeOptions *utils.KustomizeOptions,
 	alpineHost host.Host,
@@ -56,10 +54,8 @@ func performKubelet(
 	if err != nil {
 		return fmt.Errorf("failed to create kube client: %w", err)
 	}
-	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer cancel()
 
-	err = k8s.PrepareKubernetesEnvironment(alpineHost, ikniteConfig)
+	err = k8s.PrepareKubernetesEnvironment(ctx, alpineHost, ikniteConfig)
 	if err != nil {
 		return fmt.Errorf("failed to prepare Kubernetes environment: %w", err)
 	}

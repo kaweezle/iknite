@@ -11,6 +11,7 @@ import (
 	"github.com/bitfield/script"
 	"github.com/stretchr/testify/require"
 
+	mockHost "github.com/kaweezle/iknite/mocks/github.com/kaweezle/iknite/pkg/host"
 	"github.com/kaweezle/iknite/pkg/host"
 )
 
@@ -149,7 +150,7 @@ func TestTerminateProcess(t *testing.T) {
 	t.Parallel()
 	req := require.New(t)
 
-	p := host.NewMockProcess(t)
+	p := mockHost.NewMockProcess(t)
 	p.On("Signal", syscall.SIGTERM).Return(nil).Once()
 	p.On("Wait").Return(nil).Once()
 
@@ -162,7 +163,7 @@ func TestTerminateProcess(t *testing.T) {
 func TestTerminateProcess_Error(t *testing.T) {
 	t.Parallel()
 	req := require.New(t)
-	p := host.NewMockProcess(t)
+	p := mockHost.NewMockProcess(t)
 	p.On("Signal", syscall.SIGTERM).Return(fmt.Errorf("signal error")).Once()
 
 	alive := true
@@ -175,7 +176,7 @@ func TestTerminateProcess_Error(t *testing.T) {
 func TestTerminateProcess_WaitError(t *testing.T) {
 	t.Parallel()
 	req := require.New(t)
-	p := host.NewMockProcess(t)
+	p := mockHost.NewMockProcess(t)
 	p.On("Signal", syscall.SIGTERM).Return(nil).Once()
 	p.On("Wait").Return(fmt.Errorf("wait error")).Once()
 

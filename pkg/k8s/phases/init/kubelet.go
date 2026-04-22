@@ -108,7 +108,7 @@ func runKubeletStart(c workflow.RunData) error {
 	// Try to start the kubelet service in case it's inactive
 	if !data.DryRun() {
 		logrus.WithField("phase", "kubelet-start").Info("Starting the kubelet")
-		ctx, _ := data.ContextWithCancel()
+		ctx := data.Context()
 		process, err := k8s.StartKubelet(ctx, data.Host())
 		if err != nil {
 			return fmt.Errorf("failed to start kubelet: %w", err)

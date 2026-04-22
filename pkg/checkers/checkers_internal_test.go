@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	mockHost "github.com/kaweezle/iknite/mocks/github.com/kaweezle/iknite/pkg/host"
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
 	"github.com/kaweezle/iknite/pkg/check"
 	"github.com/kaweezle/iknite/pkg/constants"
@@ -61,14 +62,14 @@ func TestFileTreeDifferenceAndCheck(t *testing.T) {
 	req.NotEmpty(extra)
 
 	// EvalSymlinks error.
-	mockFSSymErr := host.NewMockFileSystem(t)
+	mockFSSymErr := mockHost.NewMockFileSystem(t)
 	mockFSSymErr.On("EvalSymlinks", dir).Return("", errors.New("symlink error"))
 	_, _, err = FileTreeDifference(mockFSSymErr, dir, expected)
 	req.Error(err)
 	req.ErrorContains(err, "failed to evaluate symlinks")
 
 	// Walk returns error directly (without calling walkFn).
-	mockFSWalkErr := host.NewMockFileSystem(t)
+	mockFSWalkErr := mockHost.NewMockFileSystem(t)
 	mockFSWalkErr.On("EvalSymlinks", dir).Return(dir, nil)
 	mockFSWalkErr.On("Walk", dir, mock.Anything).Return(errors.New("walk error"))
 	_, _, err = FileTreeDifference(mockFSWalkErr, dir, expected)
@@ -76,7 +77,7 @@ func TestFileTreeDifferenceAndCheck(t *testing.T) {
 	req.ErrorContains(err, "failed to walk file tree")
 
 	// Walk calls the walkFn with a non-nil error (covers the `if err != nil { return err }` inside the callback).
-	mockFSWalkFnErr := host.NewMockFileSystem(t)
+	mockFSWalkFnErr := mockHost.NewMockFileSystem(t)
 	mockFSWalkFnErr.On("EvalSymlinks", dir).Return(dir, nil)
 	fileErr := errors.New("file error")
 	mockFSWalkFnErr.On("Walk", dir, mock.Anything).Run(func(args mock.Arguments) {
@@ -88,12 +89,12 @@ func TestFileTreeDifferenceAndCheck(t *testing.T) {
 	req.ErrorContains(err, "failed to walk file tree")
 
 	// FileTreeCheck via mock host (three checks: match, missing, extra).
-	mockHost := host.NewMockHost(t)
-	mockProvider := host.NewMockHostProvider(t)
-	mockProvider.On("Host").Return(mockHost).Times(3)
+	mockH := mockHost.NewMockHost(t)
+	mockProvider := mockHost.NewMockHostProvider(t)
+	mockProvider.On("Host").Return(mockH).Times(3)
 
-	mockHost.On("EvalSymlinks", mock.Anything).Return(dir, nil).Times(3)
-	mockHost.On("Walk", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
+	mockH.On("EvalSymlinks", mock.Anything).Return(dir, nil).Times(3)
+	mockH.On("Walk", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
 		path := args.Get(0).(string)              //nolint:errcheck,forcetypeassert // No need
 		walkFn := args.Get(1).(filepath.WalkFunc) //nolint:errcheck,forcetypeassert // No need
 		//nolint:errcheck // WalkFunc does not return an error.
@@ -130,8 +131,8 @@ func TestFileTreeDifferenceAndCheck(t *testing.T) {
 	req.ErrorContains(err, "invalid check data type")
 
 	// FileTreeCheck where FileTreeDifference returns an error (EvalSymlinks fails via mock).
-	mockErrProvider := host.NewMockHostProvider(t)
-	mockErrHost := host.NewMockHost(t)
+	mockErrProvider := mockHost.NewMockHostProvider(t)
+	mockErrHost := mockHost.NewMockHost(t)
 	mockErrProvider.On("Host").Return(mockErrHost)
 	mockErrHost.On("EvalSymlinks", dir).Return("", errors.New("symlink fail"))
 	errCheck := FileTreeCheck("tree", "tree check", dir, expected)
@@ -148,7 +149,7 @@ func TestKubernetesFileCheckAndSystemFileCheck(t *testing.T) {
 	file := filepath.Join(dir, "conf.txt")
 	req.NoError(os.WriteFile(file, []byte("ok\n"), 0o600))
 	h := host.NewDefaultHost()
-	mockProvider := host.NewMockHostProvider(t)
+	mockProvider := mockHost.NewMockHostProvider(t)
 	mockProvider.On("Host").Return(h).Times(3)
 
 	kubeCheck := SimpleFileCheck("kube-file", file)
@@ -317,7 +318,7 @@ func TestAdditionalCheckerPaths(t *testing.T) {
 	req.ErrorContains(err, "service ignored is not running")
 
 	// CheckService: IsServiceStarted returns an error (Exists fails).
-	mockErrHost := host.NewMockHost(t)
+	mockErrHost := mockHost.NewMockHost(t)
 	mockErrHost.On("Exists", mock.Anything).Return(false, errors.New("disk error"))
 	ok, _, err = CheckService(mockErrHost, "svc", ServiceTypeOpenRC)
 	req.Error(err)
@@ -325,7 +326,7 @@ func TestAdditionalCheckerPaths(t *testing.T) {
 	req.ErrorContains(err, "failed to check if service svc is started")
 
 	// CheckService: IsServiceStarted returns true (success path for OpenRC).
-	mockOkHost := host.NewMockHost(t)
+	mockOkHost := mockHost.NewMockHost(t)
 	mockOkHost.On("Exists", mock.Anything).Return(true, nil)
 	ok, msg, err = CheckService(mockOkHost, "svc", ServiceTypeOpenRC)
 	req.NoError(err)
@@ -333,7 +334,7 @@ func TestAdditionalCheckerPaths(t *testing.T) {
 	req.Contains(msg, "svc")
 
 	// CheckService: CheckPidFile returns a non-ErrNotExist error.
-	mockPidErrHost := host.NewMockHost(t)
+	mockPidErrHost := mockHost.NewMockHost(t)
 	mockPidErrHost.On("ReadFile", "/run/svc.pid").Return([]byte(nil), errors.New("permission denied"))
 	ok, _, err = CheckService(mockPidErrHost, "svc", ServiceTypePidFile)
 	req.Error(err)
@@ -391,8 +392,8 @@ func TestAdditionalCheckerPaths(t *testing.T) {
 	req.ErrorContains(err, "invalid check data type")
 
 	// ServiceCheck CheckFn with valid data (service not running).
-	mockSvcProvider := host.NewMockHostProvider(t)
-	mockSvcHost := host.NewMockHost(t)
+	mockSvcProvider := mockHost.NewMockHostProvider(t)
+	mockSvcHost := mockHost.NewMockHost(t)
 	mockSvcProvider.On("Host").Return(mockSvcHost)
 	mockSvcHost.On("Exists", mock.Anything).Return(false, nil)
 	ok, _, err = serviceCheck.CheckFn(context.Background(), mockSvcProvider)
@@ -422,7 +423,7 @@ func TestCheckFileAndContent_Errors(t *testing.T) {
 			name: "stat returns non-ErrNotExist error",
 			setup: func(t *testing.T) host.FileSystem {
 				t.Helper()
-				m := host.NewMockFileSystem(t)
+				m := mockHost.NewMockFileSystem(t)
 				m.On("Stat", "/test").Return((*fakefi)(nil), errors.New("permission denied"))
 				return m
 			},
@@ -445,7 +446,7 @@ func TestCheckFileAndContent_Errors(t *testing.T) {
 			name: "readFile error",
 			setup: func(t *testing.T) host.FileSystem {
 				t.Helper()
-				m := host.NewMockFileSystem(t)
+				m := mockHost.NewMockFileSystem(t)
 				m.On("Stat", "/test").Return(&fakefi{dir: false}, nil)
 				m.On("ReadFile", "/test").Return([]byte(nil), errors.New("read error"))
 				return m
@@ -490,7 +491,7 @@ func TestCheckOpenRCAndOpenRCCheck(t *testing.T) {
 	req.Contains(msg, "OpenRC is not started")
 
 	// Exists returns an error.
-	mockFS := host.NewMockFileSystem(t)
+	mockFS := mockHost.NewMockFileSystem(t)
 	mockFS.On("Exists", constants.SoftLevelPath).Return(false, errors.New("disk error"))
 	ok, _, err = checkOpenRCStarted(mockFS)
 	req.Error(err)
@@ -504,17 +505,17 @@ func TestCheckOpenRCAndOpenRCCheck(t *testing.T) {
 	req.ErrorContains(err, "invalid check data type")
 
 	// OpenRCCheck with valid data (file exists).
-	mockHost := host.NewMockHost(t)
-	mockProvider := host.NewMockHostProvider(t)
-	mockProvider.On("Host").Return(mockHost).Twice()
-	mockHost.On("Exists", constants.SoftLevelPath).Return(true, nil).Once()
+	mockH := mockHost.NewMockHost(t)
+	mockProvider := mockHost.NewMockHostProvider(t)
+	mockProvider.On("Host").Return(mockH).Twice()
+	mockH.On("Exists", constants.SoftLevelPath).Return(true, nil).Once()
 	ok, msg, err = chk.CheckFn(context.Background(), mockProvider)
 	req.NoError(err)
 	req.True(ok)
 	req.Contains(msg, "OpenRC is started")
 
 	// OpenRCCheck with valid data (file does not exist).
-	mockHost.On("Exists", constants.SoftLevelPath).Return(false, nil).Once()
+	mockH.On("Exists", constants.SoftLevelPath).Return(false, nil).Once()
 	ok, msg, err = chk.CheckFn(context.Background(), mockProvider)
 	req.NoError(err)
 	req.False(ok)
@@ -552,7 +553,7 @@ func TestCheckAPIBackendData(t *testing.T) {
 	req.Contains(msg, "has no data file")
 
 	// EvalSymlinks error via mock.
-	mockFS := host.NewMockFileSystem(t)
+	mockFS := mockHost.NewMockFileSystem(t)
 	mockFS.On("EvalSymlinks", mock.Anything).Return("", errors.New("symlink error"))
 	ok, _, err = checkApiBackendData(mockFS, constants.EtcdBackendName)
 	req.Error(err)
@@ -566,11 +567,11 @@ func TestCheckAPIBackendData(t *testing.T) {
 	req.ErrorContains(err, "invalid check data type")
 
 	// APIBackendDataCheck with valid data.
-	mockHost := host.NewMockHost(t)
-	mockProvider := host.NewMockHostProvider(t)
-	mockProvider.On("Host").Return(mockHost)
-	mockHost.On("EvalSymlinks", mock.Anything).Return("/var/lib/etcd", nil)
-	mockHost.On("Walk", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
+	mockH := mockHost.NewMockHost(t)
+	mockProvider := mockHost.NewMockHostProvider(t)
+	mockProvider.On("Host").Return(mockH)
+	mockH.On("EvalSymlinks", mock.Anything).Return("/var/lib/etcd", nil)
+	mockH.On("Walk", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
 		wfn := args.Get(1).(filepath.WalkFunc) //nolint:errcheck,forcetypeassert // No need
 		_ = fsEtcd.Walk("/var/lib/etcd", wfn)  //nolint:errcheck // Walk does not return an error here
 	}).Return(nil)
@@ -593,7 +594,7 @@ func TestCheckDomainName(t *testing.T) {
 	req.True(ok)
 	req.Contains(msg, "not set")
 
-	mockNH := host.NewMockNetworkHost(t)
+	mockNH := mockHost.NewMockNetworkHost(t)
 
 	// Domain mapped to the correct IP.
 	mockNH.On("IsHostMapped", ctx, ip, "good.local").Return(true, []net.IP{ip}).Once()
@@ -624,10 +625,10 @@ func TestCheckDomainName(t *testing.T) {
 	req.ErrorContains(err, "invalid check data type")
 
 	// DomainNameCheck with valid data (mapped correctly).
-	mockHost := host.NewMockHost(t)
-	mockProvider := host.NewMockHostProvider(t)
-	mockProvider.On("Host").Return(mockHost)
-	mockHost.On("IsHostMapped", ctx, ip, "test.local").Return(true, []net.IP{ip})
+	mockH := mockHost.NewMockHost(t)
+	mockProvider := mockHost.NewMockHostProvider(t)
+	mockProvider.On("Host").Return(mockH)
+	mockH.On("IsHostMapped", ctx, ip, "test.local").Return(true, []net.IP{ip})
 	ok, _, err = chk.CheckFn(ctx, mockProvider)
 	req.NoError(err)
 	req.True(ok)

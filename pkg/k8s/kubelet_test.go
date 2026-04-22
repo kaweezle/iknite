@@ -15,6 +15,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	mockHost "github.com/kaweezle/iknite/mocks/github.com/kaweezle/iknite/pkg/host"
 	mockk8s "github.com/kaweezle/iknite/mocks/github.com/kaweezle/iknite/pkg/k8s"
 	"github.com/kaweezle/iknite/pkg/alpine"
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
@@ -123,14 +124,14 @@ func TestStarKubelet(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		prepareMock  func(t *testing.T, m *host.MockFileExecutor) error
+		prepareMock  func(t *testing.T, m *mockHost.MockFileExecutor) error
 		expectations func(req *require.Assertions, process host.Process) error
 		name         string
 		wantErr      string
 	}{
 		{
 			name: "nominal case",
-			prepareMock: func(t *testing.T, m *host.MockFileExecutor) error {
+			prepareMock: func(t *testing.T, m *mockHost.MockFileExecutor) error {
 				t.Helper()
 				// Check if process is already running
 				m.On("ReadFile", "/run/kubelet.pid").Return(nil, os.ErrNotExist).Once()
@@ -145,7 +146,7 @@ func TestStarKubelet(t *testing.T) {
 					Return(mem.NewFileHandle(mem.CreateFile("kubelet.log")), nil).
 					Once()
 				// Start kubelet process
-				mockProcess := host.NewMockProcess(t)
+				mockProcess := mockHost.NewMockProcess(t)
 				mockProcess.On("Pid").Return(1234).Twice()
 				m.On("StartCommand", mock.Anything, mock.Anything).Return(mockProcess, nil).Once()
 				pidFilePath := alpine.ServicePidFilePath(k8s.KubeletName)
@@ -160,11 +161,11 @@ func TestStarKubelet(t *testing.T) {
 		},
 		{
 			name: "kubelet already running",
-			prepareMock: func(t *testing.T, m *host.MockFileExecutor) error {
+			prepareMock: func(t *testing.T, m *mockHost.MockFileExecutor) error {
 				t.Helper()
 				// Check if process is already running
 				m.On("ReadFile", "/run/kubelet.pid").Return([]byte("1234"), nil).Once()
-				mockProcess := host.NewMockProcess(t)
+				mockProcess := mockHost.NewMockProcess(t)
 				mockProcess.On("Pid").Return(1234).Once()
 				mockProcess.On("Signal", mock.Anything).Return(nil).Once()
 				m.On("FindProcess", 1234).Return(mockProcess, nil).Once()
@@ -178,7 +179,7 @@ func TestStarKubelet(t *testing.T) {
 		},
 		{
 			name: "Fail to read kubelet pid file",
-			prepareMock: func(t *testing.T, m *host.MockFileExecutor) error {
+			prepareMock: func(t *testing.T, m *mockHost.MockFileExecutor) error {
 				t.Helper()
 				// Check if process is already running
 				m.On("ReadFile", "/run/kubelet.pid").Return([]byte("abcd"), nil).Once()
@@ -188,7 +189,7 @@ func TestStarKubelet(t *testing.T) {
 		},
 		{
 			name: "Fail to read env files",
-			prepareMock: func(t *testing.T, m *host.MockFileExecutor) error {
+			prepareMock: func(t *testing.T, m *mockHost.MockFileExecutor) error {
 				t.Helper()
 				// Check if process is already running
 				m.On("ReadFile", "/run/kubelet.pid").Return(nil, os.ErrNotExist).Once()
@@ -200,7 +201,7 @@ func TestStarKubelet(t *testing.T) {
 		},
 		{
 			name: "Fail to create log directory",
-			prepareMock: func(t *testing.T, m *host.MockFileExecutor) error {
+			prepareMock: func(t *testing.T, m *mockHost.MockFileExecutor) error {
 				t.Helper()
 				// Check if process is already running
 				m.On("ReadFile", "/run/kubelet.pid").Return(nil, os.ErrNotExist).Once()
@@ -216,7 +217,7 @@ func TestStarKubelet(t *testing.T) {
 		},
 		{
 			name: "Fail to create log file",
-			prepareMock: func(t *testing.T, m *host.MockFileExecutor) error {
+			prepareMock: func(t *testing.T, m *mockHost.MockFileExecutor) error {
 				t.Helper()
 				// Check if process is already running
 				m.On("ReadFile", "/run/kubelet.pid").Return(nil, os.ErrNotExist).Once()
@@ -236,7 +237,7 @@ func TestStarKubelet(t *testing.T) {
 		},
 		{
 			name: "Fail to start kubelet process",
-			prepareMock: func(t *testing.T, m *host.MockFileExecutor) error {
+			prepareMock: func(t *testing.T, m *mockHost.MockFileExecutor) error {
 				t.Helper()
 				// Check if process is already running
 				m.On("ReadFile", "/run/kubelet.pid").Return(nil, os.ErrNotExist).Once()
@@ -257,7 +258,7 @@ func TestStarKubelet(t *testing.T) {
 		},
 		{
 			name: "fail to write pid file",
-			prepareMock: func(t *testing.T, m *host.MockFileExecutor) error {
+			prepareMock: func(t *testing.T, m *mockHost.MockFileExecutor) error {
 				t.Helper()
 				// Check if process is already running
 				m.On("ReadFile", "/run/kubelet.pid").Return(nil, os.ErrNotExist).Once()
@@ -272,7 +273,7 @@ func TestStarKubelet(t *testing.T) {
 					Return(mem.NewFileHandle(mem.CreateFile("kubelet.log")), nil).
 					Once()
 				// Start kubelet process
-				mockProcess := host.NewMockProcess(t)
+				mockProcess := mockHost.NewMockProcess(t)
 				mockProcess.On("Pid").Return(1234).Times(3)
 				m.On("StartCommand", mock.Anything, mock.Anything).Return(mockProcess, nil).Once()
 				pidFilePath := alpine.ServicePidFilePath(k8s.KubeletName)
@@ -296,7 +297,7 @@ func TestStarKubelet(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer cancel()
 
-			fileExec := host.NewMockFileExecutor(t)
+			fileExec := mockHost.NewMockFileExecutor(t)
 			err := tt.prepareMock(t, fileExec)
 			req.NoError(err)
 
@@ -359,7 +360,7 @@ func TestStartAndConfigureKubelet_KubeletHealthError(t *testing.T) {
 	req := require.New(t)
 
 	runtime := mockk8s.NewMockKubeletRuntime(t)
-	process := host.NewMockProcess(t)
+	process := mockHost.NewMockProcess(t)
 	process.On("Wait").Run(func(_ mock.Arguments) {
 		time.Sleep(30 * time.Millisecond)
 	}).Return(nil).Maybe()
@@ -390,7 +391,7 @@ func TestStartAndConfigureKubelet_APIServerHealthError(t *testing.T) {
 	req := require.New(t)
 
 	runtime := mockk8s.NewMockKubeletRuntime(t)
-	process := host.NewMockProcess(t)
+	process := mockHost.NewMockProcess(t)
 	process.On("Wait").Run(func(_ mock.Arguments) {
 		time.Sleep(30 * time.Millisecond)
 	}).Return(nil).Maybe()
@@ -422,7 +423,7 @@ func TestStartAndConfigureKubelet_KustomizeError(t *testing.T) {
 	req := require.New(t)
 
 	runtime := mockk8s.NewMockKubeletRuntime(t)
-	process := host.NewMockProcess(t)
+	process := mockHost.NewMockProcess(t)
 	process.On("Wait").Run(func(_ mock.Arguments) {
 		time.Sleep(30 * time.Millisecond)
 	}).Return(nil).Maybe()
@@ -458,7 +459,7 @@ func TestStartAndConfigureKubelet_Success(t *testing.T) {
 
 	runtime := mockk8s.NewMockKubeletRuntime(t)
 	waitRelease := make(chan struct{})
-	process := host.NewMockProcess(t)
+	process := mockHost.NewMockProcess(t)
 	process.EXPECT().Wait().RunAndReturn(func() error {
 		<-waitRelease
 		return nil
@@ -496,7 +497,7 @@ func TestStartAndConfigureKubelet_ContextCanceled(t *testing.T) {
 	cancel()
 
 	runtime := mockk8s.NewMockKubeletRuntime(t)
-	process := host.NewMockProcess(t)
+	process := mockHost.NewMockProcess(t)
 	process.On("Wait").Run(func(_ mock.Arguments) {
 		time.Sleep(30 * time.Millisecond)
 	}).Return(nil).Maybe()

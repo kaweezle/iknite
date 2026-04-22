@@ -7,26 +7,27 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	mockHost "github.com/kaweezle/iknite/mocks/github.com/kaweezle/iknite/pkg/host"
 	"github.com/kaweezle/iknite/pkg/host"
 )
 
 func TestEnsureNetFilter(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
-		prepare func(t *testing.T, mockExec *host.MockFileExecutor)
+		prepare func(t *testing.T, mockExec *mockHost.MockFileExecutor)
 		name    string
 		wantErr bool
 	}{
 		{
 			name: "directory exists skips modprobe",
-			prepare: func(_ *testing.T, fs *host.MockFileExecutor) {
+			prepare: func(_ *testing.T, fs *mockHost.MockFileExecutor) {
 				fs.On("Exists", brNetfilterDir).Return(true, nil).Once()
 			},
 			wantErr: false,
 		},
 		{
 			name: "missing directory runs modprobe",
-			prepare: func(_ *testing.T, mockExec *host.MockFileExecutor) {
+			prepare: func(_ *testing.T, mockExec *mockHost.MockFileExecutor) {
 				mockExec.On("Exists", brNetfilterDir).Return(false, nil).Once()
 				mockExec.On("Run", true, modProbeCmd, []string{netfilter_module}).Return([]byte("ok"), nil).Once()
 			},
@@ -34,7 +35,7 @@ func TestEnsureNetFilter(t *testing.T) {
 		},
 		{
 			name: "modprobe error is returned",
-			prepare: func(_ *testing.T, mockExec *host.MockFileExecutor) {
+			prepare: func(_ *testing.T, mockExec *mockHost.MockFileExecutor) {
 				mockExec.On("Exists", brNetfilterDir).Return(false, nil).Once()
 				mockExec.On("Run", true, modProbeCmd, []string{netfilter_module}).
 					Return([]byte("boom"), errors.New("failed")).
@@ -49,7 +50,7 @@ func TestEnsureNetFilter(t *testing.T) {
 			t.Parallel()
 			req := require.New(t)
 
-			mockFileExec := host.NewMockFileExecutor(t)
+			mockFileExec := mockHost.NewMockFileExecutor(t)
 
 			tt.prepare(t, mockFileExec)
 

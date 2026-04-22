@@ -8,6 +8,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	mockHost "github.com/kaweezle/iknite/mocks/github.com/kaweezle/iknite/pkg/host"
 	"github.com/kaweezle/iknite/pkg/alpine"
 	"github.com/kaweezle/iknite/pkg/constants"
 	"github.com/kaweezle/iknite/pkg/host"
@@ -28,7 +29,7 @@ func TestEnsureOpenRC_Success(t *testing.T) {
 	t.Parallel()
 	req := require.New(t)
 
-	mockExec := host.NewMockExecutor(t)
+	mockExec := mockHost.NewMockExecutor(t)
 	mockExec.On("Run", true, "/sbin/openrc", []string{"default"}).Return([]byte("ok"), nil).Once()
 
 	err := alpine.EnsureOpenRC(mockExec, "default")
@@ -39,7 +40,7 @@ func TestEnsureOpenRC_Error(t *testing.T) {
 	t.Parallel()
 	req := require.New(t)
 
-	mockExec := host.NewMockExecutor(t)
+	mockExec := mockHost.NewMockExecutor(t)
 	mockExec.On("Run", true, "/sbin/openrc", []string{"default"}).
 		Return(nil, errors.New("openrc failed")).Once()
 
@@ -54,7 +55,7 @@ func TestStartOpenRC_SoftLevelExists(t *testing.T) {
 	t.Parallel()
 	req := require.New(t)
 
-	mockFE := host.NewMockFileExecutor(t)
+	mockFE := mockHost.NewMockFileExecutor(t)
 	// SoftLevelPath already exists → no Run call expected
 	mockFE.On("Exists", constants.SoftLevelPath).Return(true, nil).Once()
 
@@ -66,7 +67,7 @@ func TestStartOpenRC_SoftLevelAbsent_Success(t *testing.T) {
 	t.Parallel()
 	req := require.New(t)
 
-	mockFE := host.NewMockFileExecutor(t)
+	mockFE := mockHost.NewMockFileExecutor(t)
 	mockFE.On("Exists", constants.SoftLevelPath).Return(false, nil).Once()
 	mockFE.On("Run", true, "/sbin/openrc", []string{"default"}).Return([]byte("ok"), nil).Once()
 
@@ -78,7 +79,7 @@ func TestStartOpenRC_SoftLevelAbsent_EnsureOpenRCError(t *testing.T) {
 	t.Parallel()
 	req := require.New(t)
 
-	mockFE := host.NewMockFileExecutor(t)
+	mockFE := mockHost.NewMockFileExecutor(t)
 	mockFE.On("Exists", constants.SoftLevelPath).Return(false, nil).Once()
 	mockFE.On("Run", true, "/sbin/openrc", []string{"default"}).
 		Return(nil, errors.New("openrc failed")).Once()
@@ -92,7 +93,7 @@ func TestStartOpenRC_ExistsError(t *testing.T) {
 	t.Parallel()
 	req := require.New(t)
 
-	mockFE := host.NewMockFileExecutor(t)
+	mockFE := mockHost.NewMockFileExecutor(t)
 	mockFE.On("Exists", constants.SoftLevelPath).
 		Return(false, errors.New("stat error")).Once()
 
@@ -130,7 +131,7 @@ func TestIsServiceStarted_Error(t *testing.T) {
 	t.Parallel()
 	req := require.New(t)
 
-	mockFS := host.NewMockFileSystem(t)
+	mockFS := mockHost.NewMockFileSystem(t)
 	mockFS.On("Exists", startedSvcLink).Return(false, errors.New("stat error")).Once()
 
 	_, err := alpine.IsServiceStarted(mockFS, testSvc)
@@ -175,7 +176,7 @@ func TestExecuteIfServiceNotStarted_ExistsError(t *testing.T) {
 	t.Parallel()
 	req := require.New(t)
 
-	mockFS := host.NewMockFileSystem(t)
+	mockFS := mockHost.NewMockFileSystem(t)
 	mockFS.On("Exists", startedSvcLink).Return(false, errors.New("stat error")).Once()
 
 	err := alpine.ExecuteIfServiceNotStarted(mockFS, testSvc, func() error { return nil })
@@ -220,7 +221,7 @@ func TestExecuteIfServiceStarted_ExistsError(t *testing.T) {
 	t.Parallel()
 	req := require.New(t)
 
-	mockFS := host.NewMockFileSystem(t)
+	mockFS := mockHost.NewMockFileSystem(t)
 	mockFS.On("Exists", startedSvcLink).Return(false, errors.New("stat error")).Once()
 
 	err := alpine.ExecuteIfServiceStarted(mockFS, testSvc, func() error { return nil })
@@ -234,7 +235,7 @@ func TestEnableService_NotYetEnabled(t *testing.T) {
 	t.Parallel()
 	req := require.New(t)
 
-	mockFS := host.NewMockFileSystem(t)
+	mockFS := mockHost.NewMockFileSystem(t)
 	mockFS.On("Exists", runLevelSvcLink).Return(false, nil).Once()
 	mockFS.On("Symlink", initSvcFile, runLevelSvcLink).Return(nil).Once()
 
@@ -246,7 +247,7 @@ func TestEnableService_AlreadyEnabled(t *testing.T) {
 	t.Parallel()
 	req := require.New(t)
 
-	mockFS := host.NewMockFileSystem(t)
+	mockFS := mockHost.NewMockFileSystem(t)
 	mockFS.On("Exists", runLevelSvcLink).Return(true, nil).Once()
 	// Symlink should NOT be called
 
@@ -258,7 +259,7 @@ func TestEnableService_SymlinkError(t *testing.T) {
 	t.Parallel()
 	req := require.New(t)
 
-	mockFS := host.NewMockFileSystem(t)
+	mockFS := mockHost.NewMockFileSystem(t)
 	mockFS.On("Exists", runLevelSvcLink).Return(false, nil).Once()
 	mockFS.On("Symlink", initSvcFile, runLevelSvcLink).Return(errors.New("symlink failed")).Once()
 
@@ -271,7 +272,7 @@ func TestEnableService_ExistsError(t *testing.T) {
 	t.Parallel()
 	req := require.New(t)
 
-	mockFS := host.NewMockFileSystem(t)
+	mockFS := mockHost.NewMockFileSystem(t)
 	mockFS.On("Exists", runLevelSvcLink).Return(false, errors.New("stat error")).Once()
 
 	err := alpine.EnableService(mockFS, testSvc)
@@ -284,7 +285,7 @@ func TestDisableService_Enabled(t *testing.T) {
 	t.Parallel()
 	req := require.New(t)
 
-	mockFS := host.NewMockFileSystem(t)
+	mockFS := mockHost.NewMockFileSystem(t)
 	mockFS.On("Exists", runLevelSvcLink).Return(true, nil).Once()
 	mockFS.On("Remove", runLevelSvcLink).Return(nil).Once()
 
@@ -296,7 +297,7 @@ func TestDisableService_NotEnabled(t *testing.T) {
 	t.Parallel()
 	req := require.New(t)
 
-	mockFS := host.NewMockFileSystem(t)
+	mockFS := mockHost.NewMockFileSystem(t)
 	mockFS.On("Exists", runLevelSvcLink).Return(false, nil).Once()
 	// Remove should NOT be called
 
@@ -308,7 +309,7 @@ func TestDisableService_RemoveError(t *testing.T) {
 	t.Parallel()
 	req := require.New(t)
 
-	mockFS := host.NewMockFileSystem(t)
+	mockFS := mockHost.NewMockFileSystem(t)
 	mockFS.On("Exists", runLevelSvcLink).Return(true, nil).Once()
 	mockFS.On("Remove", runLevelSvcLink).Return(errors.New("remove failed")).Once()
 
@@ -323,7 +324,7 @@ func TestStartService_NotStarted_Success(t *testing.T) {
 	t.Parallel()
 	req := require.New(t)
 
-	mockFE := host.NewMockFileExecutor(t)
+	mockFE := mockHost.NewMockFileExecutor(t)
 	mockFE.On("Exists", startedSvcLink).Return(false, nil).Once()
 	mockFE.On("Run", false, "/sbin/rc-service", []string{testSvc, "start"}).
 		Return([]byte("started"), nil).Once()
@@ -336,7 +337,7 @@ func TestStartService_AlreadyStarted(t *testing.T) {
 	t.Parallel()
 	req := require.New(t)
 
-	mockFE := host.NewMockFileExecutor(t)
+	mockFE := mockHost.NewMockFileExecutor(t)
 	mockFE.On("Exists", startedSvcLink).Return(true, nil).Once()
 	// Run should NOT be called
 
@@ -348,7 +349,7 @@ func TestStartService_RunError(t *testing.T) {
 	t.Parallel()
 	req := require.New(t)
 
-	mockFE := host.NewMockFileExecutor(t)
+	mockFE := mockHost.NewMockFileExecutor(t)
 	mockFE.On("Exists", startedSvcLink).Return(false, nil).Once()
 	mockFE.On("Run", false, "/sbin/rc-service", []string{testSvc, "start"}).
 		Return(nil, errors.New("start failed")).Once()
@@ -364,7 +365,7 @@ func TestStopService_Started_Success(t *testing.T) {
 	t.Parallel()
 	req := require.New(t)
 
-	mockFE := host.NewMockFileExecutor(t)
+	mockFE := mockHost.NewMockFileExecutor(t)
 	mockFE.On("Exists", startedSvcLink).Return(true, nil).Once()
 	mockFE.On("Run", false, "/sbin/rc-service", []string{testSvc, "stop"}).
 		Return([]byte("stopped"), nil).Once()
@@ -377,7 +378,7 @@ func TestStopService_NotStarted(t *testing.T) {
 	t.Parallel()
 	req := require.New(t)
 
-	mockFE := host.NewMockFileExecutor(t)
+	mockFE := mockHost.NewMockFileExecutor(t)
 	mockFE.On("Exists", startedSvcLink).Return(false, nil).Once()
 	// Run should NOT be called
 
@@ -389,7 +390,7 @@ func TestStopService_RunError(t *testing.T) {
 	t.Parallel()
 	req := require.New(t)
 
-	mockFE := host.NewMockFileExecutor(t)
+	mockFE := mockHost.NewMockFileExecutor(t)
 	mockFE.On("Exists", startedSvcLink).Return(true, nil).Once()
 	mockFE.On("Run", false, "/sbin/rc-service", []string{testSvc, "stop"}).
 		Return(nil, errors.New("stop failed")).Once()
@@ -405,7 +406,7 @@ func TestPretendServiceStarted_NotYet(t *testing.T) {
 	t.Parallel()
 	req := require.New(t)
 
-	mockFS := host.NewMockFileSystem(t)
+	mockFS := mockHost.NewMockFileSystem(t)
 	mockFS.On("Exists", startedSvcLink).Return(false, nil).Once()
 	mockFS.On("Symlink", initSvcFile, startedSvcLink).Return(nil).Once()
 
@@ -417,7 +418,7 @@ func TestPretendServiceStarted_AlreadyStarted(t *testing.T) {
 	t.Parallel()
 	req := require.New(t)
 
-	mockFS := host.NewMockFileSystem(t)
+	mockFS := mockHost.NewMockFileSystem(t)
 	mockFS.On("Exists", startedSvcLink).Return(true, nil).Once()
 	// Symlink should NOT be called
 
@@ -429,7 +430,7 @@ func TestPretendServiceStarted_SymlinkError(t *testing.T) {
 	t.Parallel()
 	req := require.New(t)
 
-	mockFS := host.NewMockFileSystem(t)
+	mockFS := mockHost.NewMockFileSystem(t)
 	mockFS.On("Exists", startedSvcLink).Return(false, nil).Once()
 	mockFS.On("Symlink", initSvcFile, startedSvcLink).Return(errors.New("symlink failed")).Once()
 
@@ -444,7 +445,7 @@ func TestEnsureOpenRCDirectory_NotYet(t *testing.T) {
 	t.Parallel()
 	req := require.New(t)
 
-	mockFS := host.NewMockFileSystem(t)
+	mockFS := mockHost.NewMockFileSystem(t)
 	mockFS.On("Exists", openRCDir).Return(false, nil).Once()
 	mockFS.On("Symlink", openRCSrcDir, openRCDir).Return(nil).Once()
 
@@ -456,7 +457,7 @@ func TestEnsureOpenRCDirectory_AlreadyExists(t *testing.T) {
 	t.Parallel()
 	req := require.New(t)
 
-	mockFS := host.NewMockFileSystem(t)
+	mockFS := mockHost.NewMockFileSystem(t)
 	mockFS.On("Exists", openRCDir).Return(true, nil).Once()
 	// Symlink should NOT be called
 
@@ -468,7 +469,7 @@ func TestEnsureOpenRCDirectory_SymlinkError(t *testing.T) {
 	t.Parallel()
 	req := require.New(t)
 
-	mockFS := host.NewMockFileSystem(t)
+	mockFS := mockHost.NewMockFileSystem(t)
 	mockFS.On("Exists", openRCDir).Return(false, nil).Once()
 	mockFS.On("Symlink", openRCSrcDir, openRCDir).Return(errors.New("symlink failed")).Once()
 

@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 
 	"github.com/bitfield/script"
+	"github.com/kaweezle/iknite/pkg/host"
 	"github.com/spf13/afero"
 	mock "github.com/stretchr/testify/mock"
 	"github.com/txn2/txeh"
@@ -525,23 +526,23 @@ func (_c *MockHost_Exists_Call) RunAndReturn(run func(path string) (bool, error)
 }
 
 // FindProcess provides a mock function for the type MockHost
-func (_mock *MockHost) FindProcess(pid int) (Process, error) {
+func (_mock *MockHost) FindProcess(pid int) (host.Process, error) {
 	ret := _mock.Called(pid)
 
 	if len(ret) == 0 {
 		panic("no return value specified for FindProcess")
 	}
 
-	var r0 Process
+	var r0 host.Process
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(int) (Process, error)); ok {
+	if returnFunc, ok := ret.Get(0).(func(int) (host.Process, error)); ok {
 		return returnFunc(pid)
 	}
-	if returnFunc, ok := ret.Get(0).(func(int) Process); ok {
+	if returnFunc, ok := ret.Get(0).(func(int) host.Process); ok {
 		r0 = returnFunc(pid)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(Process)
+			r0 = ret.Get(0).(host.Process)
 		}
 	}
 	if returnFunc, ok := ret.Get(1).(func(int) error); ok {
@@ -576,12 +577,12 @@ func (_c *MockHost_FindProcess_Call) Run(run func(pid int)) *MockHost_FindProces
 	return _c
 }
 
-func (_c *MockHost_FindProcess_Call) Return(process Process, err error) *MockHost_FindProcess_Call {
+func (_c *MockHost_FindProcess_Call) Return(process host.Process, err error) *MockHost_FindProcess_Call {
 	_c.Call.Return(process, err)
 	return _c
 }
 
-func (_c *MockHost_FindProcess_Call) RunAndReturn(run func(pid int) (Process, error)) *MockHost_FindProcess_Call {
+func (_c *MockHost_FindProcess_Call) RunAndReturn(run func(pid int) (host.Process, error)) *MockHost_FindProcess_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -1525,26 +1526,26 @@ func (_c *MockHost_Run_Call) RunAndReturn(run func(combined bool, cmd string, ar
 }
 
 // StartCommand provides a mock function for the type MockHost
-func (_mock *MockHost) StartCommand(ctx context.Context, options *CommandOptions) (Process, error) {
+func (_mock *MockHost) StartCommand(ctx context.Context, options *host.CommandOptions) (host.Process, error) {
 	ret := _mock.Called(ctx, options)
 
 	if len(ret) == 0 {
 		panic("no return value specified for StartCommand")
 	}
 
-	var r0 Process
+	var r0 host.Process
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, *CommandOptions) (Process, error)); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *host.CommandOptions) (host.Process, error)); ok {
 		return returnFunc(ctx, options)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, *CommandOptions) Process); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *host.CommandOptions) host.Process); ok {
 		r0 = returnFunc(ctx, options)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(Process)
+			r0 = ret.Get(0).(host.Process)
 		}
 	}
-	if returnFunc, ok := ret.Get(1).(func(context.Context, *CommandOptions) error); ok {
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *host.CommandOptions) error); ok {
 		r1 = returnFunc(ctx, options)
 	} else {
 		r1 = ret.Error(1)
@@ -1559,20 +1560,20 @@ type MockHost_StartCommand_Call struct {
 
 // StartCommand is a helper method to define mock.On call
 //   - ctx context.Context
-//   - options *CommandOptions
+//   - options *host.CommandOptions
 func (_e *MockHost_Expecter) StartCommand(ctx interface{}, options interface{}) *MockHost_StartCommand_Call {
 	return &MockHost_StartCommand_Call{Call: _e.mock.On("StartCommand", ctx, options)}
 }
 
-func (_c *MockHost_StartCommand_Call) Run(run func(ctx context.Context, options *CommandOptions)) *MockHost_StartCommand_Call {
+func (_c *MockHost_StartCommand_Call) Run(run func(ctx context.Context, options *host.CommandOptions)) *MockHost_StartCommand_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
 			arg0 = args[0].(context.Context)
 		}
-		var arg1 *CommandOptions
+		var arg1 *host.CommandOptions
 		if args[1] != nil {
-			arg1 = args[1].(*CommandOptions)
+			arg1 = args[1].(*host.CommandOptions)
 		}
 		run(
 			arg0,
@@ -1582,12 +1583,12 @@ func (_c *MockHost_StartCommand_Call) Run(run func(ctx context.Context, options 
 	return _c
 }
 
-func (_c *MockHost_StartCommand_Call) Return(process Process, err error) *MockHost_StartCommand_Call {
+func (_c *MockHost_StartCommand_Call) Return(process host.Process, err error) *MockHost_StartCommand_Call {
 	_c.Call.Return(process, err)
 	return _c
 }
 
-func (_c *MockHost_StartCommand_Call) RunAndReturn(run func(ctx context.Context, options *CommandOptions) (Process, error)) *MockHost_StartCommand_Call {
+func (_c *MockHost_StartCommand_Call) RunAndReturn(run func(ctx context.Context, options *host.CommandOptions) (host.Process, error)) *MockHost_StartCommand_Call {
 	_c.Call.Return(run)
 	return _c
 }

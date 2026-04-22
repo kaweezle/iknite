@@ -8,6 +8,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 
 	"github.com/kaweezle/iknite/pkg/constants"
+	"github.com/kaweezle/iknite/pkg/host"
 	"github.com/kaweezle/iknite/pkg/server"
 )
 
@@ -21,8 +22,14 @@ func NewServePhase() workflow.Phase {
 	}
 }
 
+type serverData interface {
+	IkniteClusterProvider
+	host.HostProvider
+	StatusServerHolder
+}
+
 func runServe(c workflow.RunData) error {
-	data, ok := c.(IkniteInitData)
+	data, ok := c.(serverData)
 	if !ok {
 		return fmt.Errorf("serve phase invoked with an invalid data struct")
 	}
@@ -40,7 +47,7 @@ func runServe(c workflow.RunData) error {
 
 // ensureServerStopped stops the status server if it is still running.
 // It is called from the daemonize phase after the kubelet has stopped.
-func ensureServerStopped(data IkniteInitData) {
+func ensureServerStopped(data StatusServerHolder) {
 	srv := data.StatusServer()
 	if srv == nil {
 		return

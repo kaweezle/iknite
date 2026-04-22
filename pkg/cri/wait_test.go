@@ -9,6 +9,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	mockHost "github.com/kaweezle/iknite/mocks/github.com/kaweezle/iknite/pkg/host"
 	"github.com/kaweezle/iknite/pkg/constants"
 	"github.com/kaweezle/iknite/pkg/cri"
 	"github.com/kaweezle/iknite/pkg/host"
@@ -16,7 +17,7 @@ import (
 
 func TestWaitForContainerService(t *testing.T) {
 	tests := []struct {
-		prepareExec  func(m *host.MockExecutor)
+		prepareExec  func(m *mockHost.MockExecutor)
 		name         string
 		wantReady    bool
 		wantErr      bool
@@ -24,7 +25,7 @@ func TestWaitForContainerService(t *testing.T) {
 	}{
 		{
 			name: "service becomes ready",
-			prepareExec: func(m *host.MockExecutor) {
+			prepareExec: func(m *mockHost.MockExecutor) {
 				m.On(
 					"Run",
 					false,
@@ -42,7 +43,7 @@ func TestWaitForContainerService(t *testing.T) {
 		},
 		{
 			name: "service not ready after retries",
-			prepareExec: func(m *host.MockExecutor) {
+			prepareExec: func(m *mockHost.MockExecutor) {
 				m.On(
 					"Run",
 					false,
@@ -65,7 +66,7 @@ func TestWaitForContainerService(t *testing.T) {
 			req := require.New(t)
 
 			fs := host.NewMemMapFS()
-			mockExec := host.NewMockExecutor(t)
+			mockExec := mockHost.NewMockExecutor(t)
 			tt.prepareExec(mockExec)
 
 			if tt.expectSocket {

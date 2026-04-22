@@ -9,6 +9,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 
 	"github.com/kaweezle/iknite/pkg/config"
+	"github.com/kaweezle/iknite/pkg/host"
 	"github.com/kaweezle/iknite/pkg/k8s"
 )
 
@@ -22,9 +23,16 @@ func NewKustomizeClusterPhase() workflow.Phase {
 	}
 }
 
+type kustomizeData interface {
+	IkniteClusterProvider
+	host.HostProvider
+	KustomizeOptionsProvider
+	ContextProvider
+}
+
 // runKustomize is a phase that configures the cluster with base Kustomization.
 func runKustomize(c workflow.RunData) error {
-	data, ok := c.(IkniteInitData)
+	data, ok := c.(kustomizeData)
 	if !ok {
 		return fmt.Errorf("configure phase invoked with an invalid data struct. ")
 	}
@@ -40,7 +48,7 @@ func runKustomize(c workflow.RunData) error {
 	if err != nil {
 		return fmt.Errorf("failed to load configuration: %w", err)
 	}
-	ctx, _ := data.ContextWithCancel()
+	ctx := data.Context()
 	kustomizeOptions := data.KustomizeOptions()
 	if err := k8s.Kustomize(
 		ctx,

@@ -209,7 +209,7 @@ func EnsureClientCertAndKey(fs host.FileSystem, certDir string) error {
 // status server. It is (re-)created on every start so that the IP address is
 // always up to date.
 //
-//nolint:gosec // Reading from a protected directory
+
 func EnsureIkniteConf(fs host.FileSystem, certDir, confPath string, spec *v1alpha1.IkniteClusterSpec) error {
 	// Determine the server address from the cluster spec
 	serverAddr := "localhost"
@@ -260,7 +260,7 @@ func EnsureIkniteConf(fs host.FileSystem, certDir, confPath string, spec *v1alph
 // NewIkniteServer builds an IkniteServer from spec and the certificates in
 // certDir. The port is taken from spec.StatusServerPort.
 //
-//nolint:gosec // Reading from a protected directory
+
 func NewIkniteServer(fs host.FileSystem, certDir string, spec *v1alpha1.IkniteClusterSpec) (*IkniteServer, error) {
 	caCertPEM, err := fs.ReadFile(filepath.Join(certDir, "ca.crt"))
 	if err != nil {

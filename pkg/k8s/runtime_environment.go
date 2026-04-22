@@ -219,7 +219,11 @@ func EnableCGroupSubtreeControl(fs host.FileSystem) error {
 // checks that the target IP address is available and adds it if necessary.
 //
 
-func PrepareKubernetesEnvironment(alpineHost host.Host, ikniteConfig *v1alpha1.IkniteClusterSpec) error {
+func PrepareKubernetesEnvironment(
+	ctx context.Context,
+	alpineHost host.Host,
+	ikniteConfig *v1alpha1.IkniteClusterSpec,
+) error {
 	log.WithFields(log.Fields{
 		"ip":                 ikniteConfig.Ip.String(),
 		"kubernetes_version": ikniteConfig.KubernetesVersion,
@@ -286,7 +290,7 @@ func PrepareKubernetesEnvironment(alpineHost host.Host, ikniteConfig *v1alpha1.I
 		}).Info("Check domain name to IP mapping...")
 
 		if contains, ips := alpineHost.IsHostMapped(
-			context.Background(),
+			ctx,
 			ikniteConfig.Ip,
 			ikniteConfig.DomainName,
 		); !contains {

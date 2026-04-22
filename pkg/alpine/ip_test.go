@@ -13,8 +13,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/txn2/txeh"
 
+	mockHost "github.com/kaweezle/iknite/mocks/github.com/kaweezle/iknite/pkg/host"
 	"github.com/kaweezle/iknite/pkg/alpine"
-	"github.com/kaweezle/iknite/pkg/host"
 )
 
 // cSpell: enable
@@ -27,7 +27,7 @@ func TestAddIpAddress(t *testing.T) {
 	ipaddr := net.ParseIP("192.168.99.2")
 	req.NotNil(ipaddr)
 
-	mockExec := host.NewMockExecutor(t)
+	mockExec := mockHost.NewMockExecutor(t)
 
 	call := mockExec.On(
 		"Run",

@@ -26,7 +26,6 @@ packages:
   github.com/kaweezle/iknite/pkg/host:
     config:
       all: true
-      dir: "{{.InterfaceDir}}"
   github.com/kaweezle/iknite/pkg/k8s:
     interfaces: { KubeletRuntime }
   k8s.io/cli-runtime/pkg/genericclioptions:
@@ -43,3 +42,14 @@ packages:
     interfaces: { ClientConfig }
   k8s.io/apimachinery/pkg/api/meta:
     interfaces: { RESTMapper }
+  github.com/kaweezle/iknite/pkg/k8s/phases/init:
+    interfaces:
+      {
+        IkniteInitData,
+        daemonizeData,
+        serverData,
+        kustomizeData,
+        monitorData,
+        mdnsData,
+        prepareHostData,
+      }

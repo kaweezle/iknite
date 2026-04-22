@@ -15,6 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/txn2/txeh"
 
+	mockHost "github.com/kaweezle/iknite/mocks/github.com/kaweezle/iknite/pkg/host"
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
 	"github.com/kaweezle/iknite/pkg/constants"
 	"github.com/kaweezle/iknite/pkg/host"
@@ -204,12 +205,12 @@ func TestEnsureConfigFileHasConfigurationLine_Errors(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name            string
-		prepare         func(mfs *host.MockFileSystem)
+		prepare         func(mfs *mockHost.MockFileSystem)
 		wantErrContains string
 	}{
 		{
 			name: "CountLines error propagates",
-			prepare: func(mfs *host.MockFileSystem) {
+			prepare: func(mfs *mockHost.MockFileSystem) {
 				mfs.On("Pipe", confFilePath).
 					Return(script.NewPipe().WithError(errors.New("read error"))).Once()
 			},
@@ -217,7 +218,7 @@ func TestEnsureConfigFileHasConfigurationLine_Errors(t *testing.T) {
 		},
 		{
 			name: "Slice error propagates",
-			prepare: func(mfs *host.MockFileSystem) {
+			prepare: func(mfs *mockHost.MockFileSystem) {
 				mfs.On("Pipe", confFilePath).
 					Return(script.NewPipe().WithReader(strings.NewReader("existing\n"))).Once()
 				mfs.On("Pipe", confFilePath).
@@ -227,7 +228,7 @@ func TestEnsureConfigFileHasConfigurationLine_Errors(t *testing.T) {
 		},
 		{
 			name: "WriteFile error propagates",
-			prepare: func(mfs *host.MockFileSystem) {
+			prepare: func(mfs *mockHost.MockFileSystem) {
 				mfs.On("Pipe", confFilePath).
 					Return(script.NewPipe().WithReader(strings.NewReader("existing\n"))).Once()
 				mfs.On("Pipe", confFilePath).
@@ -243,7 +244,7 @@ func TestEnsureConfigFileHasConfigurationLine_Errors(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			req := require.New(t)
-			mfs := host.NewMockFileSystem(t)
+			mfs := mockHost.NewMockFileSystem(t)
 			tt.prepare(mfs)
 
 			err := k8s.EnsureConfigFileHasConfigurationLine(mfs, confFilePath, "new-line")
@@ -255,19 +256,19 @@ func TestEnsureConfigFileHasConfigurationLine_Errors(t *testing.T) {
 func TestEnsureNetworkInterfacesConfiguration(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
-		prepare func(mfs *host.MockFileSystem)
+		prepare func(mfs *mockHost.MockFileSystem)
 		name    string
 		wantErr bool
 	}{
 		{
 			name: "file exists skips creation",
-			prepare: func(mfs *host.MockFileSystem) {
+			prepare: func(mfs *mockHost.MockFileSystem) {
 				mfs.On("Exists", constants.NetworkInterfacesConfFile).Return(true, nil).Once()
 			},
 		},
 		{
 			name: "file absent creates it",
-			prepare: func(mfs *host.MockFileSystem) {
+			prepare: func(mfs *mockHost.MockFileSystem) {
 				mfs.On("Exists", constants.NetworkInterfacesConfFile).Return(false, nil).Once()
 				mfs.On("WriteFile", constants.NetworkInterfacesConfFile, mock.Anything, os.FileMode(0o644)).
 					Return(nil).Once()
@@ -275,7 +276,7 @@ func TestEnsureNetworkInterfacesConfiguration(t *testing.T) {
 		},
 		{
 			name: "Exists error propagates",
-			prepare: func(mfs *host.MockFileSystem) {
+			prepare: func(mfs *mockHost.MockFileSystem) {
 				mfs.On("Exists", constants.NetworkInterfacesConfFile).
 					Return(false, errors.New("stat error")).Once()
 			},
@@ -283,7 +284,7 @@ func TestEnsureNetworkInterfacesConfiguration(t *testing.T) {
 		},
 		{
 			name: "WriteFile error propagates",
-			prepare: func(mfs *host.MockFileSystem) {
+			prepare: func(mfs *mockHost.MockFileSystem) {
 				mfs.On("Exists", constants.NetworkInterfacesConfFile).Return(false, nil).Once()
 				mfs.On("WriteFile", constants.NetworkInterfacesConfFile, mock.Anything, os.FileMode(0o644)).
 					Return(errors.New("write error")).Once()
@@ -296,7 +297,7 @@ func TestEnsureNetworkInterfacesConfiguration(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			req := require.New(t)
-			mfs := host.NewMockFileSystem(t)
+			mfs := mockHost.NewMockFileSystem(t)
 			tt.prepare(mfs)
 
 			err := k8s.EnsureNetworkInterfacesConfiguration(mfs)
@@ -312,19 +313,19 @@ func TestEnsureNetworkInterfacesConfiguration(t *testing.T) {
 func TestEnableCGroupSubtreeControl(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
-		prepare func(mfs *host.MockFileSystem)
+		prepare func(mfs *mockHost.MockFileSystem)
 		name    string
 		wantErr bool
 	}{
 		{
 			name: "already enabled is a no-op",
-			prepare: func(mfs *host.MockFileSystem) {
+			prepare: func(mfs *mockHost.MockFileSystem) {
 				mfs.On("ReadFile", cgroupSubtreeControlPath).Return([]byte("+cpuset cpu"), nil).Once()
 			},
 		},
 		{
 			name: "enables with process migration and subtree write",
-			prepare: func(mfs *host.MockFileSystem) {
+			prepare: func(mfs *mockHost.MockFileSystem) {
 				mfs.On("ReadFile", cgroupSubtreeControlPath).Return([]byte("cpu memory"), nil).Once()
 				mfs.On("MkdirAll", cgroupInitDir, os.FileMode(0o755)).Return(nil).Once()
 				mfs.On("Pipe", cgroupProcsPath).
@@ -336,7 +337,7 @@ func TestEnableCGroupSubtreeControl(t *testing.T) {
 		},
 		{
 			name: "process write warning does not abort",
-			prepare: func(mfs *host.MockFileSystem) {
+			prepare: func(mfs *mockHost.MockFileSystem) {
 				mfs.On("ReadFile", cgroupSubtreeControlPath).Return([]byte("cpu memory"), nil).Once()
 				mfs.On("MkdirAll", cgroupInitDir, os.FileMode(0o755)).Return(nil).Once()
 				mfs.On("Pipe", cgroupProcsPath).
@@ -349,14 +350,14 @@ func TestEnableCGroupSubtreeControl(t *testing.T) {
 		},
 		{
 			name: "ReadFile subtree_control error propagates",
-			prepare: func(mfs *host.MockFileSystem) {
+			prepare: func(mfs *mockHost.MockFileSystem) {
 				mfs.On("ReadFile", cgroupSubtreeControlPath).Return(nil, errors.New("read error")).Once()
 			},
 			wantErr: true,
 		},
 		{
 			name: "MkdirAll error propagates",
-			prepare: func(mfs *host.MockFileSystem) {
+			prepare: func(mfs *mockHost.MockFileSystem) {
 				mfs.On("ReadFile", cgroupSubtreeControlPath).Return([]byte("cpu memory"), nil).Once()
 				mfs.On("MkdirAll", cgroupInitDir, os.FileMode(0o755)).Return(errors.New("mkdir failed")).Once()
 			},
@@ -364,7 +365,7 @@ func TestEnableCGroupSubtreeControl(t *testing.T) {
 		},
 		{
 			name: "cgroup.procs Slice error propagates",
-			prepare: func(mfs *host.MockFileSystem) {
+			prepare: func(mfs *mockHost.MockFileSystem) {
 				mfs.On("ReadFile", cgroupSubtreeControlPath).Return([]byte("cpu memory"), nil).Once()
 				mfs.On("MkdirAll", cgroupInitDir, os.FileMode(0o755)).Return(nil).Once()
 				mfs.On("Pipe", cgroupProcsPath).
@@ -374,7 +375,7 @@ func TestEnableCGroupSubtreeControl(t *testing.T) {
 		},
 		{
 			name: "ReadFile cgroup.controllers error propagates",
-			prepare: func(mfs *host.MockFileSystem) {
+			prepare: func(mfs *mockHost.MockFileSystem) {
 				mfs.On("ReadFile", cgroupSubtreeControlPath).Return([]byte("cpu memory"), nil).Once()
 				mfs.On("MkdirAll", cgroupInitDir, os.FileMode(0o755)).Return(nil).Once()
 				mfs.On("Pipe", cgroupProcsPath).
@@ -385,7 +386,7 @@ func TestEnableCGroupSubtreeControl(t *testing.T) {
 		},
 		{
 			name: "WriteFile subtree_control error propagates",
-			prepare: func(mfs *host.MockFileSystem) {
+			prepare: func(mfs *mockHost.MockFileSystem) {
 				mfs.On("ReadFile", cgroupSubtreeControlPath).Return([]byte("cpu memory"), nil).Once()
 				mfs.On("MkdirAll", cgroupInitDir, os.FileMode(0o755)).Return(nil).Once()
 				mfs.On("Pipe", cgroupProcsPath).
@@ -402,7 +403,7 @@ func TestEnableCGroupSubtreeControl(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			req := require.New(t)
-			mfs := host.NewMockFileSystem(t)
+			mfs := mockHost.NewMockFileSystem(t)
 			tt.prepare(mfs)
 
 			err := k8s.EnableCGroupSubtreeControl(mfs)
@@ -417,7 +418,7 @@ func TestEnableCGroupSubtreeControl(t *testing.T) {
 
 // setupPreIPSuccessMocks mocks PrepareKubernetesEnvironment operations before IP configuration.
 // All operations succeed.
-func setupPreIPSuccessMocks(m *host.MockHost) {
+func setupPreIPSuccessMocks(m *mockHost.MockHost) {
 	m.On("WriteFile", ipForwardPath, mock.Anything, mock.Anything).Return(nil).Once()
 	m.On("Exists", netBridgePath).Return(true, nil).Once()
 	m.On("WriteFile", bridgeNfCallPath, mock.Anything, mock.Anything).Return(nil).Once()
@@ -428,7 +429,7 @@ func setupPreIPSuccessMocks(m *host.MockHost) {
 
 // setupPostIPSuccessMocks mocks PrepareKubernetesEnvironment operations after IP configuration.
 // All operations succeed.
-func setupPostIPSuccessMocks(m *host.MockHost) {
+func setupPostIPSuccessMocks(m *mockHost.MockHost) {
 	m.On("Pipe", constants.RcConfFile).
 		Return(script.NewPipe().WithReader(strings.NewReader(k8s.RcConfPreventKubeletRunning + "\n"))).Once()
 	m.On("Exists", runlevelIknitePath).Return(true, nil).Once()
@@ -446,13 +447,13 @@ func TestPrepareKubernetesEnvironment(t *testing.T) {
 
 	tests := []struct {
 		name            string
-		prepare         func(m *host.MockHost)
+		prepare         func(m *mockHost.MockHost)
 		config          *v1alpha1.IkniteClusterSpec
 		wantErrContains string
 	}{
 		{
 			name: "happy path succeeds",
-			prepare: func(m *host.MockHost) {
+			prepare: func(m *mockHost.MockHost) {
 				setupPreIPSuccessMocks(m)
 				m.On("GetOutboundIP").Return(net.ParseIP("10.0.0.1"), nil).Once()
 				m.On("CheckIpExists", mock.Anything).Return(true, nil).Once()
@@ -461,7 +462,7 @@ func TestPrepareKubernetesEnvironment(t *testing.T) {
 		},
 		{
 			name: "logged WriteFile errors do not abort execution",
-			prepare: func(m *host.MockHost) {
+			prepare: func(m *mockHost.MockHost) {
 				m.On("WriteFile", ipForwardPath, mock.Anything, mock.Anything).
 					Return(errors.New("denied")).Once()
 				m.On("Exists", netBridgePath).Return(true, nil).Once()
@@ -478,7 +479,7 @@ func TestPrepareKubernetesEnvironment(t *testing.T) {
 		},
 		{
 			name: "no outbound IP with networking succeeds then fails at kubelet",
-			prepare: func(m *host.MockHost) {
+			prepare: func(m *mockHost.MockHost) {
 				setupPreIPSuccessMocks(m)
 				m.On("GetOutboundIP").Return(nil, errors.New("no route")).Once()
 				// MakeIkniteServiceNeedNetworking: networking line not present yet.
@@ -495,7 +496,7 @@ func TestPrepareKubernetesEnvironment(t *testing.T) {
 		},
 		{
 			name: "IP not bound, CreateIp true, AddIpAddress succeeds then fails at kubelet",
-			prepare: func(m *host.MockHost) {
+			prepare: func(m *mockHost.MockHost) {
 				setupPreIPSuccessMocks(m)
 				m.On("GetOutboundIP").Return(net.ParseIP("10.0.0.1"), nil).Once()
 				m.On("CheckIpExists", mock.Anything).Return(false, nil).Once()
@@ -511,7 +512,7 @@ func TestPrepareKubernetesEnvironment(t *testing.T) {
 		},
 		{
 			name: "domain name already mapped then fails at kubelet",
-			prepare: func(m *host.MockHost) {
+			prepare: func(m *mockHost.MockHost) {
 				setupPreIPSuccessMocks(m)
 				m.On("GetOutboundIP").Return(net.ParseIP("10.0.0.1"), nil).Once()
 				m.On("CheckIpExists", mock.Anything).Return(true, nil).Once()
@@ -526,7 +527,7 @@ func TestPrepareKubernetesEnvironment(t *testing.T) {
 		},
 		{
 			name: "EnsureNetFilter error is returned",
-			prepare: func(m *host.MockHost) {
+			prepare: func(m *mockHost.MockHost) {
 				m.On("WriteFile", ipForwardPath, mock.Anything, mock.Anything).Return(nil).Once()
 				m.On("Exists", netBridgePath).Return(false, nil).Once()
 				m.On("Run", true, "/sbin/modprobe", []string{"br_netfilter"}).
@@ -536,7 +537,7 @@ func TestPrepareKubernetesEnvironment(t *testing.T) {
 		},
 		{
 			name: "EnableCGroupSubtreeControl error is returned",
-			prepare: func(m *host.MockHost) {
+			prepare: func(m *mockHost.MockHost) {
 				m.On("WriteFile", ipForwardPath, mock.Anything, mock.Anything).Return(nil).Once()
 				m.On("Exists", netBridgePath).Return(true, nil).Once()
 				m.On("WriteFile", bridgeNfCallPath, mock.Anything, mock.Anything).Return(nil).Once()
@@ -547,7 +548,7 @@ func TestPrepareKubernetesEnvironment(t *testing.T) {
 		},
 		{
 			name: "EnsureMachineID error is returned",
-			prepare: func(m *host.MockHost) {
+			prepare: func(m *mockHost.MockHost) {
 				m.On("WriteFile", ipForwardPath, mock.Anything, mock.Anything).Return(nil).Once()
 				m.On("Exists", netBridgePath).Return(true, nil).Once()
 				m.On("WriteFile", bridgeNfCallPath, mock.Anything, mock.Anything).Return(nil).Once()
@@ -559,7 +560,7 @@ func TestPrepareKubernetesEnvironment(t *testing.T) {
 		},
 		{
 			name: "no outbound IP and MakeIkniteServiceNeedNetworking fails",
-			prepare: func(m *host.MockHost) {
+			prepare: func(m *mockHost.MockHost) {
 				setupPreIPSuccessMocks(m)
 				m.On("GetOutboundIP").Return(nil, errors.New("no route")).Once()
 				m.On("Pipe", constants.RcConfFile).
@@ -569,7 +570,7 @@ func TestPrepareKubernetesEnvironment(t *testing.T) {
 		},
 		{
 			name: "CheckIpExists error is returned",
-			prepare: func(m *host.MockHost) {
+			prepare: func(m *mockHost.MockHost) {
 				setupPreIPSuccessMocks(m)
 				m.On("GetOutboundIP").Return(net.ParseIP("10.0.0.1"), nil).Once()
 				m.On("CheckIpExists", mock.Anything).Return(false, errors.New("check failed")).Once()
@@ -578,7 +579,7 @@ func TestPrepareKubernetesEnvironment(t *testing.T) {
 		},
 		{
 			name: "IP not bound and CreateIp false returns error",
-			prepare: func(m *host.MockHost) {
+			prepare: func(m *mockHost.MockHost) {
 				setupPreIPSuccessMocks(m)
 				m.On("GetOutboundIP").Return(net.ParseIP("10.0.0.1"), nil).Once()
 				m.On("CheckIpExists", mock.Anything).Return(false, nil).Once()
@@ -588,7 +589,7 @@ func TestPrepareKubernetesEnvironment(t *testing.T) {
 		},
 		{
 			name: "IP not bound, CreateIp true, AddIpAddress fails",
-			prepare: func(m *host.MockHost) {
+			prepare: func(m *mockHost.MockHost) {
 				setupPreIPSuccessMocks(m)
 				m.On("GetOutboundIP").Return(net.ParseIP("10.0.0.1"), nil).Once()
 				m.On("CheckIpExists", mock.Anything).Return(false, nil).Once()
@@ -601,7 +602,7 @@ func TestPrepareKubernetesEnvironment(t *testing.T) {
 		},
 		{
 			name: "domain name not mapped and AddIpMapping fails",
-			prepare: func(m *host.MockHost) {
+			prepare: func(m *mockHost.MockHost) {
 				setupPreIPSuccessMocks(m)
 				m.On("GetOutboundIP").Return(net.ParseIP("10.0.0.1"), nil).Once()
 				m.On("CheckIpExists", mock.Anything).Return(true, nil).Once()
@@ -615,7 +616,7 @@ func TestPrepareKubernetesEnvironment(t *testing.T) {
 		},
 		{
 			name: "PreventKubeletServiceFromStarting error is returned",
-			prepare: func(m *host.MockHost) {
+			prepare: func(m *mockHost.MockHost) {
 				setupPreIPSuccessMocks(m)
 				m.On("GetOutboundIP").Return(net.ParseIP("10.0.0.1"), nil).Once()
 				m.On("CheckIpExists", mock.Anything).Return(true, nil).Once()
@@ -626,7 +627,7 @@ func TestPrepareKubernetesEnvironment(t *testing.T) {
 		},
 		{
 			name: "EnableService error is returned",
-			prepare: func(m *host.MockHost) {
+			prepare: func(m *mockHost.MockHost) {
 				setupPreIPSuccessMocks(m)
 				m.On("GetOutboundIP").Return(net.ParseIP("10.0.0.1"), nil).Once()
 				m.On("CheckIpExists", mock.Anything).Return(true, nil).Once()
@@ -639,7 +640,7 @@ func TestPrepareKubernetesEnvironment(t *testing.T) {
 		},
 		{
 			name: "crictl.yaml existence error is returned",
-			prepare: func(m *host.MockHost) {
+			prepare: func(m *mockHost.MockHost) {
 				setupPreIPSuccessMocks(m)
 				m.On("GetOutboundIP").Return(net.ParseIP("10.0.0.1"), nil).Once()
 				m.On("CheckIpExists", mock.Anything).Return(true, nil).Once()
@@ -653,7 +654,7 @@ func TestPrepareKubernetesEnvironment(t *testing.T) {
 		},
 		{
 			name: "crictl.yaml absent WriteFile fails returns error",
-			prepare: func(m *host.MockHost) {
+			prepare: func(m *mockHost.MockHost) {
 				setupPreIPSuccessMocks(m)
 				m.On("GetOutboundIP").Return(net.ParseIP("10.0.0.1"), nil).Once()
 				m.On("CheckIpExists", mock.Anything).Return(true, nil).Once()
@@ -673,7 +674,7 @@ func TestPrepareKubernetesEnvironment(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			req := require.New(t)
-			m := host.NewMockHost(t)
+			m := mockHost.NewMockHost(t)
 			tt.prepare(m)
 
 			cfg := defaultConfig
@@ -681,7 +682,7 @@ func TestPrepareKubernetesEnvironment(t *testing.T) {
 				cfg = tt.config
 			}
 
-			err := k8s.PrepareKubernetesEnvironment(m, cfg)
+			err := k8s.PrepareKubernetesEnvironment(t.Context(), m, cfg)
 			if tt.wantErrContains == "" {
 				req.NoError(err)
 				return

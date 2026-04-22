@@ -62,9 +62,18 @@ func WaitForKubelet(ctx context.Context, process host.Process, conn *mdns.Conn) 
 	return nil
 }
 
+type daemonizeData interface {
+	KubeletProcessHolder
+	MDnsConnectionProvider
+	IkniteClusterProvider
+	host.HostProvider
+	ContextProvider
+	StatusServerHolder
+}
+
 // runPrepare executes the node initialization process.
 func runDaemonize(c workflow.RunData) error {
-	data, ok := c.(IkniteInitData)
+	data, ok := c.(daemonizeData)
 	if !ok {
 		return fmt.Errorf("prepare phase invoked with an invalid data struct. ")
 	}
@@ -73,7 +82,7 @@ func runDaemonize(c workflow.RunData) error {
 		return nil
 	}
 	conn := data.MDnsConn()
-	ctx, _ := data.ContextWithCancel()
+	ctx := data.Context()
 
 	err := WaitForKubelet(ctx, kubeletProcess, conn)
 

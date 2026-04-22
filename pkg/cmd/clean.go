@@ -264,9 +264,10 @@ func performClean(alpineHost host.Host, ikniteConfig *v1alpha1.IkniteClusterSpec
 	}
 
 	_, kubeletProcess, err := alpine.CheckPidFile(alpineHost, "kubelet")
-	if err != nil {
+	switch {
+	case err != nil:
 		logger.WithError(err).Warn("Error checking kubelet process")
-	} else if kubeletProcess != nil {
+	case kubeletProcess != nil:
 		logger.WithField("pid", kubeletProcess.Pid).Info("Kubelet is still running, stopping it...")
 		if !dryRun {
 			err = kubeletProcess.Signal(syscall.SIGTERM)
@@ -278,6 +279,8 @@ func performClean(alpineHost host.Host, ikniteConfig *v1alpha1.IkniteClusterSpec
 				}
 			}
 		}
+	default:
+		logger.Info("Kubelet is not running")
 	}
 
 	logger.Info("Cleanup completed")

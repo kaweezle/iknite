@@ -5,6 +5,7 @@
 package host
 
 import (
+	"github.com/kaweezle/iknite/pkg/host"
 	mock "github.com/stretchr/testify/mock"
 )
 
@@ -36,19 +37,19 @@ func (_m *MockHostProvider) EXPECT() *MockHostProvider_Expecter {
 }
 
 // Host provides a mock function for the type MockHostProvider
-func (_mock *MockHostProvider) Host() Host {
+func (_mock *MockHostProvider) Host() host.Host {
 	ret := _mock.Called()
 
 	if len(ret) == 0 {
 		panic("no return value specified for Host")
 	}
 
-	var r0 Host
-	if returnFunc, ok := ret.Get(0).(func() Host); ok {
+	var r0 host.Host
+	if returnFunc, ok := ret.Get(0).(func() host.Host); ok {
 		r0 = returnFunc()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(Host)
+			r0 = ret.Get(0).(host.Host)
 		}
 	}
 	return r0
@@ -71,12 +72,12 @@ func (_c *MockHostProvider_Host_Call) Run(run func()) *MockHostProvider_Host_Cal
 	return _c
 }
 
-func (_c *MockHostProvider_Host_Call) Return(host Host) *MockHostProvider_Host_Call {
-	_c.Call.Return(host)
+func (_c *MockHostProvider_Host_Call) Return(host1 host.Host) *MockHostProvider_Host_Call {
+	_c.Call.Return(host1)
 	return _c
 }
 
-func (_c *MockHostProvider_Host_Call) RunAndReturn(run func() Host) *MockHostProvider_Host_Call {
+func (_c *MockHostProvider_Host_Call) RunAndReturn(run func() host.Host) *MockHostProvider_Host_Call {
 	_c.Call.Return(run)
 	return _c
 }

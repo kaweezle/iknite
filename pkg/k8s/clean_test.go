@@ -18,6 +18,7 @@ import (
 	"github.com/txn2/txeh"
 	kubeadmConstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 
+	mockHost "github.com/kaweezle/iknite/mocks/github.com/kaweezle/iknite/pkg/host"
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
 	"github.com/kaweezle/iknite/pkg/host"
 	"github.com/kaweezle/iknite/pkg/k8s"
@@ -29,11 +30,11 @@ func TestResetIPAddress_CreateIpFalse(t *testing.T) {
 	t.Parallel()
 	req := require.New(t)
 
-	mockHost := host.NewMockHost(t)
+	mockH := mockHost.NewMockHost(t)
 	config := &v1alpha1.IkniteClusterSpec{CreateIp: false}
 
 	// No methods should be called on the mock
-	err := k8s.ResetIPAddress(mockHost, config, false)
+	err := k8s.ResetIPAddress(mockH, config, false)
 	req.NoError(err)
 }
 
@@ -53,8 +54,8 @@ func TestResetIPAddress_HostNotMapped(t *testing.T) {
 		WriteFilePath: hostsFile.Name(),
 	}
 
-	mockHost := host.NewMockHost(t)
-	mockHost.On("GetHostsConfig").Return(hostsConfig).Once()
+	mockH := mockHost.NewMockHost(t)
+	mockH.On("GetHostsConfig").Return(hostsConfig).Once()
 
 	config := &v1alpha1.IkniteClusterSpec{
 		CreateIp:   true,
@@ -62,7 +63,7 @@ func TestResetIPAddress_HostNotMapped(t *testing.T) {
 	}
 
 	// IpMappingForHost fails → logs warning and returns nil
-	err := k8s.ResetIPAddress(mockHost, config, false)
+	err := k8s.ResetIPAddress(mockH, config, false)
 	req.NoError(err)
 }
 
@@ -101,15 +102,15 @@ func TestResetIPAddress_IPFoundDryRunCases(t *testing.T) {
 			req := require.New(t)
 
 			hostsConfig := newHostsFileConfig(t, "127.0.0.1 localhost\n192.168.99.2 kaweezle.local\n")
-			mockHost := host.NewMockHost(t)
-			mockHost.On("GetHostsConfig").Return(hostsConfig).Once()
-			mockHost.On("ExecPipe", mock.Anything, "ip -br -4 a sh").
+			mockH := mockHost.NewMockHost(t)
+			mockH.On("GetHostsConfig").Return(hostsConfig).Once()
+			mockH.On("ExecPipe", mock.Anything, "ip -br -4 a sh").
 				Return(script.Echo("eth0             UP             192.168.99.2/24\n")).Once()
-			mockHost.On("ExecForEach", mock.Anything, tt.execForEachCmd).
+			mockH.On("ExecForEach", mock.Anything, tt.execForEachCmd).
 				Return(script.NewPipe()).Once()
 
 			config := &v1alpha1.IkniteClusterSpec{CreateIp: true, DomainName: "kaweezle.local"}
-			err := k8s.ResetIPAddress(mockHost, config, tt.isDryRun)
+			err := k8s.ResetIPAddress(mockH, config, tt.isDryRun)
 			req.NoError(err)
 		})
 	}
@@ -120,11 +121,11 @@ func TestResetIPAddress_ExecForEachError(t *testing.T) {
 	req := require.New(t)
 
 	hostsConfig := newHostsFileConfig(t, "127.0.0.1 localhost\n192.168.99.2 kaweezle.local\n")
-	mockHost := host.NewMockHost(t)
-	mockHost.On("GetHostsConfig").Return(hostsConfig).Once()
-	mockHost.On("ExecPipe", mock.Anything, "ip -br -4 a sh").
+	mockH := mockHost.NewMockHost(t)
+	mockH.On("GetHostsConfig").Return(hostsConfig).Once()
+	mockH.On("ExecPipe", mock.Anything, "ip -br -4 a sh").
 		Return(script.Echo("eth0             UP             192.168.99.2/24\n")).Once()
-	mockHost.On("ExecForEach", mock.Anything, "ip addr del 192.168.99.2/24 dev {{.}}").
+	mockH.On("ExecForEach", mock.Anything, "ip addr del 192.168.99.2/24 dev {{.}}").
 		Return(script.NewPipe().WithError(errors.New("exec error"))).Once()
 
 	config := &v1alpha1.IkniteClusterSpec{
@@ -132,7 +133,7 @@ func TestResetIPAddress_ExecForEachError(t *testing.T) {
 		DomainName: "kaweezle.local",
 	}
 
-	err := k8s.ResetIPAddress(mockHost, config, false)
+	err := k8s.ResetIPAddress(mockH, config, false)
 	req.Error(err)
 	req.Contains(err.Error(), "failed to delete IP address")
 }
@@ -143,7 +144,7 @@ func TestResetIPTables_DryRun(t *testing.T) {
 	t.Parallel()
 	req := require.New(t)
 
-	mockExec := host.NewMockExecutor(t)
+	mockExec := mockHost.NewMockExecutor(t)
 	// No calls expected in dry run mode
 
 	err := k8s.ResetIPTables(mockExec, true)
@@ -154,7 +155,7 @@ func TestResetIPTables_Success(t *testing.T) {
 	t.Parallel()
 	req := require.New(t)
 
-	mockExec := host.NewMockExecutor(t)
+	mockExec := mockHost.NewMockExecutor(t)
 	// iptables chain
 	mockExec.On("ExecPipe", mock.Anything, "iptables-save").
 		Return(script.Echo("iptables content\n")).Once()
@@ -174,7 +175,7 @@ func TestResetIPTables_IPTablesError(t *testing.T) { //nolint:dupl // same struc
 	t.Parallel()
 	req := require.New(t)
 
-	mockExec := host.NewMockExecutor(t)
+	mockExec := mockHost.NewMockExecutor(t)
 	mockExec.On("ExecPipe", mock.Anything, "iptables-save").
 		Return(script.Echo("content\n")).Once()
 	mockExec.On("ExecPipe", mock.Anything, "iptables-restore").
@@ -189,7 +190,7 @@ func TestResetIPTables_IP6TablesError(t *testing.T) {
 	t.Parallel()
 	req := require.New(t)
 
-	mockExec := host.NewMockExecutor(t)
+	mockExec := mockHost.NewMockExecutor(t)
 	// iptables succeeds
 	mockExec.On("ExecPipe", mock.Anything, "iptables-save").
 		Return(script.Echo("content\n")).Once()
@@ -212,7 +213,7 @@ func TestRemoveKubeletFiles_DryRun(t *testing.T) {
 	t.Parallel()
 	req := require.New(t)
 
-	mockExec := host.NewMockExecutor(t)
+	mockExec := mockHost.NewMockExecutor(t)
 	// No calls expected
 
 	err := k8s.RemoveKubeletFiles(mockExec, true)
@@ -223,7 +224,7 @@ func TestRemoveKubeletFiles_Success(t *testing.T) {
 	t.Parallel()
 	req := require.New(t)
 
-	mockExec := host.NewMockExecutor(t)
+	mockExec := mockHost.NewMockExecutor(t)
 	mockExec.On("ExecPipe", mock.Anything, mock.Anything).
 		Return(script.NewPipe()).Once()
 
@@ -235,7 +236,7 @@ func TestRemoveKubeletFiles_Error(t *testing.T) {
 	t.Parallel()
 	req := require.New(t)
 
-	mockExec := host.NewMockExecutor(t)
+	mockExec := mockHost.NewMockExecutor(t)
 	mockExec.On("ExecPipe", mock.Anything, mock.Anything).
 		Return(script.NewPipe().WithError(errors.New("rm failed"))).Once()
 
@@ -250,7 +251,7 @@ func TestStopAllContainers_DryRun(t *testing.T) {
 	t.Parallel()
 	req := require.New(t)
 
-	mockExec := host.NewMockExecutor(t)
+	mockExec := mockHost.NewMockExecutor(t)
 	// No calls expected
 
 	err := k8s.StopAllContainers(mockExec, true)
@@ -261,7 +262,7 @@ func TestStopAllContainers_Success(t *testing.T) {
 	t.Parallel()
 	req := require.New(t)
 
-	mockExec := host.NewMockExecutor(t)
+	mockExec := mockHost.NewMockExecutor(t)
 	mockExec.On("ExecPipe", mock.Anything, mock.Anything).
 		Return(script.NewPipe()).Once()
 
@@ -273,7 +274,7 @@ func TestStopAllContainers_Error(t *testing.T) {
 	t.Parallel()
 	req := require.New(t)
 
-	mockExec := host.NewMockExecutor(t)
+	mockExec := mockHost.NewMockExecutor(t)
 	mockExec.On("ExecPipe", mock.Anything, mock.Anything).
 		Return(script.NewPipe().WithError(errors.New("crictl failed"))).Once()
 
@@ -288,7 +289,7 @@ func TestDeleteCniNamespaces_DryRun(t *testing.T) {
 	t.Parallel()
 	req := require.New(t)
 
-	mockExec := host.NewMockExecutor(t)
+	mockExec := mockHost.NewMockExecutor(t)
 	// ip netns show is still called in dry run (to list namespaces), but with "echo " prefix
 	mockExec.On("ExecPipe", mock.Anything, "ip netns show").
 		Return(script.Echo("ns1 ns2\nns3\n")).Once()
@@ -303,7 +304,7 @@ func TestDeleteCniNamespaces_Success(t *testing.T) {
 	t.Parallel()
 	req := require.New(t)
 
-	mockExec := host.NewMockExecutor(t)
+	mockExec := mockHost.NewMockExecutor(t)
 	mockExec.On("ExecPipe", mock.Anything, "ip netns show").
 		Return(script.Echo("ns1\nns2\n")).Once()
 	mockExec.On("ExecForEach", mock.Anything, "ip netns delete {{.}}").
@@ -317,7 +318,7 @@ func TestDeleteCniNamespaces_Error(t *testing.T) { //nolint:dupl // same structu
 	t.Parallel()
 	req := require.New(t)
 
-	mockExec := host.NewMockExecutor(t)
+	mockExec := mockHost.NewMockExecutor(t)
 	mockExec.On("ExecPipe", mock.Anything, "ip netns show").
 		Return(script.Echo("ns1\n")).Once()
 	mockExec.On("ExecForEach", mock.Anything, "ip netns delete {{.}}").
@@ -334,7 +335,7 @@ func TestDeleteNetworkInterfaces_DryRun(t *testing.T) {
 	t.Parallel()
 	req := require.New(t)
 
-	mockExec := host.NewMockExecutor(t)
+	mockExec := mockHost.NewMockExecutor(t)
 	mockExec.On("ExecPipe", mock.Anything, "ip -j link show").
 		Return(script.Echo("[]\n")).Once()
 	mockExec.On("ExecForEach", mock.Anything, "{{ . }}").
@@ -348,7 +349,7 @@ func TestDeleteNetworkInterfaces_Success(t *testing.T) {
 	t.Parallel()
 	req := require.New(t)
 
-	mockExec := host.NewMockExecutor(t)
+	mockExec := mockHost.NewMockExecutor(t)
 	mockExec.On("ExecPipe", mock.Anything, "ip -j link show").
 		Return(script.Echo("[]\n")).Once()
 	mockExec.On("ExecForEach", mock.Anything, "{{ . }}").
@@ -362,7 +363,7 @@ func TestDeleteNetworkInterfaces_Error(t *testing.T) { //nolint:dupl // same str
 	t.Parallel()
 	req := require.New(t)
 
-	mockExec := host.NewMockExecutor(t)
+	mockExec := mockHost.NewMockExecutor(t)
 	mockExec.On("ExecPipe", mock.Anything, "ip -j link show").
 		Return(script.Echo("[]\n")).Once()
 	mockExec.On("ExecForEach", mock.Anything, "{{ . }}").
@@ -376,7 +377,7 @@ func TestDeleteNetworkInterfaces_Error(t *testing.T) { //nolint:dupl // same str
 // --- UnmountPaths ---
 
 // setupAllEvalSymlinksNotExist sets all EvalSymlinks calls to return os.ErrNotExist.
-func setupAllEvalSymlinksNotExist(m *host.MockHost) {
+func setupAllEvalSymlinksNotExist(m *mockHost.MockHost) {
 	m.On("EvalSymlinks", mock.Anything).Return("", os.ErrNotExist)
 }
 
@@ -384,10 +385,10 @@ func TestUnmountPaths_AllNotExist(t *testing.T) {
 	t.Parallel()
 	req := require.New(t)
 
-	mockHost := host.NewMockHost(t)
-	setupAllEvalSymlinksNotExist(mockHost)
+	mockH := mockHost.NewMockHost(t)
+	setupAllEvalSymlinksNotExist(mockH)
 
-	err := k8s.UnmountPaths(mockHost, false, false)
+	err := k8s.UnmountPaths(mockH, false, false)
 	req.NoError(err)
 }
 
@@ -395,13 +396,13 @@ func TestUnmountPaths_EvalSymlinksOtherError_ContinueOnError(t *testing.T) {
 	t.Parallel()
 	req := require.New(t)
 
-	mockHost := host.NewMockHost(t)
+	mockH := mockHost.NewMockHost(t)
 	// First path returns a non-NotExist error
-	mockHost.On("EvalSymlinks", "/var/lib/kubelet/pods").Return("", errors.New("perm denied")).Once()
+	mockH.On("EvalSymlinks", "/var/lib/kubelet/pods").Return("", errors.New("perm denied")).Once()
 	// Remaining paths return NotExist
-	mockHost.On("EvalSymlinks", mock.Anything).Return("", os.ErrNotExist)
+	mockH.On("EvalSymlinks", mock.Anything).Return("", os.ErrNotExist)
 
-	err := k8s.UnmountPaths(mockHost, false /* failOnError */, false)
+	err := k8s.UnmountPaths(mockH, false /* failOnError */, false)
 	req.NoError(err)
 }
 
@@ -409,10 +410,10 @@ func TestUnmountPaths_EvalSymlinksOtherError_FailOnError(t *testing.T) {
 	t.Parallel()
 	req := require.New(t)
 
-	mockHost := host.NewMockHost(t)
-	mockHost.On("EvalSymlinks", "/var/lib/kubelet/pods").Return("", errors.New("perm denied")).Once()
+	mockH := mockHost.NewMockHost(t)
+	mockH.On("EvalSymlinks", "/var/lib/kubelet/pods").Return("", errors.New("perm denied")).Once()
 
-	err := k8s.UnmountPaths(mockHost, true /* failOnError */, false)
+	err := k8s.UnmountPaths(mockH, true /* failOnError */, false)
 	req.Error(err)
 }
 
@@ -605,7 +606,7 @@ func TestDeleteAPIBackendData(t *testing.T) {
 			createFS: func(t *testing.T, backendName, defaultDatadir, _ string) host.FileSystem {
 				t.Helper()
 
-				mockFS := host.NewMockFileSystem(t)
+				mockFS := mockHost.NewMockFileSystem(t)
 				var manifest bytes.Buffer
 				err := createDataManifest(&manifest, backendName, defaultDatadir)
 				require.NoError(t, err)
@@ -656,24 +657,24 @@ func TestCleanAll_DryRun(t *testing.T) {
 	t.Parallel()
 	req := require.New(t)
 
-	mockHost := host.NewMockHost(t)
+	mockH := mockHost.NewMockHost(t)
 	// StopAllContainers (dry run): no ExecPipe call
 	// UnmountPaths: EvalSymlinks for all paths
-	setupAllEvalSymlinksNotExist(mockHost)
+	setupAllEvalSymlinksNotExist(mockH)
 	// RemoveKubeletFiles (dry run): no ExecPipe call
 	// DeleteCniNamespaces (dry run)
-	mockHost.On("ExecPipe", mock.Anything, "ip netns show").
+	mockH.On("ExecPipe", mock.Anything, "ip netns show").
 		Return(script.Echo("")).Once()
-	mockHost.On("ExecForEach", mock.Anything, "echo ip netns delete {{.}}").
+	mockH.On("ExecForEach", mock.Anything, "echo ip netns delete {{.}}").
 		Return(script.NewPipe()).Once()
 	// DeleteNetworkInterfaces (dry run)
-	mockHost.On("ExecPipe", mock.Anything, "ip -j link show").
+	mockH.On("ExecPipe", mock.Anything, "ip -j link show").
 		Return(script.Echo("[]\n")).Once()
-	mockHost.On("ExecForEach", mock.Anything, "{{ . }}").
+	mockH.On("ExecForEach", mock.Anything, "{{ . }}").
 		Return(script.NewPipe()).Once()
 
 	config := &v1alpha1.IkniteClusterSpec{CreateIp: false}
-	err := k8s.CleanAll(mockHost, config, false, false, false, true /* isDryRun */)
+	err := k8s.CleanAll(mockH, config, false, false, false, true /* isDryRun */)
 	req.NoError(err)
 }
 
@@ -683,31 +684,31 @@ func TestCleanAll_WithIPTablesAndIPAddress_DryRun(t *testing.T) {
 
 	hostsConfig := newHostsFileConfig(t, "127.0.0.1 localhost\n")
 
-	mockHost := host.NewMockHost(t)
+	mockH := mockHost.NewMockHost(t)
 	// StopAllContainers (dry run): no ExecPipe
 	// UnmountPaths
-	setupAllEvalSymlinksNotExist(mockHost)
+	setupAllEvalSymlinksNotExist(mockH)
 	// RemoveKubeletFiles (dry run): no ExecPipe
 	// DeleteCniNamespaces (dry run)
-	mockHost.On("ExecPipe", mock.Anything, "ip netns show").
+	mockH.On("ExecPipe", mock.Anything, "ip netns show").
 		Return(script.Echo("")).Once()
-	mockHost.On("ExecForEach", mock.Anything, "echo ip netns delete {{.}}").
+	mockH.On("ExecForEach", mock.Anything, "echo ip netns delete {{.}}").
 		Return(script.NewPipe()).Once()
 	// DeleteNetworkInterfaces (dry run)
-	mockHost.On("ExecPipe", mock.Anything, "ip -j link show").
+	mockH.On("ExecPipe", mock.Anything, "ip -j link show").
 		Return(script.Echo("[]\n")).Once()
-	mockHost.On("ExecForEach", mock.Anything, "{{ . }}").
+	mockH.On("ExecForEach", mock.Anything, "{{ . }}").
 		Return(script.NewPipe()).Once()
 	// ResetIPTables (dry run): no calls
 	// ResetIPAddress: host not mapped → just logs
-	mockHost.On("GetHostsConfig").Return(hostsConfig).Once()
+	mockH.On("GetHostsConfig").Return(hostsConfig).Once()
 
 	config := &v1alpha1.IkniteClusterSpec{
 		CreateIp:   true,
 		DomainName: "nonexistent.local",
 	}
 	err := k8s.CleanAll(
-		mockHost,
+		mockH,
 		config,
 		true, /* resetIPAddress */
 		true, /* resetIPTables */
@@ -734,15 +735,15 @@ func TestResetIPAddress_HostsCreateError(t *testing.T) {
 		WriteFilePath: unreadable,
 	}
 
-	mockHost := host.NewMockHost(t)
-	mockHost.On("GetHostsConfig").Return(hostsConfig).Once()
+	mockH := mockHost.NewMockHost(t)
+	mockH.On("GetHostsConfig").Return(hostsConfig).Once()
 
 	config := &v1alpha1.IkniteClusterSpec{
 		CreateIp:   true,
 		DomainName: "test.local",
 	}
 
-	err := k8s.ResetIPAddress(mockHost, config, false)
+	err := k8s.ResetIPAddress(mockH, config, false)
 	req.Error(err)
 	req.Contains(err.Error(), "failed to create hosts file handler")
 }
@@ -755,11 +756,11 @@ func TestResetIPAddress_SaveError(t *testing.T) {
 	// Override WriteFilePath to a non-writable location
 	hostsConfig.WriteFilePath = filepath.Join(t.TempDir(), "nonexistent-dir", "hosts")
 
-	mockHost := host.NewMockHost(t)
-	mockHost.On("GetHostsConfig").Return(hostsConfig).Once()
-	mockHost.On("ExecPipe", mock.Anything, "ip -br -4 a sh").
+	mockH := mockHost.NewMockHost(t)
+	mockH.On("GetHostsConfig").Return(hostsConfig).Once()
+	mockH.On("ExecPipe", mock.Anything, "ip -br -4 a sh").
 		Return(script.Echo("eth0             UP             192.168.99.2/24\n")).Once()
-	mockHost.On("ExecForEach", mock.Anything, "ip addr del 192.168.99.2/24 dev {{.}}").
+	mockH.On("ExecForEach", mock.Anything, "ip addr del 192.168.99.2/24 dev {{.}}").
 		Return(script.NewPipe()).Once()
 
 	config := &v1alpha1.IkniteClusterSpec{
@@ -767,7 +768,7 @@ func TestResetIPAddress_SaveError(t *testing.T) {
 		DomainName: "kaweezle.local",
 	}
 
-	err := k8s.ResetIPAddress(mockHost, config, false /* isDryRun */)
+	err := k8s.ResetIPAddress(mockH, config, false /* isDryRun */)
 	req.Error(err)
 	req.Contains(err.Error(), "failed to save hosts file")
 }
@@ -781,7 +782,7 @@ func TestDeleteNetworkInterfaces_WithMatchingInterface(t *testing.T) {
 	t.Parallel()
 	req := require.New(t)
 
-	mockExec := host.NewMockExecutor(t)
+	mockExec := mockHost.NewMockExecutor(t)
 	mockExec.On("ExecPipe", mock.Anything, "ip -j link show").
 		Return(script.Echo(interfaceJSON + "\n")).Once()
 	// ExecForEach receives commands like "ip link delete cni0"
@@ -796,7 +797,7 @@ func TestDeleteNetworkInterfaces_DryRun_WithMatchingInterface(t *testing.T) {
 	t.Parallel()
 	req := require.New(t)
 
-	mockExec := host.NewMockExecutor(t)
+	mockExec := mockHost.NewMockExecutor(t)
 	mockExec.On("ExecPipe", mock.Anything, "ip -j link show").
 		Return(script.Echo(interfaceJSON + "\n")).Once()
 	mockExec.On("ExecForEach", mock.Anything, "{{ . }}").
@@ -812,15 +813,15 @@ func TestUnmountPaths_RemovePath_FailOnError(t *testing.T) {
 	t.Parallel()
 	req := require.New(t)
 
-	mockHost := host.NewMockHost(t)
+	mockH := mockHost.NewMockHost(t)
 	// All pathsToUnmount paths return ErrNotExist (no error)
-	mockHost.On("EvalSymlinks", "/var/lib/kubelet/pods").Return("", os.ErrNotExist).Once()
-	mockHost.On("EvalSymlinks", "/var/lib/kubelet/plugins").Return("", os.ErrNotExist).Once()
-	mockHost.On("EvalSymlinks", "/var/lib/kubelet").Return("", os.ErrNotExist).Once()
+	mockH.On("EvalSymlinks", "/var/lib/kubelet/pods").Return("", os.ErrNotExist).Once()
+	mockH.On("EvalSymlinks", "/var/lib/kubelet/plugins").Return("", os.ErrNotExist).Once()
+	mockH.On("EvalSymlinks", "/var/lib/kubelet").Return("", os.ErrNotExist).Once()
 	// First pathsToUnmountAndRemove path returns a non-NotExist error
-	mockHost.On("EvalSymlinks", "/run/containerd").Return("", errors.New("perm denied")).Once()
+	mockH.On("EvalSymlinks", "/run/containerd").Return("", errors.New("perm denied")).Once()
 
-	err := k8s.UnmountPaths(mockHost, true /* failOnError */, false)
+	err := k8s.UnmountPaths(mockH, true /* failOnError */, false)
 	req.Error(err)
 }
 
@@ -828,16 +829,16 @@ func TestUnmountPaths_RemovePath_ContinueOnError(t *testing.T) {
 	t.Parallel()
 	req := require.New(t)
 
-	mockHost := host.NewMockHost(t)
+	mockH := mockHost.NewMockHost(t)
 	// All pathsToUnmount paths succeed (ErrNotExist → nil)
-	mockHost.On("EvalSymlinks", "/var/lib/kubelet/pods").Return("", os.ErrNotExist).Once()
-	mockHost.On("EvalSymlinks", "/var/lib/kubelet/plugins").Return("", os.ErrNotExist).Once()
-	mockHost.On("EvalSymlinks", "/var/lib/kubelet").Return("", os.ErrNotExist).Once()
+	mockH.On("EvalSymlinks", "/var/lib/kubelet/pods").Return("", os.ErrNotExist).Once()
+	mockH.On("EvalSymlinks", "/var/lib/kubelet/plugins").Return("", os.ErrNotExist).Once()
+	mockH.On("EvalSymlinks", "/var/lib/kubelet").Return("", os.ErrNotExist).Once()
 	// First pathsToUnmountAndRemove path fails, rest succeed (ErrNotExist)
-	mockHost.On("EvalSymlinks", "/run/containerd").Return("", errors.New("perm denied")).Once()
-	mockHost.On("EvalSymlinks", mock.Anything).Return("", os.ErrNotExist)
+	mockH.On("EvalSymlinks", "/run/containerd").Return("", errors.New("perm denied")).Once()
+	mockH.On("EvalSymlinks", mock.Anything).Return("", os.ErrNotExist)
 
-	err := k8s.UnmountPaths(mockHost, false /* failOnError */, false)
+	err := k8s.UnmountPaths(mockH, false /* failOnError */, false)
 	req.NoError(err) // errors are logged but not returned
 }
 
@@ -857,12 +858,12 @@ func TestCleanAll_StopContainersError_FailOnError(t *testing.T) {
 	t.Parallel()
 	req := require.New(t)
 
-	mockHost := host.NewMockHost(t)
-	mockHost.On("ExecPipe", mock.Anything, stopContainersCmd).
+	mockH := mockHost.NewMockHost(t)
+	mockH.On("ExecPipe", mock.Anything, stopContainersCmd).
 		Return(script.NewPipe().WithError(errors.New("crictl failed"))).Once()
 
 	config := &v1alpha1.IkniteClusterSpec{CreateIp: false}
-	err := k8s.CleanAll(mockHost, config, false, false, true /* failOnError */, false /* isDryRun */)
+	err := k8s.CleanAll(mockH, config, false, false, true /* failOnError */, false /* isDryRun */)
 	req.Error(err)
 	req.Contains(err.Error(), "failed to stop all containers")
 }
@@ -871,14 +872,14 @@ func TestCleanAll_UnmountError_FailOnError(t *testing.T) {
 	t.Parallel()
 	req := require.New(t)
 
-	mockHost := host.NewMockHost(t)
+	mockH := mockHost.NewMockHost(t)
 	// StopAllContainers succeeds (not dry run)
-	mockHost.On("ExecPipe", mock.Anything, stopContainersCmd).Return(script.NewPipe()).Once()
+	mockH.On("ExecPipe", mock.Anything, stopContainersCmd).Return(script.NewPipe()).Once()
 	// UnmountPaths: first path returns a non-NotExist error → with failOnError=true, returns error
-	mockHost.On("EvalSymlinks", "/var/lib/kubelet/pods").Return("", errors.New("perm denied")).Once()
+	mockH.On("EvalSymlinks", "/var/lib/kubelet/pods").Return("", errors.New("perm denied")).Once()
 
 	config := &v1alpha1.IkniteClusterSpec{CreateIp: false}
-	err := k8s.CleanAll(mockHost, config, false, false, true /* failOnError */, false /* isDryRun */)
+	err := k8s.CleanAll(mockH, config, false, false, true /* failOnError */, false /* isDryRun */)
 	req.Error(err)
 	req.Contains(err.Error(), "failed to evaluate symlinks")
 }
@@ -887,17 +888,17 @@ func TestCleanAll_RemoveKubeletError_FailOnError(t *testing.T) {
 	t.Parallel()
 	req := require.New(t)
 
-	mockHost := host.NewMockHost(t)
+	mockH := mockHost.NewMockHost(t)
 	// StopAllContainers succeeds
-	mockHost.On("ExecPipe", mock.Anything, stopContainersCmd).Return(script.NewPipe()).Once()
+	mockH.On("ExecPipe", mock.Anything, stopContainersCmd).Return(script.NewPipe()).Once()
 	// UnmountPaths: all return ErrNotExist
-	setupAllEvalSymlinksNotExist(mockHost)
+	setupAllEvalSymlinksNotExist(mockH)
 	// RemoveKubeletFiles fails
-	mockHost.On("ExecPipe", mock.Anything, kubeletRemoveCmd).
+	mockH.On("ExecPipe", mock.Anything, kubeletRemoveCmd).
 		Return(script.NewPipe().WithError(errors.New("rm failed"))).Once()
 
 	config := &v1alpha1.IkniteClusterSpec{CreateIp: false}
-	err := k8s.CleanAll(mockHost, config, false, false, true /* failOnError */, false /* isDryRun */)
+	err := k8s.CleanAll(mockH, config, false, false, true /* failOnError */, false /* isDryRun */)
 	req.Error(err)
 	req.Contains(err.Error(), "failed to remove kubelet files")
 }
@@ -906,21 +907,21 @@ func TestCleanAll_DeleteCniError_FailOnError(t *testing.T) {
 	t.Parallel()
 	req := require.New(t)
 
-	mockHost := host.NewMockHost(t)
+	mockH := mockHost.NewMockHost(t)
 	// StopAllContainers succeeds
-	mockHost.On("ExecPipe", mock.Anything, stopContainersCmd).Return(script.NewPipe()).Once()
+	mockH.On("ExecPipe", mock.Anything, stopContainersCmd).Return(script.NewPipe()).Once()
 	// UnmountPaths: all return ErrNotExist
-	setupAllEvalSymlinksNotExist(mockHost)
+	setupAllEvalSymlinksNotExist(mockH)
 	// RemoveKubeletFiles succeeds
-	mockHost.On("ExecPipe", mock.Anything, kubeletRemoveCmd).Return(script.NewPipe()).Once()
+	mockH.On("ExecPipe", mock.Anything, kubeletRemoveCmd).Return(script.NewPipe()).Once()
 	// DeleteCniNamespaces fails
-	mockHost.On("ExecPipe", mock.Anything, "ip netns show").
+	mockH.On("ExecPipe", mock.Anything, "ip netns show").
 		Return(script.Echo("ns1\n")).Once()
-	mockHost.On("ExecForEach", mock.Anything, "ip netns delete {{.}}").
+	mockH.On("ExecForEach", mock.Anything, "ip netns delete {{.}}").
 		Return(script.NewPipe().WithError(errors.New("netns failed"))).Once()
 
 	config := &v1alpha1.IkniteClusterSpec{CreateIp: false}
-	err := k8s.CleanAll(mockHost, config, false, false, true /* failOnError */, false /* isDryRun */)
+	err := k8s.CleanAll(mockH, config, false, false, true /* failOnError */, false /* isDryRun */)
 	req.Error(err)
 	req.Contains(err.Error(), "failed to delete CNI namespaces")
 }
@@ -929,23 +930,23 @@ func TestCleanAll_DeleteNetworkInterfacesError_FailOnError(t *testing.T) {
 	t.Parallel()
 	req := require.New(t)
 
-	mockHost := host.NewMockHost(t)
+	mockH := mockHost.NewMockHost(t)
 	// StopAllContainers succeeds
-	mockHost.On("ExecPipe", mock.Anything, stopContainersCmd).Return(script.NewPipe()).Once()
+	mockH.On("ExecPipe", mock.Anything, stopContainersCmd).Return(script.NewPipe()).Once()
 	// UnmountPaths: all return ErrNotExist
-	setupAllEvalSymlinksNotExist(mockHost)
+	setupAllEvalSymlinksNotExist(mockH)
 	// RemoveKubeletFiles succeeds
-	mockHost.On("ExecPipe", mock.Anything, kubeletRemoveCmd).Return(script.NewPipe()).Once()
+	mockH.On("ExecPipe", mock.Anything, kubeletRemoveCmd).Return(script.NewPipe()).Once()
 	// DeleteCniNamespaces succeeds
-	mockHost.On("ExecPipe", mock.Anything, "ip netns show").Return(script.Echo("")).Once()
-	mockHost.On("ExecForEach", mock.Anything, "ip netns delete {{.}}").Return(script.NewPipe()).Once()
+	mockH.On("ExecPipe", mock.Anything, "ip netns show").Return(script.Echo("")).Once()
+	mockH.On("ExecForEach", mock.Anything, "ip netns delete {{.}}").Return(script.NewPipe()).Once()
 	// DeleteNetworkInterfaces fails
-	mockHost.On("ExecPipe", mock.Anything, "ip -j link show").Return(script.Echo("[]\n")).Once()
-	mockHost.On("ExecForEach", mock.Anything, "{{ . }}").
+	mockH.On("ExecPipe", mock.Anything, "ip -j link show").Return(script.Echo("[]\n")).Once()
+	mockH.On("ExecForEach", mock.Anything, "{{ . }}").
 		Return(script.NewPipe().WithError(errors.New("link delete failed"))).Once()
 
 	config := &v1alpha1.IkniteClusterSpec{CreateIp: false}
-	err := k8s.CleanAll(mockHost, config, false, false, true /* failOnError */, false /* isDryRun */)
+	err := k8s.CleanAll(mockH, config, false, false, true /* failOnError */, false /* isDryRun */)
 	req.Error(err)
 	req.Contains(err.Error(), "failed to delete network interfaces")
 }
@@ -954,26 +955,26 @@ func TestCleanAll_IPTablesError_FailOnError(t *testing.T) {
 	t.Parallel()
 	req := require.New(t)
 
-	mockHost := host.NewMockHost(t)
+	mockH := mockHost.NewMockHost(t)
 	// StopAllContainers succeeds (not dry run)
-	mockHost.On("ExecPipe", mock.Anything, stopContainersCmd).Return(script.NewPipe()).Once()
+	mockH.On("ExecPipe", mock.Anything, stopContainersCmd).Return(script.NewPipe()).Once()
 	// UnmountPaths: all return ErrNotExist
-	setupAllEvalSymlinksNotExist(mockHost)
+	setupAllEvalSymlinksNotExist(mockH)
 	// RemoveKubeletFiles succeeds (not dry run)
-	mockHost.On("ExecPipe", mock.Anything, kubeletRemoveCmd).Return(script.NewPipe()).Once()
+	mockH.On("ExecPipe", mock.Anything, kubeletRemoveCmd).Return(script.NewPipe()).Once()
 	// DeleteCniNamespaces succeeds (not dry run)
-	mockHost.On("ExecPipe", mock.Anything, "ip netns show").Return(script.Echo("")).Once()
-	mockHost.On("ExecForEach", mock.Anything, "ip netns delete {{.}}").Return(script.NewPipe()).Once()
+	mockH.On("ExecPipe", mock.Anything, "ip netns show").Return(script.Echo("")).Once()
+	mockH.On("ExecForEach", mock.Anything, "ip netns delete {{.}}").Return(script.NewPipe()).Once()
 	// DeleteNetworkInterfaces succeeds (not dry run)
-	mockHost.On("ExecPipe", mock.Anything, "ip -j link show").Return(script.Echo("[]\n")).Once()
-	mockHost.On("ExecForEach", mock.Anything, "{{ . }}").Return(script.NewPipe()).Once()
+	mockH.On("ExecPipe", mock.Anything, "ip -j link show").Return(script.Echo("[]\n")).Once()
+	mockH.On("ExecForEach", mock.Anything, "{{ . }}").Return(script.NewPipe()).Once()
 	// ResetIPTables fails (not dry run)
-	mockHost.On("ExecPipe", mock.Anything, "iptables-save").Return(script.Echo("content\n")).Once()
-	mockHost.On("ExecPipe", mock.Anything, "iptables-restore").
+	mockH.On("ExecPipe", mock.Anything, "iptables-save").Return(script.Echo("content\n")).Once()
+	mockH.On("ExecPipe", mock.Anything, "iptables-restore").
 		Return(script.NewPipe().WithError(errors.New("iptables error"))).Once()
 
 	config := &v1alpha1.IkniteClusterSpec{CreateIp: false}
-	err := k8s.CleanAll(mockHost, config, false, true /* resetIpTables */, true /* failOnError */, false /* isDryRun */)
+	err := k8s.CleanAll(mockH, config, false, true /* resetIpTables */, true /* failOnError */, false /* isDryRun */)
 	req.Error(err)
 	req.Contains(err.Error(), "failed to clean up iptables rules")
 }
@@ -992,24 +993,24 @@ func TestCleanAll_IPAddressError_FailOnError(t *testing.T) {
 		WriteFilePath: hostsFile,
 	}
 
-	mockHost := host.NewMockHost(t)
+	mockH := mockHost.NewMockHost(t)
 	// StopAllContainers (dry run): no ExecPipe
 	// UnmountPaths: all return ErrNotExist
-	setupAllEvalSymlinksNotExist(mockHost)
+	setupAllEvalSymlinksNotExist(mockH)
 	// DeleteCniNamespaces (dry run)
-	mockHost.On("ExecPipe", mock.Anything, "ip netns show").Return(script.Echo("")).Once()
-	mockHost.On("ExecForEach", mock.Anything, "echo ip netns delete {{.}}").Return(script.NewPipe()).Once()
+	mockH.On("ExecPipe", mock.Anything, "ip netns show").Return(script.Echo("")).Once()
+	mockH.On("ExecForEach", mock.Anything, "echo ip netns delete {{.}}").Return(script.NewPipe()).Once()
 	// DeleteNetworkInterfaces (dry run)
-	mockHost.On("ExecPipe", mock.Anything, "ip -j link show").Return(script.Echo("[]\n")).Once()
-	mockHost.On("ExecForEach", mock.Anything, "{{ . }}").Return(script.NewPipe()).Once()
+	mockH.On("ExecPipe", mock.Anything, "ip -j link show").Return(script.Echo("[]\n")).Once()
+	mockH.On("ExecForEach", mock.Anything, "{{ . }}").Return(script.NewPipe()).Once()
 	// ResetIPAddress fails (hostsFile is unreadable)
-	mockHost.On("GetHostsConfig").Return(hostsConfig).Once()
+	mockH.On("GetHostsConfig").Return(hostsConfig).Once()
 
 	config := &v1alpha1.IkniteClusterSpec{
 		CreateIp:   true,
 		DomainName: "kaweezle.local",
 	}
-	err := k8s.CleanAll(mockHost, config, true /* resetIpAddress */, false, true /* failOnError */, true /* isDryRun */)
+	err := k8s.CleanAll(mockH, config, true /* resetIpAddress */, false, true /* failOnError */, true /* isDryRun */)
 	req.Error(err)
 	req.Contains(err.Error(), "failed to create hosts file handler")
 }
