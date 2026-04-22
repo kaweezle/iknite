@@ -69,7 +69,7 @@ func TestCommandConstructors(t *testing.T) {
 		{name: "start", fn: func() *cobra.Command { return NewStartCmd(spec, nil) }},
 		{name: "status", fn: func() *cobra.Command { return NewStatusCmd(spec, nil) }},
 		{name: "prepare", fn: func() *cobra.Command { return NewPrepareCommand(spec) }},
-		{name: "kubelet", fn: func() *cobra.Command { return NewKubeletCmd(spec, nil) }},
+		{name: "kubelet", fn: func() *cobra.Command { return NewKubeletCmd(spec, nil, nil) }},
 		{name: "mdns", fn: func() *cobra.Command { return NewMdnsCmd(spec) }},
 		{name: "info", fn: func() *cobra.Command { return NewInfoCmd(spec) }},
 		{name: "kustomize", fn: func() *cobra.Command { return NewKustomizeCmd(spec, nil, nil) }},
@@ -79,7 +79,7 @@ func TestCommandConstructors(t *testing.T) {
 				return NewPrintKustomizeCmd(host.NewMemMapFS(), spec, utils.NewKustomizeOptions())
 			},
 		},
-		{name: "clean", fn: func() *cobra.Command { return NewCmdClean(spec, nil) }},
+		{name: "clean", fn: func() *cobra.Command { return NewCmdClean(spec, nil, nil) }},
 	}
 
 	for _, tt := range constructors {

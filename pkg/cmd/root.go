@@ -28,6 +28,7 @@ import (
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
 	"github.com/kaweezle/iknite/pkg/cmd/util"
 	"github.com/kaweezle/iknite/pkg/config"
+	"github.com/kaweezle/iknite/pkg/host"
 )
 
 // cSpell: enable
@@ -75,12 +76,13 @@ kubernetes.`,
 	flags := rootCmd.PersistentFlags()
 	opts.AddFlags(flags)
 	util.AddConfigFlag(rootCmd)
+	alpineHost := host.NewDefaultHost()
 
 	rootCmd.AddCommand(NewKustomizeCmd(ikniteConfig, nil, nil))
-	rootCmd.AddCommand(newCmdInit(os.Stdout, nil, nil))
+	rootCmd.AddCommand(newCmdInit(os.Stdout, nil, nil, alpineHost))
 	rootCmd.AddCommand(newCmdReset(os.Stdin, os.Stdout, nil, nil))
-	rootCmd.AddCommand(NewCmdClean(ikniteConfig, nil))
-	rootCmd.AddCommand(NewKubeletCmd(ikniteConfig, nil))
+	rootCmd.AddCommand(NewCmdClean(ikniteConfig, nil, alpineHost))
+	rootCmd.AddCommand(NewKubeletCmd(ikniteConfig, nil, alpineHost))
 	rootCmd.AddCommand(NewMdnsCmd(ikniteConfig))
 	rootCmd.AddCommand(NewPrepareCommand(ikniteConfig))
 	rootCmd.AddCommand(NewStartCmd(ikniteConfig, nil))

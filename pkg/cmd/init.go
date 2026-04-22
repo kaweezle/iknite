@@ -113,6 +113,9 @@ const (
 // compile-time assert that the local data object satisfies the phases data interface.
 var _ iknitePhase.IkniteInitData = (*initData)(nil)
 
+// function hook used for testing purposes to mock the addition of phases to the workflow runner in init command.
+var addInitWorkflowPhasesFn = addInitWorkflowPhases
+
 // initData defines all the runtime information used when running the kubeadm init workflow;
 // this data is shared across all the phases that are included in the workflow.
 //
@@ -157,12 +160,65 @@ func AddInitOtherFlags(flagSet *flag.FlagSet, initOptions *initOptions)
 //go:linkname getDryRunClient k8s.io/kubernetes/cmd/kubeadm/app/cmd.getDryRunClient
 func getDryRunClient(d *initData) (clientset.Interface, error)
 
+// addInitWorkflowPhases adds to the workflow runner the list of phases that should be executed when running kubeadm
+// init.
+func addInitWorkflowPhases(initRunner *workflow.Runner) {
+	initRunner.AppendPhase(WrapPhase(iknitePhase.NewPrepareHostPhase(), ikniteApi.Started, nil))
+	initRunner.AppendPhase(WrapPhase(iknitePhase.NewPreCleanHostPhase(), ikniteApi.Started, nil))
+	initRunner.AppendPhase(WrapPhase(phases.NewPreflightPhase(), ikniteApi.Initializing, nil))
+	initRunner.AppendPhase(WrapPhase(phases.NewCertsPhase(), ikniteApi.Initializing, nil))
+	initRunner.AppendPhase(WrapPhase(phases.NewKubeConfigPhase(), ikniteApi.Initializing, nil))
+	initRunner.AppendPhase(WrapPhase(phases.NewEtcdPhase(), ikniteApi.Initializing, nil))
+	initRunner.AppendPhase(
+		WrapPhase(iknitePhase.NewKineControlPlanePhase(), ikniteApi.Initializing, nil),
+	)
+	controlPlanePhase := phases.NewControlPlanePhase()
+	controlPlanePhase.Phases = append(
+		controlPlanePhase.Phases,
+		iknitePhase.NewKubeVipControlPlanePhase(),
+	)
+
+	initRunner.AppendPhase(WrapPhase(controlPlanePhase, ikniteApi.Initializing, nil))
+	initRunner.AppendPhase(
+		WrapPhase(iknitePhase.NewKubeletStartPhase(), ikniteApi.Initializing, nil),
+	)
+	initRunner.AppendPhase(
+		WrapPhase(phases.NewWaitControlPlanePhase(), ikniteApi.Initializing, nil),
+	)
+	initRunner.AppendPhase(WrapPhase(phases.NewUploadConfigPhase(), ikniteApi.Initializing, nil))
+	initRunner.AppendPhase(WrapPhase(phases.NewUploadCertsPhase(), ikniteApi.Initializing, nil))
+	//nolint:gocritic // both control plane and worker
+	// initRunner.AppendPhase(phases.NewMarkControlPlanePhase())
+	initRunner.AppendPhase(WrapPhase(phases.NewBootstrapTokenPhase(), ikniteApi.Initializing, nil))
+	initRunner.AppendPhase(WrapPhase(phases.NewKubeletFinalizePhase(), ikniteApi.Initializing, nil))
+	initRunner.AppendPhase(WrapPhase(phases.NewAddonPhase(), ikniteApi.Initializing, nil))
+	initRunner.AppendPhase(WrapPhase(iknitePhase.NewCopyConfigPhase(), ikniteApi.Stabilizing, nil))
+	initRunner.AppendPhase(WrapPhase(iknitePhase.NewMDnsPublishPhase(), ikniteApi.Stabilizing, nil))
+	initRunner.AppendPhase(
+		WrapPhase(iknitePhase.NewKustomizeClusterPhase(), ikniteApi.Stabilizing, nil),
+	)
+	initRunner.AppendPhase(WrapPhase(iknitePhase.NewServePhase(), ikniteApi.Stabilizing, nil))
+	initRunner.AppendPhase(WrapPhase(iknitePhase.NewWorkloadsPhase(), ikniteApi.Stabilizing, nil))
+	initRunner.AppendPhase(WrapPhase(iknitePhase.NewDaemonizePhase(), ikniteApi.Stabilizing, nil))
+	//nolint:gocritic // standalone node
+	// initRunner.AppendPhase(phases.NewShowJoinCommandPhase())
+}
+
 // newCmdInit returns "kubeadm init" command.
 //
 // NB. InitOptions is exposed as parameter for allowing unit testing of the newInitOptions method, that implements all
 // the command options validation logic.
-func newCmdInit(out io.Writer, initOptions *initOptions, initRunner *workflow.Runner) *cobra.Command {
-	alpineHost := host.NewDefaultHost()
+//
+//nolint:gocyclo // TODO: reduce more
+func newCmdInit(
+	out io.Writer,
+	initOptions *initOptions,
+	initRunner *workflow.Runner,
+	alpineHost host.Host,
+) *cobra.Command {
+	if alpineHost == nil {
+		alpineHost = host.NewDefaultHost()
+	}
 	if initOptions == nil {
 		initOptions = newInitOptions()
 	}
@@ -264,45 +320,7 @@ func newCmdInit(out io.Writer, initOptions *initOptions, initRunner *workflow.Ru
 	})
 
 	// initialize the workflow runner with the list of phases
-	initRunner.AppendPhase(WrapPhase(iknitePhase.NewPrepareHostPhase(), ikniteApi.Started, nil))
-	initRunner.AppendPhase(WrapPhase(iknitePhase.NewPreCleanHostPhase(), ikniteApi.Started, nil))
-	initRunner.AppendPhase(WrapPhase(phases.NewPreflightPhase(), ikniteApi.Initializing, nil))
-	initRunner.AppendPhase(WrapPhase(phases.NewCertsPhase(), ikniteApi.Initializing, nil))
-	initRunner.AppendPhase(WrapPhase(phases.NewKubeConfigPhase(), ikniteApi.Initializing, nil))
-	initRunner.AppendPhase(WrapPhase(phases.NewEtcdPhase(), ikniteApi.Initializing, nil))
-	initRunner.AppendPhase(
-		WrapPhase(iknitePhase.NewKineControlPlanePhase(), ikniteApi.Initializing, nil),
-	)
-	controlPlanePhase := phases.NewControlPlanePhase()
-	controlPlanePhase.Phases = append(
-		controlPlanePhase.Phases,
-		iknitePhase.NewKubeVipControlPlanePhase(),
-	)
-
-	initRunner.AppendPhase(WrapPhase(controlPlanePhase, ikniteApi.Initializing, nil))
-	initRunner.AppendPhase(
-		WrapPhase(iknitePhase.NewKubeletStartPhase(), ikniteApi.Initializing, nil),
-	)
-	initRunner.AppendPhase(
-		WrapPhase(phases.NewWaitControlPlanePhase(), ikniteApi.Initializing, nil),
-	)
-	initRunner.AppendPhase(WrapPhase(phases.NewUploadConfigPhase(), ikniteApi.Initializing, nil))
-	initRunner.AppendPhase(WrapPhase(phases.NewUploadCertsPhase(), ikniteApi.Initializing, nil))
-	//nolint:gocritic // both control plane and worker
-	// initRunner.AppendPhase(phases.NewMarkControlPlanePhase())
-	initRunner.AppendPhase(WrapPhase(phases.NewBootstrapTokenPhase(), ikniteApi.Initializing, nil))
-	initRunner.AppendPhase(WrapPhase(phases.NewKubeletFinalizePhase(), ikniteApi.Initializing, nil))
-	initRunner.AppendPhase(WrapPhase(phases.NewAddonPhase(), ikniteApi.Initializing, nil))
-	initRunner.AppendPhase(WrapPhase(iknitePhase.NewCopyConfigPhase(), ikniteApi.Stabilizing, nil))
-	initRunner.AppendPhase(WrapPhase(iknitePhase.NewMDnsPublishPhase(), ikniteApi.Stabilizing, nil))
-	initRunner.AppendPhase(
-		WrapPhase(iknitePhase.NewKustomizeClusterPhase(), ikniteApi.Stabilizing, nil),
-	)
-	initRunner.AppendPhase(WrapPhase(iknitePhase.NewServePhase(), ikniteApi.Stabilizing, nil))
-	initRunner.AppendPhase(WrapPhase(iknitePhase.NewWorkloadsPhase(), ikniteApi.Stabilizing, nil))
-	initRunner.AppendPhase(WrapPhase(iknitePhase.NewDaemonizePhase(), ikniteApi.Stabilizing, nil))
-	//nolint:gocritic // standalone node
-	// initRunner.AppendPhase(phases.NewShowJoinCommandPhase())
+	addInitWorkflowPhasesFn(initRunner)
 
 	// sets the data builder function, that will be used by the runner
 	// both when running the entire workflow or single phases
@@ -313,7 +331,7 @@ func newCmdInit(out io.Writer, initOptions *initOptions, initRunner *workflow.Ru
 				// assume that the command execution does not depend on CRISocket when --cri-socket flag is not set
 				initOptions.skipCRIDetect = true
 			}
-			data, err := newInitData(cmd, args, initOptions, out)
+			data, err := newInitData(cmd, args, initOptions, out, alpineHost)
 			if err != nil {
 				return nil, err
 			}
@@ -324,11 +342,14 @@ func newCmdInit(out io.Writer, initOptions *initOptions, initRunner *workflow.Ru
 
 			// Skip either kine or etcd based on UseEtcd setting.
 			if data.ikniteCluster.Spec.UseEtcd {
-				initRunner.Options.SkipPhases = append(initRunner.Options.SkipPhases, constants.KineBackendName)
+				skipPhaseIfExists(initRunner.Phases, &(initRunner.Options.SkipPhases), constants.KineBackendName, "")
 				data.ikniteCluster.Spec.APIBackendDatabaseDirectory = data.cfg.Etcd.Local.DataDir
 			} else {
-				initRunner.Options.SkipPhases = append(initRunner.Options.SkipPhases, constants.EtcdBackendName)
+				skipPhaseIfExists(initRunner.Phases, &(initRunner.Options.SkipPhases), constants.EtcdBackendName, "")
 			}
+
+			// force skip CoreDNS as it is injected by the kustomization
+			skipPhaseIfExists(initRunner.Phases, &initRunner.Options.SkipPhases, coreDNSPhase, "")
 
 			initRunner.Options.SkipPhases = manageSkippedAddons(
 				&data.cfg.ClusterConfiguration,
@@ -345,12 +366,28 @@ func newCmdInit(out io.Writer, initOptions *initOptions, initRunner *workflow.Ru
 	return cmd
 }
 
+func skipPhaseIfExists(initPhases []workflow.Phase, skipPhases *[]string, phaseName, prefix string) bool {
+	for i := range initPhases {
+		phase := &initPhases[i]
+		fullPhaseName := prefix + phase.Name
+		if fullPhaseName == phaseName {
+			*skipPhases = append(*skipPhases, fullPhaseName)
+			return true
+		}
+		if len(phase.Phases) > 0 {
+			if skipPhaseIfExists(phase.Phases, skipPhases, phaseName, fullPhaseName+"/") {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 // newInitOptions returns a struct ready for being used for creating cmd init flags.
 func newInitOptions() *initOptions {
 	// initialize the public kubeadm config API by applying defaults
 	externalInitCfg := &kubeadmApiV1.InitConfiguration{}
 	kubeadmScheme.Scheme.Default(externalInitCfg)
-	externalInitCfg.SkipPhases = []string{coreDNSPhase}
 
 	externalClusterCfg := &kubeadmApiV1.ClusterConfiguration{}
 	kubeadmScheme.Scheme.Default(externalClusterCfg)
@@ -387,6 +424,7 @@ func newInitData(
 	_ []string,
 	initOptions *initOptions,
 	out io.Writer,
+	alpineHost host.Host,
 ) (*initData, error) {
 	// Re-apply defaults to the public kubeadm API (this will set only values not exposed/not set as a flags)
 	kubeadmScheme.Scheme.Default(initOptions.externalInitCfg)
@@ -567,7 +605,7 @@ func newInitData(
 			options.DryRun,
 			cfg.DryRun,
 			initOptions.dryRun).(bool),
-		alpineHost: host.NewDefaultHost(),
+		alpineHost: alpineHost,
 	}, nil
 }
 
@@ -795,17 +833,17 @@ func manageSkippedAddons(cfg *kubeadmApi.ClusterConfiguration, skipPhases []stri
 	)
 	// If the DNS or Proxy addons are disabled, skip the corresponding phase.
 	// Alternatively, update the proxy and DNS "Disabled" status based on skipped addon phases.
-	if isPhaseInSkipPhases(addonPhase, skipPhases) {
+	if slices.Contains(skipPhases, addonPhase) {
 		skipDNSPhase = true
 		skipProxyPhase = true
 		cfg.DNS.Disabled = true
 		cfg.Proxy.Disabled = true
 	}
-	if isPhaseInSkipPhases(coreDNSPhase, skipPhases) {
+	if slices.Contains(skipPhases, coreDNSPhase) {
 		skipDNSPhase = true
 		cfg.DNS.Disabled = true
 	}
-	if isPhaseInSkipPhases(kubeProxyPhase, skipPhases) {
+	if slices.Contains(skipPhases, kubeProxyPhase) {
 		skipProxyPhase = true
 		cfg.Proxy.Disabled = true
 	}
@@ -816,10 +854,6 @@ func manageSkippedAddons(cfg *kubeadmApi.ClusterConfiguration, skipPhases []stri
 		skipPhases = append(skipPhases, kubeProxyPhase)
 	}
 	return skipPhases
-}
-
-func isPhaseInSkipPhases(phase string, skipPhases []string) bool {
-	return slices.Contains(skipPhases, phase)
 }
 
 func (d *initData) IkniteCluster() *v1alpha1.IkniteCluster {
@@ -895,7 +929,7 @@ func WrapPhase(
 				return fmt.Errorf("phase %q invoked with an invalid data struct", p.Name)
 			}
 			phaseName := PhaseName(p, parentPhases)
-			data.IkniteCluster().Update(state, phaseName, nil, nil)
+			data.IkniteCluster().Update(state, phaseName, nil, nil, data.Host())
 			log.WithFields(log.Fields{
 				"phase": phaseName,
 				"state": state.String(),

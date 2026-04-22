@@ -63,8 +63,8 @@ func NewStartCmd(ikniteConfig *v1alpha1.IkniteClusterSpec, waitOptions *utils.Wa
 	return startCmd
 }
 
-func IsIkniteReady(_ context.Context) (bool, error) {
-	cluster, err := v1alpha1.LoadIkniteCluster()
+func IsIkniteReady(_ context.Context, fs host.FileSystem) (bool, error) {
+	cluster, err := v1alpha1.LoadIkniteCluster(fs)
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
 		return false, fmt.Errorf("failed to load iknite cluster: %w", err)
 	}
@@ -120,6 +120,8 @@ func performStart(ikniteConfig *v1alpha1.IkniteClusterSpec, waitOptions *utils.W
 
 	// Start OpenRC. This will perform `iknite init`.
 	cobra.CheckErr(alpine.EnsureOpenRC(alpineHost, "default"))
-	cobra.CheckErr(waitOptions.Poll(context.Background(), IsIkniteReady))
+	cobra.CheckErr(waitOptions.Poll(context.Background(), func(ctx context.Context) (bool, error) {
+		return IsIkniteReady(ctx, alpineHost)
+	}))
 	log.Info("Cluster is ready")
 }

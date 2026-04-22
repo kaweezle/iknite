@@ -10,6 +10,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 
 	ikniteapi "github.com/kaweezle/iknite/pkg/apis/iknite"
+	"github.com/kaweezle/iknite/pkg/constants"
 	"github.com/kaweezle/iknite/pkg/host"
 )
 
@@ -89,10 +90,11 @@ func TestIkniteCluster_Update(t *testing.T) {
 
 	cluster := &IkniteCluster{}
 	SetDefaults_IkniteCluster(cluster)
+	fs := host.NewMemMapFS()
 
 	ready := []*WorkloadState{{Namespace: "ns", Name: "a", Ok: true, Message: "ok"}}
 	unready := []*WorkloadState{{Namespace: "ns", Name: "b", Ok: false, Message: "waiting"}}
-	cluster.Update(ikniteapi.Stabilizing, "phase-a", ready, unready)
+	cluster.Update(ikniteapi.Stabilizing, "phase-a", ready, unready, fs)
 
 	req.Equal(ikniteapi.Stabilizing, cluster.Status.State)
 	req.Equal("phase-a", cluster.Status.CurrentPhase)
@@ -101,17 +103,21 @@ func TestIkniteCluster_Update(t *testing.T) {
 	req.Equal(1, cluster.Status.WorkloadsState.UnreadyCount)
 	req.Equal(ready, cluster.Status.WorkloadsState.Ready)
 	req.Equal(unready, cluster.Status.WorkloadsState.Unready)
+	exist, err := fs.Exists(constants.StatusFile)
+	req.NoError(err)
+	req.True(exist)
 }
 
 func TestLoadIkniteClusterErrors(t *testing.T) {
 	t.Parallel()
 	req := require.New(t)
 
-	_, err := LoadIkniteCluster()
+	fs := host.NewMemMapFS()
+	_, err := LoadIkniteCluster(fs)
 	req.Error(err)
 	req.Contains(err.Error(), "failed to read status file")
 
-	cluster, err := LoadIkniteClusterOrDefault()
+	cluster, err := LoadIkniteClusterOrDefault(fs)
 	req.NoError(err)
 	req.NotNil(cluster)
 	req.Equal(ikniteapi.Stopped, cluster.Status.State)

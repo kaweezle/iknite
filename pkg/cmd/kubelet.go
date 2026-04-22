@@ -16,9 +16,16 @@ import (
 	"github.com/kaweezle/iknite/pkg/utils"
 )
 
-func NewKubeletCmd(ikniteConfig *v1alpha1.IkniteClusterSpec, kustomizeOptions *utils.KustomizeOptions) *cobra.Command {
+func NewKubeletCmd(
+	ikniteConfig *v1alpha1.IkniteClusterSpec,
+	kustomizeOptions *utils.KustomizeOptions,
+	alpineHost host.Host,
+) *cobra.Command {
 	if kustomizeOptions == nil {
 		kustomizeOptions = utils.NewKustomizeOptions()
+	}
+	if alpineHost == nil {
+		alpineHost = host.NewDefaultHost()
 	}
 	kubeletCmd := &cobra.Command{
 		Use:   "kubelet",
@@ -29,7 +36,9 @@ The kubelet is started and monitored. The following operations are performed:
 - Starts the kubelet,
 - Monitors the kubelet,
 `,
-		RunE: func(_ *cobra.Command, _ []string) error { return performKubelet(ikniteConfig, kustomizeOptions) },
+		RunE: func(_ *cobra.Command, _ []string) error {
+			return performKubelet(ikniteConfig, kustomizeOptions, alpineHost)
+		},
 	}
 
 	config.AddIkniteClusterFlags(kubeletCmd.Flags(), ikniteConfig)
@@ -38,8 +47,11 @@ The kubelet is started and monitored. The following operations are performed:
 	return kubeletCmd
 }
 
-func performKubelet(ikniteConfig *v1alpha1.IkniteClusterSpec, kustomizeOptions *utils.KustomizeOptions) error {
-	alpineHost := host.NewDefaultHost()
+func performKubelet(
+	ikniteConfig *v1alpha1.IkniteClusterSpec,
+	kustomizeOptions *utils.KustomizeOptions,
+	alpineHost host.Host,
+) error {
 	kubeClient, err := k8s.NewDefaultClient(alpineHost)
 	if err != nil {
 		return fmt.Errorf("failed to create kube client: %w", err)

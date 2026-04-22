@@ -45,7 +45,11 @@ func runCopyConfig(c workflow.RunData) error {
 
 	// Ensure the iknite configuration actually exists
 	// TODO: This should be done where all the certificates are done.
-	if err := server.EnsureIkniteServerConfiguration(constants.KubernetesPKIDir, &ikniteConfig); err != nil {
+	if err := server.EnsureIkniteServerConfiguration(
+		data.Host(),
+		constants.KubernetesPKIDir,
+		&ikniteConfig,
+	); err != nil {
 		return fmt.Errorf("failed to ensure iknite server configuration: %w", err)
 	}
 

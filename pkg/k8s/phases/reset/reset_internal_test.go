@@ -23,7 +23,11 @@ import (
 	"github.com/stretchr/testify/require"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	kubeadmConstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
+
+	"github.com/kaweezle/iknite/pkg/host"
 )
+
+const testDir = "test"
 
 func TestResetPhaseConstructors(t *testing.T) {
 	t.Parallel()
@@ -82,13 +86,14 @@ func TestCleanDirAndIsDirEmpty(t *testing.T) {
 		t.Parallel()
 		req := require.New(t)
 
-		dir := t.TempDir()
-		req.NoError(os.WriteFile(filepath.Join(dir, "a.txt"), []byte("a"), 0o600))
-		req.NoError(os.MkdirAll(filepath.Join(dir, "nested"), 0o750))
-		req.NoError(os.WriteFile(filepath.Join(dir, "nested", "b.txt"), []byte("b"), 0o600))
+		fs := host.NewMemMapFS()
+		req.NoError(fs.MkdirAll(testDir, os.FileMode(0o755)))
+		req.NoError(fs.WriteFile(filepath.Join(testDir, "a.txt"), []byte("a"), 0o600))
+		req.NoError(fs.MkdirAll(filepath.Join(testDir, "nested"), 0o750))
+		req.NoError(fs.WriteFile(filepath.Join(testDir, "nested", "b.txt"), []byte("b"), 0o600))
 
-		req.NoError(CleanDir(dir))
-		empty, err := IsDirEmpty(dir)
+		req.NoError(CleanDir(fs, testDir))
+		empty, err := IsDirEmpty(fs, testDir)
 		req.NoError(err)
 		req.True(empty)
 	})
@@ -96,17 +101,19 @@ func TestCleanDirAndIsDirEmpty(t *testing.T) {
 	t.Run("missing directory returns nil", func(t *testing.T) {
 		t.Parallel()
 		req := require.New(t)
-		err := CleanDir(filepath.Join(t.TempDir(), "missing"))
+		fs := host.NewMemMapFS()
+		err := CleanDir(fs, "missing")
 		req.NoError(err)
 	})
 
 	t.Run("is dir empty on non-empty directory", func(t *testing.T) {
 		t.Parallel()
 		req := require.New(t)
-		dir := t.TempDir()
-		req.NoError(os.WriteFile(filepath.Join(dir, "x"), []byte("x"), 0o600))
+		fs := host.NewMemMapFS()
+		req.NoError(fs.MkdirAll(testDir, os.FileMode(0o755)))
+		req.NoError(fs.WriteFile(filepath.Join(testDir, "x"), []byte("x"), 0o600))
 
-		empty, err := IsDirEmpty(dir)
+		empty, err := IsDirEmpty(fs, testDir)
 		req.NoError(err)
 		req.False(empty)
 	})
@@ -114,7 +121,8 @@ func TestCleanDirAndIsDirEmpty(t *testing.T) {
 	t.Run("is dir empty returns error for missing path", func(t *testing.T) {
 		t.Parallel()
 		req := require.New(t)
-		_, err := IsDirEmpty(filepath.Join(t.TempDir(), "missing"))
+		fs := host.NewMemMapFS()
+		_, err := IsDirEmpty(fs, "missing")
 		req.Error(err)
 	})
 }
@@ -123,10 +131,11 @@ func TestResetConfigDirDeletesExpectedFiles(t *testing.T) {
 	t.Parallel()
 	req := require.New(t)
 
-	configDir := t.TempDir()
-	manifestDir := filepath.Join(configDir, "manifests")
-	req.NoError(os.MkdirAll(manifestDir, 0o750))
-	req.NoError(os.WriteFile(filepath.Join(manifestDir, "kube-apiserver.yaml"), []byte("x"), 0o600))
+	fs := host.NewMemMapFS()
+	req.NoError(fs.MkdirAll(testDir, os.FileMode(0o755)))
+	manifestDir := filepath.Join(testDir, "manifests")
+	req.NoError(fs.MkdirAll(manifestDir, 0o750))
+	req.NoError(fs.WriteFile(filepath.Join(manifestDir, "kube-apiserver.yaml"), []byte("x"), 0o600))
 
 	filesToCreate := []string{
 		kubeadmConstants.AdminKubeConfigFileName,
@@ -138,17 +147,17 @@ func TestResetConfigDirDeletesExpectedFiles(t *testing.T) {
 	}
 
 	for _, fileName := range filesToCreate {
-		req.NoError(os.WriteFile(filepath.Join(configDir, fileName), []byte("conf"), 0o600))
+		req.NoError(fs.WriteFile(filepath.Join(testDir, fileName), []byte("conf"), 0o600))
 	}
 
-	resetConfigDir(configDir, []string{manifestDir}, false)
+	resetConfigDir(fs, testDir, []string{manifestDir}, false)
 
-	empty, err := IsDirEmpty(manifestDir)
+	empty, err := IsDirEmpty(fs, manifestDir)
 	req.NoError(err)
 	req.True(empty)
 
 	for _, fileName := range filesToCreate {
-		_, statErr := os.Stat(filepath.Join(configDir, fileName))
+		_, statErr := fs.Stat(filepath.Join(testDir, fileName))
 		req.Error(statErr)
 		req.ErrorIs(statErr, os.ErrNotExist)
 	}

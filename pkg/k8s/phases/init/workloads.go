@@ -51,7 +51,7 @@ func runMonitorWorkloads(c workflow.RunData) error {
 				status = iknite.Stabilizing
 			}
 
-			cluster.Update(status, "daemonize", ready, unready)
+			cluster.Update(status, "daemonize", ready, unready, data.Host())
 			// Propagate the updated status to the in-memory server cache so
 			// that /status requests reflect the latest state without a file read.
 			if srv := data.StatusServer(); srv != nil {

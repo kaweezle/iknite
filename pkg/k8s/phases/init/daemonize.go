@@ -77,7 +77,7 @@ func runDaemonize(c workflow.RunData) error {
 
 	err := WaitForKubelet(ctx, kubeletProcess, conn)
 
-	data.IkniteCluster().Update(iknite.Stopping, "stop", nil, nil)
+	data.IkniteCluster().Update(iknite.Stopping, "stop", nil, nil, data.Host())
 	if err == nil {
 		// Prevent double stop
 		data.SetKubeletProcess(nil)
@@ -85,11 +85,11 @@ func runDaemonize(c workflow.RunData) error {
 
 	ensureServerStopped(data)
 
-	data.IkniteCluster().Update(iknite.Cleaning, "clean", nil, nil)
+	data.IkniteCluster().Update(iknite.Cleaning, "clean", nil, nil, data.Host())
 	err = k8s.CleanAll(data.Host(), &data.IkniteCluster().Spec, true, false, false, false)
 	if err != nil {
 		log.WithError(err).Warn("Error during cleanup after kubelet stopped")
 	}
-	data.IkniteCluster().Update(iknite.Stopped, "", nil, nil)
+	data.IkniteCluster().Update(iknite.Stopped, "", nil, nil, data.Host())
 	return nil
 }

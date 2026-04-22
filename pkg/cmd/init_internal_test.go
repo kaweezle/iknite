@@ -6,15 +6,18 @@ package cmd
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"slices"
+	"syscall"
 	"testing"
 
 	"github.com/spf13/cobra"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
@@ -22,6 +25,8 @@ import (
 	kubeadmConstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 
 	ikniteApi "github.com/kaweezle/iknite/pkg/apis/iknite"
+	"github.com/kaweezle/iknite/pkg/host"
+	k8sInit "github.com/kaweezle/iknite/pkg/k8s/phases/init"
 )
 
 func TestNewInitData(t *testing.T) {
@@ -136,7 +141,7 @@ func TestNewInitData(t *testing.T) {
 			initRunner := workflow.NewRunner()
 			var output bytes.Buffer // dummy output for validation
 
-			cmd := newCmdInit(&output, opts, initRunner)
+			cmd := newCmdInit(&output, opts, initRunner, host.NewDefaultHost())
 			if tt.customizeOptions != nil {
 				cleanup, err := tt.customizeOptions(t, cmd, opts)
 				req.NoError(err)
@@ -195,7 +200,7 @@ func TestInitDataClientWithNonDefaultKubeconfig(t *testing.T) {
 	initOptions.kubeconfigPath = kubeconfigPath
 	initRunner := workflow.NewRunner()
 	var output bytes.Buffer // dummy output for validation
-	_ = newCmdInit(&output, initOptions, initRunner)
+	_ = newCmdInit(&output, initOptions, initRunner, host.NewDefaultHost())
 
 	d, err := initRunner.InitData([]string{})
 	if err != nil {
@@ -261,4 +266,91 @@ func TestInitDataClientWithNonDefaultKubeconfig(t *testing.T) {
 		"Cluster state should be 'Initializing' after preflight phase",
 	)
 	require.Equal(t, "preflight", status.CurrentPhase, "Current phase should be preflight")
+}
+
+func TestRunInitCmd_Failed(t *testing.T) {
+	req := require.New(t)
+	initOptions := newInitOptions()
+	initRunner := workflow.NewRunner()
+	mockHost := host.NewMockHost(t)
+	// Expected to write the status upon start
+	mockHost.EXPECT().MkdirAll("/run/iknite", os.FileMode(0o755)).Return(nil).Maybe()
+	mockHost.EXPECT().WriteFile("/run/iknite/status.json", mock.Anything, os.FileMode(0o644)).Return(nil).Maybe()
+	// We cannot fail on this one because the error is just logged out.
+	mockHost.EXPECT().WriteFile(
+		"/proc/sys/net/ipv4/ip_forward",
+		[]byte("1\n"),
+		os.FileMode(int(0o644)),
+	).Return(nil).Once()
+	mockHost.EXPECT().Exists("/proc/sys/net/bridge").
+		Return(false, errors.New("File error"))
+
+	var output bytes.Buffer
+	cmd := newCmdInit(&output, initOptions, initRunner, mockHost)
+	err := cmd.Execute()
+	req.Error(err)
+	req.Contains(err.Error(), "File error")
+	// Check that etcd and addon/coredns phases are in the skipped phases
+	skippedPhases := initRunner.Options.SkipPhases
+	req.Contains(skippedPhases, "etcd")
+	req.Contains(skippedPhases, "addon/coredns")
+}
+
+// NewDummyPhase performs A simple dummy phase to test the whole init workflow.
+func NewDummyPhase(t *testing.T) workflow.Phase {
+	t.Helper()
+	req := require.New(t)
+	return workflow.Phase{
+		Name:  "dummy-phase",
+		Short: "Test the init workflow.",
+		Run: func(c workflow.RunData) error {
+			data, ok := c.(k8sInit.IkniteInitData)
+			if !ok {
+				return fmt.Errorf("prepare phase invoked with an invalid data struct. ")
+			}
+			ikniteConfig := &data.IkniteCluster().Spec
+			alpineHost := data.Host()
+			req.NotNil(ikniteConfig)
+			req.NotNil(alpineHost)
+
+			// Set a mock kubelet process in the state
+			mockProcess := host.NewMockProcess(t)
+			mockProcess.EXPECT().Signal(syscall.SIGTERM).Return(nil).Once()
+			mockProcess.EXPECT().Wait().Return(nil).Once()
+			data.SetKubeletProcess(mockProcess)
+
+			return nil
+		},
+	}
+}
+
+func TestRunInitCmd_Success(t *testing.T) {
+	req := require.New(t)
+	initOptions := newInitOptions()
+	initRunner := workflow.NewRunner()
+	mockHost := host.NewMockHost(t)
+
+	addInitWorkflowPhasesFn = func(initRunner *workflow.Runner) {
+		initRunner.AppendPhase(WrapPhase(NewDummyPhase(t), ikniteApi.Started, nil))
+	}
+	defer func() {
+		addInitWorkflowPhasesFn = addInitWorkflowPhases
+	}()
+
+	// Expected to write the status upon start
+	mockHost.EXPECT().MkdirAll("/run/iknite", os.FileMode(0o755)).Return(nil).Maybe()
+	mockHost.EXPECT().
+		WriteFile("/run/iknite/status.json", mock.Anything, os.FileMode(0o644)).
+		RunAndReturn(func(path string, data []byte, perm os.FileMode) error {
+			t.Logf("Mock WriteFile called with path: %s, data: %s, perm: %o\n", path, string(data), perm)
+			return nil
+		}).
+		Maybe()
+	// Remove the kubelet pid file at the end of the workflow
+	mockHost.EXPECT().Remove("/run/kubelet.pid").Return(nil).Once()
+
+	var output bytes.Buffer
+	cmd := newCmdInit(&output, initOptions, initRunner, mockHost)
+	err := cmd.Execute()
+	req.NoError(err)
 }

@@ -66,7 +66,7 @@ func SetDefaults_IkniteClusterStatus(obj *IkniteClusterStatus) {
 		obj.CurrentPhase = "undefined"
 	}
 	if obj.LastUpdateTimeStamp.IsZero() {
-		obj.LastUpdateTimeStamp = metav1.Now()
+		obj.LastUpdateTimeStamp = metav1.Now().Rfc3339Copy()
 	}
 }
 

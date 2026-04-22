@@ -44,7 +44,7 @@ func (h *hostImpl) GetOutboundIP( /* ctx context.Context */ ) (net.IP, error) {
 		return nil, fmt.Errorf("failed to get local address")
 	}
 
-	return localAddr.IP, nil
+	return localAddr.IP.To16(), nil
 }
 
 func (h *hostImpl) CheckIpExists(ip net.IP) (bool, error) {
