@@ -1,6 +1,6 @@
+// cSpell: words wrapcheck sirupsen apimachinery
 package v1alpha1
 
-// cSpell: disable
 import (
 	"encoding/json"
 	"errors"
@@ -15,8 +15,6 @@ import (
 	"github.com/kaweezle/iknite/pkg/constants"
 	"github.com/kaweezle/iknite/pkg/host"
 )
-
-// cSpell: enable
 
 // cSpell: disable-next-line
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -133,7 +131,7 @@ func LoadIkniteCluster(fs host.FileSystem) (*IkniteCluster, error) {
 			return nil, fmt.Errorf("failed to unmarshal iknite cluster: %w", err)
 		}
 	} else {
-		return nil, fmt.Errorf("failed to read status file: %w", err)
+		return nil, err //nolint:wrapcheck // could be os.ErrNotExist or other errors
 	}
 	return ikniteCluster, nil
 }

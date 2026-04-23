@@ -1,9 +1,9 @@
 package cmd
 
-// cSpell:words txeh
-// cSpell: disable
+// cSpell:words txeh ikniteapi sirupsen
 import (
 	"fmt"
+	"os"
 	"syscall"
 
 	log "github.com/sirupsen/logrus"
@@ -21,8 +21,6 @@ import (
 	"github.com/kaweezle/iknite/pkg/k8s"
 	"github.com/kaweezle/iknite/pkg/k8s/phases/reset"
 )
-
-// cSpell: enable
 
 type cleanOptions struct {
 	dryRun             bool
@@ -160,11 +158,17 @@ func performClean(alpineHost host.Host, ikniteConfig *v1alpha1.IkniteClusterSpec
 		return nil
 	}
 
-	ikniteCluster, err := v1alpha1.LoadIkniteClusterOrDefault(alpineHost)
+	state := iknite.Undefined
+	ikniteCluster, err := v1alpha1.LoadIkniteCluster(alpineHost)
 	if err != nil {
-		return fmt.Errorf("failed to load iknite cluster: %w", err)
+		if !os.IsNotExist(err) {
+			logger.WithError(err).Warn("Failed to load iknite cluster, assuming it does not exist")
+		}
+	} else {
+		logger.Info("Loaded iknite cluster status. Replace cluster config with the one from the status file")
+		state = ikniteCluster.Status.State
+		*ikniteConfig = ikniteCluster.Spec
 	}
-	state := ikniteCluster.Status.State
 
 	if !state.Stable() {
 		return fmt.Errorf("cluster is not in a stable state: %s", state)
@@ -268,11 +272,11 @@ func performClean(alpineHost host.Host, ikniteConfig *v1alpha1.IkniteClusterSpec
 	case err != nil:
 		logger.WithError(err).Warn("Error checking kubelet process")
 	case kubeletProcess != nil:
-		logger.WithField("pid", kubeletProcess.Pid).Info("Kubelet is still running, stopping it...")
+		logger.WithField("pid", kubeletProcess.Pid()).Info("Kubelet is still running, stopping it...")
 		if !dryRun {
 			err = kubeletProcess.Signal(syscall.SIGTERM)
 			if err == nil {
-				logger.WithField("pid", kubeletProcess.Pid).Info("Waiting for kubelet to stop...")
+				logger.WithField("pid", kubeletProcess.Pid()).Info("Waiting for kubelet to stop...")
 				err = kubeletProcess.Wait()
 				if err != nil {
 					return fmt.Errorf("failed to wait for kubelet process to stop: %w", err)

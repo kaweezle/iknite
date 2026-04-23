@@ -13,7 +13,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
-	"github.com/kaweezle/iknite/pkg/cmd/options"
 )
 
 //nolint:paralleltest // Changes stdout
@@ -56,10 +55,12 @@ func TestPerformInfoWritesFile(t *testing.T) {
 	t.Cleanup(viper.Reset)
 
 	destination := filepath.Join(t.TempDir(), "config.json")
-	viper.Set(options.OutputFormat, "json")
-	viper.Set(options.OutputDestination, destination)
+	infoOptions := &infoOptions{
+		outputFormat:      "json",
+		outputDestination: destination,
+	}
 
-	performInfo(&v1alpha1.IkniteClusterSpec{ClusterName: "demo", Ip: []byte{127, 0, 0, 1}})
+	performInfo(&v1alpha1.IkniteClusterSpec{ClusterName: "demo", Ip: []byte{127, 0, 0, 1}}, infoOptions)
 
 	content, err := os.ReadFile(destination)
 	req.NoError(err)

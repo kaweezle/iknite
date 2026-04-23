@@ -22,11 +22,18 @@ type CommandOptions struct {
 	Env    []string
 }
 
+type ProcessState interface {
+	Success() bool
+	Exited() bool
+	ExitCode() int
+	String() string
+}
+
 type Process interface {
 	Pid() int
 	Signal(signal os.Signal) error
 	Wait() error
-	State() *os.ProcessState
+	State() ProcessState
 }
 
 // ExecutorFunction is a function that executes a command and returns its input.
@@ -124,7 +131,7 @@ func (p *processImpl) Wait() error {
 	return err //nolint:wrapcheck // Want to return original error
 }
 
-func (p *processImpl) State() *os.ProcessState {
+func (p *processImpl) State() ProcessState {
 	return p.state
 }
 

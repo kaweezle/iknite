@@ -9,11 +9,11 @@ import (
 	"crypto/rsa"
 	"crypto/tls"
 	"crypto/x509"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 
-	"github.com/pkg/errors"
 	"k8s.io/client-go/util/cert"
 	"k8s.io/client-go/util/keyutil"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
@@ -154,7 +154,7 @@ func TryLoadKeyFromDisk(fs host.FileSystem, pkiPath, name string) (crypto.Signer
 	case *ecdsa.PrivateKey:
 		key = k
 	default:
-		return nil, errors.Errorf("the private key file %s is neither in RSA nor ECDSA format", privateKeyPath)
+		return nil, fmt.Errorf("the private key file %s is neither in RSA nor ECDSA format", privateKeyPath)
 	}
 
 	return key, nil

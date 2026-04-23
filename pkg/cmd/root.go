@@ -47,7 +47,6 @@ func NewRootCmd(opts *util.BaseOptions) *cobra.Command {
 		opts = util.DefaultBaseOptions()
 	}
 
-	cobra.OnInitialize(initConfig)
 	cobra.EnableTraverseRunHooks = true
 
 	ikniteConfig := &v1alpha1.IkniteClusterSpec{}
@@ -65,6 +64,7 @@ kubernetes.`,
 			if err := opts.SetUpLogs(os.Stderr); err != nil {
 				return fmt.Errorf("while setting up logs: %w", err)
 			}
+			initConfig()
 			if err := config.DecodeIkniteConfig(ikniteConfig); err != nil {
 				return fmt.Errorf("while decoding iknite config: %w", err)
 			}

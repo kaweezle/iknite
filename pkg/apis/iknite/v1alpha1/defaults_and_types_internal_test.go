@@ -115,7 +115,7 @@ func TestLoadIkniteClusterErrors(t *testing.T) {
 	fs := host.NewMemMapFS()
 	_, err := LoadIkniteCluster(fs)
 	req.Error(err)
-	req.Contains(err.Error(), "failed to read status file")
+	req.True(os.IsNotExist(err))
 
 	cluster, err := LoadIkniteClusterOrDefault(fs)
 	req.NoError(err)

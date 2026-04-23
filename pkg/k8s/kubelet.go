@@ -1,6 +1,6 @@
 package k8s
 
-// cSpell:words godotenv txeh joho sirupsen ipcns utsns
+// cSpell:words godotenv txeh joho sirupsen ipcns utsns apimachinery
 import (
 	"context"
 	"fmt"
@@ -11,6 +11,7 @@ import (
 	"time"
 
 	log "github.com/sirupsen/logrus"
+	"k8s.io/apimachinery/pkg/util/errors"
 
 	"github.com/kaweezle/iknite/pkg/alpine"
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
@@ -208,7 +209,11 @@ func StartAndConfigureKubelet(
 		case configError := <-configErr:
 			if configError != nil {
 				log.WithError(configError).Error("Failed to configure the cluster")
-				err = host.TerminateProcess(process, &alive)
+				err = configError
+				terminateError := host.TerminateProcess(process, &alive)
+				if terminateError != nil {
+					err = errors.NewAggregate([]error{configError, terminateError})
+				}
 			} else {
 				log.Info("Cluster configured successfully")
 			}

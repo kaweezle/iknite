@@ -101,7 +101,6 @@ func AddIkniteClusterFlags(dest *flag.FlagSet, ikniteConfig *v1alpha1.IkniteClus
 	flagSet.VisitAll(func(f *flag.Flag) {
 		util.SetFlagConfigSection(flagSet, f.Name, "cluster") //nolint:errcheck // flag exists
 	})
-	util.BindFlagSet(flagSet, viper.GetViper(), "", util.BindFlag)
 	dest.AddFlagSet(flagSet)
 }
 

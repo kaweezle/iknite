@@ -7,6 +7,7 @@ package host
 import (
 	"os"
 
+	"github.com/kaweezle/iknite/pkg/host"
 	mock "github.com/stretchr/testify/mock"
 )
 
@@ -133,19 +134,19 @@ func (_c *MockProcess_Signal_Call) RunAndReturn(run func(signal os.Signal) error
 }
 
 // State provides a mock function for the type MockProcess
-func (_mock *MockProcess) State() *os.ProcessState {
+func (_mock *MockProcess) State() host.ProcessState {
 	ret := _mock.Called()
 
 	if len(ret) == 0 {
 		panic("no return value specified for State")
 	}
 
-	var r0 *os.ProcessState
-	if returnFunc, ok := ret.Get(0).(func() *os.ProcessState); ok {
+	var r0 host.ProcessState
+	if returnFunc, ok := ret.Get(0).(func() host.ProcessState); ok {
 		r0 = returnFunc()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*os.ProcessState)
+			r0 = ret.Get(0).(host.ProcessState)
 		}
 	}
 	return r0
@@ -168,12 +169,12 @@ func (_c *MockProcess_State_Call) Run(run func()) *MockProcess_State_Call {
 	return _c
 }
 
-func (_c *MockProcess_State_Call) Return(processState *os.ProcessState) *MockProcess_State_Call {
+func (_c *MockProcess_State_Call) Return(processState host.ProcessState) *MockProcess_State_Call {
 	_c.Call.Return(processState)
 	return _c
 }
 
-func (_c *MockProcess_State_Call) RunAndReturn(run func() *os.ProcessState) *MockProcess_State_Call {
+func (_c *MockProcess_State_Call) RunAndReturn(run func() host.ProcessState) *MockProcess_State_Call {
 	_c.Call.Return(run)
 	return _c
 }

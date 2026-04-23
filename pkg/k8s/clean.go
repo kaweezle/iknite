@@ -292,7 +292,7 @@ func DeleteNetworkInterfaces(exec host.Executor, isDryRun bool) error {
 		JQ(`sort_by(.ifname)| reverse | .[] | select((has("link_netnsid") and .ifname != "eth0") or .ifname == "cni0" or .ifname == "flannel.1" or (.ifname | startswith("vip-"))) | .ifname`).
 		FilterLine(func(s string) string {
 			ifname := s[1 : len(s)-1]
-			command := fmt.Sprintf("%s ip link delete %s", prefix, ifname)
+			command := fmt.Sprintf("%sip link delete %s", prefix, ifname)
 			logger.WithField("interface", ifname).Debugf("Deleting interface with: %s...", command)
 			return command
 		})

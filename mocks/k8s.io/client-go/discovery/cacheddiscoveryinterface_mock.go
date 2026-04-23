@@ -5,9 +5,9 @@
 package discovery
 
 import (
-	"github.com/google/gnostic-models/openapiv2"
+	openapi_v2 "github.com/google/gnostic-models/openapiv2"
 	mock "github.com/stretchr/testify/mock"
-	"k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/openapi"

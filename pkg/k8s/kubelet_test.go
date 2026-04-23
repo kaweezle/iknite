@@ -423,16 +423,17 @@ func TestStartAndConfigureKubelet_KustomizeError(t *testing.T) {
 	req := require.New(t)
 
 	runtime := mockk8s.NewMockKubeletRuntime(t)
-	process := mockHost.NewMockProcess(t)
-	process.On("Wait").Run(func(_ mock.Arguments) {
-		time.Sleep(30 * time.Millisecond)
-	}).Return(nil).Maybe()
-	process.On("State").Return(exitedProcessState(t)).Maybe()
-	process.EXPECT().Signal(mock.Anything).Return(errors.New("signal error")).Once()
 
 	clusterSpec := &v1alpha1.IkniteClusterSpec{Kustomization: "test-kustomization"}
 	kustomizeOptions := &utils.KustomizeOptions{}
-	runtime.EXPECT().StartKubelet(mock.Anything).Return(process, nil).Once()
+	runtime.EXPECT().StartKubelet(mock.Anything).RunAndReturn(func(ctx context.Context) (host.Process, error) {
+		process := host.NewDummyProcess(ctx, &host.DummyProcessOptions{
+			Cmd: "kubelet",
+			Pid: 1234,
+		})
+		process.Start(10 * time.Second) //nolint:errcheck // Start the process and ignore errors for testing
+		return process, nil
+	}).Once()
 	runtime.EXPECT().CheckKubeletRunning(mock.Anything, 10, 3, time.Second).Return(nil).Once()
 	runtime.EXPECT().CheckClusterRunning(mock.Anything, 30, 2, 10*time.Second).Return(nil).Once()
 	runtime.EXPECT().
@@ -450,7 +451,6 @@ func TestStartAndConfigureKubelet_KustomizeError(t *testing.T) {
 
 	req.Error(err)
 	req.Contains(err.Error(), "error while waiting for kubelet to stop")
-	req.Contains(err.Error(), "failed to terminate process")
 }
 
 func TestStartAndConfigureKubelet_Success(t *testing.T) {
