@@ -58,7 +58,7 @@ func NewClientFromFile(fs host.FileSystem, path string) (*Client, error) {
 	return NewClientFromClientConfig(clientconfig), nil
 }
 
-func NewDefaultClient(fs host.Host) (*Client, error) {
+func NewDefaultClient(fs host.FileSystem) (*Client, error) {
 	return NewClientFromFile(fs, kubeadmConstants.GetAdminKubeConfigPath())
 }
 
@@ -151,7 +151,7 @@ func (r *Client) ToRawKubeConfigLoader() clientcmd.ClientConfig {
 
 func ResourceInfosFromResMap(client resource.RESTClientGetter, resources resmap.ResMap) ([]*resource.Info, error) {
 	rawResources, err := resources.AsYaml()
-	if err != nil {
+	if err != nil { // nocov - unlikely to fail as the resources are already in memory and should be well-formed
 		return nil, fmt.Errorf("failed to convert resources to YAML: %w", err)
 	}
 
@@ -174,12 +174,12 @@ func ApplyResourceInfosServerSide(infos []*resource.Info) error {
 	force := true
 	for _, info := range infos {
 		unstructuredObj, err := runtime.DefaultUnstructuredConverter.ToUnstructured(info.Object)
-		if err != nil {
+		if err != nil { // nocov - unlikely to fail as the objects should be well-formed and convertible
 			return fmt.Errorf("failed to convert resource %s to unstructured: %w", info.ObjectName(), err)
 		}
 
 		payload, err := json.Marshal(unstructuredObj)
-		if err != nil {
+		if err != nil { // nocov - unlikely to fail as the objects should be well-formed and convertible
 			return fmt.Errorf("failed to marshal resource %s for apply: %w", info.ObjectName(), err)
 		}
 
@@ -350,7 +350,7 @@ func AllWorkloadStates(client resource.RESTClientGetter) ([]*v1alpha1.WorkloadSt
 	for _, info := range infos {
 		var u map[string]any
 
-		if u, err = runtime.DefaultUnstructuredConverter.ToUnstructured(info.Object); err != nil {
+		if u, err = runtime.DefaultUnstructuredConverter.ToUnstructured(info.Object); err != nil { // nocov
 			return nil, fmt.Errorf("failed to convert object to unstructured: %w", err)
 		}
 
