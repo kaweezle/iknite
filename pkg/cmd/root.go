@@ -60,11 +60,11 @@ Makes the appropriate initialization of a WSL 2 Alpine distribution for running
 kubernetes.`,
 		Example: `> iknite start`,
 		Version: IkniteVersion,
-		PersistentPreRunE: func(_ *cobra.Command, _ []string) error {
+		PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
 			if err := opts.SetUpLogs(os.Stderr); err != nil {
 				return fmt.Errorf("while setting up logs: %w", err)
 			}
-			initConfig()
+			initConfig(cmd.Root())
 			if err := config.DecodeIkniteConfig(ikniteConfig); err != nil {
 				return fmt.Errorf("while decoding iknite config: %w", err)
 			}
@@ -78,7 +78,7 @@ kubernetes.`,
 	util.AddConfigFlag(rootCmd)
 	alpineHost := host.NewDefaultHost()
 
-	rootCmd.AddCommand(NewKustomizeCmd(ikniteConfig, nil, nil))
+	rootCmd.AddCommand(NewKustomizeCmd(ikniteConfig, nil, nil, nil))
 	rootCmd.AddCommand(newCmdInit(os.Stdout, nil, nil, alpineHost))
 	rootCmd.AddCommand(newCmdReset(os.Stdin, os.Stdout, nil, nil))
 	rootCmd.AddCommand(NewCmdClean(ikniteConfig, nil, alpineHost))
@@ -89,11 +89,13 @@ kubernetes.`,
 	rootCmd.AddCommand(NewStatusCmd(ikniteConfig, nil))
 	rootCmd.AddCommand(NewInfoCmd(ikniteConfig))
 
+	util.BindFlagsToViper(rootCmd, viper.GetViper())
+
 	return rootCmd
 }
 
 // initConfig reads in config file and ENV variables if set.
-func initConfig() {
+func initConfig(cmd *cobra.Command) {
 	if cfgFile != "" {
 		// Use config file from the flag.
 		viper.SetConfigFile(cfgFile)
@@ -112,6 +114,7 @@ func initConfig() {
 	if err := viper.ReadInConfig(); err == nil {
 		fmt.Fprintln(os.Stderr, "Using config file:", viper.ConfigFileUsed())
 	}
+	util.ApplyViperConfigToFlags(cmd, viper.GetViper())
 }
 
 func inheritsFlags(sourceFlags, targetFlags *pflag.FlagSet, cmdFlags ...string) {

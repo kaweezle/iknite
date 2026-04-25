@@ -19,6 +19,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	cliOptions "k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
@@ -33,7 +34,6 @@ import (
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
 	"github.com/kaweezle/iknite/pkg/host"
 	"github.com/kaweezle/iknite/pkg/k8s"
-	cliOptions "k8s.io/cli-runtime/pkg/genericclioptions"
 )
 
 type errorRESTMapper struct {
@@ -160,7 +160,6 @@ func createWorkloadServer(t *testing.T, failPath string, includeApplications boo
 	getter.EXPECT().ToRESTMapper().Return(newWorkloadRESTMapper(includeApplications), nil).Maybe()
 	getter.EXPECT().ToRESTConfig().Return(&rest.Config{Host: server.URL}, nil).Maybe()
 	return getter
-
 }
 
 func TestClient_BasicHelpers(t *testing.T) {
@@ -344,7 +343,11 @@ func TestClient_ErrorAndDiscoveryPaths(t *testing.T) {
 	req.Error(err)
 }
 
-func createClientGetterWithTestServer(t *testing.T, mapper meta.RESTMapper, handler http.HandlerFunc) cliOptions.RESTClientGetter {
+func createClientGetterWithTestServer(
+	t *testing.T,
+	mapper meta.RESTMapper,
+	handler http.HandlerFunc,
+) cliOptions.RESTClientGetter {
 	t.Helper()
 	restConfig := createTestAPIServer(t, handler)
 	client := genericclioptions.NewMockRESTClientGetter(t)

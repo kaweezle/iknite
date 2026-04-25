@@ -53,10 +53,9 @@ func (r *defaultKubeletRuntime) CheckClusterRunning(
 
 func (r *defaultKubeletRuntime) Kustomize(
 	ctx context.Context,
-	kustomization string,
 	options *utils.KustomizeOptions,
 ) error { // nocov
-	return Kustomize(ctx, r.kubeClient, r.alpineHost, kustomization, options)
+	return Kustomize(ctx, r.kubeClient, r.alpineHost, options)
 }
 
 func (r *defaultKubeletRuntime) RemovePidFile() { // nocov

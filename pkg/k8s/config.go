@@ -251,10 +251,9 @@ func Kustomize(
 	ctx context.Context,
 	kubeClient resource.RESTClientGetter,
 	fs host.FileSystem,
-	kustomization string,
 	options *utils.KustomizeOptions,
 ) error {
-	if kustomization == "" {
+	if options.Kustomization == "" && !options.ForceEmbedded {
 		log.Warn("Empty kustomization.")
 		return nil
 	}
@@ -274,10 +273,10 @@ func Kustomize(
 	}
 
 	log.WithFields(log.Fields{
-		"kustomization": kustomization,
+		"kustomization": options.Kustomization,
 	}).Info("Performing configuration")
 
-	resources, err := provision.GetBaseKustomizationResources(fs, kustomization, options.ForceEmbedded)
+	resources, err := provision.GetBaseKustomizationResources(fs, options.Kustomization, options.ForceEmbedded)
 	if err != nil {
 		return fmt.Errorf("while getting kustomization resources: %w", err)
 	}
@@ -295,7 +294,7 @@ func Kustomize(
 	}
 
 	log.WithFields(log.Fields{
-		"kustomization": kustomization,
+		"kustomization": options.Kustomization,
 		"resources":     ids,
 	}).Info("Configuration applied")
 

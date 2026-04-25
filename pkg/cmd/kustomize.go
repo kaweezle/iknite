@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"os/signal"
 
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -40,7 +39,6 @@ import (
 
 func NewPrintKustomizeCmd(
 	fs host.FileSystem,
-	ikniteConfig *v1alpha1.IkniteClusterSpec,
 	kustomizeOptions *utils.KustomizeOptions,
 ) *cobra.Command {
 	printKustomizeCmd := &cobra.Command{
@@ -57,8 +55,12 @@ prints the Embedded configuration that installs the following components:
 - metrics-server to make resources work on payloads.
 
 `,
-		Run: func(_ *cobra.Command, _ []string) {
-			performPrintKustomize(fs, ikniteConfig, kustomizeOptions)
+		RunE: func(_ *cobra.Command, _ []string) error {
+			err := performPrintKustomize(fs, kustomizeOptions)
+			if err != nil {
+				return fmt.Errorf("failed to print kustomize configuration: %w", err)
+			}
+			return nil
 		},
 	}
 	return printKustomizeCmd
@@ -68,6 +70,7 @@ func NewKustomizeCmd(
 	ikniteConfig *v1alpha1.IkniteClusterSpec,
 	kustomizeOptions *utils.KustomizeOptions,
 	waitOptions *utils.WaitOptions,
+	fs host.FileSystem,
 ) *cobra.Command {
 	if kustomizeOptions == nil {
 		kustomizeOptions = utils.NewKustomizeOptions()
@@ -78,7 +81,9 @@ func NewKustomizeCmd(
 		waitOptions.Immediate = false
 		waitOptions.Wait = false
 	}
-	fs := host.NewOsFS()
+	if fs == nil {
+		fs = host.NewOsFS()
+	}
 	kustomizeCmd := &cobra.Command{
 		Use:   "kustomize",
 		Short: "Kustomize the cluster",
@@ -94,8 +99,12 @@ applies the Embedded configuration that installs the following components:
 - metrics-server to make resources work on payloads.
 
 `,
-		Run: func(_ *cobra.Command, _ []string) {
-			performKustomize(fs, ikniteConfig, kustomizeOptions, waitOptions)
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			err := performKustomize(cmd.Context(), fs, kustomizeOptions, waitOptions)
+			if err != nil {
+				return fmt.Errorf("failed to apply kustomize configuration: %w", err)
+			}
+			return nil
 		},
 
 		PreRun: func(cmd *cobra.Command, _ []string) {
@@ -109,42 +118,27 @@ applies the Embedded configuration that installs the following components:
 	config.AddIkniteClusterFlags(kustomizeCmd.Flags(), ikniteConfig)
 	utils.AddKustomizeOptionsFlags(kustomizeCmd.Flags(), kustomizeOptions)
 
-	printCmd := NewPrintKustomizeCmd(fs, ikniteConfig, kustomizeOptions)
+	printCmd := NewPrintKustomizeCmd(fs, kustomizeOptions)
 	inheritsFlags(kustomizeCmd.Flags(), printCmd.Flags(), options.Kustomization)
 	kustomizeCmd.AddCommand(printCmd)
 	return kustomizeCmd
 }
 
 func performKustomize(
+	ctx context.Context,
 	fs host.FileSystem,
-	ikniteConfig *v1alpha1.IkniteClusterSpec,
 	kustomizeOptions *utils.KustomizeOptions,
 	waitOptions *utils.WaitOptions,
-) {
+) error {
 	// We need to get it from root as we will apply configuration
 	kubeClient, err := k8s.NewClientFromFile(fs, constants.KubernetesRootConfig)
 	if err != nil {
-		cobra.CheckErr(fmt.Errorf("while loading local cluster configuration: %w", err))
+		return fmt.Errorf("while loading local cluster configuration: %w", err)
 	}
-	// Make wait finish when the process receives an interrupt signal
-	ctx, cancel := context.WithCancel(context.Background())
-	c := make(chan os.Signal, 1)
-	signal.Notify(c, os.Interrupt)
-	defer func() {
-		signal.Stop(c)
-		cancel()
-	}()
-	go func() {
-		select {
-		case <-c:
-			cancel()
-		case <-ctx.Done():
-		}
-	}()
 
 	restClient, err := k8s.RESTClient(kubeClient)
 	if err != nil {
-		cobra.CheckErr(fmt.Errorf("failed to create REST client: %w", err))
+		return fmt.Errorf("failed to create REST client: %w", err)
 	}
 
 	err = k8s.CheckClusterRunning(
@@ -154,29 +148,38 @@ func performKustomize(
 		waitOptions.OkResponses,
 		waitOptions.Interval,
 	)
-	cobra.CheckErr(err)
+	if err != nil {
+		return fmt.Errorf("failed to check if cluster is running: %w", err)
+	}
 
-	cobra.CheckErr(k8s.Kustomize(ctx, kubeClient, fs, ikniteConfig.Kustomization, kustomizeOptions))
+	if err := k8s.Kustomize(ctx, kubeClient, fs, kustomizeOptions); err != nil {
+		return fmt.Errorf("failed to apply kustomize configuration: %w", err)
+	}
 
 	if waitOptions.HasLoop() {
 		logrus.Infof("Waiting for workloads with options: %s", waitOptions.String())
 		runtime.ErrorHandlers = runtime.ErrorHandlers[:0] //nolint:reassign // disabling printing of errors to stderr
-		cobra.CheckErr(waitOptions.Poll(ctx, k8s.WorkloadsReadyConditionWithContextFunc(kubeClient, nil)))
+		if err := waitOptions.Poll(ctx, k8s.WorkloadsReadyConditionWithContextFunc(kubeClient, nil)); err != nil {
+			return fmt.Errorf("failed to wait for workloads: %w", err)
+		}
 	}
+	return nil
 }
 
 func performPrintKustomize(
 	fs host.FileSystem,
-	ikniteConfig *v1alpha1.IkniteClusterSpec,
 	kustomizeOptions *utils.KustomizeOptions,
-) {
+) error {
 	resources, err := provision.GetBaseKustomizationResources(
 		fs,
-		ikniteConfig.Kustomization,
+		kustomizeOptions.Kustomization,
 		kustomizeOptions.ForceEmbedded,
 	)
 	if err != nil {
-		cobra.CheckErr(fmt.Errorf("while getting kustomization resources: %w", err))
+		return fmt.Errorf("while getting kustomization resources: %w", err)
 	}
-	cobra.CheckErr(kustomize.WriteToWriter(resources, os.Stdout))
+	if err := kustomize.WriteToWriter(resources, os.Stdout); err != nil {
+		return fmt.Errorf("while writing kustomization resources: %w", err)
+	}
+	return nil
 }

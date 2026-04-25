@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -123,16 +124,34 @@ func (r *Client) ToRESTMapper() (meta.RESTMapper, error) {
 	return restmapper.NewDeferredDiscoveryRESTMapper(dc), nil
 }
 
+func copyConfig(from *rest.Config) *rest.Config {
+	config := *from
+	config.APIPath = ""
+	config.GroupVersion = nil
+	if config.Timeout == 0 {
+		config.Timeout = 15 * time.Second
+	}
+	if config.Burst == 0 {
+		config.Burst = 300
+	}
+	config.ContentConfig = resource.UnstructuredPlusDefaultContentConfig()
+	if config.UserAgent == "" {
+		config.UserAgent = rest.DefaultKubernetesUserAgent()
+	}
+	return &config
+}
+
 func RESTClient(r resource.RESTClientGetter) (rest.Interface, error) {
 	restconfig, err := r.ToRESTConfig()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get REST config for discovery: %w", err)
 	}
-	dc, err := discovery.NewDiscoveryClientForConfig(restconfig)
+	config := copyConfig(restconfig)
+	result, err := rest.UnversionedRESTClientFor(config)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create discovery client: %w", err)
+		return nil, fmt.Errorf("failed to create REST client: %w", err)
 	}
-	return dc.RESTClient(), nil
+	return result, nil
 }
 
 func (r *Client) ToRawKubeConfigLoader() clientcmd.ClientConfig {

@@ -72,11 +72,11 @@ func TestCommandConstructors(t *testing.T) {
 		{name: "kubelet", fn: func() *cobra.Command { return NewKubeletCmd(spec, nil, nil) }},
 		{name: "mdns", fn: func() *cobra.Command { return NewMdnsCmd(spec) }},
 		{name: "info", fn: func() *cobra.Command { return NewInfoCmd(spec) }},
-		{name: "kustomize", fn: func() *cobra.Command { return NewKustomizeCmd(spec, nil, nil) }},
+		{name: "kustomize", fn: func() *cobra.Command { return NewKustomizeCmd(spec, nil, nil, nil) }},
 		{
 			name: "print-kustomize",
 			fn: func() *cobra.Command {
-				return NewPrintKustomizeCmd(host.NewMemMapFS(), spec, utils.NewKustomizeOptions())
+				return NewPrintKustomizeCmd(host.NewMemMapFS(), utils.NewKustomizeOptions())
 			},
 		},
 		{name: "clean", fn: func() *cobra.Command { return NewCmdClean(spec, nil, nil) }},

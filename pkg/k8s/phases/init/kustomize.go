@@ -4,11 +4,8 @@ package init
 import (
 	"fmt"
 
-	log "github.com/sirupsen/logrus"
-	"github.com/spf13/viper"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 
-	"github.com/kaweezle/iknite/pkg/config"
 	"github.com/kaweezle/iknite/pkg/host"
 	"github.com/kaweezle/iknite/pkg/k8s"
 )
@@ -24,7 +21,6 @@ func NewKustomizeClusterPhase() workflow.Phase {
 }
 
 type kustomizeData interface {
-	IkniteClusterProvider
 	host.HostProvider
 	KustomizeOptionsProvider
 	ContextProvider
@@ -36,13 +32,6 @@ func runKustomize(c workflow.RunData) error {
 	if !ok {
 		return fmt.Errorf("configure phase invoked with an invalid data struct. ")
 	}
-	ikniteConfig := data.IkniteCluster().Spec
-
-	force_config := viper.GetBool(config.ForceConfig)
-	log.WithFields(log.Fields{
-		"force_config":  force_config,
-		"kustomization": ikniteConfig.Kustomization,
-	}).Info("Performing kustomize configuration")
 
 	kubeClient, err := k8s.NewDefaultClient(data.Host())
 	if err != nil {
@@ -54,7 +43,6 @@ func runKustomize(c workflow.RunData) error {
 		ctx,
 		kubeClient,
 		data.Host(),
-		ikniteConfig.Kustomization,
 		kustomizeOptions,
 	); err != nil {
 		return fmt.Errorf("failed to apply kustomization: %w", err)

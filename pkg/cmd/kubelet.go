@@ -61,7 +61,7 @@ func performKubelet(
 	}
 
 	runtime := k8s.NewKubeletRuntime(alpineHost, kubeClient)
-	err = k8s.StartAndConfigureKubelet(ctx, runtime, ikniteConfig, kustomizeOptions)
+	err = k8s.StartAndConfigureKubelet(ctx, runtime, kustomizeOptions)
 	if err != nil {
 		return fmt.Errorf("failed to start and configure kubelet: %w", err)
 	}

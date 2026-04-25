@@ -7,7 +7,6 @@ package init
 import (
 	"context"
 
-	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
 	"github.com/kaweezle/iknite/pkg/host"
 	"github.com/kaweezle/iknite/pkg/utils"
 	mock "github.com/stretchr/testify/mock"
@@ -128,52 +127,6 @@ func (_c *mockkustomizeData_Host_Call) Return(host1 host.Host) *mockkustomizeDat
 }
 
 func (_c *mockkustomizeData_Host_Call) RunAndReturn(run func() host.Host) *mockkustomizeData_Host_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// IkniteCluster provides a mock function for the type mockkustomizeData
-func (_mock *mockkustomizeData) IkniteCluster() *v1alpha1.IkniteCluster {
-	ret := _mock.Called()
-
-	if len(ret) == 0 {
-		panic("no return value specified for IkniteCluster")
-	}
-
-	var r0 *v1alpha1.IkniteCluster
-	if returnFunc, ok := ret.Get(0).(func() *v1alpha1.IkniteCluster); ok {
-		r0 = returnFunc()
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*v1alpha1.IkniteCluster)
-		}
-	}
-	return r0
-}
-
-// mockkustomizeData_IkniteCluster_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'IkniteCluster'
-type mockkustomizeData_IkniteCluster_Call struct {
-	*mock.Call
-}
-
-// IkniteCluster is a helper method to define mock.On call
-func (_e *mockkustomizeData_Expecter) IkniteCluster() *mockkustomizeData_IkniteCluster_Call {
-	return &mockkustomizeData_IkniteCluster_Call{Call: _e.mock.On("IkniteCluster")}
-}
-
-func (_c *mockkustomizeData_IkniteCluster_Call) Run(run func()) *mockkustomizeData_IkniteCluster_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run()
-	})
-	return _c
-}
-
-func (_c *mockkustomizeData_IkniteCluster_Call) Return(ikniteCluster *v1alpha1.IkniteCluster) *mockkustomizeData_IkniteCluster_Call {
-	_c.Call.Return(ikniteCluster)
-	return _c
-}
-
-func (_c *mockkustomizeData_IkniteCluster_Call) RunAndReturn(run func() *v1alpha1.IkniteCluster) *mockkustomizeData_IkniteCluster_Call {
 	_c.Call.Return(run)
 	return _c
 }

@@ -179,16 +179,16 @@ func (_c *MockKubeletRuntime_CheckKubeletRunning_Call) RunAndReturn(run func(ctx
 }
 
 // Kustomize provides a mock function for the type MockKubeletRuntime
-func (_mock *MockKubeletRuntime) Kustomize(ctx context.Context, kustomization string, options *utils.KustomizeOptions) error {
-	ret := _mock.Called(ctx, kustomization, options)
+func (_mock *MockKubeletRuntime) Kustomize(ctx context.Context, options *utils.KustomizeOptions) error {
+	ret := _mock.Called(ctx, options)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Kustomize")
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string, *utils.KustomizeOptions) error); ok {
-		r0 = returnFunc(ctx, kustomization, options)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *utils.KustomizeOptions) error); ok {
+		r0 = returnFunc(ctx, options)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -202,30 +202,24 @@ type MockKubeletRuntime_Kustomize_Call struct {
 
 // Kustomize is a helper method to define mock.On call
 //   - ctx context.Context
-//   - kustomization string
 //   - options *utils.KustomizeOptions
-func (_e *MockKubeletRuntime_Expecter) Kustomize(ctx interface{}, kustomization interface{}, options interface{}) *MockKubeletRuntime_Kustomize_Call {
-	return &MockKubeletRuntime_Kustomize_Call{Call: _e.mock.On("Kustomize", ctx, kustomization, options)}
+func (_e *MockKubeletRuntime_Expecter) Kustomize(ctx interface{}, options interface{}) *MockKubeletRuntime_Kustomize_Call {
+	return &MockKubeletRuntime_Kustomize_Call{Call: _e.mock.On("Kustomize", ctx, options)}
 }
 
-func (_c *MockKubeletRuntime_Kustomize_Call) Run(run func(ctx context.Context, kustomization string, options *utils.KustomizeOptions)) *MockKubeletRuntime_Kustomize_Call {
+func (_c *MockKubeletRuntime_Kustomize_Call) Run(run func(ctx context.Context, options *utils.KustomizeOptions)) *MockKubeletRuntime_Kustomize_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
 			arg0 = args[0].(context.Context)
 		}
-		var arg1 string
+		var arg1 *utils.KustomizeOptions
 		if args[1] != nil {
-			arg1 = args[1].(string)
-		}
-		var arg2 *utils.KustomizeOptions
-		if args[2] != nil {
-			arg2 = args[2].(*utils.KustomizeOptions)
+			arg1 = args[1].(*utils.KustomizeOptions)
 		}
 		run(
 			arg0,
 			arg1,
-			arg2,
 		)
 	})
 	return _c
@@ -236,7 +230,7 @@ func (_c *MockKubeletRuntime_Kustomize_Call) Return(err error) *MockKubeletRunti
 	return _c
 }
 
-func (_c *MockKubeletRuntime_Kustomize_Call) RunAndReturn(run func(ctx context.Context, kustomization string, options *utils.KustomizeOptions) error) *MockKubeletRuntime_Kustomize_Call {
+func (_c *MockKubeletRuntime_Kustomize_Call) RunAndReturn(run func(ctx context.Context, options *utils.KustomizeOptions) error) *MockKubeletRuntime_Kustomize_Call {
 	_c.Call.Return(run)
 	return _c
 }

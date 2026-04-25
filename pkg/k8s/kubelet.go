@@ -14,7 +14,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/errors"
 
 	"github.com/kaweezle/iknite/pkg/alpine"
-	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
 	"github.com/kaweezle/iknite/pkg/host"
 	"github.com/kaweezle/iknite/pkg/utils"
 )
@@ -46,7 +45,7 @@ type KubeletRuntime interface {
 		retries, okResponses int,
 		interval time.Duration,
 	) error
-	Kustomize(ctx context.Context, kustomization string, options *utils.KustomizeOptions) error
+	Kustomize(ctx context.Context, options *utils.KustomizeOptions) error
 	RemovePidFile()
 }
 
@@ -148,7 +147,6 @@ func StartKubelet(ctx context.Context, h host.FileExecutor) (host.Process, error
 func StartAndConfigureKubelet(
 	ctx context.Context,
 	runtime KubeletRuntime,
-	kubeConfig *v1alpha1.IkniteClusterSpec,
 	kustomizeOptions *utils.KustomizeOptions,
 ) error {
 	if runtime == nil {
@@ -201,7 +199,6 @@ func StartAndConfigureKubelet(
 				go func() {
 					configErr <- runtime.Kustomize(
 						ctx,
-						kubeConfig.Kustomization,
 						kustomizeOptions,
 					)
 				}()

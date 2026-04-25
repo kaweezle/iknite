@@ -18,7 +18,6 @@ import (
 	mockHost "github.com/kaweezle/iknite/mocks/github.com/kaweezle/iknite/pkg/host"
 	mockk8s "github.com/kaweezle/iknite/mocks/github.com/kaweezle/iknite/pkg/k8s"
 	"github.com/kaweezle/iknite/pkg/alpine"
-	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
 	"github.com/kaweezle/iknite/pkg/host"
 	"github.com/kaweezle/iknite/pkg/k8s"
 	"github.com/kaweezle/iknite/pkg/utils"
@@ -329,7 +328,6 @@ func TestStartAndConfigureKubelet_NilRuntime(t *testing.T) {
 	err := k8s.StartAndConfigureKubelet(
 		context.Background(),
 		nil,
-		&v1alpha1.IkniteClusterSpec{},
 		&utils.KustomizeOptions{},
 	)
 
@@ -347,7 +345,6 @@ func TestStartAndConfigureKubelet_StartKubeletError(t *testing.T) {
 	err := k8s.StartAndConfigureKubelet(
 		context.Background(),
 		runtime,
-		&v1alpha1.IkniteClusterSpec{},
 		&utils.KustomizeOptions{},
 	)
 
@@ -377,7 +374,6 @@ func TestStartAndConfigureKubelet_KubeletHealthError(t *testing.T) {
 	err := k8s.StartAndConfigureKubelet(
 		context.Background(),
 		runtime,
-		&v1alpha1.IkniteClusterSpec{},
 		&utils.KustomizeOptions{},
 	)
 
@@ -409,7 +405,6 @@ func TestStartAndConfigureKubelet_APIServerHealthError(t *testing.T) {
 	err := k8s.StartAndConfigureKubelet(
 		context.Background(),
 		runtime,
-		&v1alpha1.IkniteClusterSpec{},
 		&utils.KustomizeOptions{},
 	)
 
@@ -424,8 +419,7 @@ func TestStartAndConfigureKubelet_KustomizeError(t *testing.T) {
 
 	runtime := mockk8s.NewMockKubeletRuntime(t)
 
-	clusterSpec := &v1alpha1.IkniteClusterSpec{Kustomization: "test-kustomization"}
-	kustomizeOptions := &utils.KustomizeOptions{}
+	kustomizeOptions := &utils.KustomizeOptions{Kustomization: "test-kustomization"}
 	runtime.EXPECT().StartKubelet(mock.Anything).RunAndReturn(func(ctx context.Context) (host.Process, error) {
 		process := host.NewDummyProcess(ctx, &host.DummyProcessOptions{
 			Cmd: "kubelet",
@@ -437,7 +431,7 @@ func TestStartAndConfigureKubelet_KustomizeError(t *testing.T) {
 	runtime.EXPECT().CheckKubeletRunning(mock.Anything, 10, 3, time.Second).Return(nil).Once()
 	runtime.EXPECT().CheckClusterRunning(mock.Anything, 30, 2, 10*time.Second).Return(nil).Once()
 	runtime.EXPECT().
-		Kustomize(mock.Anything, "test-kustomization", kustomizeOptions).
+		Kustomize(mock.Anything, kustomizeOptions).
 		Return(errors.New("kustomize error")).
 		Once()
 	runtime.EXPECT().RemovePidFile().Once()
@@ -445,7 +439,6 @@ func TestStartAndConfigureKubelet_KustomizeError(t *testing.T) {
 	err := k8s.StartAndConfigureKubelet(
 		context.Background(),
 		runtime,
-		clusterSpec,
 		kustomizeOptions,
 	)
 
@@ -466,13 +459,12 @@ func TestStartAndConfigureKubelet_Success(t *testing.T) {
 	}).Once()
 	process.EXPECT().State().Return(exitedProcessState(t)).Once()
 
-	clusterSpec := &v1alpha1.IkniteClusterSpec{Kustomization: "test-kustomization"}
-	kustomizeOptions := &utils.KustomizeOptions{}
+	kustomizeOptions := &utils.KustomizeOptions{Kustomization: "test-kustomization"}
 	runtime.EXPECT().StartKubelet(mock.Anything).Return(process, nil).Once()
 	runtime.EXPECT().CheckKubeletRunning(mock.Anything, 10, 3, time.Second).Return(nil).Once()
 	runtime.EXPECT().CheckClusterRunning(mock.Anything, 30, 2, 10*time.Second).Return(nil).Once()
-	runtime.EXPECT().Kustomize(mock.Anything, "test-kustomization", kustomizeOptions).
-		Run(func(_ context.Context, _ string, _ *utils.KustomizeOptions) {
+	runtime.EXPECT().Kustomize(mock.Anything, kustomizeOptions).
+		Run(func(_ context.Context, _ *utils.KustomizeOptions) {
 			close(waitRelease)
 		}).
 		Return(nil).
@@ -482,7 +474,6 @@ func TestStartAndConfigureKubelet_Success(t *testing.T) {
 	err := k8s.StartAndConfigureKubelet(
 		context.Background(),
 		runtime,
-		clusterSpec,
 		kustomizeOptions,
 	)
 
@@ -511,7 +502,6 @@ func TestStartAndConfigureKubelet_ContextCanceled(t *testing.T) {
 	err := k8s.StartAndConfigureKubelet(
 		ctx,
 		runtime,
-		&v1alpha1.IkniteClusterSpec{},
 		&utils.KustomizeOptions{},
 	)
 
