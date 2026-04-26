@@ -23,9 +23,10 @@ import (
 	"time"
 
 	"github.com/bitfield/script"
-	"github.com/kaweezle/iknite/pkg/host"
 	"github.com/spf13/afero"
 	"github.com/txn2/txeh"
+
+	"github.com/kaweezle/iknite/pkg/host"
 )
 
 type DelegateHost struct {

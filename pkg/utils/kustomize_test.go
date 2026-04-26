@@ -17,19 +17,19 @@ func TestKustomizeOptions_DefaultsAndFlags(t *testing.T) {
 	t.Parallel()
 	req := require.New(t)
 
-	options := utils.NewKustomizeOptions()
-	req.False(options.ForceConfig)
-	req.False(options.ForceEmbedded)
-	req.Equal(constants.DefaultKustomization, options.Kustomization)
+	kOpts := utils.NewKustomizeOptions()
+	req.False(kOpts.ForceConfig)
+	req.False(kOpts.ForceEmbedded)
+	req.Equal(constants.DefaultKustomization, kOpts.Kustomization)
 
 	flags := pflag.NewFlagSet("kustomize", pflag.ContinueOnError)
-	utils.AddKustomizeOptionsFlags(flags, options)
+	utils.AddKustomizeOptionsFlags(flags, kOpts)
 	err := flags.Parse([]string{"--force-config", "--force-embedded", "--kustomization=custom"})
 	req.NoError(err)
 
-	req.True(options.ForceConfig)
-	req.True(options.ForceEmbedded)
-	req.Equal("custom", options.Kustomization)
+	req.True(kOpts.ForceConfig)
+	req.True(kOpts.ForceEmbedded)
+	req.Equal("custom", kOpts.Kustomization)
 }
 
 func TestKustomizationValue(t *testing.T) {

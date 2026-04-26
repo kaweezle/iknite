@@ -1,4 +1,4 @@
-// cSpell: words kstatus apimachinery wrapcheck testrestmapper clientcmd genericclioptions sirupsen kyaml
+// cSpell: words kstatus apimachinery wrapcheck testrestmapper clientcmd genericclioptions sirupsen kyaml testutil
 //
 //nolint:errcheck,dupl // Tests
 package k8s_test
@@ -15,16 +15,13 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/api/meta"
-	"k8s.io/apimachinery/pkg/api/meta/testrestmapper"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	cliOptions "k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/resource"
-	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd/api"
-	certUtil "k8s.io/client-go/util/cert"
 	kubeadmConstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"sigs.k8s.io/kustomize/api/provider"
 	"sigs.k8s.io/kustomize/api/resmap"
@@ -34,6 +31,7 @@ import (
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
 	"github.com/kaweezle/iknite/pkg/host"
 	"github.com/kaweezle/iknite/pkg/k8s"
+	"github.com/kaweezle/iknite/pkg/testutil"
 )
 
 type errorRESTMapper struct {
@@ -76,7 +74,7 @@ func createBasicConfig(fs host.FileSystem, path, url string) error {
 
 func resMapFromFixture(t *testing.T, fixture string) resmap.ResMap {
 	t.Helper()
-	content, err := os.ReadFile(fixture)
+	content, err := os.ReadFile(fixture) //nolint:gosec // Test fixture
 	require.NoError(t, err)
 	return resMapFromYAML(t, string(content))
 }
@@ -92,17 +90,6 @@ func resMapFromYAML(t *testing.T, yaml string) resmap.ResMap {
 	resources, err := factory.NewResMapFromBytes([]byte(yaml))
 	require.NoError(t, err)
 	return resources
-}
-
-func newWorkloadRESTMapper(includeApplications bool) meta.RESTMapper {
-	mapper := meta.NewDefaultRESTMapper([]schema.GroupVersion{{Group: "apps", Version: "v1"}})
-	mapper.Add(schema.GroupVersionKind{Group: "apps", Version: "v1", Kind: "Deployment"}, meta.RESTScopeNamespace)
-	mapper.Add(schema.GroupVersionKind{Group: "apps", Version: "v1", Kind: "StatefulSet"}, meta.RESTScopeNamespace)
-	mapper.Add(schema.GroupVersionKind{Group: "apps", Version: "v1", Kind: "DaemonSet"}, meta.RESTScopeNamespace)
-	if includeApplications {
-		mapper.Add(k8s.ApplicationSchemaGroupVersionKind, meta.RESTScopeNamespace)
-	}
-	return mapper
 }
 
 func newUnknownWorkloadRESTMapper() meta.RESTMapper {
@@ -121,44 +108,13 @@ func newUnknownWorkloadRESTMapper() meta.RESTMapper {
 func createWorkloadServer(t *testing.T, failPath string, includeApplications bool) cliOptions.RESTClientGetter {
 	t.Helper()
 
-	//nolint:lll // JSON literals
-	deploymentList := `{"kind":"DeploymentList","apiVersion":"apps/v1","items":[{"apiVersion":"apps/v1","kind":"Deployment","metadata":{"name":"deploy-ready","namespace":"default","generation":1},"spec":{"replicas":1,"strategy":{"type":"RollingUpdate","rollingUpdate":{"maxUnavailable":0,"maxSurge":1}}},"status":{"observedGeneration":1,"replicas":1,"updatedReplicas":1,"availableReplicas":1}}]}`
-	//nolint:lll // JSON literals
-	statefulSetList := `{"kind":"StatefulSetList","apiVersion":"apps/v1","items":[{"apiVersion":"apps/v1","kind":"StatefulSet","metadata":{"name":"stateful-ready","namespace":"default","generation":1},"spec":{"replicas":1,"updateStrategy":{"type":"RollingUpdate","rollingUpdate":{"partition":0}}},"status":{"observedGeneration":1,"replicas":1,"readyReplicas":1,"updatedReplicas":1}}]}`
-	//nolint:lll // JSON literals
-	daemonSetList := `{"kind":"DaemonSetList","apiVersion":"apps/v1","items":[{"apiVersion":"apps/v1","kind":"DaemonSet","metadata":{"name":"daemon-ready","namespace":"default","generation":1},"spec":{"updateStrategy":{"type":"RollingUpdate","rollingUpdate":{"maxUnavailable":0}}},"status":{"observedGeneration":1,"desiredNumberScheduled":1,"updatedNumberScheduled":1,"numberReady":1,"numberAvailable":1}}]}`
-	//nolint:lll // JSON literals
-	applicationList := `{"kind":"ApplicationList","apiVersion":"argoproj.io/v1alpha1","items":[{"apiVersion":"argoproj.io/v1alpha1","kind":"Application","metadata":{"name":"argocd-app","namespace":"argocd"},"status":{"sync":{"status":"Synced"},"health":{"status":"Healthy"}}}]}`
-
-	bodies := map[string]string{
-		"/apis/apps/v1/deployments":               deploymentList,
-		"/apis/apps/v1/statefulsets":              statefulSetList,
-		"/apis/apps/v1/daemonsets":                daemonSetList,
-		"/apis/argoproj.io/v1alpha1/applications": applicationList,
-	}
-
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		path := strings.TrimSuffix(r.URL.Path, "/")
-		if failPath != "" && path == failPath {
-			w.WriteHeader(http.StatusInternalServerError)
-			return
-		}
-
-		body, ok := bodies[path]
-		if !ok {
-			w.WriteHeader(http.StatusNotFound)
-			return
-		}
-
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(body))
-	}))
-
-	t.Cleanup(server.Close)
+	config := testutil.CreateTestAPIServer(
+		t,
+		testutil.ContentPatchHandler("with_resources", &testutil.TestServerOptions{FailurePaths: []string{failPath}}),
+	)
 	getter := genericclioptions.NewMockRESTClientGetter(t)
-	getter.EXPECT().ToRESTMapper().Return(newWorkloadRESTMapper(includeApplications), nil).Maybe()
-	getter.EXPECT().ToRESTConfig().Return(&rest.Config{Host: server.URL}, nil).Maybe()
+	getter.EXPECT().ToRESTMapper().Return(testutil.NewWorkloadRESTMapper(includeApplications), nil).Maybe()
+	getter.EXPECT().ToRESTConfig().Return(config, nil).Maybe()
 	return getter
 }
 
@@ -189,22 +145,11 @@ func TestNewDefaultClient(t *testing.T) {
 	req.True(k8s.IsConfigServerAddress(client, "127.0.0.1"))
 }
 
-func createTestAPIServer(t *testing.T, handler http.HandlerFunc) *rest.Config {
-	t.Helper()
-	server := httptest.NewTLSServer(handler)
-	t.Cleanup(server.Close)
-	cert := server.Certificate()
-	pem, err := certUtil.EncodeCertificates(cert)
-	require.NoError(t, err)
-	restConfig := &rest.Config{Host: server.URL, TLSClientConfig: rest.TLSClientConfig{CAData: pem}}
-	return restConfig
-}
-
 func TestResourceInfosFromResMap(t *testing.T) {
 	t.Parallel()
 	req := require.New(t)
 
-	restConfig := createTestAPIServer(t, func(w http.ResponseWriter, r *http.Request) {
+	restConfig := testutil.CreateTestAPIServer(t, func(w http.ResponseWriter, r *http.Request) {
 		logrus.Infof("Received request: %s %s %s", r.Method, r.URL.Path, r.URL.RawQuery)
 		switch r.Method {
 		case http.MethodPatch:
@@ -224,16 +169,16 @@ func TestResourceInfosFromResMap(t *testing.T) {
 	})
 
 	fs := host.NewMemMapFS()
-	req.NoError(createBasicConfig(fs, kubeadmConstants.GetAdminKubeConfigPath(), ""))
+	testutil.WriteRestConfigToFile(t, restConfig, fs, kubeadmConstants.GetAdminKubeConfigPath(), "iknite-test")
 	client, err := k8s.NewDefaultClient(fs)
 	req.NoError(err)
 
 	resources := sampleResMap(t)
 
 	_, err = k8s.ResourceInfosFromResMap(client, resources)
-	req.Error(err)
+	req.NoError(err)
 
-	mapper := testrestmapper.TestOnlyStaticRESTMapper(scheme.Scheme)
+	mapper := testutil.NewRESTMapper()
 	mGetter := genericclioptions.NewMockRESTClientGetter(t)
 	mGetter.EXPECT().ToRESTMapper().Return(mapper, nil).Maybe()
 	mGetter.EXPECT().ToRESTConfig().Return(restConfig, nil).Maybe()
@@ -313,7 +258,7 @@ func TestClient_ErrorAndDiscoveryPaths(t *testing.T) {
 	_, err = k8s.RESTClient(r)
 	req.Error(err)
 
-	restConfig := createTestAPIServer(t, func(w http.ResponseWriter, r *http.Request) {
+	restConfig := testutil.CreateTestAPIServer(t, func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/api":
 			w.WriteHeader(http.StatusOK)
@@ -349,7 +294,7 @@ func createClientGetterWithTestServer(
 	handler http.HandlerFunc,
 ) cliOptions.RESTClientGetter {
 	t.Helper()
-	restConfig := createTestAPIServer(t, handler)
+	restConfig := testutil.CreateTestAPIServer(t, handler)
 	client := genericclioptions.NewMockRESTClientGetter(t)
 	client.EXPECT().ToRESTMapper().Return(mapper, nil)
 	client.EXPECT().
@@ -362,7 +307,7 @@ func TestApplyResourceInfosServerSide_ErrorPaths(t *testing.T) {
 	t.Parallel()
 	req := require.New(t)
 
-	client := createClientGetterWithTestServer(t, testrestmapper.TestOnlyStaticRESTMapper(scheme.Scheme),
+	client := createClientGetterWithTestServer(t, testutil.NewRESTMapper(),
 		func(w http.ResponseWriter, r *http.Request) {
 			if r.Method == http.MethodPatch {
 				w.WriteHeader(http.StatusInternalServerError)
@@ -412,7 +357,7 @@ func TestApplyResMapWithServerSideApply_Branches(t *testing.T) {
 
 	realGetter := createClientGetterWithTestServer(
 		t,
-		testrestmapper.TestOnlyStaticRESTMapper(scheme.Scheme),
+		testutil.NewRESTMapper(),
 		func(w http.ResponseWriter, r *http.Request) {
 			if r.Method == http.MethodPatch {
 				w.WriteHeader(http.StatusInternalServerError)
@@ -445,7 +390,7 @@ func TestApplyResMapWithServerSideApply_Branches(t *testing.T) {
 
 	nsPatchFail := createClientGetterWithTestServer(
 		t,
-		testrestmapper.TestOnlyStaticRESTMapper(scheme.Scheme),
+		testutil.NewRESTMapper(),
 		func(w http.ResponseWriter, r *http.Request) {
 			if r.Method == http.MethodPatch {
 				w.WriteHeader(http.StatusInternalServerError)
@@ -465,7 +410,7 @@ func TestApplyResMapWithServerSideApply_Branches(t *testing.T) {
 
 	removeServer := createClientGetterWithTestServer(
 		t,
-		testrestmapper.TestOnlyStaticRESTMapper(scheme.Scheme),
+		testutil.NewRESTMapper(),
 		func(w http.ResponseWriter, r *http.Request) {
 			if r.Method != http.MethodPatch {
 				w.WriteHeader(http.StatusNotFound)
@@ -499,14 +444,14 @@ func TestHasApplicationsAndAllWorkloadStates(t *testing.T) {
 	t.Parallel()
 	req := require.New(t)
 
-	has, err := k8s.HasApplications(newWorkloadRESTMapper(false))
+	has, err := k8s.HasApplications(testutil.NewWorkloadRESTMapper(false))
 	req.NoError(err)
 	req.False(has)
-	has, err = k8s.HasApplications(newWorkloadRESTMapper(true))
+	has, err = k8s.HasApplications(testutil.NewWorkloadRESTMapper(true))
 	req.NoError(err)
 	req.True(has)
 	_, err = k8s.HasApplications(
-		errorRESTMapper{RESTMapper: newWorkloadRESTMapper(true), err: errors.New("mapping boom")},
+		errorRESTMapper{RESTMapper: testutil.NewWorkloadRESTMapper(true), err: errors.New("mapping boom")},
 	)
 	req.Error(err)
 
@@ -518,7 +463,7 @@ func TestHasApplicationsAndAllWorkloadStates(t *testing.T) {
 	getter = genericclioptions.NewMockRESTClientGetter(t)
 	getter.EXPECT().
 		ToRESTMapper().
-		Return(errorRESTMapper{RESTMapper: newWorkloadRESTMapper(true), err: errors.New("mapping boom")}, nil).
+		Return(errorRESTMapper{RESTMapper: testutil.NewWorkloadRESTMapper(true), err: errors.New("mapping boom")}, nil).
 		Once()
 	_, err = k8s.AllWorkloadStates(getter)
 	req.Error(err)
@@ -551,7 +496,7 @@ func TestHasApplicationsAndAllWorkloadStates(t *testing.T) {
 
 	statusErrServerGetter := createClientGetterWithTestServer(
 		t,
-		testrestmapper.TestOnlyStaticRESTMapper(scheme.Scheme),
+		testutil.NewRESTMapper(),
 		func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
@@ -615,7 +560,7 @@ func TestWorkloadsReadyConditionWithContextFunc(t *testing.T) {
 
 	unreadyServerGetter := createClientGetterWithTestServer(
 		t,
-		newWorkloadRESTMapper(false),
+		testutil.NewWorkloadRESTMapper(false),
 		func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)

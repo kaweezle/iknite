@@ -93,23 +93,19 @@ func TestWaitOptions_ValidateAndHasLoop(t *testing.T) {
 
 	tests := []struct {
 		name        string
+		wantErr     string
 		input       utils.WaitOptions
 		expected    utils.WaitOptions
 		hasLoopWant bool
 	}{
 		{
-			name: "watch overrides timeout and wait",
+			name: "Error when watch and wait are both true",
 			input: utils.WaitOptions{
 				Timeout: 8 * time.Second,
 				Watch:   true,
 				Wait:    true,
 			},
-			expected: utils.WaitOptions{
-				Timeout: 0,
-				Watch:   true,
-				Wait:    false,
-			},
-			hasLoopWant: true,
+			wantErr: "watch and wait options cannot be used together",
 		},
 		{
 			name: "wait clears timeout",
@@ -154,6 +150,11 @@ func TestWaitOptions_ValidateAndHasLoop(t *testing.T) {
 
 			waitOptions := tt.input
 			err := waitOptions.Validate()
+			if tt.wantErr != "" {
+				req.Error(err)
+				req.Contains(err.Error(), tt.wantErr)
+				return
+			}
 			req.NoError(err)
 			req.Equal(tt.expected.Timeout, waitOptions.Timeout)
 			req.Equal(tt.expected.Wait, waitOptions.Wait)

@@ -19,7 +19,7 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"os"
+	"io"
 
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -55,8 +55,8 @@ prints the Embedded configuration that installs the following components:
 - metrics-server to make resources work on payloads.
 
 `,
-		RunE: func(_ *cobra.Command, _ []string) error {
-			err := performPrintKustomize(fs, kustomizeOptions)
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			err := performPrintKustomize(fs, kustomizeOptions, cmd.OutOrStdout())
 			if err != nil {
 				return fmt.Errorf("failed to print kustomize configuration: %w", err)
 			}
@@ -169,6 +169,7 @@ func performKustomize(
 func performPrintKustomize(
 	fs host.FileSystem,
 	kustomizeOptions *utils.KustomizeOptions,
+	out io.Writer,
 ) error {
 	resources, err := provision.GetBaseKustomizationResources(
 		fs,
@@ -178,7 +179,7 @@ func performPrintKustomize(
 	if err != nil {
 		return fmt.Errorf("while getting kustomization resources: %w", err)
 	}
-	if err := kustomize.WriteToWriter(resources, os.Stdout); err != nil {
+	if err := kustomize.WriteToWriter(resources, out); err != nil {
 		return fmt.Errorf("while writing kustomization resources: %w", err)
 	}
 	return nil

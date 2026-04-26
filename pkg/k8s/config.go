@@ -20,6 +20,7 @@ package k8s
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -172,7 +173,7 @@ func CheckClusterRunning(
 		}
 
 		contentStr := string(content)
-		if contentStr != "ok" {
+		if strings.TrimSpace(contentStr) != "ok" {
 			err = fmt.Errorf("cluster health API returned: %s", contentStr)
 			log.WithError(err).Debug("Bad response")
 		} else {

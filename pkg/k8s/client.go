@@ -1,6 +1,7 @@
 package k8s
 
 // cSpell: words clientcmd clientconfig restconfig casttype metav1 polymorphichelpers restmapper genericclioptions
+// cSpell: words testutil
 // cSpell: disable
 import (
 	"bytes"
@@ -36,6 +37,7 @@ import (
 
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
 	"github.com/kaweezle/iknite/pkg/host"
+	"github.com/kaweezle/iknite/pkg/testutil"
 )
 
 // cSpell: enable
@@ -43,6 +45,7 @@ import (
 type Client struct {
 	clientconfig clientcmd.ClientConfig
 	restConfig   *rest.Config
+	mapper       meta.RESTMapper
 }
 
 var _ genericclioptions.RESTClientGetter = (*Client)(nil)
@@ -117,6 +120,19 @@ func ClientSet(client resource.RESTClientGetter) (kubernetes.Interface, error) {
 }
 
 func (r *Client) ToRESTMapper() (meta.RESTMapper, error) {
+	if r.mapper != nil {
+		return r.mapper, nil
+	}
+	// Allow using test RESTMapper if set as an extension in the client config, which is useful for testing with a
+	// mock RESTMapper without needing to set up a fake API server.
+	if r.clientconfig != nil {
+		c, err := r.clientconfig.RawConfig()
+		if err == nil {
+			if ext := c.Extensions["test-rest-mapper"]; ext != nil {
+				return testutil.NewRESTMapper(), nil
+			}
+		}
+	}
 	dc, err := r.ToDiscoveryClient()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get discovery client for REST mapper: %w", err)

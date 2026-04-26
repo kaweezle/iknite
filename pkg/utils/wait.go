@@ -109,6 +109,9 @@ func AddWaitOptionsFlags(flags *flag.FlagSet, waitOptions *WaitOptions) {
 }
 
 func (waitOptions *WaitOptions) Validate() error {
+	if waitOptions.Watch && waitOptions.Wait {
+		return fmt.Errorf("watch and wait options cannot be used together")
+	}
 	// if watch, timeout should be 0 and wait should be false
 	if waitOptions.Watch {
 		waitOptions.Timeout = 0  // override timeout to avoid conflicts
