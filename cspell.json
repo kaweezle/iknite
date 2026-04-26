@@ -23,6 +23,7 @@
     "deploy/k8s/hack/schemas/**/*.json",
     "**/*_mock.go",
     "**/mocks/**",
+    "**/packages.txt"
   ],
   "dictionaryDefinitions": [],
   "dictionaries": [
