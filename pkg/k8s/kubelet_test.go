@@ -1,4 +1,4 @@
-// cSpell: words cgroupfs mockk8s
+// cSpell: words cgroupfs mockk8s testutil
 package k8s_test
 
 import (
@@ -20,6 +20,7 @@ import (
 	"github.com/kaweezle/iknite/pkg/alpine"
 	"github.com/kaweezle/iknite/pkg/host"
 	"github.com/kaweezle/iknite/pkg/k8s"
+	"github.com/kaweezle/iknite/pkg/testutil"
 	"github.com/kaweezle/iknite/pkg/utils"
 )
 
@@ -421,7 +422,7 @@ func TestStartAndConfigureKubelet_KustomizeError(t *testing.T) {
 
 	kustomizeOptions := &utils.KustomizeOptions{Kustomization: "test-kustomization"}
 	runtime.EXPECT().StartKubelet(mock.Anything).RunAndReturn(func(ctx context.Context) (host.Process, error) {
-		process := host.NewDummyProcess(ctx, &host.DummyProcessOptions{
+		process := testutil.NewDummyProcess(ctx, &testutil.DummyProcessOptions{
 			Cmd: "kubelet",
 			Pid: 1234,
 		})

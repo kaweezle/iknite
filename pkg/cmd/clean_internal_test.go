@@ -1,4 +1,4 @@
-// cSpell: words ipcns utsns
+// cSpell: words ipcns utsns testutil
 //
 //nolint:errcheck,forcetypeassert // Ignoring error checks in tests for simplicity
 package cmd
@@ -13,14 +13,15 @@ import (
 
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
 	"github.com/kaweezle/iknite/pkg/host"
+	"github.com/kaweezle/iknite/pkg/testutil"
 )
 
-var simpleDummyHostOptions = host.DummyHostOptions{
-	Processes: []host.DummyProcessOptions{
-		{Pid: 1, Cmd: "init", State: host.ProcessStateRunning, ExitCode: 0},
-		{Pid: 2, Cmd: "containerd", State: host.ProcessStateRunning, ExitCode: 0},
-		{Pid: 3, Cmd: "iknite", State: host.ProcessStateRunning, ExitCode: 0},
-		{Pid: 4, Cmd: "kubelet", State: host.ProcessStateRunning, ExitCode: 0},
+var simpleDummyHostOptions = testutil.DummyHostOptions{
+	Processes: []testutil.DummyProcessOptions{
+		{Pid: 1, Cmd: "init", State: testutil.ProcessStateRunning, ExitCode: 0},
+		{Pid: 2, Cmd: "containerd", State: testutil.ProcessStateRunning, ExitCode: 0},
+		{Pid: 3, Cmd: "iknite", State: testutil.ProcessStateRunning, ExitCode: 0},
+		{Pid: 4, Cmd: "kubelet", State: testutil.ProcessStateRunning, ExitCode: 0},
 	},
 	// cSpell: disable
 	//nolint:lll // raw output
@@ -69,7 +70,7 @@ func createCleanParameters(t *testing.T) (host.Host, *v1alpha1.IkniteClusterSpec
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to write testdata file to mem fs: %w", err)
 	}
-	alpineHost, err := host.NewDummyHost(fs, &simpleDummyHostOptions)
+	alpineHost, err := testutil.NewDummyHost(fs, &simpleDummyHostOptions)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to create dummy host: %w", err)
 	}
@@ -107,11 +108,11 @@ func TestPerformClean(t *testing.T) {
 			},
 			expectedError: "",
 			expectations: func(req *require.Assertions, alpineHost host.Host) {
-				dummyHost := alpineHost.(*host.DelegateHost)
-				dummyExec := dummyHost.Exec.(*host.DummyExecutor)
+				dummyHost := alpineHost.(*testutil.DelegateHost)
+				dummyExec := dummyHost.Exec.(*testutil.DummyExecutor)
 				// Check that no processes were killed
 				for _, process := range dummyExec.Processes {
-					dummyProcess := process.(*host.DummyProcess)
+					dummyProcess := process.(*testutil.DummyProcess)
 					req.Nil(
 						dummyProcess.State(),
 						"Process %s should not have been killed in dry-run mode",
@@ -124,7 +125,7 @@ func TestPerformClean(t *testing.T) {
 					req.NoError(err, "Error while checking existence of mount %s", mount)
 					req.True(exists, "Mount %s should still be present in dry-run mode", mount)
 				}
-				dummySystem := dummyHost.Sys.(*host.DummySystem)
+				dummySystem := dummyHost.Sys.(*testutil.DummySystem)
 				for _, mount := range simpleDummyHostOptions.Mounts {
 					req.Contains(dummySystem.Mounts, mount, "Mount %s should still be present in dry-run mode", mount)
 				}
@@ -135,11 +136,11 @@ func TestPerformClean(t *testing.T) {
 			prepareParameters: createCleanParameters,
 			expectedError:     "",
 			expectations: func(req *require.Assertions, alpineHost host.Host) {
-				dummyHost := alpineHost.(*host.DelegateHost)
-				dummyExec := dummyHost.Exec.(*host.DummyExecutor)
+				dummyHost := alpineHost.(*testutil.DelegateHost)
+				dummyExec := dummyHost.Exec.(*testutil.DummyExecutor)
 				// Check that no processes were killed except kubelet
 				for _, process := range dummyExec.Processes {
-					dummyProcess := process.(*host.DummyProcess)
+					dummyProcess := process.(*testutil.DummyProcess)
 					switch dummyProcess.Cmd() {
 					case "kubelet":
 						req.NotNil(dummyProcess.State(), "Process kubelet should have been killed in non dry-run mode")
@@ -154,7 +155,7 @@ func TestPerformClean(t *testing.T) {
 						)
 					}
 				}
-				dummySys := dummyHost.Sys.(*host.DummySystem)
+				dummySys := dummyHost.Sys.(*testutil.DummySystem)
 				req.Empty(
 					dummySys.Mounts,
 					"All mounts should have been removed in non dry-run mode (%d mounts still present)",
@@ -192,8 +193,8 @@ func TestPerformClean(t *testing.T) {
 				return alpineHost, ikniteConfig, cleanOptions, nil
 			},
 			expectations: func(req *require.Assertions, alpineHost host.Host) {
-				dummyHost := alpineHost.(*host.DelegateHost)
-				dummyExec := dummyHost.Exec.(*host.DummyExecutor)
+				dummyHost := alpineHost.(*testutil.DelegateHost)
+				dummyExec := dummyHost.Exec.(*testutil.DummyExecutor)
 				// Check that the IP address has been removed
 				req.Contains(
 					dummyExec.GetCalledCommands(),

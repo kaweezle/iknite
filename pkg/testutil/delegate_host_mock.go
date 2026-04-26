@@ -1,7 +1,7 @@
 // cSpell: words wrapcheck contextcheck
 //
 //nolint:wrapcheck,errcheck // Returning underlying errors
-package host
+package testutil
 
 import (
 	"bufio"
@@ -23,15 +23,16 @@ import (
 	"time"
 
 	"github.com/bitfield/script"
+	"github.com/kaweezle/iknite/pkg/host"
 	"github.com/spf13/afero"
 	"github.com/txn2/txeh"
 )
 
 type DelegateHost struct {
-	Fs   FileSystem
-	Exec Executor
-	Sys  System
-	Net  NetworkHost
+	Fs   host.FileSystem
+	Exec host.Executor
+	Sys  host.System
+	Net  host.NetworkHost
 }
 
 // Abs implements [Host].
@@ -75,7 +76,7 @@ func (d *DelegateHost) Exists(path string) (bool, error) {
 }
 
 // FindProcess implements [Host].
-func (d *DelegateHost) FindProcess(pid int) (Process, error) {
+func (d *DelegateHost) FindProcess(pid int) (host.Process, error) {
 	return d.Exec.FindProcess(pid)
 }
 
@@ -155,7 +156,7 @@ func (d *DelegateHost) Run(combined bool, cmd string, arguments ...string) ([]by
 }
 
 // StartCommand implements [Host].
-func (d *DelegateHost) StartCommand(ctx context.Context, options *CommandOptions) (Process, error) {
+func (d *DelegateHost) StartCommand(ctx context.Context, options *host.CommandOptions) (host.Process, error) {
 	return d.Exec.StartCommand(ctx, options)
 }
 
@@ -189,9 +190,9 @@ func (d *DelegateHost) WritePipe(path string, pipe *script.Pipe, flag int, perm 
 	return d.Fs.WritePipe(path, pipe, flag, perm)
 }
 
-var _ Host = (*DelegateHost)(nil)
+var _ host.Host = (*DelegateHost)(nil)
 
-func NewDelegateHost(fs FileSystem, exec Executor, sys System, n NetworkHost) *DelegateHost {
+func NewDelegateHost(fs host.FileSystem, exec host.Executor, sys host.System, n host.NetworkHost) *DelegateHost {
 	return &DelegateHost{
 		Fs:   fs,
 		Exec: exec,
@@ -200,7 +201,7 @@ func NewDelegateHost(fs FileSystem, exec Executor, sys System, n NetworkHost) *D
 	}
 }
 
-var _ NetworkHost = (*DummyNetworkHost)(nil)
+var _ host.NetworkHost = (*DummyNetworkHost)(nil)
 
 type DummyNetworkHost struct {
 	mappedHosts map[string][]string
@@ -314,7 +315,7 @@ type DummySystem struct {
 	Mounts []string
 }
 
-var _ System = (*DummySystem)(nil)
+var _ host.System = (*DummySystem)(nil)
 
 func (d *DummySystem) Unmount(path string) error {
 	if !slices.Contains(d.Mounts, path) {
@@ -377,8 +378,8 @@ type DummyProcess struct {
 }
 
 var (
-	_ Process      = (*DummyProcess)(nil)
-	_ ProcessState = (*DummyProcess)(nil)
+	_ host.Process      = (*DummyProcess)(nil)
+	_ host.ProcessState = (*DummyProcess)(nil)
 )
 
 // ExitCode implements [ProcessState].
@@ -427,7 +428,7 @@ func (p *DummyProcess) Pid() int {
 	return p.pid
 }
 
-func (p *DummyProcess) State() ProcessState {
+func (p *DummyProcess) State() host.ProcessState {
 	if p.state == ProcessStateCompleted || p.state == ProcessStateTerminated {
 		return p
 	}
@@ -492,12 +493,12 @@ func NewDummyProcess(ctx context.Context, options *DummyProcessOptions) *DummyPr
 }
 
 type DummyExecutor struct {
-	Processes      map[int]Process
+	Processes      map[int]host.Process
 	fakeOutputs    map[string]string
 	calledCommands []string
 }
 
-var _ Executor = (*DummyExecutor)(nil)
+var _ host.Executor = (*DummyExecutor)(nil)
 
 func (d *DummyExecutor) fakeOutput(stdin io.Reader, cmd string, args ...string) ([]byte, error) {
 	key := cmd
@@ -576,7 +577,7 @@ func (d *DummyExecutor) ExecPipe(stdin *script.Pipe, cmd string) *script.Pipe {
 }
 
 // FindProcess implements [Executor].
-func (d *DummyExecutor) FindProcess(pid int) (Process, error) {
+func (d *DummyExecutor) FindProcess(pid int) (host.Process, error) {
 	process, exists := d.Processes[pid]
 	if !exists {
 		return nil, fmt.Errorf("process with PID %d not found", pid)
@@ -603,7 +604,7 @@ func (d *DummyExecutor) Run(_ bool, cmd string, arguments ...string) ([]byte, er
 }
 
 // StartCommand implements [Executor].
-func (d *DummyExecutor) StartCommand(ctx context.Context, options *CommandOptions) (Process, error) {
+func (d *DummyExecutor) StartCommand(ctx context.Context, options *host.CommandOptions) (host.Process, error) {
 	process := NewDummyProcess(ctx, &DummyProcessOptions{
 		Pid:      int(time.Now().UnixNano() % 10000),
 		Cmd:      options.Cmd,
@@ -622,7 +623,7 @@ func (d *DummyExecutor) GetCalledCommands() []string {
 	return d.calledCommands
 }
 
-func NewDummyExecutor(processes map[int]Process, fakeOutputs map[string]string) *DummyExecutor {
+func NewDummyExecutor(processes map[int]host.Process, fakeOutputs map[string]string) *DummyExecutor {
 	return &DummyExecutor{
 		Processes:   processes,
 		fakeOutputs: fakeOutputs,
@@ -638,14 +639,14 @@ type DummyHostOptions struct {
 }
 
 func NewDummyHost(
-	fs FileSystem,
+	fs host.FileSystem,
 	options *DummyHostOptions,
 ) (*DelegateHost, error) {
 	networkHost, err := NewDummyNetworkHost(options.NetworkIPs, options.HostMappings)
 	if err != nil {
 		return nil, fmt.Errorf("error while creating dummy network host: %w", err)
 	}
-	processes := make(map[int]Process)
+	processes := make(map[int]host.Process)
 	for _, processOptions := range options.Processes {
 		process := NewDummyProcess(context.Background(), &processOptions)
 		processes[process.Pid()] = process
