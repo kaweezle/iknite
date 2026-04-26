@@ -15,8 +15,8 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	mockHost "github.com/kaweezle/iknite/mocks/github.com/kaweezle/iknite/pkg/host"
-	mockk8s "github.com/kaweezle/iknite/mocks/github.com/kaweezle/iknite/pkg/k8s"
+	mockHost "github.com/kaweezle/iknite/mocks/pkg/host"
+	mockk8s "github.com/kaweezle/iknite/mocks/pkg/k8s"
 	"github.com/kaweezle/iknite/pkg/alpine"
 	"github.com/kaweezle/iknite/pkg/host"
 	"github.com/kaweezle/iknite/pkg/k8s"

@@ -23,11 +23,6 @@ require-template-schema-exists: true
 template: testify
 template-schema: "{{.Template}}.schema.json"
 packages:
-  github.com/kaweezle/iknite/pkg/host:
-    config:
-      all: true
-  github.com/kaweezle/iknite/pkg/k8s:
-    interfaces: { KubeletRuntime }
   k8s.io/cli-runtime/pkg/genericclioptions:
     interfaces: { RESTClientGetter }
   k8s.io/client-go/rest:
@@ -42,7 +37,17 @@ packages:
     interfaces: { ClientConfig }
   k8s.io/apimachinery/pkg/api/meta:
     interfaces: { RESTMapper }
+  github.com/kaweezle/iknite/pkg/host:
+    config:
+      all: true
+      dir: mocks/{{.InterfaceDirRelative}}
+  github.com/kaweezle/iknite/pkg/k8s:
+    config:
+      dir: mocks/{{.InterfaceDirRelative}}
+    interfaces: { KubeletRuntime }
   github.com/kaweezle/iknite/pkg/k8s/phases/init:
+    config:
+      dir: mocks/{{.InterfaceDirRelative}}
     interfaces:
       {
         IkniteInitData,

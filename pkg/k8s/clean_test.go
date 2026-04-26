@@ -18,7 +18,7 @@ import (
 	"github.com/txn2/txeh"
 	kubeadmConstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 
-	mockHost "github.com/kaweezle/iknite/mocks/github.com/kaweezle/iknite/pkg/host"
+	mockHost "github.com/kaweezle/iknite/mocks/pkg/host"
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
 	"github.com/kaweezle/iknite/pkg/host"
 	"github.com/kaweezle/iknite/pkg/k8s"

@@ -28,7 +28,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 
-	mockHost "github.com/kaweezle/iknite/mocks/github.com/kaweezle/iknite/pkg/host"
+	mockHost "github.com/kaweezle/iknite/mocks/pkg/host"
 	"github.com/kaweezle/iknite/pkg/host"
 )
 
