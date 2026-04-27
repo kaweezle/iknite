@@ -72,7 +72,7 @@ func TestCommandConstructors(t *testing.T) {
 		{name: "kubelet", fn: func() *cobra.Command { return NewKubeletCmd(spec, nil, nil) }},
 		{name: "mdns", fn: func() *cobra.Command { return NewMdnsCmd(spec) }},
 		{name: "info", fn: func() *cobra.Command { return NewInfoCmd(spec) }},
-		{name: "kustomize", fn: func() *cobra.Command { return NewKustomizeCmd(spec, nil, nil, nil) }},
+		{name: "kustomize", fn: func() *cobra.Command { return NewKustomizeCmd(nil, nil, nil) }},
 		{
 			name: "print-kustomize",
 			fn: func() *cobra.Command {

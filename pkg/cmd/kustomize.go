@@ -26,7 +26,6 @@ import (
 	"github.com/spf13/viper"
 	"k8s.io/apimachinery/pkg/util/runtime"
 
-	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
 	"github.com/kaweezle/iknite/pkg/cmd/options"
 	"github.com/kaweezle/iknite/pkg/config"
 	"github.com/kaweezle/iknite/pkg/constants"
@@ -67,7 +66,6 @@ prints the Embedded configuration that installs the following components:
 }
 
 func NewKustomizeCmd(
-	ikniteConfig *v1alpha1.IkniteClusterSpec,
 	kustomizeOptions *utils.KustomizeOptions,
 	waitOptions *utils.WaitOptions,
 	fs host.FileSystem,
@@ -115,7 +113,6 @@ applies the Embedded configuration that installs the following components:
 		},
 	}
 
-	config.AddIkniteClusterFlags(kustomizeCmd.Flags(), ikniteConfig)
 	utils.AddKustomizeOptionsFlags(kustomizeCmd.Flags(), kustomizeOptions)
 
 	printCmd := NewPrintKustomizeCmd(fs, kustomizeOptions)

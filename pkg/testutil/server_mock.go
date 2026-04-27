@@ -250,28 +250,33 @@ func ContentPatchHandler(subdir string, options *TestServerOptions) http.Handler
 	}
 }
 
-func CreateBasicKustomization(fs host.FileSystem, dir string) error {
-	err := fs.MkdirAll(dir, 0o755)
-	if err != nil {
-		return fmt.Errorf("failed to create directory: %w", err)
-	}
-	kustomizationContent := `apiVersion: kustomize.config.k8s.io/v1beta1
-kind: Kustomization
-namespace: kube-system
-resources:
-- configmap.yaml
-`
-	if err := fs.WriteFile(filepath.Join(dir, "kustomization.yaml"), []byte(kustomizationContent), 0o600); err != nil {
-		return fmt.Errorf("failed to write kustomization.yaml: %w", err)
-	}
-	if err := fs.WriteFile(filepath.Join(dir, "configmap.yaml"), []byte(`apiVersion: v1
+const basicConfigmap = `apiVersion: v1
 kind: ConfigMap
 metadata:
   name: test-config
 data:
   key: value
-`), 0o600); err != nil {
-		return fmt.Errorf("failed to write configmap.yaml: %w", err)
+`
+
+const basicKustomization = `apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: kube-system
+resources:
+- configmap.yaml
+`
+
+func CreateBasicKustomization(fs host.FileSystem, dir string, failing bool) error {
+	err := fs.MkdirAll(dir, 0o755)
+	if err != nil {
+		return fmt.Errorf("failed to create directory: %w", err)
+	}
+	if err := fs.WriteFile(filepath.Join(dir, "kustomization.yaml"), []byte(basicKustomization), 0o600); err != nil {
+		return fmt.Errorf("failed to write kustomization.yaml: %w", err)
+	}
+	if !failing {
+		if err := fs.WriteFile(filepath.Join(dir, "configmap.yaml"), []byte(basicConfigmap), 0o600); err != nil {
+			return fmt.Errorf("failed to write configmap.yaml: %w", err)
+		}
 	}
 	return nil
 }

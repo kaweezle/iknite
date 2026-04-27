@@ -78,7 +78,7 @@ kubernetes.`,
 	util.AddConfigFlag(rootCmd)
 	alpineHost := host.NewDefaultHost()
 
-	rootCmd.AddCommand(NewKustomizeCmd(ikniteConfig, nil, nil, nil))
+	rootCmd.AddCommand(NewKustomizeCmd(nil, nil, nil))
 	rootCmd.AddCommand(newCmdInit(os.Stdout, nil, nil, alpineHost))
 	rootCmd.AddCommand(newCmdReset(os.Stdin, os.Stdout, nil, nil))
 	rootCmd.AddCommand(NewCmdClean(ikniteConfig, nil, alpineHost))
