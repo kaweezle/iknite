@@ -13,6 +13,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
+// cSpell: words testutil
 package kubewait_test
 
 import (
@@ -22,6 +23,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/kaweezle/iknite/pkg/cmd/kubewait"
+	"github.com/kaweezle/iknite/pkg/host"
+	pkgKubewait "github.com/kaweezle/iknite/pkg/kubewait"
+	"github.com/kaweezle/iknite/pkg/testutil"
 )
 
 func TestCreateKubewaitCmd(t *testing.T) {
@@ -29,7 +33,11 @@ func TestCreateKubewaitCmd(t *testing.T) {
 	req := require.New(t)
 
 	buf := &bytes.Buffer{}
-	cmd := kubewait.CreateKubewaitCmd(buf)
+	opts := pkgKubewait.NewOptions()
+	fs := host.NewMemMapFS()
+	h, err := testutil.NewDummyHost(fs, &testutil.DummyHostOptions{})
+	req.NoError(err)
+	cmd := kubewait.CreateKubewaitCmd(buf, h, opts)
 	req.NotNil(cmd)
 	req.Equal("kubewait", cmd.Name())
 	req.NotNil(cmd.PersistentPreRunE)
@@ -41,6 +49,6 @@ func TestCreateKubewaitCmd(t *testing.T) {
 	req.NotNil(flags.Lookup("status-update-interval"))
 	req.NotNil(flags.Lookup("resources-update-interval"))
 
-	err := flags.Parse([]string{"--resource-types", "deployments,daemonsets", "default"})
+	err = flags.Parse([]string{"--resource-types", "deployments,daemonsets", "default"})
 	req.NoError(err)
 }

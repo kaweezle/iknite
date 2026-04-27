@@ -100,6 +100,63 @@ func (_c *MockFileSystem_Abs_Call) RunAndReturn(run func(path string) (string, e
 	return _c
 }
 
+// Chmod provides a mock function for the type MockFileSystem
+func (_mock *MockFileSystem) Chmod(path string, mode os.FileMode) error {
+	ret := _mock.Called(path, mode)
+
+	if len(ret) == 0 {
+		panic("no return value specified for Chmod")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(string, os.FileMode) error); ok {
+		r0 = returnFunc(path, mode)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockFileSystem_Chmod_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Chmod'
+type MockFileSystem_Chmod_Call struct {
+	*mock.Call
+}
+
+// Chmod is a helper method to define mock.On call
+//   - path string
+//   - mode os.FileMode
+func (_e *MockFileSystem_Expecter) Chmod(path interface{}, mode interface{}) *MockFileSystem_Chmod_Call {
+	return &MockFileSystem_Chmod_Call{Call: _e.mock.On("Chmod", path, mode)}
+}
+
+func (_c *MockFileSystem_Chmod_Call) Run(run func(path string, mode os.FileMode)) *MockFileSystem_Chmod_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 string
+		if args[0] != nil {
+			arg0 = args[0].(string)
+		}
+		var arg1 os.FileMode
+		if args[1] != nil {
+			arg1 = args[1].(os.FileMode)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockFileSystem_Chmod_Call) Return(err error) *MockFileSystem_Chmod_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockFileSystem_Chmod_Call) RunAndReturn(run func(path string, mode os.FileMode) error) *MockFileSystem_Chmod_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // Create provides a mock function for the type MockFileSystem
 func (_mock *MockFileSystem) Create(path string) (afero.File, error) {
 	ret := _mock.Called(path)

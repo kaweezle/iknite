@@ -16,7 +16,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/resource"
-	clientRest "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling/engine"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling/event"
@@ -25,23 +24,26 @@ import (
 	runTimeClient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
+	"github.com/kaweezle/iknite/pkg/host"
 )
 
 // NewClientFromKubeconfig creates a RESTClientGetter using the default kubeconfig
 // loading rules. If kubeconfigPath is non-empty it is used directly; otherwise KUBECONFIG
 // env var and ~/.kube/config are tried in turn, with a final fall-back to in-cluster config.
-func NewClientFromKubeconfig(kubeconfigPath string) *Client {
-	restConfig, err := clientRest.InClusterConfig()
+func NewClientFromKubeconfig(fs host.FileSystem, kubeconfigPath string) (*Client, error) {
+	restConfig, err := InClusterConfig(fs)
 	if err == nil {
 		log.Info("Using in-cluster configuration")
-		return NewClientFromRestConfig(restConfig)
+		return NewClientFromRestConfig(restConfig), nil
 	}
-	loadingRules := clientcmd.NewDefaultClientConfigLoadingRules()
 	if kubeconfigPath != "" {
-		loadingRules.ExplicitPath = kubeconfigPath
+		return NewClientFromFile(fs, kubeconfigPath)
 	}
-	overrides := &clientcmd.ConfigOverrides{}
-	return NewClientFromClientConfig(clientcmd.NewNonInteractiveDeferredLoadingClientConfig(loadingRules, overrides))
+
+	// TODO: the following works with KUBECONFIG and home directory,
+	// but it doesn't support merging and default localhost access.
+	loadingRules := clientcmd.NewDefaultClientConfigLoadingRules()
+	return NewClientFromFile(fs, loadingRules.Precedence[0])
 }
 
 // workloadStatesToSlice converts resource.Info objects to WorkloadState using kstatus.

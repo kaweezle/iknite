@@ -1,10 +1,9 @@
-// cSpell: words kstatus sirupsen apimachinery
+// cSpell: words kstatus sirupsen apimachinery testutil clientcmd
 package kubewait
 
 import (
 	"context"
 	"fmt"
-	"os"
 	"path/filepath"
 	"testing"
 	"time"
@@ -12,12 +11,15 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/tools/clientcmd/api"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling/collector"
 	pollingEvent "sigs.k8s.io/cli-utils/pkg/kstatus/polling/event"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/status"
 	"sigs.k8s.io/cli-utils/pkg/object"
 
+	"github.com/kaweezle/iknite/pkg/host"
 	"github.com/kaweezle/iknite/pkg/k8s"
+	"github.com/kaweezle/iknite/pkg/testutil"
 )
 
 func TestClientDependentHelpersReturnErrors(t *testing.T) {
@@ -32,7 +34,7 @@ func TestClientDependentHelpersReturnErrors(t *testing.T) {
 		{
 			name: "list namespaces with invalid kubeconfig",
 			run: func() error {
-				client := k8s.NewClientFromKubeconfig(missingKubeconfig)
+				client := k8s.NewClientFromConfig(api.NewConfig())
 				clientset, err := k8s.ClientSet(client)
 				if err != nil {
 					return fmt.Errorf("failed to create clientset: %w", err)
@@ -44,7 +46,7 @@ func TestClientDependentHelpersReturnErrors(t *testing.T) {
 		{
 			name: "wait namespace resources with invalid kubeconfig",
 			run: func() error {
-				client := k8s.NewClientFromKubeconfig(missingKubeconfig)
+				client := k8s.NewClientFromConfig(api.NewConfig())
 				opts := NewOptions()
 				opts.StatusUpdateInterval = time.Millisecond
 				return waitNamespaceResources(context.Background(), client, "default", opts)
@@ -57,7 +59,8 @@ func TestClientDependentHelpersReturnErrors(t *testing.T) {
 				opts.Kubeconfig = missingKubeconfig
 				opts.ResourceTypes = []string{"deployments"}
 				opts.StatusUpdateInterval = time.Millisecond
-				return waitForResources(context.Background(), opts, []string{"default"})
+				fs := host.NewMemMapFS()
+				return waitForResources(context.Background(), fs, opts, []string{"default"})
 			},
 		},
 	}
@@ -155,7 +158,11 @@ func TestRunKubewaitErrorWrapping(t *testing.T) {
 		opts.StatusUpdateInterval = time.Millisecond
 		opts.SkipBootstrap = true
 
-		err := RunKubewait(context.Background(), opts, []string{"default"})
+		fs := host.NewMemMapFS()
+		h, err := testutil.NewDummyHost(fs, &testutil.DummyHostOptions{})
+		req.NoError(err)
+
+		err = RunKubewait(context.Background(), h, opts, []string{"default"})
 		req.Error(err)
 		req.Contains(err.Error(), "error while waiting for resources")
 	})
@@ -164,18 +171,24 @@ func TestRunKubewaitErrorWrapping(t *testing.T) {
 		t.Parallel()
 		req := require.New(t)
 
-		dir := t.TempDir()
-		script := filepath.Join(dir, "iknite-bootstrap.sh")
-		req.NoError(os.WriteFile(script, []byte("#!/bin/sh\nexit 7\n"), 0o600))
-		req.NoError(os.Chmod(script, 0o755)) //nolint:gosec // test script needs executable bit
+		fs := host.NewMemMapFS()
+		script := filepath.Join(bootstrapDir, "iknite-bootstrap.sh")
+		req.NoError(fs.WriteFile(script, []byte("#!/bin/sh\nexit 7\n"), 0o600))
+		req.NoError(fs.Chmod(script, 0o755))
+
+		fakeExecs := map[string]*testutil.FakeProcessOutput{
+			`/base/iknite-bootstrap\.sh`: testutil.FakeExec("", 7),
+		}
+		h := &testutil.DelegateHost{Fs: fs, Exec: testutil.NewDummyExecutor(map[int]host.Process{}, fakeExecs)}
 
 		opts := NewOptions()
 		opts.SkipWaitingForResources = true
 		opts.SkipBootstrap = false
-		opts.BootstrapDir = dir
+		opts.BootstrapDir = bootstrapDir
 		opts.BootstrapScript = filepath.Base(script)
 
-		err := RunKubewait(context.Background(), opts, []string{"default"})
+		// We need that as we cannot execute RAM based scripts (should mock execution in that case)
+		err := RunKubewait(context.Background(), h, opts, []string{"default"})
 		req.Error(err)
 		req.Contains(err.Error(), "error during bootstrap")
 	})

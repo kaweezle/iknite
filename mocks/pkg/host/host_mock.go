@@ -165,6 +165,63 @@ func (_c *MockHost_CheckIpExists_Call) RunAndReturn(run func(ip net.IP) (bool, e
 	return _c
 }
 
+// Chmod provides a mock function for the type MockHost
+func (_mock *MockHost) Chmod(path string, mode os.FileMode) error {
+	ret := _mock.Called(path, mode)
+
+	if len(ret) == 0 {
+		panic("no return value specified for Chmod")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(string, os.FileMode) error); ok {
+		r0 = returnFunc(path, mode)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockHost_Chmod_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Chmod'
+type MockHost_Chmod_Call struct {
+	*mock.Call
+}
+
+// Chmod is a helper method to define mock.On call
+//   - path string
+//   - mode os.FileMode
+func (_e *MockHost_Expecter) Chmod(path interface{}, mode interface{}) *MockHost_Chmod_Call {
+	return &MockHost_Chmod_Call{Call: _e.mock.On("Chmod", path, mode)}
+}
+
+func (_c *MockHost_Chmod_Call) Run(run func(path string, mode os.FileMode)) *MockHost_Chmod_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 string
+		if args[0] != nil {
+			arg0 = args[0].(string)
+		}
+		var arg1 os.FileMode
+		if args[1] != nil {
+			arg1 = args[1].(os.FileMode)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockHost_Chmod_Call) Return(err error) *MockHost_Chmod_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockHost_Chmod_Call) RunAndReturn(run func(path string, mode os.FileMode) error) *MockHost_Chmod_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // Create provides a mock function for the type MockHost
 func (_mock *MockHost) Create(path string) (afero.File, error) {
 	ret := _mock.Called(path)
@@ -1521,6 +1578,63 @@ func (_c *MockHost_Run_Call) Return(bytes []byte, err error) *MockHost_Run_Call 
 }
 
 func (_c *MockHost_Run_Call) RunAndReturn(run func(combined bool, cmd string, arguments ...string) ([]byte, error)) *MockHost_Run_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// RunCommand provides a mock function for the type MockHost
+func (_mock *MockHost) RunCommand(ctx context.Context, options *host.CommandOptions) error {
+	ret := _mock.Called(ctx, options)
+
+	if len(ret) == 0 {
+		panic("no return value specified for RunCommand")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *host.CommandOptions) error); ok {
+		r0 = returnFunc(ctx, options)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockHost_RunCommand_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'RunCommand'
+type MockHost_RunCommand_Call struct {
+	*mock.Call
+}
+
+// RunCommand is a helper method to define mock.On call
+//   - ctx context.Context
+//   - options *host.CommandOptions
+func (_e *MockHost_Expecter) RunCommand(ctx interface{}, options interface{}) *MockHost_RunCommand_Call {
+	return &MockHost_RunCommand_Call{Call: _e.mock.On("RunCommand", ctx, options)}
+}
+
+func (_c *MockHost_RunCommand_Call) Run(run func(ctx context.Context, options *host.CommandOptions)) *MockHost_RunCommand_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *host.CommandOptions
+		if args[1] != nil {
+			arg1 = args[1].(*host.CommandOptions)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockHost_RunCommand_Call) Return(err error) *MockHost_RunCommand_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockHost_RunCommand_Call) RunAndReturn(run func(ctx context.Context, options *host.CommandOptions) error) *MockHost_RunCommand_Call {
 	_c.Call.Return(run)
 	return _c
 }

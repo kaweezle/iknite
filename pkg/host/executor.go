@@ -29,6 +29,15 @@ type ProcessState interface {
 	String() string
 }
 
+type ExitError struct {
+	ProcessState
+	Stderr []byte
+}
+
+func (e *ExitError) Error() string {
+	return e.String()
+}
+
 type Process interface {
 	Pid() int
 	Signal(signal os.Signal) error
@@ -47,6 +56,7 @@ type Executor interface {
 	ExecForEach(stdin *script.Pipe, cmd string) *script.Pipe
 	FindProcess(pid int) (Process, error)
 	StartCommand(ctx context.Context, options *CommandOptions) (Process, error)
+	RunCommand(ctx context.Context, options *CommandOptions) error
 }
 
 var _ Executor = (*hostImpl)(nil)
@@ -156,6 +166,17 @@ func (c *hostImpl) StartCommand(ctx context.Context, options *CommandOptions) (P
 		return nil, fmt.Errorf("failed to start command %s: %w", options.Cmd, err)
 	}
 	return &processImpl{process: cmd.Process}, nil
+}
+
+func (c *hostImpl) RunCommand(ctx context.Context, options *CommandOptions) error {
+	//nolint:gosec // Harness done upstream
+	cmd := exec.CommandContext(ctx, options.Cmd, options.Args...)
+	cmd.Env = options.Env
+	cmd.Dir = options.Dir
+	cmd.Stdout = options.Stdout
+	cmd.Stderr = options.Stderr
+	cmd.Stdin = options.Stdin
+	return cmd.Run() //nolint:wrapcheck // Want to return original error (ExitError)
 }
 
 func TerminateProcess(p Process, alive *bool) error {

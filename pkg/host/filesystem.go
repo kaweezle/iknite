@@ -100,6 +100,9 @@ type FileSystem interface {
 
 	// Abs returns the absolute path for the given path, resolving any symbolic links.
 	Abs(path string) (string, error)
+
+	// Chmod changes the mode of the file at the given path to the specified permissions.
+	Chmod(path string, mode os.FileMode) error
 }
 
 type hostImpl struct {
@@ -238,6 +241,10 @@ func (a *hostImpl) Abs(path string) (string, error) {
 	}
 
 	return base.RealPath(path)
+}
+
+func (a *hostImpl) Chmod(path string, mode os.FileMode) error {
+	return a.fs.Chmod(path, mode)
 }
 
 // NewMemMapFS creates in-memory filesystem for tests.

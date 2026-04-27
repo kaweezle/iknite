@@ -392,6 +392,63 @@ func (_c *MockExecutor_Run_Call) RunAndReturn(run func(combined bool, cmd string
 	return _c
 }
 
+// RunCommand provides a mock function for the type MockExecutor
+func (_mock *MockExecutor) RunCommand(ctx context.Context, options *host.CommandOptions) error {
+	ret := _mock.Called(ctx, options)
+
+	if len(ret) == 0 {
+		panic("no return value specified for RunCommand")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *host.CommandOptions) error); ok {
+		r0 = returnFunc(ctx, options)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockExecutor_RunCommand_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'RunCommand'
+type MockExecutor_RunCommand_Call struct {
+	*mock.Call
+}
+
+// RunCommand is a helper method to define mock.On call
+//   - ctx context.Context
+//   - options *host.CommandOptions
+func (_e *MockExecutor_Expecter) RunCommand(ctx interface{}, options interface{}) *MockExecutor_RunCommand_Call {
+	return &MockExecutor_RunCommand_Call{Call: _e.mock.On("RunCommand", ctx, options)}
+}
+
+func (_c *MockExecutor_RunCommand_Call) Run(run func(ctx context.Context, options *host.CommandOptions)) *MockExecutor_RunCommand_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *host.CommandOptions
+		if args[1] != nil {
+			arg1 = args[1].(*host.CommandOptions)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockExecutor_RunCommand_Call) Return(err error) *MockExecutor_RunCommand_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockExecutor_RunCommand_Call) RunAndReturn(run func(ctx context.Context, options *host.CommandOptions) error) *MockExecutor_RunCommand_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // StartCommand provides a mock function for the type MockExecutor
 func (_mock *MockExecutor) StartCommand(ctx context.Context, options *host.CommandOptions) (host.Process, error) {
 	ret := _mock.Called(ctx, options)

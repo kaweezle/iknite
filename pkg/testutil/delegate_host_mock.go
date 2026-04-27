@@ -161,6 +161,10 @@ func (d *DelegateHost) StartCommand(ctx context.Context, options *host.CommandOp
 	return d.Exec.StartCommand(ctx, options)
 }
 
+func (d *DelegateHost) RunCommand(ctx context.Context, options *host.CommandOptions) error {
+	return d.Exec.RunCommand(ctx, options)
+}
+
 // Stat implements [Host].
 func (d *DelegateHost) Stat(path string) (os.FileInfo, error) {
 	return d.Fs.Stat(path)
@@ -189,6 +193,10 @@ func (d *DelegateHost) WriteFile(path string, data []byte, perm os.FileMode) err
 // WritePipe implements [Host].
 func (d *DelegateHost) WritePipe(path string, pipe *script.Pipe, flag int, perm os.FileMode) (int64, error) {
 	return d.Fs.WritePipe(path, pipe, flag, perm)
+}
+
+func (d *DelegateHost) Chmod(path string, mode os.FileMode) error {
+	return d.Fs.Chmod(path, mode)
 }
 
 var _ host.Host = (*DelegateHost)(nil)
@@ -446,6 +454,8 @@ func (p *DummyProcess) Start(duration time.Duration) error {
 	// Start a goroutine to simulate the process running and completing after the specified duration
 	go func() {
 		time.Sleep(duration)
+		p.mu.Lock()
+		defer p.mu.Unlock()
 		if p.state == ProcessStateRunning {
 			p.state = ProcessStateCompleted
 			p.endChannel <- nil // Signal that the process has completed after the duration
@@ -493,9 +503,51 @@ func NewDummyProcess(ctx context.Context, options *DummyProcessOptions) *DummyPr
 	}
 }
 
+//nolint:errname // Allow to return static error
+type FakeProcessOutput struct {
+	string
+	code int
+}
+
+// ExitCode implements [host.ProcessState].
+func (e *FakeProcessOutput) ExitCode() int {
+	return e.code
+}
+
+// Exited implements [host.ProcessState].
+func (e *FakeProcessOutput) Exited() bool {
+	return true
+}
+
+// String implements [host.ProcessState].
+func (e *FakeProcessOutput) String() string {
+	return fmt.Sprintf("FakeProcessOutput(code=%d, string=%s)", e.code, e.string)
+}
+
+// Success implements [host.ProcessState].
+func (e *FakeProcessOutput) Success() bool {
+	return e.code == 0
+}
+
+func (e *FakeProcessOutput) Error() string {
+	return e.string
+}
+
+var (
+	_ error             = (*FakeProcessOutput)(nil)
+	_ host.ProcessState = (*FakeProcessOutput)(nil)
+)
+
+func FakeExec(out string, code int) *FakeProcessOutput {
+	return &FakeProcessOutput{
+		string: out,
+		code:   code,
+	}
+}
+
 type DummyExecutor struct {
 	Processes      map[int]host.Process
-	fakeOutputs    map[string]string
+	fakeOutputs    map[string]*FakeProcessOutput
 	calledCommands []string
 }
 
@@ -514,7 +566,12 @@ func (d *DummyExecutor) fakeOutput(stdin io.Reader, cmd string, args ...string) 
 			return nil, fmt.Errorf("invalid pattern %s: %w", pattern, err)
 		}
 		if matched {
-			return []byte(output), nil
+			var err error
+			if output.code != 0 {
+				err = output
+			}
+
+			return []byte(output.string), err
 		}
 	}
 	output := &bytes.Buffer{}
@@ -588,20 +645,12 @@ func (d *DummyExecutor) FindProcess(pid int) (host.Process, error) {
 
 // PipeRun implements [Executor].
 func (d *DummyExecutor) PipeRun(stdin io.Reader, _ bool, cmd string, arguments ...string) ([]byte, error) {
-	output, err := d.fakeOutput(stdin, cmd, arguments...)
-	if err != nil {
-		return nil, fmt.Errorf("error while generating fake output: %w", err)
-	}
-	return output, nil
+	return d.fakeOutput(stdin, cmd, arguments...)
 }
 
 // Run implements [Executor].
 func (d *DummyExecutor) Run(_ bool, cmd string, arguments ...string) ([]byte, error) {
-	output, err := d.fakeOutput(nil, cmd, arguments...)
-	if err != nil {
-		return nil, fmt.Errorf("error while generating fake output: %w", err)
-	}
-	return output, nil
+	return d.fakeOutput(nil, cmd, arguments...)
 }
 
 // StartCommand implements [Executor].
@@ -620,11 +669,25 @@ func (d *DummyExecutor) StartCommand(ctx context.Context, options *host.CommandO
 	return process, nil
 }
 
+func (d *DummyExecutor) RunCommand(_ context.Context, options *host.CommandOptions) error {
+	output, err := d.fakeOutput(options.Stdin, options.Cmd, options.Args...)
+	if err != nil {
+		return err
+	}
+	if options.Stdout != nil {
+		_, err := options.Stdout.Write(output)
+		if err != nil {
+			return fmt.Errorf("error while writing to stdout: %w", err)
+		}
+	}
+	return nil
+}
+
 func (d *DummyExecutor) GetCalledCommands() []string {
 	return d.calledCommands
 }
 
-func NewDummyExecutor(processes map[int]host.Process, fakeOutputs map[string]string) *DummyExecutor {
+func NewDummyExecutor(processes map[int]host.Process, fakeOutputs map[string]*FakeProcessOutput) *DummyExecutor {
 	return &DummyExecutor{
 		Processes:   processes,
 		fakeOutputs: fakeOutputs,
@@ -632,7 +695,7 @@ func NewDummyExecutor(processes map[int]host.Process, fakeOutputs map[string]str
 }
 
 type DummyHostOptions struct {
-	FakeOutputs  map[string]string
+	FakeOutputs  map[string]*FakeProcessOutput
 	HostMappings map[string][]string
 	Processes    []DummyProcessOptions
 	Mounts       []string

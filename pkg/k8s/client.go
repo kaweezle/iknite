@@ -1,13 +1,15 @@
 package k8s
 
 // cSpell: words clientcmd clientconfig restconfig casttype metav1 polymorphichelpers restmapper genericclioptions
-// cSpell: words testutil
+// cSpell: words testutil serviceaccount
 // cSpell: disable
 import (
 	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"net"
+	"os"
 	"sort"
 	"strings"
 	"time"
@@ -29,6 +31,7 @@ import (
 	"k8s.io/client-go/restmapper"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/clientcmd/api"
+	"k8s.io/client-go/util/cert"
 	"k8s.io/kubectl/pkg/polymorphichelpers"
 	kubeadmConstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"sigs.k8s.io/kustomize/api/provider"
@@ -457,4 +460,44 @@ func WorkloadsReadyConditionWithContextFunc(
 
 		return allReady, nil
 	}
+}
+
+func InClusterConfig(fs host.FileSystem) (*rest.Config, error) {
+	const (
+		tokenFile  = "/var/run/secrets/kubernetes.io/serviceaccount/token" //nolint:gosec // From client-go
+		rootCAFile = "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
+	)
+	svcHost, port := os.Getenv("KUBERNETES_SERVICE_HOST"), os.Getenv("KUBERNETES_SERVICE_PORT")
+	if svcHost == "" || port == "" {
+		return nil, rest.ErrNotInCluster
+	}
+
+	token, err := fs.ReadFile(tokenFile)
+	if err != nil {
+		return nil, fmt.Errorf("while reading token file %s: %w", tokenFile, err)
+	}
+
+	tlsClientConfig := rest.TLSClientConfig{}
+
+	pemBlock, err := fs.ReadFile(rootCAFile)
+	if err != nil {
+		log.Errorf("Expected to load root CA config from %s, but got err: %v", rootCAFile, err)
+	} else {
+		_, err := cert.NewPoolFromBytes(pemBlock)
+		if err != nil {
+			log.Errorf("Expected to parse root CA config from %s, but got err: %v", rootCAFile, err)
+		} else {
+			// Only set the CA data if it can be parsed successfully,
+			// otherwise the client will fail to connect to the API server.
+			tlsClientConfig.CAData = pemBlock
+		}
+	}
+
+	return &rest.Config{
+		// TODO: switch to using cluster DNS.
+		Host:            "https://" + net.JoinHostPort(svcHost, port),
+		TLSClientConfig: tlsClientConfig,
+		BearerToken:     string(token),
+		BearerTokenFile: tokenFile,
+	}, nil
 }

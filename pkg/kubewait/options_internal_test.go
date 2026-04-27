@@ -13,12 +13,11 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-// cSpell: words paralleltest
-//nolint:gosec // in-package helpers, environment mutation, executable script fixture
+// cSpell: words paralleltest testutil
+
 package kubewait
 
 import (
-	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -27,6 +26,9 @@ import (
 	"github.com/spf13/pflag"
 	"github.com/stretchr/testify/require"
 	"sigs.k8s.io/cli-utils/pkg/object"
+
+	"github.com/kaweezle/iknite/pkg/host"
+	"github.com/kaweezle/iknite/pkg/testutil"
 )
 
 func TestNewOptionsAndFlags(t *testing.T) {
@@ -68,9 +70,10 @@ func TestResourceAndBootstrapOptionFactories(t *testing.T) {
 func TestReadEnvFile(t *testing.T) {
 	req := require.New(t)
 
-	dir := t.TempDir()
+	fs := host.NewMemMapFS()
+	dir := "base"
 	envPath := filepath.Join(dir, ".env")
-	req.NoError(os.WriteFile(envPath, []byte("TEST_KUBEWAIT_ENV=enabled\n"), 0o600))
+	req.NoError(fs.WriteFile(envPath, []byte("TEST_KUBEWAIT_ENV=enabled\n"), 0o600))
 	oldValue, hadValue := os.LookupEnv("TEST_KUBEWAIT_ENV")
 	req.NoError(os.Unsetenv("TEST_KUBEWAIT_ENV"))
 	t.Cleanup(func() {
@@ -82,13 +85,13 @@ func TestReadEnvFile(t *testing.T) {
 	})
 
 	opts := &BootstrapOptions{BootstrapDir: dir}
-	ok, err := opts.ReadEnvFile()
+	ok, err := opts.ReadEnvFile(fs)
 	req.NoError(err)
 	req.True(ok)
 	req.Equal("enabled", os.Getenv("TEST_KUBEWAIT_ENV"))
 
 	missingOpts := &BootstrapOptions{BootstrapDir: filepath.Join(dir, "missing")}
-	ok, err = missingOpts.ReadEnvFile()
+	ok, err = missingOpts.ReadEnvFile(fs)
 	req.NoError(err)
 	req.True(ok)
 }
@@ -119,15 +122,20 @@ func TestRunBootstrapAndRunKubewaitSkipPaths(t *testing.T) {
 	t.Parallel()
 	req := require.New(t)
 
-	dir := t.TempDir()
+	fs := host.NewMemMapFS()
+	dir := "base"
 	script := filepath.Join(dir, "iknite-bootstrap.sh")
-	req.NoError(os.WriteFile(script, []byte("#!/bin/sh\nexit 0\n"), 0o755))
+	req.NoError(fs.WriteFile(script, []byte("#!/bin/sh\nexit 0\n"), 0o755))
 
-	opts := &Options{BootstrapOptions: BootstrapOptions{BootstrapDir: dir, BootstrapScript: "iknite-bootstrap.sh"}}
-	err := runBootstrap(context.Background(), opts)
+	hostOpts := &testutil.DummyHostOptions{}
+	h, err := testutil.NewDummyHost(fs, hostOpts)
 	req.NoError(err)
 
-	err = RunKubewait(context.Background(), &Options{SkipWaitingForResources: true, SkipBootstrap: true}, nil)
+	opts := &Options{BootstrapOptions: BootstrapOptions{BootstrapDir: dir, BootstrapScript: "iknite-bootstrap.sh"}}
+	err = runBootstrap(t.Context(), h, opts)
+	req.NoError(err)
+
+	err = RunKubewait(t.Context(), h, &Options{SkipWaitingForResources: true, SkipBootstrap: true}, nil)
 	req.NoError(err)
 }
 

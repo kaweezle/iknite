@@ -23,6 +23,7 @@ package kubewait
 // cSpell: words godotenv clientcmd apimachinery kstatus errorf sirupsen joho metav1 wrapcheck
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -31,12 +32,18 @@ import (
 	"github.com/spf13/viper"
 
 	cmdUtil "github.com/kaweezle/iknite/pkg/cmd/util"
+	"github.com/kaweezle/iknite/pkg/host"
 	"github.com/kaweezle/iknite/pkg/kubewait"
 )
 
 // CreateKubewaitCmd creates the root cobra command for kubewait.
-func CreateKubewaitCmd(out io.Writer) *cobra.Command {
-	opts := kubewait.NewOptions()
+func CreateKubewaitCmd(out io.Writer, fse host.FileExecutor, opts *kubewait.Options) *cobra.Command {
+	if opts == nil {
+		opts = kubewait.NewOptions()
+	}
+	if fse == nil {
+		fse = host.NewDefaultHost()
+	}
 	v := viper.GetViper()
 
 	cmd := &cobra.Command{
@@ -69,7 +76,7 @@ Examples:
   # Use a specific kubeconfig
   kubewait --kubeconfig ~/.kube/config kube-system`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return kubewait.RunKubewait(cmd.Context(), opts, args)
+			return kubewait.RunKubewait(cmd.Context(), fse, opts, args)
 		},
 		PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
 			if err := opts.SetUpLogs(out); err != nil {
@@ -79,7 +86,7 @@ Examples:
 			if err := cmdUtil.InitializeConfiguration(rootCmd, v); err != nil {
 				return fmt.Errorf("while initializing configuration: %w", err)
 			}
-			ok, err := opts.ReadEnvFile()
+			ok, err := opts.ReadEnvFile(fse)
 			if err != nil {
 				return fmt.Errorf("while reading env file: %w", err)
 			}
@@ -106,5 +113,8 @@ Examples:
 
 // Execute is the entry point called from main.
 func Execute() {
-	cobra.CheckErr(CreateKubewaitCmd(os.Stdout).Execute())
+	fse := host.NewDefaultHost()
+	opts := kubewait.NewOptions()
+	cmd := CreateKubewaitCmd(os.Stdout, fse, opts)
+	cobra.CheckErr(cmd.ExecuteContext(context.Background()))
 }

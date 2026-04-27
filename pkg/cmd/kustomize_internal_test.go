@@ -224,7 +224,7 @@ func Test_performKustomize(t *testing.T) {
 
 type errorWriter struct{}
 
-func (e *errorWriter) Write(_ []byte) (n int, err error) {
+func (e *errorWriter) Write(_ []byte) (int, error) {
 	return 0, fmt.Errorf("write error")
 }
 

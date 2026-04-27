@@ -1,6 +1,7 @@
 // cSpell: words kstatus apimachinery wrapcheck testrestmapper clientcmd genericclioptions sirupsen kyaml testutil
+// cSpell: words serviceaccount
 //
-//nolint:errcheck,dupl // Tests
+//nolint:errcheck // Tests
 package k8s_test
 
 import (
@@ -584,4 +585,136 @@ func TestWorkloadsReadyConditionWithContextFunc(t *testing.T) {
 	ready, err = condition(t.Context())
 	req.NoError(err)
 	req.False(ready)
+}
+
+const (
+	validCA = `-----BEGIN CERTIFICATE-----
+MIIDBTCCAe2gAwIBAgIIDvrQMUvfbOgwDQYJKoZIhvcNAQELBQAwFTETMBEGA1UE
+AxMKa3ViZXJuZXRlczAeFw0yNjA0MTYxMzA0MzZaFw0zNjA0MTMxMzA5MzZaMBUx
+EzARBgNVBAMTCmt1YmVybmV0ZXMwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEK
+AoIBAQDxjLdC8Bwy5mitG0nvEVH1qdOkEXwHEhX05IU61I9LbqTjGfeYm8BOe+4I
+5bYE0BkLpuQvYAkMX8TtUFfIQmYy1cepP68RHPNOUgjOjw75zAecY5O9zFWOUEsZ
+wMOn8bGeEaKBIeeE73v7B4RDZuDWI0gLuCErAX2h7hfc+6H8yDiEg5XfF7hw8TjJ
+E3oDgoKkD0dfBqHSvlV+mie2mX5LCBaWapupM0837ZvnQMYHwPdTun4+LHKtqczh
+/LXvDJDLlkx6BaodwUuzy1sQXqtDQTqClpTUx1lvL8gGwfJL3wb5t9zNiX4xMu9U
+rBURJJqb5WczCUGZMGRZPYxFRei/AgMBAAGjWTBXMA4GA1UdDwEB/wQEAwICpDAP
+BgNVHRMBAf8EBTADAQH/MB0GA1UdDgQWBBRvGLRJ3zGrtLd++3QT1+RAwfG12TAV
+BgNVHREEDjAMggprdWJlcm5ldGVzMA0GCSqGSIb3DQEBCwUAA4IBAQDrJkX8Cbgy
+Vo57PI4hVtNmUw0wBlGITInKQqj6QDe7I8bFdq8VIC6J2+vH5Mc16ueJ/N7k1Dsb
+ODmRX3J0pTYCyCxvsJG/dr7Y8V3a/+EDIgsYhnpWSD4XsQVYNK+EKh1O+tP14FVv
+0nD8GimvmjQPigi30YgEOvD0VvQRuBvp4RR6LK/WxnuuLDVdeyKy/hTIi27mAWBE
+5q8+L3yvWh9VNZYtoNxpzjAvJ6i8ASHNEfC4OWJnpsifYO8zzZ7QIl1tOtwIchWz
+kLKx5H11WJWssDV8k6Z1yNzMOxF3iQNsbFifY54q3+Ji55PZqjsC4OaveS/gngc9
+o+83dWx3ngrT
+-----END CERTIFICATE-----
+`
+	serviceAccountDir = "/var/run/secrets/kubernetes.io/serviceaccount"
+	tokenFile         = serviceAccountDir + "/token"
+	caFile            = serviceAccountDir + "/ca.crt"
+)
+
+func TestInClusterConfig_MissingServiceHost(t *testing.T) {
+	req := require.New(t)
+	t.Setenv("KUBERNETES_SERVICE_HOST", "")
+	t.Setenv("KUBERNETES_SERVICE_PORT", "6443")
+
+	fs := host.NewMemMapFS()
+	config, err := k8s.InClusterConfig(fs)
+	req.ErrorIs(err, rest.ErrNotInCluster)
+	req.Nil(config)
+}
+
+func TestInClusterConfig_MissingServicePort(t *testing.T) {
+	req := require.New(t)
+	t.Setenv("KUBERNETES_SERVICE_HOST", "kubernetes.default.svc")
+	t.Setenv("KUBERNETES_SERVICE_PORT", "")
+
+	fs := host.NewMemMapFS()
+	config, err := k8s.InClusterConfig(fs)
+	req.ErrorIs(err, rest.ErrNotInCluster)
+	req.Nil(config)
+}
+
+func TestInClusterConfig_NoBothServiceHost(t *testing.T) {
+	req := require.New(t)
+	t.Setenv("KUBERNETES_SERVICE_HOST", "")
+	t.Setenv("KUBERNETES_SERVICE_PORT", "")
+
+	fs := host.NewMemMapFS()
+	config, err := k8s.InClusterConfig(fs)
+	req.ErrorIs(err, rest.ErrNotInCluster)
+	req.Nil(config)
+}
+
+func TestInClusterConfig_TokenFileNotFound(t *testing.T) {
+	req := require.New(t)
+	t.Setenv("KUBERNETES_SERVICE_HOST", "kubernetes.default.svc")
+	t.Setenv("KUBERNETES_SERVICE_PORT", "6443")
+
+	fs := host.NewMemMapFS()
+	config, err := k8s.InClusterConfig(fs)
+	req.Error(err)
+	req.Nil(config)
+}
+
+func TestInClusterConfig_ValidTokenWithNoCA(t *testing.T) {
+	req := require.New(t)
+	t.Setenv("KUBERNETES_SERVICE_HOST", "kubernetes.default.svc")
+	t.Setenv("KUBERNETES_SERVICE_PORT", "6443")
+
+	fs := host.NewMemMapFS()
+
+	req.NoError(fs.MkdirAll(serviceAccountDir, 0o755))
+	req.NoError(fs.WriteFile(tokenFile, []byte("valid-token"), 0o644))
+
+	config, err := k8s.InClusterConfig(fs)
+	req.NoError(err)
+	req.NotNil(config)
+	req.Equal("https://kubernetes.default.svc:6443", config.Host)
+	req.Equal("valid-token", config.BearerToken)
+	req.Equal(tokenFile, config.BearerTokenFile)
+	// CAFile should be empty because cert.NewPool fails to load non-existent CA
+	req.Empty(config.CAFile)
+}
+
+func TestInClusterConfig_ValidTokenWithInvalidCA(t *testing.T) {
+	req := require.New(t)
+	t.Setenv("KUBERNETES_SERVICE_HOST", "kubernetes.default.svc")
+	t.Setenv("KUBERNETES_SERVICE_PORT", "6443")
+
+	fs := host.NewMemMapFS()
+
+	req.NoError(fs.MkdirAll(serviceAccountDir, 0o755))
+	req.NoError(fs.WriteFile(tokenFile, []byte("valid-token"), 0o644))
+	req.NoError(fs.WriteFile(caFile, []byte("invalid-ca"), 0o644))
+
+	config, err := k8s.InClusterConfig(fs)
+	req.NoError(err)
+	req.NotNil(config)
+	req.Equal("https://kubernetes.default.svc:6443", config.Host)
+	req.Equal("valid-token", config.BearerToken)
+	req.Equal(tokenFile, config.BearerTokenFile)
+	// CAFile should be empty because cert.NewPool fails to load non-existent CA
+	req.Empty(config.CAFile)
+}
+
+func TestInClusterConfig_ValidTokenWithValidCA(t *testing.T) {
+	req := require.New(t)
+	t.Setenv("KUBERNETES_SERVICE_HOST", "kubernetes.default.svc")
+	t.Setenv("KUBERNETES_SERVICE_PORT", "6443")
+
+	fs := host.NewMemMapFS()
+
+	req.NoError(fs.MkdirAll(serviceAccountDir, 0o755))
+	req.NoError(fs.WriteFile(tokenFile, []byte("valid-token"), 0o644))
+	req.NoError(fs.WriteFile(caFile, []byte(validCA), 0o644))
+
+	config, err := k8s.InClusterConfig(fs)
+	req.NoError(err)
+	req.NotNil(config)
+	req.Equal("https://kubernetes.default.svc:6443", config.Host)
+	req.Equal("valid-token", config.BearerToken)
+	req.Equal(tokenFile, config.BearerTokenFile)
+	// CAFile should be empty because cert.NewPool fails to load non-existent CA
+	req.NotEmpty(config.CAData)
 }

@@ -26,7 +26,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
 	"sync"
 	"time"
 
@@ -47,6 +46,7 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/kstatus/status"
 	"sigs.k8s.io/cli-utils/pkg/object"
 
+	"github.com/kaweezle/iknite/pkg/host"
 	"github.com/kaweezle/iknite/pkg/k8s"
 )
 
@@ -104,14 +104,17 @@ func AddResourcesFlags(flags *pflag.FlagSet, opts *ResourcesOptions) {
 }
 
 // waitForResources waits for all resources in the specified namespaces to become ready.
-func waitForResources(ctx context.Context, opts *Options, namespaces []string) error {
+func waitForResources(ctx context.Context, fs host.FileSystem, opts *Options, namespaces []string) error {
 	if opts.Timeout > 0 {
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(ctx, opts.Timeout)
 		defer cancel()
 	}
 
-	client := k8s.NewClientFromKubeconfig(opts.Kubeconfig)
+	client, err := k8s.NewClientFromKubeconfig(fs, opts.Kubeconfig)
+	if err != nil {
+		return fmt.Errorf("failed to create Kubernetes client: %w", err)
+	}
 
 	mapper, err := client.ToRESTMapper()
 	if err != nil {
@@ -128,7 +131,7 @@ func waitForResources(ctx context.Context, opts *Options, namespaces []string) e
 	}
 	opts.ResourceTypes = validTypes
 
-	namespaces, err = resolveNamespaces(ctx, client, opts, namespaces)
+	namespaces, err = resolveNamespaces(ctx, client, fs, opts, namespaces)
 	if err != nil {
 		return err
 	}
@@ -163,6 +166,7 @@ func waitForResources(ctx context.Context, opts *Options, namespaces []string) e
 func resolveNamespaces(
 	ctx context.Context,
 	client genericclioptions.RESTClientGetter,
+	fs host.FileSystem,
 	opts *Options,
 	namespaces []string,
 ) ([]string, error) {
@@ -170,9 +174,9 @@ func resolveNamespaces(
 		return namespaces, nil
 	}
 
-	if info, err := os.Stat(currentNamespaceFile); err == nil && !info.IsDir() && !opts.AllNamespaces {
+	if info, err := fs.Stat(currentNamespaceFile); err == nil && !info.IsDir() && !opts.AllNamespaces {
 		log.Infof("Getting namespace from %s", currentNamespaceFile)
-		namespaceBytes, readErr := os.ReadFile(currentNamespaceFile)
+		namespaceBytes, readErr := fs.ReadFile(currentNamespaceFile)
 		if readErr != nil {
 			return nil, fmt.Errorf("failed to read namespace from file %s: %w", currentNamespaceFile, readErr)
 		}

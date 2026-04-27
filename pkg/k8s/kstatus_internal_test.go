@@ -12,16 +12,17 @@ import (
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling/event"
 	kstatus "sigs.k8s.io/cli-utils/pkg/kstatus/status"
 
+	"github.com/kaweezle/iknite/pkg/host"
 	"github.com/kaweezle/iknite/pkg/testutil"
 )
 
 func TestNewRESTClientGetterFromKubeconfig(t *testing.T) {
 	t.Parallel()
 	req := require.New(t)
+	fs := host.NewMemMapFS()
 
-	getter := NewClientFromKubeconfig("/tmp/nonexistent-kubeconfig")
-	req.NotNil(getter)
-	req.NotNil(getter.ToRawKubeConfigLoader())
+	_, err := NewClientFromKubeconfig(fs, "/tmp/nonexistent-kubeconfig")
+	req.Error(err)
 }
 
 func TestWorkloadStatesToSliceAndInfosToMetadataSet(t *testing.T) {
