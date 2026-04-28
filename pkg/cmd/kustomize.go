@@ -73,7 +73,7 @@ func NewKustomizeCmd(
 	if kustomizeOptions == nil {
 		kustomizeOptions = utils.NewKustomizeOptions()
 	}
-	if waitOptions != nil {
+	if waitOptions == nil {
 		waitOptions = utils.NewWaitOptions()
 		// Different defaults
 		waitOptions.Immediate = false
