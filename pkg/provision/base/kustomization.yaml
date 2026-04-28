@@ -90,3 +90,17 @@ patches:
     target:
       kind: CustomResourceDefinition
       name: .*.gateway.networking.k8s.io
+  - patch: |-
+      - op: replace
+        path: /spec/versions/1/served
+        value: true
+    target:
+      kind: CustomResourceDefinition
+      name: tlsroutes.gateway.networking.k8s.io
+  - patch: |-
+      - op: replace
+        path: /spec/versions/1/served
+        value: true
+    target:
+      kind: CustomResourceDefinition
+      name: backendtlspolicies.gateway.networking.k8s.io
