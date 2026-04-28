@@ -29,6 +29,7 @@ import (
 	"github.com/kaweezle/iknite/pkg/apis/iknite"
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
 	"github.com/kaweezle/iknite/pkg/config"
+	"github.com/kaweezle/iknite/pkg/host"
 	"github.com/kaweezle/iknite/pkg/k8s"
 	"github.com/kaweezle/iknite/pkg/utils"
 )
@@ -52,8 +53,7 @@ func NewStartCmd(ikniteConfig *v1alpha1.IkniteClusterSpec, waitOptions *utils.Wa
 - Allows the use of kubectl from the root account,
 - Installs flannel, metal-lb and local-path-provisioner.
 `,
-		PersistentPreRun: config.StartPersistentPreRun,
-		Run:              func(_ *cobra.Command, _ []string) { performStart(ikniteConfig, waitOptions) },
+		Run: func(cmd *cobra.Command, _ []string) { performStart(cmd.Context(), ikniteConfig, waitOptions) },
 	}
 	flags := startCmd.Flags()
 
@@ -63,8 +63,8 @@ func NewStartCmd(ikniteConfig *v1alpha1.IkniteClusterSpec, waitOptions *utils.Wa
 	return startCmd
 }
 
-func IsIkniteReady(_ context.Context) (bool, error) {
-	cluster, err := v1alpha1.LoadIkniteCluster()
+func IsIkniteReady(_ context.Context, fs host.FileSystem) (bool, error) {
+	cluster, err := v1alpha1.LoadIkniteCluster(fs)
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
 		return false, fmt.Errorf("failed to load iknite cluster: %w", err)
 	}
@@ -93,22 +93,22 @@ func IsIkniteReady(_ context.Context) (bool, error) {
 	return false, nil
 }
 
-func performStart(ikniteConfig *v1alpha1.IkniteClusterSpec, waitOptions *utils.WaitOptions) {
-	cobra.CheckErr(config.DecodeIkniteConfig(ikniteConfig))
-	cobra.CheckErr(k8s.PrepareKubernetesEnvironment(ikniteConfig))
+func performStart(ctx context.Context, ikniteConfig *v1alpha1.IkniteClusterSpec, waitOptions *utils.WaitOptions) {
+	alpineHost := host.NewDefaultHost()
+	cobra.CheckErr(k8s.PrepareKubernetesEnvironment(ctx, alpineHost, ikniteConfig))
 
 	// If Kubernetes is already installed, check that the configuration has not
 	// Changed.
-	apiConfig, err := k8s.LoadFromDefault()
+	kubeClient, err := k8s.NewDefaultClient(alpineHost)
 	if err == nil {
-		if apiConfig.IsConfigServerAddress(ikniteConfig.GetApiEndPoint()) {
+		if k8s.IsConfigServerAddress(kubeClient, ikniteConfig.GetApiEndPoint()) {
 			log.Info("Kubeconfig already exists")
 		} else {
 			// If the configuration has changed, we stop and disable the kubelet
 			// that may be started and clean the configuration, i.e. delete
 			// certificates and manifests.
 			log.Info("Kubernetes configuration has changed. Resetting...")
-			cmd := newCmdReset(os.Stdin, os.Stdout, nil)
+			cmd := newCmdReset(os.Stdin, os.Stdout, nil, nil)
 			cobra.CheckErr(cmd.RunE(cmd, []string{}))
 		}
 	} else {
@@ -119,7 +119,9 @@ func performStart(ikniteConfig *v1alpha1.IkniteClusterSpec, waitOptions *utils.W
 	}
 
 	// Start OpenRC. This will perform `iknite init`.
-	cobra.CheckErr(alpine.EnsureOpenRC("default"))
-	cobra.CheckErr(waitOptions.Poll(context.Background(), IsIkniteReady))
+	cobra.CheckErr(alpine.EnsureOpenRC(alpineHost, "default"))
+	cobra.CheckErr(waitOptions.Poll(ctx, func(ctx context.Context) (bool, error) {
+		return IsIkniteReady(ctx, alpineHost)
+	}))
 	log.Info("Cluster is ready")
 }

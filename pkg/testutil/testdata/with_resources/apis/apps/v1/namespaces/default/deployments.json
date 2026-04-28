@@ -1,0 +1,39 @@
+{
+  "kind": "DeploymentList",
+  "apiVersion": "apps/v1",
+  "items": [
+    {
+      "apiVersion": "apps/v1",
+      "kind": "Deployment",
+      "metadata": {
+        "name": "deploy-ready",
+        "namespace": "default",
+        "generation": 1
+      },
+      "spec": {
+        "replicas": 1,
+        "strategy": {
+          "type": "RollingUpdate",
+          "rollingUpdate": { "maxUnavailable": 0, "maxSurge": 1 }
+        }
+      },
+      "status": {
+        "observedGeneration": 1,
+        "replicas": 1,
+        "updatedReplicas": 1,
+        "availableReplicas": 1,
+        "readyReplicas": 1,
+        "conditions": [
+          {
+            "type": "Available",
+            "status": "True",
+            "lastUpdateTime": "2024-06-01T12:00:00Z",
+            "lastTransitionTime": "2024-06-01T12:00:00Z",
+            "reason": "MinimumReplicasAvailable",
+            "message": "Deployment has minimum availability."
+          }
+        ]
+      }
+    }
+  ]
+}

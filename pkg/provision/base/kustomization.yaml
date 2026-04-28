@@ -8,7 +8,7 @@ resources:
   - https://raw.githubusercontent.com/kube-vip/kube-vip-cloud-provider/main/manifest/kube-vip-cloud-controller.yaml
   - https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
   - ./kube-vip-addresspool.yaml
-  - https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.4.0/standard-install.yaml
+  - https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.5.1/standard-install.yaml
   - ./kgateway.yaml
   - ./bootstrap.yaml
 
@@ -83,3 +83,24 @@ patches:
       kind: Deployment
       name: metrics-server
       namespace: kube-system
+  # Manually fix https://github.com/kubernetes-sigs/gateway-api/pull/4712
+  - patch: |-
+      - op: remove
+        path: /status
+    target:
+      kind: CustomResourceDefinition
+      name: .*.gateway.networking.k8s.io
+  - patch: |-
+      - op: replace
+        path: /spec/versions/1/served
+        value: true
+    target:
+      kind: CustomResourceDefinition
+      name: tlsroutes.gateway.networking.k8s.io
+  - patch: |-
+      - op: replace
+        path: /spec/versions/1/served
+        value: true
+    target:
+      kind: CustomResourceDefinition
+      name: backendtlspolicies.gateway.networking.k8s.io

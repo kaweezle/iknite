@@ -34,6 +34,8 @@ import (
 	kubeadmConstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/users"
+
+	"github.com/kaweezle/iknite/pkg/host"
 )
 
 // cSpell:enable
@@ -92,7 +94,7 @@ func runCleanupConfig(c workflow.RunData) error {
 		tempDir := path.Join(kubeadmConstants.KubernetesDir, kubeadmConstants.TempDir)
 		dirsToClean = append(dirsToClean, tempDir)
 	}
-	resetConfigDir(kubeadmConstants.KubernetesDir, dirsToClean, r.DryRun())
+	resetConfigDir(r.Host(), kubeadmConstants.KubernetesDir, dirsToClean, r.DryRun())
 
 	if r.Cfg() != nil && features.Enabled(r.Cfg().FeatureGates, features.RootlessControlPlane) {
 		if !r.DryRun() {
@@ -108,21 +110,21 @@ func runCleanupConfig(c workflow.RunData) error {
 	return nil
 }
 
-func CleanConfig(isDryRun bool) {
+func CleanConfig(fs host.FileSystem, isDryRun bool) {
 	dirsToClean := []string{
 		filepath.Join(kubeadmConstants.KubernetesDir, kubeadmConstants.ManifestsSubDirName),
 		kubeadmConstants.KubeletRunDirectory,
 		kubeadmApiV1.DefaultCertificatesDir,
 	}
 
-	resetConfigDir(kubeadmConstants.KubernetesDir, dirsToClean, isDryRun)
+	resetConfigDir(fs, kubeadmConstants.KubernetesDir, dirsToClean, isDryRun)
 }
 
-func resetConfigDir(configPathDir string, dirsToClean []string, isDryRun bool) {
+func resetConfigDir(fs host.FileSystem, configPathDir string, dirsToClean []string, isDryRun bool) {
 	if !isDryRun {
 		log.Infof("[reset] Deleting contents of directories: %v\n", dirsToClean)
 		for _, dir := range dirsToClean {
-			if err := CleanDir(dir); err != nil {
+			if err := CleanDir(fs, dir); err != nil {
 				klog.Warningf("[reset] Failed to delete contents of %q directory: %v", dir, err)
 			}
 		}
@@ -142,7 +144,7 @@ func resetConfigDir(configPathDir string, dirsToClean []string, isDryRun bool) {
 	if !isDryRun {
 		log.Infof("[reset] Deleting files: %v\n", filesToClean)
 		for _, path := range filesToClean {
-			if err := os.RemoveAll(path); err != nil {
+			if err := fs.RemoveAll(path); err != nil {
 				klog.Warningf("[reset] Failed to remove file: %q [%v]\n", path, err)
 			}
 		}
@@ -152,14 +154,14 @@ func resetConfigDir(configPathDir string, dirsToClean []string, isDryRun bool) {
 }
 
 // CleanDir removes everything in a directory, but not the directory itself.
-func CleanDir(filePath string) error {
+func CleanDir(fs host.FileSystem, filePath string) error {
 	// If the directory doesn't even exist there's nothing to do, and we do
 	// not consider this an error
-	if _, err := os.Stat(filePath); errors.Is(err, os.ErrNotExist) {
+	if _, err := fs.Stat(filePath); errors.Is(err, os.ErrNotExist) {
 		return nil
 	}
 
-	d, err := os.Open(filePath) //nolint:gosec // Controlled file path
+	d, err := fs.Open(filePath)
 	if err != nil {
 		return fmt.Errorf("failed to open directory for cleanup: %w", err)
 	}
@@ -171,7 +173,7 @@ func CleanDir(filePath string) error {
 		return fmt.Errorf("failed to read directory names: %w", err)
 	}
 	for _, name := range names {
-		if err = os.RemoveAll(
+		if err = fs.RemoveAll(
 			filepath.Join(filePath, name),
 		); err != nil {
 			return fmt.Errorf("failed to remove %s: %w", name, err)
@@ -181,8 +183,8 @@ func CleanDir(filePath string) error {
 }
 
 // IsDirEmpty returns true if a directory is empty.
-func IsDirEmpty(dir string) (bool, error) {
-	d, err := os.Open(dir) //nolint:gosec // Just checking directory contents
+func IsDirEmpty(fs host.FileSystem, dir string) (bool, error) {
+	d, err := fs.Open(dir)
 	if err != nil {
 		return false, fmt.Errorf("failed to open directory: %w", err)
 	}

@@ -1,0 +1,60 @@
+# cSpell: words mockery structname pkgname genericclioptions clientcmd apimachinery
+all: false
+dir: mocks/{{.SrcPackagePath}}
+filename: "{{.InterfaceName | lower }}_mock.go"
+force-file-write: true
+formatter: goimports
+formatter-options:
+  goimports:
+    all-errors: false
+    comments: true
+    format-only: true
+    fragment: false
+    local-prefix: ""
+    tab-indent: true
+    tab-width: 8
+generate: true
+include-auto-generated: false
+log-level: info
+structname: "{{.Mock}}{{.InterfaceName}}"
+pkgname: "{{.SrcPackageName}}"
+recursive: false
+require-template-schema-exists: true
+template: testify
+template-schema: "{{.Template}}.schema.json"
+packages:
+  k8s.io/cli-runtime/pkg/genericclioptions:
+    interfaces: { RESTClientGetter }
+  k8s.io/client-go/rest:
+    interfaces: { Interface }
+  k8s.io/client-go/kubernetes:
+    interfaces: { Interface }
+    config:
+      include-auto-generated: true
+  k8s.io/client-go/discovery:
+    interfaces: { DiscoveryInterface, CachedDiscoveryInterface }
+  k8s.io/client-go/tools/clientcmd:
+    interfaces: { ClientConfig }
+  k8s.io/apimachinery/pkg/api/meta:
+    interfaces: { RESTMapper }
+  github.com/kaweezle/iknite/pkg/host:
+    config:
+      all: true
+      dir: mocks/{{.InterfaceDirRelative}}
+  github.com/kaweezle/iknite/pkg/k8s:
+    config:
+      dir: mocks/{{.InterfaceDirRelative}}
+    interfaces: { KubeletRuntime }
+  github.com/kaweezle/iknite/pkg/k8s/phases/init:
+    config:
+      dir: mocks/{{.InterfaceDirRelative}}
+    interfaces:
+      {
+        IkniteInitData,
+        daemonizeData,
+        serverData,
+        kustomizeData,
+        monitorData,
+        mdnsData,
+        prepareHostData,
+      }

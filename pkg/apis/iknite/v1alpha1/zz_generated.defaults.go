@@ -29,7 +29,7 @@ import (
 // Public to allow building arbitrary schemes.
 // All generated defaulters are covering - they call all nested defaulters.
 func RegisterDefaults(scheme *runtime.Scheme) error {
-	scheme.AddTypeDefaultingFunc(&IkniteCluster{}, func(obj interface{}) { SetObjectDefaults_IkniteCluster(obj.(*IkniteCluster)) })
+	scheme.AddTypeDefaultingFunc(&IkniteCluster{}, func(obj any) { SetObjectDefaults_IkniteCluster(obj.(*IkniteCluster)) })
 	return nil
 }
 

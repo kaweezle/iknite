@@ -19,18 +19,17 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"os"
-	"os/signal"
+	"io"
 
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"k8s.io/apimachinery/pkg/util/runtime"
 
-	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
 	"github.com/kaweezle/iknite/pkg/cmd/options"
 	"github.com/kaweezle/iknite/pkg/config"
 	"github.com/kaweezle/iknite/pkg/constants"
+	"github.com/kaweezle/iknite/pkg/host"
 	"github.com/kaweezle/iknite/pkg/k8s"
 	"github.com/kaweezle/iknite/pkg/kustomize"
 	"github.com/kaweezle/iknite/pkg/provision"
@@ -38,7 +37,7 @@ import (
 )
 
 func NewPrintKustomizeCmd(
-	ikniteConfig *v1alpha1.IkniteClusterSpec,
+	fs host.FileSystem,
 	kustomizeOptions *utils.KustomizeOptions,
 ) *cobra.Command {
 	printKustomizeCmd := &cobra.Command{
@@ -55,31 +54,33 @@ prints the Embedded configuration that installs the following components:
 - metrics-server to make resources work on payloads.
 
 `,
-		Run: func(_ *cobra.Command, _ []string) {
-			performPrintKustomize(ikniteConfig, kustomizeOptions)
-		},
-		PreRun: func(cmd *cobra.Command, _ []string) {
-			flags := cmd.Flags()
-			_ = viper.BindPFlag( //nolint:errcheck // flag exists
-				config.Kustomization, flags.Lookup(options.Kustomization))
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			err := performPrintKustomize(fs, kustomizeOptions, cmd.OutOrStdout())
+			if err != nil {
+				return fmt.Errorf("failed to print kustomize configuration: %w", err)
+			}
+			return nil
 		},
 	}
 	return printKustomizeCmd
 }
 
 func NewKustomizeCmd(
-	ikniteConfig *v1alpha1.IkniteClusterSpec,
 	kustomizeOptions *utils.KustomizeOptions,
 	waitOptions *utils.WaitOptions,
+	fs host.FileSystem,
 ) *cobra.Command {
 	if kustomizeOptions == nil {
 		kustomizeOptions = utils.NewKustomizeOptions()
 	}
-	if waitOptions != nil {
+	if waitOptions == nil {
 		waitOptions = utils.NewWaitOptions()
 		// Different defaults
 		waitOptions.Immediate = false
 		waitOptions.Wait = false
+	}
+	if fs == nil {
+		fs = host.NewOsFS()
 	}
 	kustomizeCmd := &cobra.Command{
 		Use:   "kustomize",
@@ -96,79 +97,87 @@ applies the Embedded configuration that installs the following components:
 - metrics-server to make resources work on payloads.
 
 `,
-		Run: func(_ *cobra.Command, _ []string) {
-			performKustomize(ikniteConfig, kustomizeOptions, waitOptions)
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			err := performKustomize(cmd.Context(), fs, kustomizeOptions, waitOptions)
+			if err != nil {
+				return fmt.Errorf("failed to apply kustomize configuration: %w", err)
+			}
+			return nil
 		},
 
 		PreRun: func(cmd *cobra.Command, _ []string) {
 			flags := cmd.Flags()
-			_ = viper.BindPFlag( //nolint:errcheck // flag exists
-				config.Kustomization, flags.Lookup(options.Kustomization))
 
 			_ = viper.BindPFlag( //nolint:errcheck // flag exists
 				config.ForceConfig, flags.Lookup(options.ForceConfig))
 		},
 	}
 
-	config.AddIkniteClusterFlags(kustomizeCmd.Flags(), ikniteConfig)
 	utils.AddKustomizeOptionsFlags(kustomizeCmd.Flags(), kustomizeOptions)
 
-	printCmd := NewPrintKustomizeCmd(ikniteConfig, kustomizeOptions)
+	printCmd := NewPrintKustomizeCmd(fs, kustomizeOptions)
 	inheritsFlags(kustomizeCmd.Flags(), printCmd.Flags(), options.Kustomization)
 	kustomizeCmd.AddCommand(printCmd)
 	return kustomizeCmd
 }
 
 func performKustomize(
-	ikniteConfig *v1alpha1.IkniteClusterSpec,
+	ctx context.Context,
+	fs host.FileSystem,
 	kustomizeOptions *utils.KustomizeOptions,
 	waitOptions *utils.WaitOptions,
-) {
+) error {
 	// We need to get it from root as we will apply configuration
-	kubeConfig, err := k8s.LoadFromFile(constants.KubernetesRootConfig)
+	kubeClient, err := k8s.NewClientFromFile(fs, constants.KubernetesRootConfig)
 	if err != nil {
-		cobra.CheckErr(fmt.Errorf("while loading local cluster configuration: %w", err))
+		return fmt.Errorf("while loading local cluster configuration: %w", err)
 	}
-	// Make wait finish when the process receives an interrupt signal
-	ctx, cancel := context.WithCancel(context.Background())
-	c := make(chan os.Signal, 1)
-	signal.Notify(c, os.Interrupt)
-	defer func() {
-		signal.Stop(c)
-		cancel()
-	}()
-	go func() {
-		select {
-		case <-c:
-			cancel()
-		case <-ctx.Done():
-		}
-	}()
 
-	err = kubeConfig.CheckClusterRunning(
+	restClient, err := k8s.RESTClient(kubeClient)
+	if err != nil {
+		return fmt.Errorf("failed to create REST client: %w", err)
+	}
+
+	err = k8s.CheckClusterRunning(
 		ctx,
+		restClient,
 		waitOptions.Retries,
 		waitOptions.OkResponses,
 		waitOptions.Interval,
 	)
-	cobra.CheckErr(err)
+	if err != nil {
+		return fmt.Errorf("failed to check if cluster is running: %w", err)
+	}
 
-	cobra.CheckErr(kubeConfig.Kustomize(ctx, ikniteConfig.Kustomization, kustomizeOptions))
+	if err := k8s.Kustomize(ctx, kubeClient, fs, kustomizeOptions); err != nil {
+		return fmt.Errorf("failed to apply kustomize configuration: %w", err)
+	}
 
 	if waitOptions.HasLoop() {
 		logrus.Infof("Waiting for workloads with options: %s", waitOptions.String())
 		runtime.ErrorHandlers = runtime.ErrorHandlers[:0] //nolint:reassign // disabling printing of errors to stderr
-		cobra.CheckErr(waitOptions.Poll(ctx, kubeConfig.RESTClient().WorkloadsReadyConditionWithContextFunc(nil)))
+		if err := waitOptions.Poll(ctx, k8s.WorkloadsReadyConditionWithContextFunc(kubeClient, nil)); err != nil {
+			return fmt.Errorf("failed to wait for workloads: %w", err)
+		}
 	}
+	return nil
 }
 
-func performPrintKustomize(ikniteConfig *v1alpha1.IkniteClusterSpec, kustomizeOptions *utils.KustomizeOptions) {
+func performPrintKustomize(
+	fs host.FileSystem,
+	kustomizeOptions *utils.KustomizeOptions,
+	out io.Writer,
+) error {
 	resources, err := provision.GetBaseKustomizationResources(
-		ikniteConfig.Kustomization,
+		fs,
+		kustomizeOptions.Kustomization,
 		kustomizeOptions.ForceEmbedded,
 	)
 	if err != nil {
-		cobra.CheckErr(fmt.Errorf("while getting kustomization resources: %w", err))
+		return fmt.Errorf("while getting kustomization resources: %w", err)
 	}
-	cobra.CheckErr(kustomize.WriteToWriter(resources, os.Stdout))
+	if err := kustomize.WriteToWriter(resources, out); err != nil {
+		return fmt.Errorf("while writing kustomization resources: %w", err)
+	}
+	return nil
 }

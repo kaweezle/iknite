@@ -40,7 +40,10 @@ jobs:
         run: go build -v ./cmd/iknitectl/...
 
       - name: Test
-        run: go test -v -race -covermode=atomic -coverprofile=coverage.out ./...
+        run: |
+          go test -v -race -covermode=atomic -coverprofile=coverage.out ./...
+          go run hack/nocov.go coverage.out
+          mv coverage.out.nocov coverage.out
 
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@v6

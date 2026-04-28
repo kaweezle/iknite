@@ -43,7 +43,7 @@ for file in "$@"; do
 
     # Step 1: Check if metadata.name matches directory name
     step "Step 1: Checking metadata.name matches directory name"
-    application_name_in_file=$(yq e '.metadata.name' "$file")
+    application_name_in_file=$(gojq --yaml-input -r '. | select(.kind == "Application") | .metadata.name' "$file")
     if [[ "$application_name_in_file" != "$app_name" ]]; then
         error "App name in $file is '$application_name_in_file', expected '$app_name'"
         all_valid=false
@@ -53,7 +53,7 @@ for file in "$@"; do
 
     # Step 2: Check if spec.source.path matches relative path
     step "Step 2: Checking spec.source.path matches relative path"
-    application_path_in_file=$(yq e '.spec.source.path' "$file")
+    application_path_in_file=$(gojq --yaml-input -r '. | select(.kind == "Application") | .spec.source.path' "$file")
     if [[ "$application_path_in_file" != "$relative_path" ]]; then
         error "App path in $file is '$application_path_in_file', expected '$relative_path'"
         all_valid=false
@@ -78,7 +78,7 @@ for file in "$@"; do
             while IFS= read -r -d '' kustomization_file; do
                 # Check if this kustomization.yaml references our application directory
                 # Resources typically reference like: ../../app-name or ../app-name
-                if yq e '.resources[]' "$kustomization_file" 2>/dev/null | grep -q "/$app_name\$\|/$app_name/"; then
+                if gojq --yaml-input -r '.resources[]' "$kustomization_file" 2>/dev/null | grep -q "/$app_name\$\|/$app_name/"; then
                     app_referenced=true
                     kustomization_relative="${kustomization_file#"$BASE_DIR/"}"
                     ok "Application referenced in $kustomization_relative"

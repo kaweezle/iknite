@@ -1,5 +1,6 @@
 #!/bin/sh
-# cSpell: words libstdc skopeo tenv doas socat rootlesskit slirp4netns buildkit buildctl nerdctl goreleaser signingkey gpgsign sopsdiffer textconv
+# cSpell: words libstdc skopeo tenv doas socat rootlesskit slirp4netns buildkit buildctl nerdctl goreleaser signingkey
+# cSpell: words gpgsign sopsdiffer textconv gojq kubectx
 
 _step_counter=0
 step() {

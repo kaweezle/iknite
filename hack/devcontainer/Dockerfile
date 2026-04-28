@@ -10,13 +10,12 @@ ARG TERRAFORM_DOCS_VERSION=0.21.0
 LABEL org.opencontainers.image.source="https://github.com/kaweezle/iknite.git"
 
 # Add the dependencies
-RUN echo "http://dl-cdn.alpinelinux.org/alpine/edge/testing/" >> /etc/apk/repositories && \
+RUN --mount=type=bind,target=/conf \
+    echo "http://dl-cdn.alpinelinux.org/alpine/edge/testing/" >> /etc/apk/repositories && \
     apk update --quiet && \
-    apk add --quiet --no-progress --no-cache zsh tzdata git libstdc++ doas iproute2 gnupg socat openssh openrc curl tar zstd && \
-    apk add --quiet --no-progress --no-cache pipx uv go make jq skopeo tenv kubectl k9s golangci-lint gnupg sops age nodejs npm openssl abuild libarchive-tools && \
-    apk add --quiet --no-progress --no-cache ip6tables containerd kubelet kubeadm cni-plugins cni-plugin-flannel util-linux-misc buildkit buildctl \
-    nerdctl rootlesskit slirp4netns qemu-img cdrkit sfdisk e2fsprogs && \
-    GORELEASER_VERSION=$(curl --silent  https://api.github.com/repos/goreleaser/goreleaser/releases/latest | jq -r .tag_name | sed -e 's/^v//') && \
+    apk add --quiet --no-progress --no-cache $(cat /conf/packages.txt) && \
+    ln -s /usr/bin/gojq /usr/bin/jq && \
+    GORELEASER_VERSION=$(curl --silent  https://api.github.com/repos/goreleaser/goreleaser/releases/latest | gojq -r .tag_name | sed -e 's/^v//') && \
     wget -q -O /tmp/goreleaser.apk "https://github.com/goreleaser/goreleaser/releases/download/v${GORELEASER_VERSION}/goreleaser_${GORELEASER_VERSION}_x86_64.apk" && \
     apk add --quiet --no-progress --allow-untrusted --no-cache /tmp/goreleaser.apk && \
     rm -f /tmp/goreleaser.apk && \
@@ -26,12 +25,12 @@ RUN echo "http://dl-cdn.alpinelinux.org/alpine/edge/testing/" >> /etc/apk/reposi
     wget -q -O /tmp/terraform-docs.tar.gz "https://github.com/terraform-docs/terraform-docs/releases/download/v${TERRAFORM_DOCS_VERSION}/terraform-docs-v${TERRAFORM_DOCS_VERSION}-linux-amd64.tar.gz" && \
     tar -xzf /tmp/terraform-docs.tar.gz -C /usr/local/bin/ terraform-docs && \
     rm -f /tmp/terraform-docs.tar.gz && \
-    AQUA_VERSION=$(curl --silent "https://api.github.com/repos/aquaproj/aqua/releases/latest" | jq -r .tag_name | sed -e 's/^v//') && \
+    AQUA_VERSION=$(curl --silent "https://api.github.com/repos/aquaproj/aqua/releases/latest" | gojq -r .tag_name | sed -e 's/^v//') && \
     wget -q -O /tmp/aqua.tar.gz "https://github.com/aquaproj/aqua/releases/download/v${AQUA_VERSION}/aqua_linux_amd64.tar.gz" && \
     tar -xzf /tmp/aqua.tar.gz -C /usr/local/bin/ aqua && \
     rm -f /tmp/aqua.tar.gz && \
     # karmafun
-    KARMAFUN_VERSION=$(curl --silent "https://api.github.com/repos/karmafun/karmafun/releases/latest" | jq -r .tag_name) && \
+    KARMAFUN_VERSION=$(curl --silent "https://api.github.com/repos/karmafun/karmafun/releases/latest" | gojq -r .tag_name) && \
     curl -sLo /usr/local/bin/karmafun https://github.com/karmafun/karmafun/releases/download/${KARMAFUN_VERSION}/karmafun_musl_${KARMAFUN_VERSION}_linux_amd64 && \
     chmod +x /usr/local/bin/karmafun && \
     rm -rf `find /var/cache/apk/ -type f`
@@ -96,7 +95,7 @@ EOF2
 FROM scratch
 ARG USERNAME=alpine
 
-LABEL team="Octave tech team <technique@octave.biz>"
+LABEL team="Kaweezle <kaweezle-devel@kaweezle.com>"
 LABEL devcontainer.metadata='[{ \
     "capAdd": [ "SYS_ADMIN" ], \
     "remoteUser": "${USERNAME}", \

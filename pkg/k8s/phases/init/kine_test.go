@@ -7,10 +7,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/spf13/afero"
-
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
 	ikniteConfig "github.com/kaweezle/iknite/pkg/config"
+	"github.com/kaweezle/iknite/pkg/host"
 	initPhases "github.com/kaweezle/iknite/pkg/k8s/phases/init"
 )
 
@@ -103,7 +102,7 @@ func TestCreateKineConfiguration_ContainsKineFlags(t *testing.T) {
 
 func TestWriteKineConfiguration(t *testing.T) {
 	t.Parallel()
-	fs := afero.NewMemMapFs()
+	fs := host.NewMemMapFS()
 	manifestDir := "/etc/kubernetes/manifests"
 	if err := fs.MkdirAll(manifestDir, 0o755); err != nil {
 		t.Fatalf("Failed to create manifest directory: %v", err)
@@ -122,8 +121,7 @@ func TestWriteKineConfiguration(t *testing.T) {
 		t.Fatal("WriteKineConfiguration() returned nil file")
 	}
 
-	afs := afero.Afero{Fs: fs}
-	content, err := afs.ReadFile(manifestDir + "/kine.yaml")
+	content, err := fs.ReadFile(manifestDir + "/kine.yaml")
 	if err != nil {
 		t.Fatalf("Failed to read kine.yaml: %v", err)
 	}

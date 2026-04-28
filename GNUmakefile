@@ -306,7 +306,6 @@ check-prerequisites:
 	@command -v curl >/dev/null 2>&1 || { echo "Error: curl is not installed"; exit 1; }
 	@command -v bsdtar >/dev/null 2>&1 || { echo "Error: bsdtar is not installed"; exit 1; }
 	@command -v aqua >/dev/null 2>&1 || { echo "Error: aqua is not installed"; exit 1; }
-	@command -v yq >/dev/null 2>&1 || { echo "Error: yq is not installed"; exit 1; }
 	@aqua i
 	@test "$(RUN_CONTAINER_CMD) != :" || { echo "Error: No container runner (either docker or nerdctl) available"; exit 1; }
 	@test "$(BUILD_CONTAINER_CMD) != :" || { echo "Error: No container image builder (either buildctl or docker buildx) available"; exit 1; }
@@ -341,7 +340,7 @@ IKNITE_BINARY := $(DIST_DIR)/iknite_linux_amd64_v1/iknite
 KUBEWAIT_BINARY := $(DIST_DIR)/kubewait_linux_amd64_v1/kubewait
 
 # Goreleaser build produces both iknite and iknitectl packages in a single run
-$(PACKAGES) $(DIST_DIR)/metadata.json $(IKNITE_BINARY) $(KUBEWAIT_BINARY) &: $(GOLANG_FILES) $(APK_FILES) go.mod .goreleaser.yaml | check-prerequisites
+$(PACKAGES) $(DIST_DIR)/metadata.json $(IKNITE_BINARY) $(KUBEWAIT_BINARY) &: $(GOLANG_FILES) $(APK_FILES) $(ROOT_DIR)/$(KEY_NAME) go.mod .goreleaser.yaml | check-prerequisites
 	goreleaser release --skip=publish $(SNAPSHOT) --clean
 
 .PHONY: apk-iknite-build

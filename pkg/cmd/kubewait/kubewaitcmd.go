@@ -20,23 +20,31 @@ limitations under the License.
 // a bootstrap repository script.
 package kubewait
 
-// cSpell: words godotenv clientcmd apimachinery kstatus errorf sirupsen joho metav1
+// cSpell: words godotenv clientcmd apimachinery kstatus errorf sirupsen joho metav1 wrapcheck
 
 import (
+	"context"
+	"fmt"
 	"io"
 	"os"
 
-	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
 	cmdUtil "github.com/kaweezle/iknite/pkg/cmd/util"
+	"github.com/kaweezle/iknite/pkg/host"
 	"github.com/kaweezle/iknite/pkg/kubewait"
 )
 
 // CreateKubewaitCmd creates the root cobra command for kubewait.
-func CreateKubewaitCmd(out io.Writer) *cobra.Command {
-	opts := kubewait.NewOptions()
+func CreateKubewaitCmd(out io.Writer, fse host.FileExecutor, opts *kubewait.Options) *cobra.Command {
+	if opts == nil {
+		opts = kubewait.NewOptions()
+	}
+	if fse == nil {
+		fse = host.NewDefaultHost()
+	}
+	v := viper.GetViper()
 
 	cmd := &cobra.Command{
 		Use:   "kubewait [namespaces...]",
@@ -68,45 +76,45 @@ Examples:
   # Use a specific kubeconfig
   kubewait --kubeconfig ~/.kube/config kube-system`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := setUpLogs(out, opts.Verbosity, opts.JSONLogs); err != nil {
-				return err
-			}
-
-			return kubewait.RunKubewait(cmd.Context(), opts, args)
+			return kubewait.RunKubewait(cmd.Context(), fse, opts, args)
 		},
 		PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
+			if err := opts.SetUpLogs(out); err != nil {
+				return fmt.Errorf("while setting up logs: %w", err)
+			}
 			rootCmd := cmd.Root()
-			err := cmdUtil.InitializeConfiguration(rootCmd)
-			cobra.CheckErr(err)
-			cmdUtil.ApplyViperConfigToFlags(rootCmd, viper.GetViper())
-			ok, err := opts.ReadEnvFile()
-			cobra.CheckErr(err)
+			if err := cmdUtil.InitializeConfiguration(rootCmd, v); err != nil {
+				return fmt.Errorf("while initializing configuration: %w", err)
+			}
+			ok, err := opts.ReadEnvFile(fse)
+			if err != nil {
+				return fmt.Errorf("while reading env file: %w", err)
+			}
 			if ok {
 				// Re-apply config to flags to override with env file values if needed
-				cmdUtil.ApplyViperConfigToFlags(rootCmd, viper.GetViper())
+				cmdUtil.ApplyViperConfigToFlags(rootCmd, v)
+			}
+			// Re-setup logs after configuration is loaded to apply any log-related settings from the config file or
+			// env file
+			if err := opts.SetUpLogs(out); err != nil {
+				return fmt.Errorf("while setting up logs: %w", err)
 			}
 			return nil
 		},
 	}
 
+	cmdUtil.AddConfigFlag(cmd)
 	flags := cmd.Flags()
-	kubewait.AddKubewaitFlags(flags, opts)
-	cmdUtil.BindFlagsToViper(cmd, viper.GetViper())
+	opts.AddFlags(flags)
+	cmdUtil.BindFlagsToViper(cmd, v)
 
 	return cmd
 }
 
 // Execute is the entry point called from main.
 func Execute() {
-	cobra.CheckErr(CreateKubewaitCmd(os.Stdout).Execute())
-}
-
-// setUpLogs configures logrus output and level.
-func setUpLogs(out io.Writer, level log.Level, jsonFormat bool) error {
-	log.SetOutput(out)
-	if jsonFormat {
-		log.SetFormatter(&log.JSONFormatter{})
-	}
-	log.SetLevel(level)
-	return nil
+	fse := host.NewDefaultHost()
+	opts := kubewait.NewOptions()
+	cmd := CreateKubewaitCmd(os.Stdout, fse, opts)
+	cobra.CheckErr(cmd.ExecuteContext(context.Background()))
 }

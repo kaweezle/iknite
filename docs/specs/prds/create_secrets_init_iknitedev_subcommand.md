@@ -1,4 +1,4 @@
-Create an `init` subcommand for iknitedev secrets to create the
+Create an `init` subcommand for iknitectl secrets to create the
 `secrets.sops.yaml` file with the appropriate structure and encrypted values.
 
 The command will create the following files:

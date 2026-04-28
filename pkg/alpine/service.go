@@ -18,14 +18,18 @@ package alpine
 // cSpell: words runlevel runlevels softlevel
 // cSpell: disable
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path"
+	"strconv"
+	"strings"
+	"syscall"
 
 	log "github.com/sirupsen/logrus"
 
 	"github.com/kaweezle/iknite/pkg/constants"
-	"github.com/kaweezle/iknite/pkg/utils"
+	"github.com/kaweezle/iknite/pkg/host"
 )
 
 // cSpell: enable
@@ -39,9 +43,9 @@ const (
 
 var startedServicesDir = path.Join(openRCDirectory, "started")
 
-func EnsureOpenRC(level string) error {
+func EnsureOpenRC(h host.Executor, level string) error {
 	log.WithField("level", level).Info("Ensuring OpenRC...")
-	if out, err := utils.Exec.Run(true, "/sbin/openrc", "default"); err == nil {
+	if out, err := h.Run(true, "/sbin/openrc", "default"); err == nil {
 		log.Trace(string(out))
 		return nil
 	} else {
@@ -52,18 +56,19 @@ func EnsureOpenRC(level string) error {
 // StartOpenRC starts the openrc services in the default runlevel.
 // If one of the services is already started, it is not restarted. It one is
 // not started, it is started.
-func StartOpenRC() error {
-	if err := utils.ExecuteIfNotExist(constants.SoftLevelPath, func() error {
-		return EnsureOpenRC("default")
+func StartOpenRC(h host.FileExecutor) error {
+	if err := host.ExecuteIfNotExist(h, constants.SoftLevelPath, func() error {
+		return EnsureOpenRC(h, "default")
 	}); err != nil {
 		return fmt.Errorf("failed to start OpenRC: %w", err)
 	}
 	return nil
 }
 
-func IsServiceStarted(serviceName string) (bool, error) {
+// IsServiceStarted checks if the service named serviceName is started.
+func IsServiceStarted(h host.FileSystem, serviceName string) (bool, error) {
 	serviceLink := path.Join(startedServicesDir, serviceName)
-	exists, err := utils.FS.Exists(serviceLink)
+	exists, err := h.Exists(serviceLink)
 	if err != nil {
 		return false, fmt.Errorf("failed to check if service %s is started: %w", serviceName, err)
 	}
@@ -72,8 +77,8 @@ func IsServiceStarted(serviceName string) (bool, error) {
 
 // ExecuteIfServiceNotStarted executes the function fn if the service serviceName
 // is not started.
-func ExecuteIfServiceNotStarted(serviceName string, fn func() error) error {
-	exists, err := IsServiceStarted(serviceName)
+func ExecuteIfServiceNotStarted(h host.FileSystem, serviceName string, fn func() error) error {
+	exists, err := IsServiceStarted(h, serviceName)
 	if err != nil {
 		return fmt.Errorf("error while checking if service %s exists: %w", serviceName, err)
 	}
@@ -86,8 +91,8 @@ func ExecuteIfServiceNotStarted(serviceName string, fn func() error) error {
 
 // ExecuteIfServiceStarted executes the fn function if the service serviceName
 // is started.
-func ExecuteIfServiceStarted(serviceName string, fn func() error) error {
-	exists, err := IsServiceStarted(serviceName)
+func ExecuteIfServiceStarted(h host.FileSystem, serviceName string, fn func() error) error {
+	exists, err := IsServiceStarted(h, serviceName)
 	if err != nil {
 		return fmt.Errorf("error while checking if service %s exists: %w", serviceName, err)
 	}
@@ -99,11 +104,11 @@ func ExecuteIfServiceStarted(serviceName string, fn func() error) error {
 }
 
 // EnableService enables the service named serviceName.
-func EnableService(serviceName string) error {
+func EnableService(h host.FileSystem, serviceName string) error {
 	serviceFilename := path.Join(servicesDir, serviceName)
 	destinationFilename := path.Join(runLevelDir, serviceName)
-	if err := utils.ExecuteIfNotExist(destinationFilename, func() error {
-		return os.Symlink(serviceFilename, destinationFilename)
+	if err := host.ExecuteIfNotExist(h, destinationFilename, func() error {
+		return h.Symlink(serviceFilename, destinationFilename)
 	}); err != nil {
 		return fmt.Errorf("failed to enable service %s: %w", serviceName, err)
 	}
@@ -111,10 +116,10 @@ func EnableService(serviceName string) error {
 }
 
 // DisableService disables the service named serviceName.
-func DisableService(serviceName string) error {
+func DisableService(h host.FileSystem, serviceName string) error {
 	destinationFilename := path.Join(runLevelDir, serviceName)
-	if err := utils.ExecuteIfExist(destinationFilename, func() error {
-		return os.Remove(destinationFilename)
+	if err := host.ExecuteIfExist(h, destinationFilename, func() error {
+		return h.Remove(destinationFilename)
 	}); err != nil {
 		return fmt.Errorf("failed to disable service %s: %w", serviceName, err)
 	}
@@ -122,9 +127,9 @@ func DisableService(serviceName string) error {
 }
 
 // StartService start the serviceName service if it is not already started.
-func StartService(serviceName string) error {
-	return ExecuteIfServiceNotStarted(serviceName, func() error {
-		if out, err := utils.Exec.Run(false, "/sbin/rc-service", serviceName, "start"); err == nil {
+func StartService(h host.FileExecutor, serviceName string) error {
+	return ExecuteIfServiceNotStarted(h, serviceName, func() error {
+		if out, err := h.Run(false, "/sbin/rc-service", serviceName, "start"); err == nil {
 			log.Trace(string(out))
 			return nil
 		} else {
@@ -134,33 +139,85 @@ func StartService(serviceName string) error {
 }
 
 // StopService stops the serviceName service if it is  started.
-func StopService(serviceName string) error {
-	return ExecuteIfServiceStarted(serviceName, func() error {
-		if out, err := utils.Exec.Run(false, "/sbin/rc-service", serviceName, "stop"); err == nil {
+func StopService(h host.FileExecutor, serviceName string) error {
+	return ExecuteIfServiceStarted(h, serviceName, func() error {
+		if out, err := h.Run(false, "/sbin/rc-service", serviceName, "stop"); err == nil {
 			log.Trace(string(out))
 			return nil
 		} else {
-			return fmt.Errorf("error while starting service %s: %w", serviceName, err)
+			return fmt.Errorf("error while stopping service %s: %w", serviceName, err)
 		}
 	})
 }
 
-func PretendServiceStarted(serviceName string) error {
+func PretendServiceStarted(h host.FileSystem, serviceName string) error {
 	networkSource := path.Join(servicesDir, serviceName)
 	networkDestination := path.Join(startedServicesDir, serviceName)
-	if err := utils.ExecuteIfNotExist(networkDestination, func() error {
-		return os.Symlink(networkSource, networkDestination)
+	if err := host.ExecuteIfNotExist(h, networkDestination, func() error {
+		return h.Symlink(networkSource, networkDestination)
 	}); err != nil {
 		return fmt.Errorf("failed to pretend service %s is started: %w", serviceName, err)
 	}
 	return nil
 }
 
-func EnsureOpenRCDirectory() error {
-	if err := utils.ExecuteIfNotExist(openRCDirectory, func() error {
-		return os.Symlink(openRCSourceDirectory, openRCDirectory)
+func EnsureOpenRCDirectory(h host.FileSystem) error {
+	if err := host.ExecuteIfNotExist(h, openRCDirectory, func() error {
+		return h.Symlink(openRCSourceDirectory, openRCDirectory)
 	}); err != nil {
 		return fmt.Errorf("failed to ensure OpenRC directory: %w", err)
 	}
 	return nil
+}
+
+func ServicePidFilePath(serviceName string) string {
+	return fmt.Sprintf("/run/%s.pid", serviceName)
+}
+
+func CheckPidFile(h host.FileExecutor, service string) (int, host.Process, error) {
+	pidFilePath := ServicePidFilePath(service)
+	logger := log.WithField("pidfile", pidFilePath)
+	pidBytes, err := h.ReadFile(pidFilePath)
+	if err != nil && errors.Is(err, os.ErrNotExist) {
+		pidFilePath = fmt.Sprintf("/var/run/supervise-%s.pid", service)
+		pidBytes, err = h.ReadFile(pidFilePath)
+	}
+	if err != nil {
+		if !errors.Is(err, os.ErrNotExist) {
+			// only return error is the error is not a file not found error
+			return 0, nil, fmt.Errorf("failed to read pid file: %w", err)
+		}
+		return 0, nil, nil
+	}
+
+	pidStr := strings.TrimSpace(string(pidBytes))
+	var pid int
+	pid, err = strconv.Atoi(pidStr)
+	if err != nil {
+		logger.WithField("content", pidStr).Warn("Failed to convert pid file to integer")
+		return 0, nil, fmt.Errorf("failed to convert pid file to integer: %w", err)
+	}
+	var process host.Process
+	process, err = h.FindProcess(pid)
+	if err == nil && process.Signal(syscall.Signal(0)) == nil {
+		return pid, process, nil
+	}
+	logger.WithField("pid", pid).Warn("Pidfile contained an invalid pid")
+	// remove kubeletPidFile
+	err = h.Remove(pidFilePath)
+	if err != nil {
+		return 0, nil, fmt.Errorf("failed to remove pid file: %w", err)
+	}
+	return 0, nil, nil
+}
+
+func RemovePidFile(h host.FileSystem, service string) {
+	pidFilePath := ServicePidFilePath(service)
+	err := h.Remove(pidFilePath)
+	if err != nil {
+		log.WithFields(log.Fields{
+			"err":     err,
+			"pidFile": pidFilePath,
+		}).Warn("Failed to remove PID file")
+	}
 }

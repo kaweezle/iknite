@@ -16,7 +16,6 @@ limitations under the License.
 package constants
 
 const (
-	KubectlCmd                = "/usr/bin/kubectl"
 	ContainerServiceSock      = "/run/containerd/containerd.sock"
 	ContainerServiceName      = "containerd"
 	IkniteService             = "iknite"

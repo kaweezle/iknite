@@ -1,6 +1,6 @@
+// cSpell: words wrapcheck sirupsen apimachinery
 package v1alpha1
 
-// cSpell: disable
 import (
 	"encoding/json"
 	"errors"
@@ -13,9 +13,8 @@ import (
 
 	ikniteApi "github.com/kaweezle/iknite/pkg/apis/iknite"
 	"github.com/kaweezle/iknite/pkg/constants"
+	"github.com/kaweezle/iknite/pkg/host"
 )
-
-// cSpell: enable
 
 // cSpell: disable-next-line
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -88,6 +87,7 @@ func OkString(b bool) string {
 
 func (ikniteCluster *IkniteCluster) Update(
 	state ikniteApi.ClusterState, phase string, ready, unready []*WorkloadState,
+	fs host.FileSystem,
 ) {
 	ikniteCluster.Status.State = state
 	ikniteCluster.Status.CurrentPhase = phase
@@ -97,19 +97,19 @@ func (ikniteCluster *IkniteCluster) Update(
 	ikniteCluster.Status.WorkloadsState.ReadyCount = len(ready)
 	ikniteCluster.Status.WorkloadsState.Unready = unready
 	ikniteCluster.Status.WorkloadsState.UnreadyCount = len(unready)
-	ikniteCluster.Persist()
+	ikniteCluster.Persist(fs)
 }
 
-func (ikniteCluster *IkniteCluster) Persist() {
+func (ikniteCluster *IkniteCluster) Persist(fs host.FileSystem) {
 	ikniteClusterJSON, err := json.MarshalIndent(ikniteCluster, "", "  ")
 	if err == nil {
 		// Write JSON to file
-		err = os.MkdirAll(constants.StatusDirectory, 0o755) //nolint:gosec // Want read access
+		err = fs.MkdirAll(constants.StatusDirectory, 0o755)
 		if err != nil {
 			log.WithError(err).Warn("Failed to create status directory")
 			return
 		}
-		err = os.WriteFile( //nolint:gosec // Want read access
+		err = fs.WriteFile(
 			constants.StatusFile,
 			ikniteClusterJSON,
 			0o644,
@@ -122,24 +122,29 @@ func (ikniteCluster *IkniteCluster) Persist() {
 	}
 }
 
-func LoadIkniteCluster() (*IkniteCluster, error) {
+func LoadIkniteCluster(fs host.FileSystem) (*IkniteCluster, error) {
 	ikniteCluster := &IkniteCluster{}
-	ikniteClusterJSON, err := os.ReadFile(constants.StatusFile)
+	ikniteClusterJSON, err := fs.ReadFile(constants.StatusFile)
 	if err == nil {
 		err = json.Unmarshal(ikniteClusterJSON, ikniteCluster)
 		if err != nil {
 			return nil, fmt.Errorf("failed to unmarshal iknite cluster: %w", err)
 		}
 	} else {
-		return nil, fmt.Errorf("failed to read status file: %w", err)
+		return nil, err //nolint:wrapcheck // could be os.ErrNotExist or other errors
 	}
 	return ikniteCluster, nil
 }
 
-func LoadIkniteClusterOrDefault() (*IkniteCluster, error) {
-	ikniteCluster, err := LoadIkniteCluster()
+func LoadIkniteClusterOrDefault(fs host.FileSystem) (*IkniteCluster, error) {
+	ikniteCluster, err := LoadIkniteCluster(fs)
 	if errors.Is(err, os.ErrNotExist) {
-		ikniteCluster = &IkniteCluster{}
+		ikniteCluster = &IkniteCluster{
+			TypeMeta: metaV1.TypeMeta{
+				Kind:       ikniteApi.IkniteClusterKind,
+				APIVersion: SchemeGroupVersion.String(),
+			},
+		}
 		SetDefaults_IkniteCluster(ikniteCluster)
 	}
 	return ikniteCluster, nil
