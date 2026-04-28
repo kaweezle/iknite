@@ -1,5 +1,6 @@
 abuild
 age
+bash
 buildctl
 buildkit
 cdrkit
@@ -34,9 +35,9 @@ qemu-img
 sfdisk
 socat
 sops
-tenv
 tzdata
 util-linux-misc
 uv
+yq
 zsh
 zstd
