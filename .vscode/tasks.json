@@ -135,6 +135,18 @@
       },
       "problemMatcher": ["$go"],
       "detail": "Run go tests with coverage"
+    },
+    {
+      "label": "test nocov report",
+      "type": "shell",
+      "command": "make",
+      "args": ["test-nocov"],
+      "group": {
+        "kind": "test",
+        "isDefault": false
+      },
+      "problemMatcher": ["$go"],
+      "detail": "Run coverage and generate nocov HTML report"
     }
   ]
 }

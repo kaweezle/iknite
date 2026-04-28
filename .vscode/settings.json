@@ -29,6 +29,8 @@
     "golangci-lint": true,
     "pre-commit": true,
     "git add": true,
-    "/home/alpine/go/bin/mockery": true
+    "/home/alpine/go/bin/mockery": true,
+    "make": true,
+    "jq": true
   }
 }

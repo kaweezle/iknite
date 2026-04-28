@@ -44,7 +44,7 @@ RUN --mount=type=bind,target=/conf \
     sed -i -e 's#^export ZSH=.*#export ZSH=/usr/share/oh-my-zsh#g' /usr/share/oh-my-zsh/templates/zshrc.zsh-template && \
     git clone --quiet --depth=1 https://github.com/romkatv/powerlevel10k.git /usr/share/oh-my-zsh/custom/themes/powerlevel10k && \
     git clone --quiet --depth=1  https://github.com/zsh-users/zsh-autosuggestions "/usr/share/oh-my-zsh/custom/plugins/zsh-autosuggestions" && \
-    sed -ie '/^plugins=/ s#.*#plugins=(git zsh-autosuggestions)#' /usr/share/oh-my-zsh/templates/zshrc.zsh-template && \
+    sed -ie '/^plugins=/ s#.*#plugins=(git fzf zsh-autosuggestions)#' /usr/share/oh-my-zsh/templates/zshrc.zsh-template && \
     sed -ie '/^ZSH_THEME=/ s#.*#ZSH_THEME="powerlevel10k/powerlevel10k"#' /usr/share/oh-my-zsh/templates/zshrc.zsh-template && \
     sed -ie '/# User configuration/a export CONTAINERD_SNAPSHOTTER=native' /usr/share/oh-my-zsh/templates/zshrc.zsh-template && \
     echo '[[ ! -f ~/.p10k.zsh ]] || source ~/.p10k.zsh' >> /usr/share/oh-my-zsh/templates/zshrc.zsh-template && \

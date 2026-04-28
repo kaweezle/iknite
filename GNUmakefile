@@ -251,6 +251,7 @@ help: # ignore checkmake
 	@echo "  make rootfs-image                   Build final rootfs image from rootfs container"
 	@echo "  make rootfs-image-incus-attachment  Attach Incus metadata to rootfs image in container registry with oras"
 	@echo "  make test                           Run go tests with coverage"
+	@echo "  make test-nocov                     Run go tests with coverage, removing // nocov lines/blocks from the report and generating HTML output"
 	@echo "  make vm-images-build                Build VM images (qcow2, vhdx)"
 	@echo "  make vm-images-push                 Publish VM images to registry with oras"
 	@echo "  make vm-images-publish              Publish VM images to public static object storage"
@@ -672,6 +673,16 @@ clean:
 test: check-prerequisites
 	@echo "Running tests..."
 	go test -v -race -covermode=atomic -coverprofile=coverage.out ./...
+
+.PHONY: test-nocov
+test-nocov: check-prerequisites
+	@echo "Running tests and generating no-coverage report..."
+	BUILD_DIR_PATH="$(BUILD_DIR)/coverage"; \
+	rm -rf "$$BUILD_DIR_PATH"; \
+	mkdir -p "$$BUILD_DIR_PATH"; \
+	go test -v -race -covermode=atomic -coverprofile=$$BUILD_DIR_PATH/coverage.out ./...; \
+	go run hack/nocov.go $$BUILD_DIR_PATH/coverage.out; \
+	go tool cover -html=$$BUILD_DIR_PATH/coverage.out.nocov -o $$BUILD_DIR_PATH/coverage.html
 
 $(IKNITE_KNOWN_HOSTS_FILE): $(SECRETS_FILE) | check-prerequisites
 	@echo "Extracting VM SSH host public key for known_hosts from $<..."
