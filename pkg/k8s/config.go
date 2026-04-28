@@ -20,6 +20,7 @@ package k8s
 import (
 	"context"
 	"fmt"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -198,6 +199,10 @@ func WriteToFile(config *api.Config, fs host.FileSystem, filename string) error 
 	content, err := clientcmd.Write(*config)
 	if err != nil {
 		return fmt.Errorf("failed to serialize kubeconfig: %w", err)
+	}
+	dir := filepath.Dir(filename)
+	if err := fs.MkdirAll(dir, 0o700); err != nil {
+		return fmt.Errorf("failed to create directory for kubeconfig file: %w", err)
 	}
 	if err := fs.WriteFile(filename, content, 0o644); err != nil {
 		return fmt.Errorf("failed to write kubeconfig file: %w", err)

@@ -5,7 +5,6 @@ package k8s
 
 import (
 	"context"
-	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -14,6 +13,7 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/tools/clientcmd/api"
 
+	"github.com/kaweezle/iknite/pkg/constants"
 	"github.com/kaweezle/iknite/pkg/host"
 )
 
@@ -47,8 +47,9 @@ func TestConfigWriteToFileAndLoadFromFile(t *testing.T) {
 		CurrentContext: "iknite",
 	}
 
-	path := filepath.Join(t.TempDir(), "config")
-	fs := host.NewOsFS()
+	fs := host.NewMemMapFS()
+	path := constants.KubernetesRootConfig
+
 	req.NoError(WriteToFile(config, fs, path))
 
 	loaded, err := LoadFromFile(fs, path)
