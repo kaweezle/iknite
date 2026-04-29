@@ -32,5 +32,10 @@
     "/home/alpine/go/bin/mockery": true,
     "make": true,
     "jq": true
-  }
+  },
+  "go.coverageDecorator": {
+    "type": "gutter"
+  },
+  "go.coverOnSingleTestFile": true,
+  "go.coverOnSingleTest": true
 }

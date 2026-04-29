@@ -1,0 +1,32 @@
+{
+  "kind": "NamespaceList",
+  "apiVersion": "v1",
+  "metadata": { "resourceVersion": "36058" },
+  "items": [
+    {
+      "metadata": {
+        "name": "default",
+        "uid": "7a4a06f9-c6dd-46b1-9a69-c8c62df487ea",
+        "resourceVersion": "17",
+        "creationTimestamp": "2026-04-29T07:30:17Z",
+        "labels": { "kubernetes.io/metadata.name": "default" },
+        "managedFields": [
+          {
+            "manager": "kube-apiserver",
+            "operation": "Update",
+            "apiVersion": "v1",
+            "time": "2026-04-29T07:30:17Z",
+            "fieldsType": "FieldsV1",
+            "fieldsV1": {
+              "f:metadata": {
+                "f:labels": { ".": {}, "f:kubernetes.io/metadata.name": {} }
+              }
+            }
+          }
+        ]
+      },
+      "spec": { "finalizers": ["kubernetes"] },
+      "status": { "phase": "Active" }
+    }
+  ]
+}

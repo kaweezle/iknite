@@ -32,12 +32,11 @@ import (
 )
 
 type Options struct {
-	BootstrapOptions
-	ResourcesOptions
+	*BootstrapOptions
+	*ResourcesOptions
 	util.BaseOptions
 	SkipWaitingForResources bool
 	SkipBootstrap           bool
-	AllNamespaces           bool
 }
 
 func NewOptions() *Options {
@@ -50,8 +49,8 @@ func NewOptions() *Options {
 }
 
 func (opts *Options) AddFlags(flags *pflag.FlagSet) {
-	AddResourcesFlags(flags, &opts.ResourcesOptions)
-	AddBootstrapFlags(flags, &opts.BootstrapOptions)
+	AddResourcesFlags(flags, opts.ResourcesOptions)
+	AddBootstrapFlags(flags, opts.BootstrapOptions)
 	opts.BaseOptions.AddFlags(flags)
 	flags.BoolVar(
 		&opts.SkipWaitingForResources,
@@ -65,24 +64,18 @@ func (opts *Options) AddFlags(flags *pflag.FlagSet) {
 		false,
 		"Skip the bootstrap process (for testing purposes)",
 	)
-	flags.BoolVar(
-		&opts.AllNamespaces,
-		"all-namespaces",
-		false,
-		"Watch all namespaces in the cluster (ignored if specific namespaces are provided as arguments)",
-	)
 }
 
 // RunKubewait is the main logic for the kubewait command.
 func RunKubewait(ctx context.Context, fse host.FileExecutor, opts *Options, namespaces []string) error {
 	if !opts.SkipWaitingForResources {
-		if err := waitForResources(ctx, fse, opts, namespaces); err != nil {
+		if err := waitForResources(ctx, fse, opts.ResourcesOptions, namespaces); err != nil {
 			return fmt.Errorf("error while waiting for resources: %w", err)
 		}
 	}
 
 	if !opts.SkipBootstrap {
-		if err := runBootstrap(ctx, fse, opts); err != nil {
+		if err := runBootstrap(ctx, fse, opts.BootstrapOptions); err != nil {
 			return fmt.Errorf("error during bootstrap: %w", err)
 		}
 	}

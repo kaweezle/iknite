@@ -21,24 +21,22 @@ func TestRunBootstrapVariants(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		prepare      func(t *testing.T, fs host.FileSystem, exec *mockHost.MockExecutor) *Options
-		expectations func(req *require.Assertions, opts *Options, fs host.FileSystem)
+		prepare      func(t *testing.T, fs host.FileSystem, exec *mockHost.MockExecutor) *BootstrapOptions
+		expectations func(req *require.Assertions, opts *BootstrapOptions, fs host.FileSystem)
 		name         string
 		wantErr      bool
 	}{
 		{
 			name: "missing script is skipped",
-			prepare: func(t *testing.T, _ host.FileSystem, _ *mockHost.MockExecutor) *Options {
+			prepare: func(t *testing.T, _ host.FileSystem, _ *mockHost.MockExecutor) *BootstrapOptions {
 				t.Helper()
-				return &Options{
-					BootstrapOptions: BootstrapOptions{BootstrapDir: bootstrapDir, BootstrapScript: "missing.sh"},
-				}
+				return &BootstrapOptions{BootstrapDir: bootstrapDir, BootstrapScript: "missing.sh"}
 			},
 			wantErr: false,
 		},
 		{
 			name: "non executable script is chmoded and run",
-			prepare: func(t *testing.T, fs host.FileSystem, exec *mockHost.MockExecutor) *Options {
+			prepare: func(t *testing.T, fs host.FileSystem, exec *mockHost.MockExecutor) *BootstrapOptions {
 				t.Helper()
 				req := require.New(t)
 				script := filepath.Join(bootstrapDir, "iknite-bootstrap.sh")
@@ -53,33 +51,29 @@ func TestRunBootstrapVariants(t *testing.T) {
 						return nil
 					}).
 					Once()
-				return &Options{
-					BootstrapOptions: BootstrapOptions{
-						BootstrapDir:    bootstrapDir,
-						BootstrapScript: filepath.Base(script),
-					},
+				return &BootstrapOptions{
+					BootstrapDir:    bootstrapDir,
+					BootstrapScript: filepath.Base(script),
 				}
 			},
 			wantErr: false,
-			expectations: func(req *require.Assertions, opts *Options, fs host.FileSystem) {
+			expectations: func(req *require.Assertions, opts *BootstrapOptions, fs host.FileSystem) {
 				_, statErr := fs.Stat(filepath.Join(opts.BootstrapDir, "run.ok"))
 				req.NoError(statErr)
 			},
 		},
 		{
 			name: "script error is returned",
-			prepare: func(t *testing.T, fs host.FileSystem, exec *mockHost.MockExecutor) *Options {
+			prepare: func(t *testing.T, fs host.FileSystem, exec *mockHost.MockExecutor) *BootstrapOptions {
 				t.Helper()
 				req := require.New(t)
 				script := filepath.Join(bootstrapDir, "iknite-bootstrap.sh")
 				req.NoError(fs.WriteFile(script, []byte("#!/bin/sh\nexit 9\n"), 0o600))
 				req.NoError(fs.Chmod(script, 0o755))
 				exec.EXPECT().RunCommand(t.Context(), mock.Anything).Return(testutil.FakeExec("", 9)).Once()
-				return &Options{
-					BootstrapOptions: BootstrapOptions{
-						BootstrapDir:    bootstrapDir,
-						BootstrapScript: filepath.Base(script),
-					},
+				return &BootstrapOptions{
+					BootstrapDir:    bootstrapDir,
+					BootstrapScript: filepath.Base(script),
 				}
 			},
 			wantErr: true,

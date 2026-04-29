@@ -103,14 +103,15 @@ func Test_performKustomize(t *testing.T) {
 			prepare: func(
 				t *testing.T,
 				fs host.FileSystem,
-				_ *utils.KustomizeOptions,
+				kOpts *utils.KustomizeOptions,
 				wOpts *utils.WaitOptions,
 				sOpts *testutil.TestServerOptions,
 			) error {
 				t.Helper()
-				config := testutil.CreateTestAPIServer(t, testutil.ContentPatchHandler("with_resources", sOpts))
-				testutil.WriteRestConfigToFile(t, config, fs, constants.KubernetesRootConfig, "iknite")
-				wOpts.Timeout = 5 * time.Second
+				err := standardPrepareKustomization(t, fs, kOpts, wOpts, sOpts)
+				if err != nil {
+					return fmt.Errorf("failed to prepare kustomization: %w", err)
+				}
 
 				content, err := fs.ReadFile(constants.KubernetesRootConfig)
 				if err != nil {
@@ -138,16 +139,15 @@ func Test_performKustomize(t *testing.T) {
 			prepare: func(
 				t *testing.T,
 				fs host.FileSystem,
-				_ *utils.KustomizeOptions,
+				kOpts *utils.KustomizeOptions,
 				wOpts *utils.WaitOptions,
 				sOpts *testutil.TestServerOptions,
 			) error {
 				t.Helper()
-				sOpts.FailurePaths = []string{"/readyz"}
-				config := testutil.CreateTestAPIServer(t, testutil.ContentPatchHandler("with_resources", sOpts))
-				testutil.WriteRestConfigToFile(t, config, fs, constants.KubernetesRootConfig, "iknite")
-				wOpts.Timeout = 5 * time.Second
-				return nil
+				sOpts.Overrides = map[string]testutil.HandlerOverrideFunc{
+					"/readyz": testutil.FailOverrideHandler,
+				}
+				return standardPrepareKustomization(t, fs, kOpts, wOpts, sOpts)
 			},
 			wantErr: "failed to check if cluster is running",
 		},
@@ -165,11 +165,10 @@ func Test_performKustomize(t *testing.T) {
 					return fmt.Errorf("failed to create basic kustomization: %w", err)
 				}
 				kOpts.Kustomization = baseKustomizationDir
-				sOpts.FailurePaths = []string{"/api/v1/namespaces/kube-system/configmaps/test-config"}
-				config := testutil.CreateTestAPIServer(t, testutil.ContentPatchHandler("with_resources", sOpts))
-				testutil.WriteRestConfigToFile(t, config, fs, constants.KubernetesRootConfig, "iknite")
-				wOpts.Timeout = 5 * time.Second
-				return nil
+				sOpts.Overrides = map[string]testutil.HandlerOverrideFunc{
+					"/api/v1/namespaces/kube-system/configmaps/test-config": testutil.FailOverrideHandler,
+				}
+				return standardPrepareKustomization(t, fs, kOpts, wOpts, sOpts)
 			},
 			wantErr: "failed to apply kustomize configuration",
 		},
@@ -187,12 +186,9 @@ func Test_performKustomize(t *testing.T) {
 					return fmt.Errorf("failed to create basic kustomization: %w", err)
 				}
 				kOpts.Kustomization = baseKustomizationDir
-				config := testutil.CreateTestAPIServer(t, testutil.ContentPatchHandler("with_resources", sOpts))
-				testutil.WriteRestConfigToFile(t, config, fs, constants.KubernetesRootConfig, "iknite")
-				wOpts.Timeout = 5 * time.Second
 				wOpts.Wait = true
 				wOpts.Watch = true
-				return nil
+				return standardPrepareKustomization(t, fs, kOpts, wOpts, sOpts)
 			},
 			wantErr: "failed to wait for workloads",
 		},

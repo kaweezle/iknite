@@ -10,8 +10,8 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
-	"slices"
 	"strings"
+	"sync"
 	"testing"
 
 	argoprojv1 "github.com/argoproj/argo-cd/v3/pkg/apis/application/v1alpha1"
@@ -20,6 +20,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	cliOptions "k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -29,6 +30,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 	pkiutil "k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
 
+	"github.com/kaweezle/iknite/mocks/k8s.io/cli-runtime/pkg/genericclioptions"
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
 	"github.com/kaweezle/iknite/pkg/host"
 )
@@ -173,9 +175,19 @@ func (l *RequestLog) String() string {
 	return r.String()
 }
 
+type HandlerOverrideFunc func(path string, w http.ResponseWriter, r *http.Request, log *RequestLog, fs embed.FS) bool
+
+func FailOverrideHandler(path string, w http.ResponseWriter, _ *http.Request, log *RequestLog, _ embed.FS) bool {
+	logrus.Infof("Simulating failure for path: %s", path)
+	log.StatusCode = http.StatusInternalServerError
+	w.WriteHeader(http.StatusInternalServerError)
+	return true
+}
+
 type TestServerOptions struct {
-	FailurePaths []string
-	Requests     []RequestLog
+	Overrides map[string]HandlerOverrideFunc
+	Requests  []RequestLog
+	RequestMu sync.Mutex
 }
 
 func ContentPatchHandler(subdir string, options *TestServerOptions) http.HandlerFunc {
@@ -186,15 +198,17 @@ func ContentPatchHandler(subdir string, options *TestServerOptions) http.Handler
 			Query:  r.URL.RawQuery,
 		}
 		defer func() {
+			options.RequestMu.Lock()
+			defer options.RequestMu.Unlock()
 			options.Requests = append(options.Requests, *log)
 			logrus.Info(log.String())
 		}()
 		path := strings.TrimSuffix(r.URL.Path, "/")
-		if slices.Contains(options.FailurePaths, path) {
-			logrus.Infof("Simulating failure for path: %s", path)
-			log.StatusCode = http.StatusInternalServerError
-			w.WriteHeader(http.StatusInternalServerError)
-			return
+		if override, exists := options.Overrides[path]; exists {
+			if override(path, w, r, log, content) {
+				logrus.Infof("Override handled the request for path: %s", path)
+				return
+			}
 		}
 		switch r.Method {
 		case http.MethodGet:
@@ -279,4 +293,28 @@ func CreateBasicKustomization(fs host.FileSystem, dir string, failing bool) erro
 		}
 	}
 	return nil
+}
+
+func CreateClientGetterWithTestServer(
+	t *testing.T,
+	mapper meta.RESTMapper,
+	handler http.HandlerFunc,
+) cliOptions.RESTClientGetter {
+	t.Helper()
+	restConfig := CreateTestAPIServer(t, handler)
+	client := genericclioptions.NewMockRESTClientGetter(t)
+	client.EXPECT().ToRESTMapper().Return(mapper, nil).Maybe()
+	client.EXPECT().
+		ToRESTConfig().
+		Return(restConfig, nil).Maybe()
+	return client
+}
+
+func CreateDefaultTestClientGetter(t *testing.T, sOpts *TestServerOptions) cliOptions.RESTClientGetter {
+	t.Helper()
+	return CreateClientGetterWithTestServer(
+		t,
+		NewRESTMapper(),
+		ContentPatchHandler("with_resources", sOpts),
+	)
 }

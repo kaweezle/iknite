@@ -55,8 +55,8 @@ type BootstrapOptions struct {
 	EnvFile         string
 }
 
-func NewBootstrapOptions() BootstrapOptions {
-	return BootstrapOptions{
+func NewBootstrapOptions() *BootstrapOptions {
+	return &BootstrapOptions{
 		BootstrapDir:    defaultBootstrapDir,
 		BootstrapScript: defaultBootstrapScript,
 	}
@@ -101,7 +101,7 @@ func (opts *BootstrapOptions) ReadEnvFile(fs host.FileSystem) (bool, error) {
 
 // runBootstrap clones the bootstrap repository (if URL and ref are provided), loads the env
 // file (if present), and executes the bootstrap script.
-func runBootstrap(ctx context.Context, fse host.FileExecutor, opts *Options) error {
+func runBootstrap(ctx context.Context, fse host.FileExecutor, opts *BootstrapOptions) error {
 	// Clone the repository when a ref is also supplied; if no ref is given the clone is skipped.
 
 	baseDir := opts.BootstrapDir
@@ -162,7 +162,7 @@ func runBootstrap(ctx context.Context, fse host.FileExecutor, opts *Options) err
 }
 
 // cloneBootstrapRepo performs a shallow git clone of the bootstrap repository.
-func cloneBootstrapRepo(ctx context.Context, fse host.FileExecutor, opts *Options) error {
+func cloneBootstrapRepo(ctx context.Context, fse host.FileExecutor, opts *BootstrapOptions) error {
 	repoPath := filepath.Join(opts.BootstrapDir, bootstrapRepoDirname)
 	log.Infof("Cloning bootstrap repository %s (ref: %s) to %s", opts.RepoURL, opts.RepoRef, repoPath)
 

@@ -31,6 +31,38 @@ import (
 	"github.com/kaweezle/iknite/pkg/testutil"
 )
 
+func TestAddResourcesFlags(t *testing.T) {
+	t.Parallel()
+	req := require.New(t)
+
+	opts := NewResourcesOptions()
+	flags := pflag.NewFlagSet("resources", pflag.ContinueOnError)
+	AddResourcesFlags(flags, opts)
+
+	req.Equal(defaultTimeout, opts.Timeout)
+	req.Equal(defaultStatusUpdateInterval, opts.StatusUpdateInterval)
+	req.Equal(defaultResourcesUpdateInterval, opts.ResourcesUpdateInterval)
+	req.Equal(defaultSettlePeriod, opts.SettlePeriod)
+	req.Equal(defaultNamespaceSettlePeriod, opts.NamespaceSettlePeriod)
+	req.Equal(defaultResourceTypes, opts.ResourceTypes)
+
+	req.NoError(flags.Set("kubeconfig", "/tmp/test-kubeconfig"))
+	req.NoError(flags.Set("timeout", "45s"))
+	req.NoError(flags.Set("status-update-interval", "5s"))
+	req.NoError(flags.Set("resources-update-interval", "7s"))
+	req.NoError(flags.Set("settle-period", "9s"))
+	req.NoError(flags.Set("namespace-settle-period", "11s"))
+	req.NoError(flags.Set("resource-types", "deployments,jobs"))
+
+	req.Equal("/tmp/test-kubeconfig", opts.Kubeconfig)
+	req.Equal(45*time.Second, opts.Timeout)
+	req.Equal(5*time.Second, opts.StatusUpdateInterval)
+	req.Equal(7*time.Second, opts.ResourcesUpdateInterval)
+	req.Equal(9*time.Second, opts.SettlePeriod)
+	req.Equal(11*time.Second, opts.NamespaceSettlePeriod)
+	req.Equal([]string{"deployments", "jobs"}, opts.ResourceTypes)
+}
+
 func TestNewOptionsAndFlags(t *testing.T) {
 	t.Parallel()
 	req := require.New(t)
@@ -131,7 +163,7 @@ func TestRunBootstrapAndRunKubewaitSkipPaths(t *testing.T) {
 	h, err := testutil.NewDummyHost(fs, hostOpts)
 	req.NoError(err)
 
-	opts := &Options{BootstrapOptions: BootstrapOptions{BootstrapDir: dir, BootstrapScript: "iknite-bootstrap.sh"}}
+	opts := &BootstrapOptions{BootstrapDir: dir, BootstrapScript: "iknite-bootstrap.sh"}
 	err = runBootstrap(t.Context(), h, opts)
 	req.NoError(err)
 
@@ -144,7 +176,7 @@ func TestResourceWaiterStateHelpers(t *testing.T) {
 	req := require.New(t)
 
 	w := &resourceWaiter{
-		opts:       &Options{ResourcesOptions: ResourcesOptions{SettlePeriod: 10 * time.Millisecond}},
+		opts:       &ResourcesOptions{SettlePeriod: 10 * time.Millisecond},
 		endChannel: make(chan error, 1),
 	}
 

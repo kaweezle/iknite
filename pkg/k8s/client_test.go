@@ -109,14 +109,16 @@ func newUnknownWorkloadRESTMapper() meta.RESTMapper {
 func createWorkloadServer(t *testing.T, failPath string, includeApplications bool) cliOptions.RESTClientGetter {
 	t.Helper()
 
-	config := testutil.CreateTestAPIServer(
+	return testutil.CreateClientGetterWithTestServer(
 		t,
-		testutil.ContentPatchHandler("with_resources", &testutil.TestServerOptions{FailurePaths: []string{failPath}}),
+		testutil.NewWorkloadRESTMapper(includeApplications),
+		testutil.ContentPatchHandler(
+			"with_resources",
+			&testutil.TestServerOptions{
+				Overrides: map[string]testutil.HandlerOverrideFunc{failPath: testutil.FailOverrideHandler},
+			},
+		),
 	)
-	getter := genericclioptions.NewMockRESTClientGetter(t)
-	getter.EXPECT().ToRESTMapper().Return(testutil.NewWorkloadRESTMapper(includeApplications), nil).Maybe()
-	getter.EXPECT().ToRESTConfig().Return(config, nil).Maybe()
-	return getter
 }
 
 func TestClient_BasicHelpers(t *testing.T) {
@@ -289,26 +291,11 @@ func TestClient_ErrorAndDiscoveryPaths(t *testing.T) {
 	req.Error(err)
 }
 
-func createClientGetterWithTestServer(
-	t *testing.T,
-	mapper meta.RESTMapper,
-	handler http.HandlerFunc,
-) cliOptions.RESTClientGetter {
-	t.Helper()
-	restConfig := testutil.CreateTestAPIServer(t, handler)
-	client := genericclioptions.NewMockRESTClientGetter(t)
-	client.EXPECT().ToRESTMapper().Return(mapper, nil)
-	client.EXPECT().
-		ToRESTConfig().
-		Return(restConfig, nil)
-	return client
-}
-
 func TestApplyResourceInfosServerSide_ErrorPaths(t *testing.T) {
 	t.Parallel()
 	req := require.New(t)
 
-	client := createClientGetterWithTestServer(t, testutil.NewRESTMapper(),
+	client := testutil.CreateClientGetterWithTestServer(t, testutil.NewRESTMapper(),
 		func(w http.ResponseWriter, r *http.Request) {
 			if r.Method == http.MethodPatch {
 				w.WriteHeader(http.StatusInternalServerError)
@@ -356,7 +343,7 @@ func TestApplyResMapWithServerSideApply_Branches(t *testing.T) {
 	_, err = k8s.ResourceInfosFromResMap(getter, asYAMLErrorResMap{})
 	req.Error(err)
 
-	realGetter := createClientGetterWithTestServer(
+	realGetter := testutil.CreateClientGetterWithTestServer(
 		t,
 		testutil.NewRESTMapper(),
 		func(w http.ResponseWriter, r *http.Request) {
@@ -389,7 +376,7 @@ func TestApplyResMapWithServerSideApply_Branches(t *testing.T) {
 	req.Error(err)
 	req.Contains(err.Error(), "failed to build resource infos")
 
-	nsPatchFail := createClientGetterWithTestServer(
+	nsPatchFail := testutil.CreateClientGetterWithTestServer(
 		t,
 		testutil.NewRESTMapper(),
 		func(w http.ResponseWriter, r *http.Request) {
@@ -409,7 +396,7 @@ func TestApplyResMapWithServerSideApply_Branches(t *testing.T) {
 	req.Error(err)
 	req.Contains(err.Error(), "failed to apply resources")
 
-	removeServer := createClientGetterWithTestServer(
+	removeServer := testutil.CreateClientGetterWithTestServer(
 		t,
 		testutil.NewRESTMapper(),
 		func(w http.ResponseWriter, r *http.Request) {
@@ -495,7 +482,7 @@ func TestHasApplicationsAndAllWorkloadStates(t *testing.T) {
 	_, err = k8s.AllWorkloadStates(getter)
 	req.Error(err)
 
-	statusErrServerGetter := createClientGetterWithTestServer(
+	statusErrServerGetter := testutil.CreateClientGetterWithTestServer(
 		t,
 		testutil.NewRESTMapper(),
 		func(w http.ResponseWriter, r *http.Request) {
@@ -559,7 +546,7 @@ func TestWorkloadsReadyConditionWithContextFunc(t *testing.T) {
 	req.Equal([]int{0, 1}, iterations)
 	req.Equal([]int{1, 2}, okIterations)
 
-	unreadyServerGetter := createClientGetterWithTestServer(
+	unreadyServerGetter := testutil.CreateClientGetterWithTestServer(
 		t,
 		testutil.NewWorkloadRESTMapper(false),
 		func(w http.ResponseWriter, r *http.Request) {

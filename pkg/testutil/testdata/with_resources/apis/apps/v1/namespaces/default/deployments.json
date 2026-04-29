@@ -8,10 +8,15 @@
       "metadata": {
         "name": "deploy-ready",
         "namespace": "default",
-        "generation": 1
+        "generation": 1,
+        "labels": {
+          "app": "deploy-ready"
+        },
+        "uid": "deployment-uid-123"
       },
       "spec": {
         "replicas": 1,
+        "selector": { "matchLabels": { "app": "deploy-ready" } },
         "strategy": {
           "type": "RollingUpdate",
           "rollingUpdate": { "maxUnavailable": 0, "maxSurge": 1 }
