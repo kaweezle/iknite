@@ -4,6 +4,7 @@ import (
 	"crypto"
 	"crypto/x509"
 	"embed"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -16,12 +17,14 @@ import (
 
 	argoprojv1 "github.com/argoproj/argo-cd/v3/pkg/apis/application/v1alpha1"
 	"github.com/sirupsen/logrus"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	cliOptions "k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	certUtil "k8s.io/client-go/util/cert"
@@ -29,9 +32,10 @@ import (
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 	pkiutil "k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
+	"sigs.k8s.io/yaml"
 
+	mockMeta "github.com/kaweezle/iknite/mocks/k8s.io/apimachinery/pkg/api/meta"
 	"github.com/kaweezle/iknite/mocks/k8s.io/cli-runtime/pkg/genericclioptions"
-	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
 	"github.com/kaweezle/iknite/pkg/host"
 )
 
@@ -91,7 +95,7 @@ func CreateTestAPIServer(t *testing.T, handler http.HandlerFunc) *rest.Config {
 	return restConfig
 }
 
-func WriteRestConfigToFile(t *testing.T, config *rest.Config, fs host.FileSystem, path, confName string) {
+func WriteRestConfigToFile(t *testing.T, config *rest.Config, fs host.FileSystem, path, confName, mapperType string) {
 	t.Helper()
 	apiConfig := kubeconfig.CreateWithCerts(
 		config.Host,
@@ -105,9 +109,12 @@ func WriteRestConfigToFile(t *testing.T, config *rest.Config, fs host.FileSystem
 	if apiConfig.Extensions == nil {
 		apiConfig.Extensions = make(map[string]runtime.Object)
 	}
-	obj, err := scheme.Scheme.New(v1alpha1.SchemeGroupVersionWithKind)
-	require.NoError(t, err)
-	apiConfig.Extensions["test-rest-mapper"] = obj
+	cm := &corev1.ConfigMap{
+		TypeMeta:   metav1.TypeMeta{APIVersion: "v1", Kind: "ConfigMap"},
+		ObjectMeta: metav1.ObjectMeta{Name: "test-rest-mapper"},
+		Data:       map[string]string{"type": mapperType},
+	}
+	apiConfig.Extensions["test-rest-mapper"] = cm
 
 	content, err := clientcmd.Write(*apiConfig)
 	require.NoError(t, err, "Failed to serialize kubeconfig")
@@ -317,4 +324,62 @@ func CreateDefaultTestClientGetter(t *testing.T, sOpts *TestServerOptions) cliOp
 		NewRESTMapper(),
 		ContentPatchHandler("with_resources", sOpts),
 	)
+}
+
+type NoTestMapperError struct{}
+
+func (e *NoTestMapperError) Error() string {
+	return "no test REST mapper configuration found in kubeconfig extension"
+}
+
+func (*NoTestMapperError) Is(target error) bool {
+	_, ok := target.(*NoTestMapperError)
+	return ok
+}
+
+var ErrNoTestMapper = &NoTestMapperError{}
+
+func GetTestMapperFromClientConfig(clientconfig clientcmd.ClientConfig) (meta.RESTMapper, error) {
+	c, err := clientconfig.RawConfig()
+	if err != nil {
+		return nil, ErrNoTestMapper
+	}
+	ext := c.Extensions["test-rest-mapper"]
+	if ext == nil {
+		return nil, ErrNoTestMapper
+	}
+
+	// clientcmd.ClientConfig
+	// convert ext to runtime.Unknown to get Raw content
+	unk, ok := ext.(*runtime.Unknown)
+	if !ok {
+		return nil, fmt.Errorf("test REST mapper extension is not in the expected format: not a runtime.Unknown")
+	}
+	content := unk.Raw
+	if content == nil {
+		return nil, fmt.Errorf("test REST mapper extension is not in the expected format: missing raw content")
+	}
+	// unmarshal the content (YAML) into a configmap
+	var cm corev1.ConfigMap
+	if err := yaml.Unmarshal(content, &cm); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal test REST mapper config: %w", err)
+	}
+	// Now get the type
+	mapperType, ok := cm.Data["type"]
+	if !ok {
+		return nil, fmt.Errorf("test REST mapper config is missing 'type' field in data")
+	}
+	switch mapperType {
+	case "static":
+		return NewRESTMapper(), nil
+	case "mock":
+		r := mockMeta.NewMockRESTMapper(&testing.T{})
+		r.EXPECT().KindFor(mock.Anything).Return(schema.GroupVersionKind{}, errors.New("bad type")).Maybe()
+		return r, nil
+	case "network":
+		logrus.Warn("using network REST mapper, which will make real API calls to the cluster.")
+	default:
+		return nil, fmt.Errorf("unsupported test REST mapper type: %s", mapperType)
+	}
+	return nil, ErrNoTestMapper
 }

@@ -1,12 +1,13 @@
 package k8s
 
 // cSpell: words clientcmd clientconfig restconfig casttype metav1 polymorphichelpers restmapper genericclioptions
-// cSpell: words testutil serviceaccount
+// cSpell: words testutil serviceaccount corev
 // cSpell: disable
 import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net"
 	"os"
@@ -129,11 +130,13 @@ func (r *Client) ToRESTMapper() (meta.RESTMapper, error) {
 	// Allow using test RESTMapper if set as an extension in the client config, which is useful for testing with a
 	// mock RESTMapper without needing to set up a fake API server.
 	if r.clientconfig != nil {
-		c, err := r.clientconfig.RawConfig()
-		if err == nil {
-			if ext := c.Extensions["test-rest-mapper"]; ext != nil {
-				return testutil.NewRESTMapper(), nil
-			}
+		mapper, err := testutil.GetTestMapperFromClientConfig(r.clientconfig)
+		if err != nil && !errors.Is(err, testutil.ErrNoTestMapper) {
+			return nil, fmt.Errorf("failed to get test REST mapper from client config extension: %w", err)
+		}
+		if mapper != nil {
+			r.mapper = mapper
+			return mapper, nil
 		}
 	}
 	dc, err := r.ToDiscoveryClient()

@@ -15,6 +15,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/client-go/tools/clientcmd/api/latest"
 	apiregistrationv1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 )
 
@@ -23,6 +24,7 @@ var Scheme = runtime.NewScheme()
 //nolint:gochecknoinits // This is a test utility package, so it's fine to have an init function here.
 func init() {
 	utilruntime.Must(corev1.AddToScheme(Scheme))
+	utilruntime.Must(corev1.AddToScheme(latest.Scheme))
 	utilruntime.Must(apiextensionsv1.AddToScheme(Scheme))
 	utilruntime.Must(argoprojv1.AddToScheme(Scheme))
 	utilruntime.Must(appsv1.AddToScheme(Scheme))

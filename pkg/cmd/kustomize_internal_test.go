@@ -40,7 +40,7 @@ func standardPrepareKustomization(
 ) error {
 	t.Helper()
 	config := testutil.CreateTestAPIServer(t, testutil.ContentPatchHandler("with_resources", sOpts))
-	testutil.WriteRestConfigToFile(t, config, fs, constants.KubernetesRootConfig, "iknite")
+	testutil.WriteRestConfigToFile(t, config, fs, constants.KubernetesRootConfig, "iknite", "static")
 	wOpts.Timeout = 5 * time.Second
 	return nil
 }

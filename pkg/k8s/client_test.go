@@ -172,7 +172,14 @@ func TestResourceInfosFromResMap(t *testing.T) {
 	})
 
 	fs := host.NewMemMapFS()
-	testutil.WriteRestConfigToFile(t, restConfig, fs, kubeadmConstants.GetAdminKubeConfigPath(), "iknite-test")
+	testutil.WriteRestConfigToFile(
+		t,
+		restConfig,
+		fs,
+		kubeadmConstants.GetAdminKubeConfigPath(),
+		"iknite-test",
+		"static",
+	)
 	client, err := k8s.NewDefaultClient(fs)
 	req.NoError(err)
 
