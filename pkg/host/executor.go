@@ -153,7 +153,6 @@ func (c *hostImpl) FindProcess(pid int) (Process, error) {
 	return &processImpl{process: process}, nil
 }
 
-//nolint:gosec // Harness done upstream
 func (c *hostImpl) StartCommand(ctx context.Context, options *CommandOptions) (Process, error) {
 	cmd := exec.CommandContext(ctx, options.Cmd, options.Args...)
 	cmd.Env = options.Env
@@ -169,7 +168,6 @@ func (c *hostImpl) StartCommand(ctx context.Context, options *CommandOptions) (P
 }
 
 func (c *hostImpl) RunCommand(ctx context.Context, options *CommandOptions) error {
-	//nolint:gosec // Harness done upstream
 	cmd := exec.CommandContext(ctx, options.Cmd, options.Args...)
 	cmd.Env = options.Env
 	cmd.Dir = options.Dir

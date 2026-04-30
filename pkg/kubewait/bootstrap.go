@@ -223,7 +223,7 @@ func ensureSSHKnownHost(ctx context.Context, fse host.FileExecutor, repoURL stri
 	}
 
 	log.Infof("Adding SSH server %s to known_hosts", sshServer)
-	//nolint:gosec // sshServer is derived from repoURL and only used for ssh-keyscan host lookup.
+
 	sshKeyscanCmd := exec.CommandContext(ctx, "ssh-keyscan", "-t", "rsa", sshServer)
 	keyscanOutput, err := sshKeyscanCmd.Output()
 	if err != nil {

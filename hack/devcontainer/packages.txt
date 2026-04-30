@@ -16,7 +16,6 @@ git
 gnupg
 go
 gojq
-golangci-lint
 ip6tables
 iproute2
 k9s

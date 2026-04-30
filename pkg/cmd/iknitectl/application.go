@@ -128,7 +128,7 @@ func renderHelmfile(helmfileFile string) (resmap.ResMap, error) {
 // renderHelm runs helm template and returns the YAML output.
 func renderHelm(dir string) (resmap.ResMap, error) {
 	releaseName := filepath.Base(dir)
-	//nolint:gosec // controlled input for command and args, want to invoke helm CLI
+
 	cmd := exec.CommandContext(context.Background(), "helm", "template", releaseName, dir, "--skip-crds")
 	return runCommandToResmap(cmd)
 }
