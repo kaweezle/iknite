@@ -6,7 +6,6 @@ package init
 
 import (
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
-	"github.com/pion/mdns"
 	mock "github.com/stretchr/testify/mock"
 )
 
@@ -35,50 +34,6 @@ type MockMdnsData_Expecter struct {
 
 func (_m *MockMdnsData) EXPECT() *MockMdnsData_Expecter {
 	return &MockMdnsData_Expecter{mock: &_m.Mock}
-}
-
-// CloseMDnsConn provides a mock function for the type MockMdnsData
-func (_mock *MockMdnsData) CloseMDnsConn() error {
-	ret := _mock.Called()
-
-	if len(ret) == 0 {
-		panic("no return value specified for CloseMDnsConn")
-	}
-
-	var r0 error
-	if returnFunc, ok := ret.Get(0).(func() error); ok {
-		r0 = returnFunc()
-	} else {
-		r0 = ret.Error(0)
-	}
-	return r0
-}
-
-// MockMdnsData_CloseMDnsConn_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CloseMDnsConn'
-type MockMdnsData_CloseMDnsConn_Call struct {
-	*mock.Call
-}
-
-// CloseMDnsConn is a helper method to define mock.On call
-func (_e *MockMdnsData_Expecter) CloseMDnsConn() *MockMdnsData_CloseMDnsConn_Call {
-	return &MockMdnsData_CloseMDnsConn_Call{Call: _e.mock.On("CloseMDnsConn")}
-}
-
-func (_c *MockMdnsData_CloseMDnsConn_Call) Run(run func()) *MockMdnsData_CloseMDnsConn_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run()
-	})
-	return _c
-}
-
-func (_c *MockMdnsData_CloseMDnsConn_Call) Return(err error) *MockMdnsData_CloseMDnsConn_Call {
-	_c.Call.Return(err)
-	return _c
-}
-
-func (_c *MockMdnsData_CloseMDnsConn_Call) RunAndReturn(run func() error) *MockMdnsData_CloseMDnsConn_Call {
-	_c.Call.Return(run)
-	return _c
 }
 
 // IkniteCluster provides a mock function for the type MockMdnsData
@@ -127,42 +82,48 @@ func (_c *MockMdnsData_IkniteCluster_Call) RunAndReturn(run func() *v1alpha1.Ikn
 	return _c
 }
 
-// SetMDnsConn provides a mock function for the type MockMdnsData
-func (_mock *MockMdnsData) SetMDnsConn(conn *mdns.Conn) {
-	_mock.Called(conn)
+// RegisterShutdownHook provides a mock function for the type MockMdnsData
+func (_mock *MockMdnsData) RegisterShutdownHook(name string, fn func() error) {
+	_mock.Called(name, fn)
 	return
 }
 
-// MockMdnsData_SetMDnsConn_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SetMDnsConn'
-type MockMdnsData_SetMDnsConn_Call struct {
+// MockMdnsData_RegisterShutdownHook_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'RegisterShutdownHook'
+type MockMdnsData_RegisterShutdownHook_Call struct {
 	*mock.Call
 }
 
-// SetMDnsConn is a helper method to define mock.On call
-//   - conn *mdns.Conn
-func (_e *MockMdnsData_Expecter) SetMDnsConn(conn interface{}) *MockMdnsData_SetMDnsConn_Call {
-	return &MockMdnsData_SetMDnsConn_Call{Call: _e.mock.On("SetMDnsConn", conn)}
+// RegisterShutdownHook is a helper method to define mock.On call
+//   - name string
+//   - fn func() error
+func (_e *MockMdnsData_Expecter) RegisterShutdownHook(name interface{}, fn interface{}) *MockMdnsData_RegisterShutdownHook_Call {
+	return &MockMdnsData_RegisterShutdownHook_Call{Call: _e.mock.On("RegisterShutdownHook", name, fn)}
 }
 
-func (_c *MockMdnsData_SetMDnsConn_Call) Run(run func(conn *mdns.Conn)) *MockMdnsData_SetMDnsConn_Call {
+func (_c *MockMdnsData_RegisterShutdownHook_Call) Run(run func(name string, fn func() error)) *MockMdnsData_RegisterShutdownHook_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 *mdns.Conn
+		var arg0 string
 		if args[0] != nil {
-			arg0 = args[0].(*mdns.Conn)
+			arg0 = args[0].(string)
+		}
+		var arg1 func() error
+		if args[1] != nil {
+			arg1 = args[1].(func() error)
 		}
 		run(
 			arg0,
+			arg1,
 		)
 	})
 	return _c
 }
 
-func (_c *MockMdnsData_SetMDnsConn_Call) Return() *MockMdnsData_SetMDnsConn_Call {
+func (_c *MockMdnsData_RegisterShutdownHook_Call) Return() *MockMdnsData_RegisterShutdownHook_Call {
 	_c.Call.Return()
 	return _c
 }
 
-func (_c *MockMdnsData_SetMDnsConn_Call) RunAndReturn(run func(conn *mdns.Conn)) *MockMdnsData_SetMDnsConn_Call {
+func (_c *MockMdnsData_RegisterShutdownHook_Call) RunAndReturn(run func(name string, fn func() error)) *MockMdnsData_RegisterShutdownHook_Call {
 	_c.Run(run)
 	return _c
 }

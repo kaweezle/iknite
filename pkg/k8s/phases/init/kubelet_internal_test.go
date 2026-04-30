@@ -26,7 +26,7 @@ import (
 func createInitConfiguration() (*kubeadmapi.InitConfiguration, error) {
 	cfg := &kubeadmapi.InitConfiguration{
 		ClusterConfiguration: kubeadmapi.ClusterConfiguration{
-			KubernetesVersion: "1.35.3",
+			KubernetesVersion: "1.36.0",
 			FeatureGates: map[string]bool{
 				features.NodeLocalCRISocket: true,
 			},

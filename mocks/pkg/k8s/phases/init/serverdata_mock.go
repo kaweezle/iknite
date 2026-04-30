@@ -7,7 +7,6 @@ package init
 import (
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
 	"github.com/kaweezle/iknite/pkg/host"
-	"github.com/kaweezle/iknite/pkg/server"
 	mock "github.com/stretchr/testify/mock"
 )
 
@@ -130,42 +129,105 @@ func (_c *MockServerData_IkniteCluster_Call) RunAndReturn(run func() *v1alpha1.I
 	return _c
 }
 
-// SetStatusServer provides a mock function for the type MockServerData
-func (_mock *MockServerData) SetStatusServer(srv *server.IkniteServer) {
-	_mock.Called(srv)
-	return
+// RegisterIkniteClusterListener provides a mock function for the type MockServerData
+func (_mock *MockServerData) RegisterIkniteClusterListener() (<-chan *v1alpha1.IkniteCluster, func()) {
+	ret := _mock.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for RegisterIkniteClusterListener")
+	}
+
+	var r0 <-chan *v1alpha1.IkniteCluster
+	var r1 func()
+	if returnFunc, ok := ret.Get(0).(func() (<-chan *v1alpha1.IkniteCluster, func())); ok {
+		return returnFunc()
+	}
+	if returnFunc, ok := ret.Get(0).(func() <-chan *v1alpha1.IkniteCluster); ok {
+		r0 = returnFunc()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(<-chan *v1alpha1.IkniteCluster)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func() func()); ok {
+		r1 = returnFunc()
+	} else {
+		if ret.Get(1) != nil {
+			r1 = ret.Get(1).(func())
+		}
+	}
+	return r0, r1
 }
 
-// MockServerData_SetStatusServer_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SetStatusServer'
-type MockServerData_SetStatusServer_Call struct {
+// MockServerData_RegisterIkniteClusterListener_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'RegisterIkniteClusterListener'
+type MockServerData_RegisterIkniteClusterListener_Call struct {
 	*mock.Call
 }
 
-// SetStatusServer is a helper method to define mock.On call
-//   - srv *server.IkniteServer
-func (_e *MockServerData_Expecter) SetStatusServer(srv interface{}) *MockServerData_SetStatusServer_Call {
-	return &MockServerData_SetStatusServer_Call{Call: _e.mock.On("SetStatusServer", srv)}
+// RegisterIkniteClusterListener is a helper method to define mock.On call
+func (_e *MockServerData_Expecter) RegisterIkniteClusterListener() *MockServerData_RegisterIkniteClusterListener_Call {
+	return &MockServerData_RegisterIkniteClusterListener_Call{Call: _e.mock.On("RegisterIkniteClusterListener")}
 }
 
-func (_c *MockServerData_SetStatusServer_Call) Run(run func(srv *server.IkniteServer)) *MockServerData_SetStatusServer_Call {
+func (_c *MockServerData_RegisterIkniteClusterListener_Call) Run(run func()) *MockServerData_RegisterIkniteClusterListener_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 *server.IkniteServer
+		run()
+	})
+	return _c
+}
+
+func (_c *MockServerData_RegisterIkniteClusterListener_Call) Return(ikniteClusterCh <-chan *v1alpha1.IkniteCluster, fn func()) *MockServerData_RegisterIkniteClusterListener_Call {
+	_c.Call.Return(ikniteClusterCh, fn)
+	return _c
+}
+
+func (_c *MockServerData_RegisterIkniteClusterListener_Call) RunAndReturn(run func() (<-chan *v1alpha1.IkniteCluster, func())) *MockServerData_RegisterIkniteClusterListener_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// RegisterShutdownHook provides a mock function for the type MockServerData
+func (_mock *MockServerData) RegisterShutdownHook(name string, fn func() error) {
+	_mock.Called(name, fn)
+	return
+}
+
+// MockServerData_RegisterShutdownHook_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'RegisterShutdownHook'
+type MockServerData_RegisterShutdownHook_Call struct {
+	*mock.Call
+}
+
+// RegisterShutdownHook is a helper method to define mock.On call
+//   - name string
+//   - fn func() error
+func (_e *MockServerData_Expecter) RegisterShutdownHook(name interface{}, fn interface{}) *MockServerData_RegisterShutdownHook_Call {
+	return &MockServerData_RegisterShutdownHook_Call{Call: _e.mock.On("RegisterShutdownHook", name, fn)}
+}
+
+func (_c *MockServerData_RegisterShutdownHook_Call) Run(run func(name string, fn func() error)) *MockServerData_RegisterShutdownHook_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 string
 		if args[0] != nil {
-			arg0 = args[0].(*server.IkniteServer)
+			arg0 = args[0].(string)
+		}
+		var arg1 func() error
+		if args[1] != nil {
+			arg1 = args[1].(func() error)
 		}
 		run(
 			arg0,
+			arg1,
 		)
 	})
 	return _c
 }
 
-func (_c *MockServerData_SetStatusServer_Call) Return() *MockServerData_SetStatusServer_Call {
+func (_c *MockServerData_RegisterShutdownHook_Call) Return() *MockServerData_RegisterShutdownHook_Call {
 	_c.Call.Return()
 	return _c
 }
 
-func (_c *MockServerData_SetStatusServer_Call) RunAndReturn(run func(srv *server.IkniteServer)) *MockServerData_SetStatusServer_Call {
+func (_c *MockServerData_RegisterShutdownHook_Call) RunAndReturn(run func(name string, fn func() error)) *MockServerData_RegisterShutdownHook_Call {
 	_c.Run(run)
 	return _c
 }

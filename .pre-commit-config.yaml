@@ -6,6 +6,9 @@
 #   pre-commit run --all-files
 # cSpell: words checkmake readyz
 
+default_language_version:
+  golang: 1.26.3
+
 repos:
   # General, language-agnostic sanity checks
   - repo: https://github.com/pre-commit/pre-commit-hooks
@@ -86,7 +89,7 @@ repos:
 
   # golangci-lint for Go files
   - repo: https://github.com/golangci/golangci-lint
-    rev: v2.11.4
+    rev: v2.12.2
     hooks:
       - id: golangci-lint-config-verify
       - id: golangci-lint

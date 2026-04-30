@@ -40,50 +40,6 @@ func (_m *MockDaemonizeData) EXPECT() *MockDaemonizeData_Expecter {
 	return &MockDaemonizeData_Expecter{mock: &_m.Mock}
 }
 
-// CloseMDnsConn provides a mock function for the type MockDaemonizeData
-func (_mock *MockDaemonizeData) CloseMDnsConn() error {
-	ret := _mock.Called()
-
-	if len(ret) == 0 {
-		panic("no return value specified for CloseMDnsConn")
-	}
-
-	var r0 error
-	if returnFunc, ok := ret.Get(0).(func() error); ok {
-		r0 = returnFunc()
-	} else {
-		r0 = ret.Error(0)
-	}
-	return r0
-}
-
-// MockDaemonizeData_CloseMDnsConn_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CloseMDnsConn'
-type MockDaemonizeData_CloseMDnsConn_Call struct {
-	*mock.Call
-}
-
-// CloseMDnsConn is a helper method to define mock.On call
-func (_e *MockDaemonizeData_Expecter) CloseMDnsConn() *MockDaemonizeData_CloseMDnsConn_Call {
-	return &MockDaemonizeData_CloseMDnsConn_Call{Call: _e.mock.On("CloseMDnsConn")}
-}
-
-func (_c *MockDaemonizeData_CloseMDnsConn_Call) Run(run func()) *MockDaemonizeData_CloseMDnsConn_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run()
-	})
-	return _c
-}
-
-func (_c *MockDaemonizeData_CloseMDnsConn_Call) Return(err error) *MockDaemonizeData_CloseMDnsConn_Call {
-	_c.Call.Return(err)
-	return _c
-}
-
-func (_c *MockDaemonizeData_CloseMDnsConn_Call) RunAndReturn(run func() error) *MockDaemonizeData_CloseMDnsConn_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
 // Context provides a mock function for the type MockDaemonizeData
 func (_mock *MockDaemonizeData) Context() context.Context {
 	ret := _mock.Called()
@@ -268,6 +224,50 @@ func (_c *MockDaemonizeData_KubeletProcess_Call) RunAndReturn(run func() host.Pr
 	return _c
 }
 
+// RunShutdownHooks provides a mock function for the type MockDaemonizeData
+func (_mock *MockDaemonizeData) RunShutdownHooks() error {
+	ret := _mock.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for RunShutdownHooks")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func() error); ok {
+		r0 = returnFunc()
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockDaemonizeData_RunShutdownHooks_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'RunShutdownHooks'
+type MockDaemonizeData_RunShutdownHooks_Call struct {
+	*mock.Call
+}
+
+// RunShutdownHooks is a helper method to define mock.On call
+func (_e *MockDaemonizeData_Expecter) RunShutdownHooks() *MockDaemonizeData_RunShutdownHooks_Call {
+	return &MockDaemonizeData_RunShutdownHooks_Call{Call: _e.mock.On("RunShutdownHooks")}
+}
+
+func (_c *MockDaemonizeData_RunShutdownHooks_Call) Run(run func()) *MockDaemonizeData_RunShutdownHooks_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *MockDaemonizeData_RunShutdownHooks_Call) Return(err error) *MockDaemonizeData_RunShutdownHooks_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockDaemonizeData_RunShutdownHooks_Call) RunAndReturn(run func() error) *MockDaemonizeData_RunShutdownHooks_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // SetKubeletProcess provides a mock function for the type MockDaemonizeData
 func (_mock *MockDaemonizeData) SetKubeletProcess(process host.Process) {
 	_mock.Called(process)
@@ -305,50 +305,6 @@ func (_c *MockDaemonizeData_SetKubeletProcess_Call) Return() *MockDaemonizeData_
 
 func (_c *MockDaemonizeData_SetKubeletProcess_Call) RunAndReturn(run func(process host.Process)) *MockDaemonizeData_SetKubeletProcess_Call {
 	_c.Run(run)
-	return _c
-}
-
-// StopStatusServer provides a mock function for the type MockDaemonizeData
-func (_mock *MockDaemonizeData) StopStatusServer() error {
-	ret := _mock.Called()
-
-	if len(ret) == 0 {
-		panic("no return value specified for StopStatusServer")
-	}
-
-	var r0 error
-	if returnFunc, ok := ret.Get(0).(func() error); ok {
-		r0 = returnFunc()
-	} else {
-		r0 = ret.Error(0)
-	}
-	return r0
-}
-
-// MockDaemonizeData_StopStatusServer_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'StopStatusServer'
-type MockDaemonizeData_StopStatusServer_Call struct {
-	*mock.Call
-}
-
-// StopStatusServer is a helper method to define mock.On call
-func (_e *MockDaemonizeData_Expecter) StopStatusServer() *MockDaemonizeData_StopStatusServer_Call {
-	return &MockDaemonizeData_StopStatusServer_Call{Call: _e.mock.On("StopStatusServer")}
-}
-
-func (_c *MockDaemonizeData_StopStatusServer_Call) Run(run func()) *MockDaemonizeData_StopStatusServer_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run()
-	})
-	return _c
-}
-
-func (_c *MockDaemonizeData_StopStatusServer_Call) Return(err error) *MockDaemonizeData_StopStatusServer_Call {
-	_c.Call.Return(err)
-	return _c
-}
-
-func (_c *MockDaemonizeData_StopStatusServer_Call) RunAndReturn(run func() error) *MockDaemonizeData_StopStatusServer_Call {
-	_c.Call.Return(run)
 	return _c
 }
 
