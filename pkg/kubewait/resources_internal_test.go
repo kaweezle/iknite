@@ -1,4 +1,4 @@
-// cSpell: words kstatus sirupsen apimachinery testutil clientcmd genericclioptions corev metav
+// cSpell: words kstatus sirupsen apimachinery testutil clientcmd genericclioptions corev metav unknownresource
 //
 //nolint:gocognit // Complex test cases.
 package kubewait
@@ -689,6 +689,93 @@ func TestWaitNameSpaceResources(t *testing.T) {
 			if tt.assertions != nil {
 				tt.assertions(req, serverOpts)
 			}
+		})
+	}
+}
+
+func Test_waitForResources(t *testing.T) {
+	t.Parallel()
+
+	const kubeconfigPath = "/kubeconfig"
+
+	tests := []struct {
+		overrides     map[string]testutil.HandlerOverrideFunc
+		name          string
+		wantErr       string
+		resourceTypes []string
+		namespaces    []string
+		timeout       time.Duration
+		allNamespaces bool
+	}{
+		{
+			name:       "succeeds with explicit namespace and timeout",
+			namespaces: []string{"default"},
+			timeout:    5 * time.Second,
+		},
+		{
+			name:       "succeeds with zero timeout",
+			namespaces: []string{"default"},
+			timeout:    0,
+		},
+		{
+			name:          "fails when no resource types are valid",
+			resourceTypes: []string{"unknownresource"},
+			namespaces:    []string{"default"},
+			wantErr:       "none of the specified resource types are supported by the cluster",
+		},
+		{
+			name:          "fails when namespace listing times out",
+			allNamespaces: true,
+			timeout:       50 * time.Millisecond,
+			overrides: map[string]testutil.HandlerOverrideFunc{
+				"/api/v1/namespaces": testutil.FailOverrideHandler,
+			},
+			wantErr: "failed to list namespaces",
+		},
+		{
+			name:       "fails when namespace does not appear",
+			namespaces: []string{"default"},
+			timeout:    5 * time.Second,
+			overrides: map[string]testutil.HandlerOverrideFunc{
+				defaultNamespacePath: testutil.FailOverrideHandler,
+			},
+			wantErr: "namespace default did not appear",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			req := require.New(t)
+
+			sOpts := &testutil.TestServerOptions{Overrides: tt.overrides}
+			fs := host.NewMemMapFS()
+			restConfig := testutil.CreateTestAPIServer(t, testutil.ContentPatchHandler("with_resources", sOpts))
+			testutil.WriteRestConfigToFile(t, restConfig, fs, kubeconfigPath, "test")
+
+			resourceTypes := tt.resourceTypes
+			if len(resourceTypes) == 0 {
+				resourceTypes = []string{"deployments"}
+			}
+
+			rOpts := &ResourcesOptions{
+				Kubeconfig:              kubeconfigPath,
+				ResourceTypes:           resourceTypes,
+				AllNamespaces:           tt.allNamespaces,
+				Timeout:                 tt.timeout,
+				StatusUpdateInterval:    10 * time.Millisecond,
+				ResourcesUpdateInterval: 10 * time.Millisecond,
+				SettlePeriod:            10 * time.Millisecond,
+				NamespaceSettlePeriod:   1 * time.Second,
+			}
+
+			gotErr := waitForResources(t.Context(), fs, rOpts, tt.namespaces)
+			if tt.wantErr != "" {
+				req.Error(gotErr)
+				req.Contains(gotErr.Error(), tt.wantErr)
+				return
+			}
+			req.NoError(gotErr)
 		})
 	}
 }
