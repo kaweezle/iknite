@@ -115,8 +115,7 @@ func TestBaseOptions_SetUpLogs_configuresLogger(t *testing.T) {
 			req := require.New(t)
 
 			var out bytes.Buffer
-			err := tt.opts.SetUpLogs(&out)
-			req.NoError(err, "SetUpLogs should not return an error")
+			tt.opts.SetUpLogs(&out)
 
 			req.Equal(&out, std.Out, "expected standard logger output to be set to provided writer")
 			tt.assert(req, std)

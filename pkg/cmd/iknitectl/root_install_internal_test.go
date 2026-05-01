@@ -2,6 +2,8 @@
 package iknitectl
 
 import (
+	"bytes"
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -47,4 +49,65 @@ func TestRootOptionsAndCreateRootCmd(t *testing.T) {
 			req.Equal(name, sub.Name())
 		})
 	}
+}
+
+func TestCreateRootCmd(t *testing.T) {
+	t.Parallel()
+	req := require.New(t)
+
+	cmd := CreateRootCmd(nil)
+	req.NotNil(cmd)
+	req.Equal("iknitectl", cmd.Name())
+}
+
+func TestRunRootCmd_Path(t *testing.T) {
+	t.Parallel()
+	req := require.New(t)
+
+	fileExecutor, ok := host.NewMemMapFS().(host.FileExecutor)
+	req.True(ok, "MemMapFS should implement FileExecutor")
+
+	out := &bytes.Buffer{}
+	options := &RootOptions{
+		FileExecutor: fileExecutor,
+		out:          out,
+	}
+	cmd := CreateRootCmd(options)
+	req.NotNil(cmd)
+
+	cmd.SetArgs([]string{"kustomize", "nonexistent"})
+
+	err := cmd.ExecuteContext(t.Context())
+	req.Error(err)
+	req.Contains(err.Error(), "kustomization directory does not exist")
+	req.Contains(out.String(), "Usage:\n  iknitectl kustomize <directory> [destination]")
+}
+
+//nolint:paralleltest // Messing with home
+func TestRunRootCmd_ConfigError(t *testing.T) {
+	t.Parallel()
+	req := require.New(t)
+
+	fileExecutor, ok := host.NewMemMapFS().(host.FileExecutor)
+	req.True(ok, "MemMapFS should implement FileExecutor")
+
+	out := &bytes.Buffer{}
+	options := &RootOptions{
+		FileExecutor: fileExecutor,
+		out:          out,
+	}
+	cmd := CreateRootCmd(options)
+	req.NotNil(cmd)
+
+	cmd.SetArgs([]string{"kustomize", "nonexistent"})
+
+	oldHome := os.Getenv("HOME")
+	t.Cleanup(func() {
+		os.Setenv("HOME", oldHome)
+	})
+	os.Unsetenv("HOME")
+
+	err := cmd.ExecuteContext(t.Context())
+	req.Error(err)
+	req.Contains(err.Error(), "failed to initialize configuration")
 }

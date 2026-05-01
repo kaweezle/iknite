@@ -59,22 +59,17 @@ func CreateRootCmd(opts *RootOptions) *cobra.Command {
 It provides utilities for managing secrets, building artifacts, and other
 development tasks that are not part of the main iknite binary.`,
 		PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
-			err := opts.SetUpLogs(opts.out)
-			if err != nil {
-				return fmt.Errorf("failed to set up logs: %w", err)
-			}
-			err = util.InitializeConfiguration(cmd.Root(), viper.GetViper())
+			opts.SetUpLogs(cmd.OutOrStderr())
+			err := util.InitializeConfiguration(cmd.Root(), viper.GetViper())
 			if err != nil {
 				return fmt.Errorf("failed to initialize configuration: %w", err)
 			}
 			// Re-setup logs after configuration is loaded to apply any log-related settings from the config file
-			err = opts.SetUpLogs(opts.out)
-			if err != nil {
-				return fmt.Errorf("failed to set up logs: %w", err)
-			}
+			opts.SetUpLogs(cmd.OutOrStderr())
 			return nil
 		},
 	}
+	rootCmd.SetOut(opts.out)
 
 	opts.AddFlags(rootCmd.PersistentFlags())
 
@@ -92,6 +87,6 @@ development tasks that are not part of the main iknite binary.`,
 
 // Execute adds all child commands to the root command and sets flags appropriately.
 // This is called by main.main(). It only needs to happen once to the rootCmd.
-func Execute() {
+func Execute() { // nocov - This is the main entry point for the CLI, which is hard to test in CI
 	cobra.CheckErr(CreateRootCmd(nil).Execute())
 }

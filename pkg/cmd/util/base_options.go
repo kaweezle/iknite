@@ -34,11 +34,10 @@ func (opts *BaseOptions) AddFlags(flags *pflag.FlagSet) {
 }
 
 // setUpLogs configures logrus output and level.
-func (opts *BaseOptions) SetUpLogs(out io.Writer) error {
+func (opts *BaseOptions) SetUpLogs(out io.Writer) {
 	log.SetOutput(out)
 	if opts.JSONLogs {
 		log.SetFormatter(&log.JSONFormatter{})
 	}
 	log.SetLevel(opts.Verbosity)
-	return nil
 }
