@@ -51,8 +51,8 @@ func TestRootOptionsAndCreateRootCmd(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Messing with home
 func TestCreateRootCmd(t *testing.T) {
-	t.Parallel()
 	req := require.New(t)
 
 	cmd := CreateRootCmd(nil)
@@ -60,8 +60,8 @@ func TestCreateRootCmd(t *testing.T) {
 	req.Equal("iknitectl", cmd.Name())
 }
 
+//nolint:paralleltest // Messing with home
 func TestRunRootCmd_Path(t *testing.T) {
-	t.Parallel()
 	req := require.New(t)
 
 	fileExecutor, ok := host.NewMemMapFS().(host.FileExecutor)
@@ -101,10 +101,13 @@ func TestRunRootCmd_ConfigError(t *testing.T) {
 	cmd.SetArgs([]string{"kustomize", "nonexistent"})
 
 	oldHome := os.Getenv("HOME")
+	oldXDGConfigHome := os.Getenv("XDG_CONFIG_HOME")
 	t.Cleanup(func() {
 		os.Setenv("HOME", oldHome)
+		os.Setenv("XDG_CONFIG_HOME", oldXDGConfigHome)
 	})
 	os.Unsetenv("HOME")
+	os.Unsetenv("XDG_CONFIG_HOME")
 
 	err := cmd.ExecuteContext(t.Context())
 	req.Error(err)

@@ -1,4 +1,4 @@
-// cSpell: words testutil clientcmd readyz clusterroles
+// cSpell: words testutil clientcmd readyz clusterroles paralleltest
 package cmd
 
 import (
@@ -224,8 +224,8 @@ func (e *errorWriter) Write(_ []byte) (int, error) {
 	return 0, fmt.Errorf("write error")
 }
 
+//nolint:paralleltest // Kustomize is not parallel friendly
 func TestKustomizeCmd(t *testing.T) {
-	t.Parallel()
 	tests := []*KustomizeTestCase{
 		nominalTestCase,
 		{
@@ -299,7 +299,6 @@ func TestKustomizeCmd(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
 			req := require.New(t)
 			fs := host.NewMemMapFS()
 			kustomizationOptions := utils.NewKustomizeOptions()
