@@ -22,22 +22,23 @@ import (
 
 	"github.com/getsops/sops/v3/cmd/sops/formats"
 	"github.com/getsops/sops/v3/decrypt"
-	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 	"sigs.k8s.io/kustomize/kyaml/kio"
 	"sigs.k8s.io/kustomize/kyaml/yaml"
+
+	"github.com/kaweezle/iknite/pkg/host"
 )
 
 // SigningKeyOptions contains configuration for the signing-key command.
 type SigningKeyOptions struct {
-	Fs          afero.Fs
+	Fs          host.FileSystem
 	KeyName     string
 	SecretsFile string
 	DestDir     string
 }
 
 // CreateSigningKeyCmd creates the signing-key command with the given filesystem and options.
-func CreateSigningKeyCmd(fs afero.Fs, opts *SigningKeyOptions) *cobra.Command {
+func CreateSigningKeyCmd(fs host.FileSystem, opts *SigningKeyOptions) *cobra.Command {
 	if opts == nil {
 		opts = &SigningKeyOptions{
 			KeyName: "data.apk_signing_key",
@@ -78,7 +79,7 @@ Example:
 
 func InstallSigningKey(opts *SigningKeyOptions) error {
 	// Check if secrets file exists
-	exists, err := afero.Exists(opts.Fs, opts.SecretsFile)
+	exists, err := opts.Fs.Exists(opts.SecretsFile)
 	if err != nil {
 		return fmt.Errorf("failed to check if secrets file exists: %w", err)
 	}
@@ -90,7 +91,7 @@ func InstallSigningKey(opts *SigningKeyOptions) error {
 	fmt.Printf("Extracting signing key from %s...\n", opts.SecretsFile)
 
 	// Read the encrypted secrets file from the filesystem
-	encryptedData, err := afero.ReadFile(opts.Fs, opts.SecretsFile)
+	encryptedData, err := opts.Fs.ReadFile(opts.SecretsFile)
 	if err != nil {
 		return fmt.Errorf("failed to read secrets file: %w", err)
 	}
@@ -147,7 +148,7 @@ func InstallSigningKey(opts *SigningKeyOptions) error {
 	outputFile := filepath.Join(opts.DestDir, name+".rsa")
 
 	// Write the private key to file
-	if writeErr := afero.WriteFile(opts.Fs, outputFile, []byte(privateKey), 0o400); writeErr != nil {
+	if writeErr := opts.Fs.WriteFile(outputFile, []byte(privateKey), 0o400); writeErr != nil {
 		return fmt.Errorf("failed to write signing key file: %w", writeErr)
 	}
 

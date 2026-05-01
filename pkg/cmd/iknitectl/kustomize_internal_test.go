@@ -24,7 +24,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/spf13/afero"
+	"github.com/kaweezle/iknite/pkg/host"
 )
 
 const (
@@ -39,7 +39,7 @@ data:
 
 func TestCreateKustomizeCmd(t *testing.T) {
 	t.Parallel()
-	fs := afero.NewMemMapFs()
+	fs := host.NewMemMapFS()
 	out := &bytes.Buffer{}
 	cmd := CreateKustomizeCmd(fs, out)
 
@@ -54,7 +54,7 @@ func TestCreateKustomizeCmd(t *testing.T) {
 
 func TestRunKustomize_MissingDirectory(t *testing.T) {
 	t.Parallel()
-	fs := afero.NewMemMapFs()
+	fs := host.NewMemMapFS()
 	var out bytes.Buffer
 	err := runKustomize(fs, &out, []string{"/nonexistent"})
 	if err == nil {
@@ -64,7 +64,7 @@ func TestRunKustomize_MissingDirectory(t *testing.T) {
 
 func TestRunKustomize_MissingKustomizationFile(t *testing.T) {
 	t.Parallel()
-	fs := afero.NewMemMapFs()
+	fs := host.NewMemMapFS()
 
 	// Create directory but no kustomization.yaml
 	err := fs.MkdirAll("/test", 0o755)
@@ -110,7 +110,7 @@ resources:
 	}
 
 	// Test without destination (print to stdout)
-	fs := afero.NewOsFs()
+	fs := host.NewDefaultHost()
 	var out bytes.Buffer
 	err := runKustomize(fs, &out, []string{tmpDir})
 	if err != nil {
@@ -174,7 +174,7 @@ spec:
 	}
 
 	// Test with destination
-	fs := afero.NewOsFs()
+	fs := host.NewDefaultHost()
 	out := &bytes.Buffer{}
 	err := runKustomize(fs, out, []string{tmpDir, destDir})
 	if err != nil {
@@ -182,7 +182,7 @@ spec:
 	}
 
 	// Check that files were created
-	files, err := afero.ReadDir(fs, destDir)
+	files, err := fs.ReadDir(destDir)
 	if err != nil {
 		t.Fatalf("failed to read destination directory: %v", err)
 	}
@@ -240,7 +240,7 @@ resources:
 	}
 
 	// Create command and execute
-	fs := afero.NewOsFs()
+	fs := host.NewDefaultHost()
 	// Capture output
 	var stdout bytes.Buffer
 	cmd := CreateKustomizeCmd(fs, &stdout)

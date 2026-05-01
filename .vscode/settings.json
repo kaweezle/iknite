@@ -31,7 +31,8 @@
     "git add": true,
     "/home/alpine/go/bin/mockery": true,
     "make": true,
-    "jq": true
+    "jq": true,
+    "gofmt": true
   },
   "go.coverageDecorator": {
     "type": "gutter"

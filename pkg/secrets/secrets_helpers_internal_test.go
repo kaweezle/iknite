@@ -4,8 +4,9 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/spf13/afero"
 	"github.com/stretchr/testify/require"
+
+	"github.com/kaweezle/iknite/pkg/host"
 )
 
 func TestBuildSecretsPath(t *testing.T) {
@@ -66,7 +67,7 @@ func TestResolveSecretsInitPaths(t *testing.T) {
 		{
 			name: "defaults use home dir key",
 			opts: &Options{
-				Fs:          afero.NewMemMapFs(),
+				Fs:          host.NewMemMapFS(),
 				HomeDir:     "/home/tester",
 				SecretsFile: filepath.Join("workspace", DefaultSecretsFile),
 			},
@@ -75,7 +76,7 @@ func TestResolveSecretsInitPaths(t *testing.T) {
 		{
 			name: "missing home dir with no key file errors",
 			opts: &Options{
-				Fs:          afero.NewMemMapFs(),
+				Fs:          host.NewMemMapFS(),
 				SecretsFile: DefaultSecretsFile,
 			},
 			wantErr: true,
@@ -83,7 +84,7 @@ func TestResolveSecretsInitPaths(t *testing.T) {
 		{
 			name: "custom key file supported",
 			opts: &Options{
-				Fs:          afero.NewMemMapFs(),
+				Fs:          host.NewMemMapFS(),
 				HomeDir:     "/home/tester",
 				SecretsFile: DefaultSecretsFile,
 				KeyFile:     "~/.ssh/custom",
@@ -119,7 +120,7 @@ func TestEncryptAndLoadSecretsErrorPaths(t *testing.T) {
 	_, err := encryptSecretsPlaintext(DefaultSecretsFile, []byte(""), "invalid-recipient")
 	req.Error(err)
 
-	opts := &Options{Fs: afero.NewMemMapFs(), SecretsFile: filepath.Join("tmp", "missing.yaml")}
+	opts := &Options{Fs: host.NewMemMapFS(), SecretsFile: filepath.Join("tmp", "missing.yaml")}
 	_, err = loadAndDecryptSecrets(opts)
 	req.Error(err)
 	req.Contains(err.Error(), "secrets file not found")

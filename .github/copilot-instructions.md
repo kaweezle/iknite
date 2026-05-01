@@ -454,6 +454,10 @@ Keep commits atomic and descriptive (see [CONTRIBUTING.md](../CONTRIBUTING.md)).
 5. **Race-prone globals in tests**: Avoid parallel tests when mutating global
    state (`viper`, `utils.Exec`, `utils.FS`, env vars). Prefer serialized tests
    with explicit cleanup, or refactor code to injected dependencies.
+6. **Iknitectl filesystem plumbing**: Prefer `host.FileSystem` for commands that
+   only touch files and `host.FileExecutor` only when command execution is
+   required. Do not thread `afero.Fs` through `pkg/cmd/iknitectl` root options
+   or command constructors.
 
 ## CI/CD
 

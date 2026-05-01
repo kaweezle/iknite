@@ -23,17 +23,16 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
 
-	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 	"sigs.k8s.io/kustomize/api/provider"
 	"sigs.k8s.io/kustomize/api/resmap"
 	"sigs.k8s.io/yaml"
 
+	"github.com/kaweezle/iknite/pkg/host"
 	"github.com/kaweezle/iknite/pkg/kustomize"
 )
 
@@ -62,9 +61,9 @@ type argoApplication struct {
 
 // detectAppType auto-detects the application type from a directory.
 // It returns the type, the resolved path (helmfile path or dir), and any error.
-func detectAppType(fs afero.Fs, dir string) (appType, string, error) {
+func detectAppType(fileExecutor host.FileExecutor, dir string) (appType, string, error) {
 	kustomizationFile := filepath.Join(dir, "kustomization.yaml")
-	exists, err := afero.Exists(fs, kustomizationFile)
+	exists, err := fileExecutor.Exists(kustomizationFile)
 	if err != nil {
 		return appTypeUnknown, "", fmt.Errorf("failed to check kustomization.yaml: %w", err)
 	}
@@ -74,7 +73,7 @@ func detectAppType(fs afero.Fs, dir string) (appType, string, error) {
 
 	for _, name := range []string{"helmfile.yaml", "helmfile.yaml.gotmpl"} {
 		helmfileFile := filepath.Join(dir, name)
-		exists, err = afero.Exists(fs, helmfileFile)
+		exists, err = fileExecutor.Exists(helmfileFile)
 		if err != nil {
 			return appTypeUnknown, "", fmt.Errorf("failed to check %s: %w", name, err)
 		}
@@ -84,7 +83,7 @@ func detectAppType(fs afero.Fs, dir string) (appType, string, error) {
 	}
 
 	chartFile := filepath.Join(dir, "Chart.yaml")
-	exists, err = afero.Exists(fs, chartFile)
+	exists, err = fileExecutor.Exists(chartFile)
 	if err != nil {
 		return appTypeUnknown, "", fmt.Errorf("failed to check Chart.yaml: %w", err)
 	}
@@ -95,49 +94,49 @@ func detectAppType(fs afero.Fs, dir string) (appType, string, error) {
 	return appTypeUnknown, "", nil
 }
 
-func runCommandToResmap(cmd *exec.Cmd) (resmap.ResMap, error) {
+func runCommandToResmap(
+	ctx context.Context,
+	fileExecutor host.FileExecutor,
+	options *host.CommandOptions,
+) (resmap.ResMap, error) {
 	var stdout, stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-	if err := cmd.Run(); err != nil {
-		return nil, fmt.Errorf("command %s failed: %w\n%s", cmd.Path, err, stderr.String())
+	runOptions := *options
+	runOptions.Stdout = &stdout
+	runOptions.Stderr = &stderr
+	if err := fileExecutor.RunCommand(ctx, &runOptions); err != nil {
+		return nil, fmt.Errorf("command %s failed: %w\n%s", runOptions.Cmd, err, stderr.String())
 	}
 	result, err := resmap.NewFactory(provider.NewDefaultDepProvider().GetResourceFactory()).
 		NewResMapFromBytes(stdout.Bytes())
 	if err != nil {
-		return nil, fmt.Errorf("failed to create resmap from %s output: %w", cmd.Path, err)
+		return nil, fmt.Errorf("failed to create resmap from %s output: %w", runOptions.Cmd, err)
 	}
 	return result, nil
 }
 
 // renderHelmfile runs helmfile template and returns the YAML output.
-func renderHelmfile(helmfileFile string) (resmap.ResMap, error) {
-	return runCommandToResmap(
-		exec.CommandContext(
-			context.Background(),
-			"helmfile",
-			"template",
-			"--skip-tests",
-			"--args=--skip-crds",
-			"-f",
-			helmfileFile,
-		),
-	)
+func renderHelmfile(ctx context.Context, fileExecutor host.FileExecutor, helmfileFile string) (resmap.ResMap, error) {
+	return runCommandToResmap(ctx, fileExecutor, &host.CommandOptions{
+		Cmd:  "helmfile",
+		Args: []string{"template", "--skip-tests", "--args=--skip-crds", "-f", helmfileFile},
+	})
 }
 
 // renderHelm runs helm template and returns the YAML output.
-func renderHelm(dir string) (resmap.ResMap, error) {
+func renderHelm(ctx context.Context, fileExecutor host.FileExecutor, dir string) (resmap.ResMap, error) {
 	releaseName := filepath.Base(dir)
 
-	cmd := exec.CommandContext(context.Background(), "helm", "template", releaseName, dir, "--skip-crds")
-	return runCommandToResmap(cmd)
+	return runCommandToResmap(ctx, fileExecutor, &host.CommandOptions{
+		Cmd:  "helm",
+		Args: []string{"template", releaseName, dir, "--skip-crds"},
+	})
 }
 
 // renderApp renders an application directory and returns the YAML output.
 // For kustomize apps it uses Go code; for helmfile and helm it invokes the
 // respective external commands.
-func renderApp(fs afero.Fs, dir string) (resmap.ResMap, error) {
-	appT, path, err := detectAppType(fs, dir)
+func renderApp(ctx context.Context, fileExecutor host.FileExecutor, dir string) (resmap.ResMap, error) {
+	appT, path, err := detectAppType(fileExecutor, dir)
 	if err != nil {
 		return nil, err
 	}
@@ -146,11 +145,11 @@ func renderApp(fs afero.Fs, dir string) (resmap.ResMap, error) {
 	var buildErr error
 	switch appT {
 	case appTypeKustomize:
-		resources, buildErr = kustomize.Build(path)
+		resources, buildErr = kustomize.BuildOnFileSystem(host.NewKustomizeFSWrapper(fileExecutor), path)
 	case appTypeHelmfile:
-		resources, buildErr = renderHelmfile(path)
+		resources, buildErr = renderHelmfile(ctx, fileExecutor, path)
 	case appTypeHelm:
-		resources, buildErr = renderHelm(path)
+		resources, buildErr = renderHelm(ctx, fileExecutor, path)
 	case appTypeUnknown:
 		return nil, fmt.Errorf(
 			//nolint:lll // long error message
@@ -166,13 +165,19 @@ func renderApp(fs afero.Fs, dir string) (resmap.ResMap, error) {
 
 // renderAppWithOutput renders an application and writes output to stdout or
 // splits into destDir.
-func renderAppWithOutput(fs afero.Fs, out io.Writer, dir, destDir string) error {
-	resources, err := renderApp(fs, dir)
+func renderAppWithOutput(
+	ctx context.Context,
+	fileExecutor host.FileExecutor,
+	out io.Writer,
+	dir,
+	destDir string,
+) error {
+	resources, err := renderApp(ctx, fileExecutor, dir)
 	if err != nil {
 		return fmt.Errorf("while rendering with output: %w", err)
 	}
 	if destDir != "" {
-		err = kustomize.SplitResMapToDir(fs, resources, destDir)
+		err = kustomize.SplitResMapToDir(fileExecutor, resources, destDir)
 		if err != nil {
 			return fmt.Errorf("failed to split resources to directory: %w", err)
 		}
@@ -192,7 +197,12 @@ func renderAppWithOutput(fs afero.Fs, out io.Writer, dir, destDir string) error 
 
 // runKubeconform runs kubeconform validation on the provided YAML data.
 // SchemasDir may be empty to skip the local schema location.
-func runKubeconform(resources resmap.ResMap, schemasDir string) error {
+func runKubeconform(
+	ctx context.Context,
+	fileExecutor host.FileExecutor,
+	resources resmap.ResMap,
+	schemasDir string,
+) error {
 	args := []string{"-schema-location", "default"}
 	if schemasDir != "" {
 		args = append(args, "-schema-location",
@@ -207,23 +217,31 @@ func runKubeconform(resources resmap.ResMap, schemasDir string) error {
 		"https://raw.githubusercontent.com/yannh/kubernetes-json-schema/master/master/customresourcedefinition.json",
 		"-summary",
 	)
-	cmd := exec.CommandContext(context.Background(), "kubeconform", args...)
 	data, err := resources.AsYaml()
 	if err != nil {
 		return fmt.Errorf("failed to convert resources to YAML: %w", err)
 	}
-	cmd.Stdin = bytes.NewReader(data)
-	cmd.Stdout = os.Stderr
-	cmd.Stderr = os.Stderr
-	if err := cmd.Run(); err != nil {
+	if err := fileExecutor.RunCommand(ctx, &host.CommandOptions{
+		Cmd:    "kubeconform",
+		Args:   args,
+		Stdin:  bytes.NewReader(data),
+		Stdout: os.Stderr,
+		Stderr: os.Stderr,
+	}); err != nil {
 		return fmt.Errorf("kubeconform validation failed: %w", err)
 	}
 	return nil
 }
 
 // runValidateApp validates an application directory.
-func runValidateApp(fs afero.Fs, _ io.Writer, dir, schemasDir string) error {
-	exists, err := afero.DirExists(fs, dir)
+func runValidateApp(
+	ctx context.Context,
+	fileExecutor host.FileExecutor,
+	_ io.Writer,
+	dir,
+	schemasDir string,
+) error {
+	exists, err := fileExecutor.DirExists(dir)
 	if err != nil {
 		return fmt.Errorf("failed to check directory: %w", err)
 	}
@@ -231,28 +249,34 @@ func runValidateApp(fs afero.Fs, _ io.Writer, dir, schemasDir string) error {
 		return fmt.Errorf("directory does not exist: %s", dir)
 	}
 
-	yamlData, err := renderApp(fs, dir)
+	yamlData, err := renderApp(ctx, fileExecutor, dir)
 	if err != nil {
 		return err
 	}
-	return runKubeconform(yamlData, schemasDir)
+	return runKubeconform(ctx, fileExecutor, yamlData, schemasDir)
 }
 
 // runRenderApp renders an application directory to stdout or a destination directory.
-func runRenderApp(fs afero.Fs, out io.Writer, dir, destDir string) error {
-	exists, err := afero.DirExists(fs, dir)
+func runRenderApp(
+	ctx context.Context,
+	fileExecutor host.FileExecutor,
+	out io.Writer,
+	dir,
+	destDir string,
+) error {
+	exists, err := fileExecutor.DirExists(dir)
 	if err != nil {
 		return fmt.Errorf("failed to check directory: %w", err)
 	}
 	if !exists {
 		return fmt.Errorf("directory does not exist: %s", dir)
 	}
-	return renderAppWithOutput(fs, out, dir, destDir)
+	return renderAppWithOutput(ctx, fileExecutor, out, dir, destDir)
 }
 
 // parseApplicationsFromDir parses Application resources from YAML files in a directory.
-func parseApplicationsFromDir(fs afero.Fs, manifestsDir string) ([]argoApplication, error) {
-	files, err := afero.ReadDir(fs, manifestsDir)
+func parseApplicationsFromDir(fileExecutor host.FileExecutor, manifestsDir string) ([]argoApplication, error) {
+	files, err := fileExecutor.ReadDir(manifestsDir)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read directory %s: %w", manifestsDir, err)
 	}
@@ -266,7 +290,7 @@ func parseApplicationsFromDir(fs afero.Fs, manifestsDir string) ([]argoApplicati
 		if !strings.HasSuffix(file.Name(), ".yaml") {
 			continue
 		}
-		data, err := afero.ReadFile(fs, filepath.Join(manifestsDir, file.Name()))
+		data, err := fileExecutor.ReadFile(filepath.Join(manifestsDir, file.Name()))
 		if err != nil {
 			return nil, fmt.Errorf("failed to read %s: %w", file.Name(), err)
 		}
@@ -284,8 +308,15 @@ func parseApplicationsFromDir(fs afero.Fs, manifestsDir string) ([]argoApplicati
 // runRenderAll renders all appstages in an environment, mirroring render-environment.sh.
 //
 //nolint:gocyclo // complex function but straightforward flow
-func runRenderAll(fs afero.Fs, out io.Writer, appstagesDir, destDir, baseDir string) error {
-	exists, err := afero.DirExists(fs, appstagesDir)
+func runRenderAll(
+	ctx context.Context,
+	fileExecutor host.FileExecutor,
+	out io.Writer,
+	appstagesDir,
+	destDir,
+	baseDir string,
+) error {
+	exists, err := fileExecutor.DirExists(appstagesDir)
 	if err != nil {
 		return fmt.Errorf("failed to check appstages directory: %w", err)
 	}
@@ -293,14 +324,14 @@ func runRenderAll(fs afero.Fs, out io.Writer, appstagesDir, destDir, baseDir str
 		return fmt.Errorf("appstages directory not found: %s", appstagesDir)
 	}
 
-	if err = fs.RemoveAll(destDir); err != nil {
+	if err = fileExecutor.RemoveAll(destDir); err != nil {
 		return fmt.Errorf("failed to remove destination directory: %w", err)
 	}
-	if err = fs.MkdirAll(destDir, 0o755); err != nil {
+	if err = fileExecutor.MkdirAll(destDir, 0o755); err != nil {
 		return fmt.Errorf("failed to create destination directory: %w", err)
 	}
 
-	entries, err := afero.ReadDir(fs, appstagesDir)
+	entries, err := fileExecutor.ReadDir(appstagesDir)
 	if err != nil {
 		return fmt.Errorf("failed to read appstages directory: %w", err)
 	}
@@ -324,15 +355,15 @@ func runRenderAll(fs afero.Fs, out io.Writer, appstagesDir, destDir, baseDir str
 
 		fmt.Fprintf(out, "Rendering appstage %s\n", appstageName) //nolint:errcheck // best effort logging
 
-		resources, runErr := kustomize.Build(appstageDir)
+		resources, runErr := kustomize.BuildOnFileSystem(host.NewKustomizeFSWrapper(fileExecutor), appstageDir)
 		if runErr != nil {
 			return fmt.Errorf("failed to render appstage %s: %w", appstageName, runErr)
 		}
-		if err = kustomize.SplitResMapToDir(fs, resources, manifestsDir); err != nil {
+		if err = kustomize.SplitResMapToDir(fileExecutor, resources, manifestsDir); err != nil {
 			return fmt.Errorf("failed to write manifests for appstage %s: %w", appstageName, err)
 		}
 
-		apps, err := parseApplicationsFromDir(fs, manifestsDir)
+		apps, err := parseApplicationsFromDir(fileExecutor, manifestsDir)
 		if err != nil {
 			return fmt.Errorf("failed to parse applications for appstage %s: %w", appstageName, err)
 		}
@@ -348,7 +379,13 @@ func runRenderAll(fs afero.Fs, out io.Writer, appstagesDir, destDir, baseDir str
 			//nolint:errcheck // best effort logging
 			fmt.Fprintf(out, "Rendering application %s from %s\n", app.Metadata.Name, app.Spec.Source.Path)
 
-			if renderErr := renderAppWithOutput(fs, out, appSourceDir, appDestDir); renderErr != nil {
+			if renderErr := renderAppWithOutput(
+				ctx,
+				fileExecutor,
+				out,
+				appSourceDir,
+				appDestDir,
+			); renderErr != nil {
 				return fmt.Errorf("failed to render application %s: %w", app.Metadata.Name, renderErr)
 			}
 		}
@@ -358,7 +395,11 @@ func runRenderAll(fs afero.Fs, out io.Writer, appstagesDir, destDir, baseDir str
 }
 
 // CreateApplicationCmd creates the application command with validate, render, and render-all subcommands.
-func CreateApplicationCmd(fs afero.Fs, out io.Writer) *cobra.Command {
+func CreateApplicationCmd(fileExecutor host.FileExecutor, out io.Writer) *cobra.Command {
+	if fileExecutor == nil {
+		fileExecutor = host.NewDefaultHost()
+	}
+
 	appCmd := &cobra.Command{
 		Use:   "application",
 		Short: "Manage ArgoCD applications",
@@ -380,8 +421,8 @@ The application type is auto-detected. Kustomize apps are built with Go code;
 helmfile and helm apps invoke the respective external commands. The output is
 then validated with kubeconform.`,
 		Args: cobra.ExactArgs(1),
-		RunE: func(_ *cobra.Command, args []string) error {
-			return runValidateApp(fs, out, args[0], schemasDir)
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runValidateApp(cmd.Context(), fileExecutor, out, args[0], schemasDir)
 		},
 	}
 	validateCmd.Flags().StringVar(&schemasDir, "schemas-dir", "",
@@ -398,8 +439,8 @@ The application type is auto-detected. Kustomize apps are built with Go code;
 helmfile and helm apps invoke the respective external commands.
 With --output, resources are split into individual <Kind>-<name>.yaml files.`,
 		Args: cobra.ExactArgs(1),
-		RunE: func(_ *cobra.Command, args []string) error {
-			return runRenderApp(fs, out, args[0], renderDestDir)
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runRenderApp(cmd.Context(), fileExecutor, out, args[0], renderDestDir)
 		},
 	}
 	renderCmd.Flags().StringVarP(&renderDestDir, "output", "o", "",
@@ -416,8 +457,8 @@ Processes each appstage-* directory found in <appstages-dir>, renders its
 kustomization manifests, then renders each referenced ArgoCD Application to
 <destination-dir>/<appstage>/applications/<app-name>/.`,
 		Args: cobra.ExactArgs(2),
-		RunE: func(_ *cobra.Command, args []string) error {
-			return runRenderAll(fs, out, args[0], args[1], baseDir)
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runRenderAll(cmd.Context(), fileExecutor, out, args[0], args[1], baseDir)
 		},
 	}
 	renderAllCmd.Flags().StringVar(&baseDir, "base-dir", ".",

@@ -4,15 +4,16 @@ package iknitectl
 import (
 	"testing"
 
-	"github.com/spf13/afero"
 	"github.com/stretchr/testify/require"
+
+	"github.com/kaweezle/iknite/pkg/host"
 )
 
 func TestCreateInstallCmd(t *testing.T) {
 	t.Parallel()
 	req := require.New(t)
 
-	cmd := CreateInstallCmd(afero.NewMemMapFs())
+	cmd := CreateInstallCmd(host.NewMemMapFS())
 	req.NotNil(cmd)
 	req.Equal("install", cmd.Name())
 
@@ -28,7 +29,7 @@ func TestRootOptionsAndCreateRootCmd(t *testing.T) {
 
 	opts := NewRootOptions()
 	req.NotNil(opts)
-	req.NotNil(opts.Fs)
+	req.NotNil(opts.FileExecutor)
 
 	root := CreateRootCmd(opts)
 	req.NotNil(root)

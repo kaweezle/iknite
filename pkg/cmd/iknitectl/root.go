@@ -20,26 +20,27 @@ import (
 	"io"
 	"os"
 
-	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
 	"github.com/kaweezle/iknite/pkg/cmd/secrets"
 	"github.com/kaweezle/iknite/pkg/cmd/util"
+	"github.com/kaweezle/iknite/pkg/host"
 )
 
 // RootOptions contains configuration for the root command.
 type RootOptions struct {
-	Fs  afero.Fs
-	out io.Writer
+	FileExecutor host.FileExecutor
+	out          io.Writer
 	util.BaseOptions
 }
 
 func NewRootOptions() *RootOptions {
+	defaultHost := host.NewDefaultHost()
 	opts := &RootOptions{
-		BaseOptions: *util.DefaultBaseOptions(),
-		Fs:          afero.NewOsFs(),
-		out:         os.Stdout,
+		BaseOptions:  *util.DefaultBaseOptions(),
+		FileExecutor: defaultHost,
+		out:          os.Stdout,
 	}
 	return opts
 }
@@ -78,10 +79,10 @@ development tasks that are not part of the main iknite binary.`,
 	opts.AddFlags(rootCmd.PersistentFlags())
 
 	// Add subcommands
-	rootCmd.AddCommand(CreateInstallCmd(opts.Fs))
-	rootCmd.AddCommand(CreateKustomizeCmd(opts.Fs, opts.out))
-	rootCmd.AddCommand(CreateApplicationCmd(opts.Fs, opts.out))
-	rootCmd.AddCommand(secrets.CreateSecretsCmd(opts.Fs, nil))
+	rootCmd.AddCommand(CreateInstallCmd(opts.FileExecutor))
+	rootCmd.AddCommand(CreateKustomizeCmd(opts.FileExecutor, opts.out))
+	rootCmd.AddCommand(CreateApplicationCmd(opts.FileExecutor, opts.out))
+	rootCmd.AddCommand(secrets.CreateSecretsCmd(opts.FileExecutor, nil))
 	util.AddConfigFlag(rootCmd)
 
 	util.BindFlagsToViper(rootCmd, viper.GetViper())

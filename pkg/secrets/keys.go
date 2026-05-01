@@ -7,9 +7,10 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/spf13/afero"
 	"golang.org/x/crypto/ed25519"
 	"golang.org/x/crypto/ssh"
+
+	"github.com/kaweezle/iknite/pkg/host"
 )
 
 type sshKeyInfo struct {
@@ -58,8 +59,8 @@ func sshAuthorizedKeyFromPrivateKey(privateKeyBytes []byte, comment string) (str
 	return marshalAuthorizedKey(sshPublicKey, comment), nil
 }
 
-func readAuthorizedKeyFromPublicKeyFile(fs afero.Fs, publicKeyFile string) (string, error) {
-	publicKeyBytes, readErr := afero.ReadFile(fs, publicKeyFile)
+func readAuthorizedKeyFromPublicKeyFile(fs host.FileSystem, publicKeyFile string) (string, error) {
+	publicKeyBytes, readErr := fs.ReadFile(publicKeyFile)
 	if readErr != nil {
 		return "", fmt.Errorf("failed to read public key file: %w", readErr)
 	}
@@ -73,7 +74,7 @@ func readAuthorizedKeyFromPublicKeyFile(fs afero.Fs, publicKeyFile string) (stri
 	return marshalAuthorizedKey(parsedKey, parsedComment), nil
 }
 
-func createKeyPair(fs afero.Fs, keyFile, publicKeyFile, comment string) (*sshKeyInfo, error) {
+func createKeyPair(fs host.FileSystem, keyFile, publicKeyFile, comment string) (*sshKeyInfo, error) {
 	result := &sshKeyInfo{Generated: true}
 
 	if mkdirErr := fs.MkdirAll(filepath.Dir(keyFile), 0o700); mkdirErr != nil {
@@ -97,7 +98,7 @@ func createKeyPair(fs afero.Fs, keyFile, publicKeyFile, comment string) (*sshKey
 	privateKeyBytes := pem.EncodeToMemory(privateKeyBlock)
 	result.PrivateKeyPEM = strings.TrimRight(string(privateKeyBytes), "\n")
 
-	if writeErr := afero.WriteFile(fs, keyFile, privateKeyBytes, 0o600); writeErr != nil {
+	if writeErr := fs.WriteFile(keyFile, privateKeyBytes, 0o600); writeErr != nil {
 		return nil, fmt.Errorf("failed to write private key file: %w", writeErr)
 	}
 
@@ -111,12 +112,12 @@ func createKeyPair(fs afero.Fs, keyFile, publicKeyFile, comment string) (*sshKey
 }
 
 // ensureSSHKeyPair checks for the existence of the SSH key pair and generates it if necessary.
-func ensureSSHKeyPair(fs afero.Fs, keyFile, publicKeyFile string) (*sshKeyInfo, error) {
-	privateExists, err := afero.Exists(fs, keyFile)
+func ensureSSHKeyPair(fs host.FileSystem, keyFile, publicKeyFile string) (*sshKeyInfo, error) {
+	privateExists, err := fs.Exists(keyFile)
 	if err != nil {
 		return nil, fmt.Errorf("failed to check key file: %w", err)
 	}
-	publicExists, err := afero.Exists(fs, publicKeyFile)
+	publicExists, err := fs.Exists(publicKeyFile)
 	if err != nil {
 		return nil, fmt.Errorf("failed to check public key file: %w", err)
 	}
@@ -136,7 +137,7 @@ func ensureSSHKeyPair(fs afero.Fs, keyFile, publicKeyFile string) (*sshKeyInfo, 
 	}
 
 	if privateExists {
-		privateKeyBytes, readErr := afero.ReadFile(fs, keyFile)
+		privateKeyBytes, readErr := fs.ReadFile(keyFile)
 		if readErr != nil {
 			return nil, fmt.Errorf("failed to read key file: %w", readErr)
 		}
@@ -161,8 +162,8 @@ func ensureSSHKeyPair(fs afero.Fs, keyFile, publicKeyFile string) (*sshKeyInfo, 
 	return createKeyPair(fs, keyFile, publicKeyFile, comment)
 }
 
-func writePublicKeyFile(fs afero.Fs, publicKeyFile, authorizedKey string) error {
-	if writeErr := afero.WriteFile(fs, publicKeyFile, []byte(authorizedKey+"\n"), 0o644); writeErr != nil {
+func writePublicKeyFile(fs host.FileSystem, publicKeyFile, authorizedKey string) error {
+	if writeErr := fs.WriteFile(publicKeyFile, []byte(authorizedKey+"\n"), 0o644); writeErr != nil {
 		return fmt.Errorf("failed to write public key file: %w", writeErr)
 	}
 	return nil
