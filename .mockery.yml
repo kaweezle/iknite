@@ -58,3 +58,7 @@ packages:
         mdnsData,
         prepareHostData,
       }
+  github.com/kaweezle/iknite/pkg/checkers:
+    config:
+      dir: mocks/{{.InterfaceDirRelative}}
+    interfaces: { CheckWorkloadData}

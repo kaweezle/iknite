@@ -136,16 +136,21 @@ func LoadIkniteCluster(fs host.FileSystem) (*IkniteCluster, error) {
 	return ikniteCluster, nil
 }
 
+func NewDefaultIkniteCluster() *IkniteCluster {
+	ikniteCluster := &IkniteCluster{
+		TypeMeta: metaV1.TypeMeta{
+			Kind:       ikniteApi.IkniteClusterKind,
+			APIVersion: SchemeGroupVersion.String(),
+		},
+	}
+	SetDefaults_IkniteCluster(ikniteCluster)
+	return ikniteCluster
+}
+
 func LoadIkniteClusterOrDefault(fs host.FileSystem) (*IkniteCluster, error) {
 	ikniteCluster, err := LoadIkniteCluster(fs)
 	if errors.Is(err, os.ErrNotExist) {
-		ikniteCluster = &IkniteCluster{
-			TypeMeta: metaV1.TypeMeta{
-				Kind:       ikniteApi.IkniteClusterKind,
-				APIVersion: SchemeGroupVersion.String(),
-			},
-		}
-		SetDefaults_IkniteCluster(ikniteCluster)
+		ikniteCluster = NewDefaultIkniteCluster()
 	}
 	return ikniteCluster, nil
 }

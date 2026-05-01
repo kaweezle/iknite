@@ -44,7 +44,8 @@ repos:
       - id: check-json5
         exclude: |
           (?x)^(
-            .*/readyz.json
+            .*/readyz.json |
+            .*/healthz.json
           )$
 
   # Spell checking via cspell

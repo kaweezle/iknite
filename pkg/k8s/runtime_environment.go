@@ -32,7 +32,7 @@ import (
 )
 
 const (
-	RcConfPreventKubeletRunning = "rc_kubelet_need=\"non-existing-service\""
+	RcConfPreventServiceRunning = "rc_%s_need=\"non-existing-service\""
 	RcConfIkniteNeedsNetworking = "rc_iknite_need=\"networking\""
 )
 
@@ -75,20 +75,22 @@ func EnsureConfigFileHasConfigurationLine(fs host.FileSystem, confFilePath, line
 	return nil
 }
 
-// IsKubeletServiceRunnable checks if the kubelet service is allowed to be started by the OpenRC init system.
+// IsServiceRunnable checks if the kubelet service is allowed to be started by the OpenRC init system.
 // It does so by checking if the confFilePath file contains the line that prevents kubelet from being started.
-func IsKubeletServiceRunnable(fs host.FileSystem, confFilePath string) (bool, error) {
-	result, err := HasConfigFileConfigurationLine(fs, confFilePath, RcConfPreventKubeletRunning)
+func IsServiceRunnable(fs host.FileSystem, confFilePath, serviceName string) (bool, error) {
+	line := fmt.Sprintf(RcConfPreventServiceRunning, serviceName)
+	result, err := HasConfigFileConfigurationLine(fs, confFilePath, line)
 	if err != nil {
 		return result, err
 	}
 	return !result, err
 }
 
-// PreventKubeletServiceFromStarting ensures that the kubelet service is not started
+// PreventServiceFromStarting ensures that the kubelet service is not started
 // by the OpenRC init system. It does so by adding a line to the confFilePath file.
-func PreventKubeletServiceFromStarting(fs host.FileSystem, confFilePath string) error {
-	return EnsureConfigFileHasConfigurationLine(fs, confFilePath, RcConfPreventKubeletRunning)
+func PreventServiceFromStarting(fs host.FileSystem, confFilePath, serviceName string) error {
+	line := fmt.Sprintf(RcConfPreventServiceRunning, serviceName)
+	return EnsureConfigFileHasConfigurationLine(fs, confFilePath, line)
 }
 
 // MakeIkniteServiceNeedNetworking ensures that the iknite OpenRC service has a dependency on the networking service, by
@@ -317,7 +319,7 @@ func PrepareKubernetesEnvironment(
 	}
 
 	log.Info("Preventing Kubelet from being started by OpenRC...")
-	if err := PreventKubeletServiceFromStarting(alpineHost, constants.RcConfFile); err != nil {
+	if err := PreventServiceFromStarting(alpineHost, constants.RcConfFile, "kubelet"); err != nil {
 		return fmt.Errorf("while preventing kubelet service from starting: %w", err)
 	}
 

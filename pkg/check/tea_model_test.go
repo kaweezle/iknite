@@ -16,8 +16,8 @@ func TestCheckModelInitAndView(t *testing.T) {
 	t.Parallel()
 	req := require.New(t)
 
-	executor := &check.CheckExecutor{Results: []*check.CheckResult{}}
-	model := check.NewCheckModel(context.Background(), executor)
+	executor := check.NewCheckExecutor()
+	model := check.NewCheckModel(context.Background(), executor, nil)
 
 	cmd := model.Init()
 	req.NotNil(cmd)
@@ -28,27 +28,36 @@ func TestCheckModelView(t *testing.T) {
 	t.Parallel()
 	req := require.New(t)
 
-	done := make(chan struct{})
-	close(done)
+	executor := check.NewCheckExecutor()
+	executor.AddCheck(&check.Check{
+		Name:        "check-a",
+		Description: "desc-a",
+		CheckFn: func(_ context.Context, _ check.CheckData) (bool, string, error) {
+			return true, "ok", nil
+		},
+	})
+	executor.PrepareRun()
 
-	executor := &check.CheckExecutor{Results: []*check.CheckResult{{
-		Check:   &check.Check{Name: "a", Description: "check-a"},
-		Done:    done,
-		Status:  check.StatusSuccess,
-		Message: "ok",
-	}}}
-	model := check.NewCheckModel(context.Background(), executor)
-
+	model := check.NewCheckModel(t.Context(), executor, nil)
 	view := model.View()
-	req.Contains(view, "check-a")
+	req.Contains(view, "desc-a")
 }
 
 func TestCheckModelUpdateKeyCancelsContext(t *testing.T) {
 	t.Parallel()
 	req := require.New(t)
 
-	executor := &check.CheckExecutor{Results: []*check.CheckResult{}}
-	model := check.NewCheckModel(context.Background(), executor)
+	executor := check.NewCheckExecutor()
+	executor.AddCheck(&check.Check{
+		Name:        "check-a",
+		Description: "desc-a",
+		CheckFn: func(_ context.Context, _ check.CheckData) (bool, string, error) {
+			return true, "ok", nil
+		},
+	})
+	executor.PrepareRun()
+
+	model := check.NewCheckModel(context.Background(), executor, nil)
 
 	_, cmd := model.Update(tea.KeyMsg{})
 	req.NotNil(cmd)
@@ -71,13 +80,20 @@ func TestCheckModelUpdateDefaultBranches(t *testing.T) {
 		t.Parallel()
 		req := require.New(t)
 
-		done := make(chan struct{})
-		close(done)
-		executor := &check.CheckExecutor{Results: []*check.CheckResult{{
-			Check: &check.Check{Name: "a", Description: "a"},
-			Done:  done,
-		}}}
-		model := check.NewCheckModel(context.Background(), executor)
+		executor := check.NewCheckExecutor()
+		executor.AddCheck(&check.Check{
+			Name:        "a",
+			Description: "a",
+			CheckFn: func(_ context.Context, _ check.CheckData) (bool, string, error) {
+				return true, "ok", nil
+			},
+		})
+		executor.PrepareRun()
+		res := executor.Run(t.Context(), nil)
+		req.NotNil(res)
+		req.Len(res, 1)
+
+		model := check.NewCheckModel(t.Context(), executor, nil)
 
 		_, cmd := model.Update(struct{}{})
 		req.NotNil(cmd)
@@ -90,11 +106,16 @@ func TestCheckModelUpdateDefaultBranches(t *testing.T) {
 		t.Parallel()
 		req := require.New(t)
 
-		executor := &check.CheckExecutor{Results: []*check.CheckResult{{
-			Check: &check.Check{Name: "a", Description: "a"},
-			Done:  make(chan struct{}),
-		}}}
-		model := check.NewCheckModel(context.Background(), executor)
+		executor := check.NewCheckExecutor()
+		executor.AddCheck(&check.Check{
+			Name:        "a",
+			Description: "a",
+			CheckFn: func(_ context.Context, _ check.CheckData) (bool, string, error) {
+				return true, "ok", nil
+			},
+		})
+		executor.PrepareRun()
+		model := check.NewCheckModel(t.Context(), executor, nil)
 
 		_, cmd := model.Update(spinner.TickMsg{})
 		req.NotNil(cmd)

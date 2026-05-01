@@ -1,4 +1,6 @@
 // cSpell: words paralleltest
+//
+//nolint:errcheck // not checking setEnv
 package iknitectl
 
 import (

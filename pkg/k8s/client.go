@@ -163,17 +163,21 @@ func copyConfig(from *rest.Config) *rest.Config {
 	return &config
 }
 
-func RESTClient(r resource.RESTClientGetter) (rest.Interface, error) {
-	restconfig, err := r.ToRESTConfig()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get REST config for discovery: %w", err)
-	}
-	config := copyConfig(restconfig)
+func RESTClientFromConfig(restConfig *rest.Config) (rest.Interface, error) {
+	config := copyConfig(restConfig)
 	result, err := rest.UnversionedRESTClientFor(config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create REST client: %w", err)
 	}
 	return result, nil
+}
+
+func RESTClient(r resource.RESTClientGetter) (rest.Interface, error) {
+	restconfig, err := r.ToRESTConfig()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get REST config for discovery: %w", err)
+	}
+	return RESTClientFromConfig(restconfig)
 }
 
 func (r *Client) ToRawKubeConfigLoader() clientcmd.ClientConfig {

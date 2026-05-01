@@ -14,6 +14,7 @@ import (
 //nolint:interfacebloat // Interface is used to pass data between check and printer functions
 type CheckWorkloadData interface {
 	host.HostProvider
+	IkniteClusterSpec() *v1alpha1.IkniteClusterSpec
 	IsOk() bool
 	WorkloadCount() int
 	ReadyWorkloads() []*v1alpha1.WorkloadState
@@ -34,19 +35,23 @@ type CheckWorkloadData interface {
 }
 
 type checkWorkloadData struct {
-	startTime           time.Time
-	waitOptions         *utils.WaitOptions
-	alpineHost          host.Host
-	apiAdvertiseAddress string
-	readyWorkloads      []*v1alpha1.WorkloadState
-	notReadyWorkloads   []*v1alpha1.WorkloadState
-	workloadCount       int
-	iteration           int
-	okIterations        int
-	ok                  bool
+	ikniteConfig      *v1alpha1.IkniteClusterSpec
+	startTime         time.Time
+	waitOptions       *utils.WaitOptions
+	alpineHost        host.Host
+	readyWorkloads    []*v1alpha1.WorkloadState
+	notReadyWorkloads []*v1alpha1.WorkloadState
+	workloadCount     int
+	iteration         int
+	okIterations      int
+	ok                bool
 }
 
 var _ CheckWorkloadData = (*checkWorkloadData)(nil)
+
+func (c *checkWorkloadData) IkniteClusterSpec() *v1alpha1.IkniteClusterSpec {
+	return c.ikniteConfig
+}
 
 func (c *checkWorkloadData) IsOk() bool {
 	return c.ok
@@ -108,7 +113,7 @@ func (c *checkWorkloadData) Duration() time.Duration {
 }
 
 func (c *checkWorkloadData) ApiAdvertiseAddress() string {
-	return c.apiAdvertiseAddress
+	return c.ikniteConfig.GetApiEndPoint()
 }
 
 func (c *checkWorkloadData) ManifestDir() string {
@@ -124,13 +129,13 @@ func (c *checkWorkloadData) Host() host.Host {
 }
 
 func CreateCheckWorkloadData(
-	apiAdvertiseAddress string,
+	ikniteConfig *v1alpha1.IkniteClusterSpec,
 	waitOptions *utils.WaitOptions,
 	alpineHost host.Host,
 ) check.CheckData {
 	return &checkWorkloadData{
-		apiAdvertiseAddress: apiAdvertiseAddress,
-		waitOptions:         waitOptions,
-		alpineHost:          alpineHost,
+		ikniteConfig: ikniteConfig,
+		waitOptions:  waitOptions,
+		alpineHost:   alpineHost,
 	}
 }

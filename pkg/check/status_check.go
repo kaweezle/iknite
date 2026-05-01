@@ -45,7 +45,7 @@ type CheckDataBuilder func() CheckData
 
 type CheckFn func(ctx context.Context, data CheckData) (bool, string, error)
 
-type CustomResultPrinter func(result *CheckResult, prefix string, spinView string) string
+type CustomResultPrinter func(result *CheckResult, data CheckData, prefix string, spinView string) string
 
 type Check struct {
 	CheckFn       CheckFn
@@ -59,7 +59,6 @@ type Check struct {
 
 type CheckResult struct {
 	Error         error
-	CheckData     CheckData
 	Check         *Check
 	Done          chan struct{}
 	Message       string
@@ -74,17 +73,16 @@ type CheckExecutor struct {
 	Results       []*CheckResult
 }
 
-func (c *Check) NewResult(checkData CheckData) *CheckResult {
+func (c *Check) NewResult() *CheckResult {
 	subResults := make([]*CheckResult, 0, len(c.SubChecks))
 	for _, subCheck := range c.SubChecks {
-		subResults = append(subResults, subCheck.NewResult(checkData))
+		subResults = append(subResults, subCheck.NewResult())
 	}
 
 	return &CheckResult{
 		Check:      c,
 		SubResults: subResults,
 		Done:       make(chan struct{}),
-		CheckData:  checkData,
 	}
 }
 
@@ -112,9 +110,9 @@ func (r *CheckResult) FillDependencies(resultNameMap map[string]*CheckResult) {
 	}
 }
 
-func (c *CheckResult) CheckFn(ctx context.Context) *CheckResult {
+func (c *CheckResult) CheckFn(ctx context.Context, checkData CheckData) *CheckResult {
 	if c.Check.CheckFn != nil {
-		success, message, err := c.Check.CheckFn(ctx, c.CheckData)
+		success, message, err := c.Check.CheckFn(ctx, checkData)
 		c.Message = message
 		c.Error = err
 		if success {
@@ -172,7 +170,7 @@ func (c *CheckResult) waitForSubChecks(ctx context.Context) bool {
 	return result
 }
 
-func (c *CheckResult) Run(ctx context.Context) {
+func (c *CheckResult) Run(ctx context.Context, checkData CheckData) {
 	go func() {
 		defer close(c.Done)
 
@@ -188,7 +186,7 @@ func (c *CheckResult) Run(ctx context.Context) {
 		// If check has subChecks, run them all concurrently
 		if len(c.SubResults) > 0 {
 			for _, subResult := range c.SubResults {
-				subResult.Run(ctx)
+				subResult.Run(ctx, checkData)
 			}
 
 			c.waitForSubChecks(ctx)
@@ -196,7 +194,7 @@ func (c *CheckResult) Run(ctx context.Context) {
 		}
 
 		// No subChecks, run the check function if available
-		c.CheckFn(ctx)
+		c.CheckFn(ctx, checkData)
 	}()
 }
 
@@ -226,10 +224,10 @@ func FillResultNameMap(
 }
 
 // PrepareChecks prepares the checks for running.
-func PrepareChecks(checks []*Check, checkData CheckData) []*CheckResult {
+func PrepareChecks(checks []*Check) []*CheckResult {
 	results := make([]*CheckResult, 0, len(checks))
 	for _, check := range checks {
-		results = append(results, check.NewResult(checkData))
+		results = append(results, check.NewResult())
 	}
 
 	resultNameMap := FillResultNameMap(results, nil)
@@ -241,26 +239,28 @@ func PrepareChecks(checks []*Check, checkData CheckData) []*CheckResult {
 }
 
 // RunChecks runs the checks.
-func RunChecks(ctx context.Context, results []*CheckResult) []*CheckResult {
+func RunChecks(ctx context.Context, results []*CheckResult, checkData CheckData) []*CheckResult {
 	for _, result := range results {
-		result.Run(ctx)
+		result.Run(ctx, checkData)
 	}
 	return results
 }
 
 // NewCheckExecutor creates a new CheckExecutor.
-func NewCheckExecutor(checks []*Check, checkData CheckData) *CheckExecutor {
-	e := &CheckExecutor{
-		Checks:        checks,
-		Results:       PrepareChecks(checks, checkData),
-		resultNameMap: nil,
-	}
+func NewCheckExecutor() *CheckExecutor {
+	return &CheckExecutor{}
+}
+
+func (e *CheckExecutor) PrepareRun() {
+	e.Results = PrepareChecks(e.Checks)
 	e.resultNameMap = FillResultNameMap(e.Results, e.resultNameMap)
 	for _, result := range e.Results {
 		result.FillDependencies(e.resultNameMap)
 	}
+}
 
-	return e
+func (e *CheckExecutor) AddCheck(check ...*Check) {
+	e.Checks = append(e.Checks, check...)
 }
 
 var (
@@ -293,7 +293,7 @@ func (result *CheckResult) StatusString(spinView string) string {
 	return statusStyle.Render(status)
 }
 
-func (result *CheckResult) FormatResult(prefix, spinView string) string {
+func (result *CheckResult) FormatResult(prefix string, checkData CheckData, spinView string) string {
 	status := result.StatusString(spinView)
 
 	description := result.Check.Description
@@ -313,25 +313,25 @@ func (result *CheckResult) FormatResult(prefix, spinView string) string {
 
 	if len(result.SubResults) > 0 {
 		for _, subResult := range result.SubResults {
-			output.WriteString(subResult.Format(prefix+"  ", spinView))
+			output.WriteString(subResult.Format(prefix+"  ", checkData, spinView))
 		}
 	}
 
 	return output.String()
 }
 
-func (result *CheckResult) Format(prefix, spinView string) string {
+func (result *CheckResult) Format(prefix string, checkData CheckData, spinView string) string {
 	if result.Check.CustomPrinter != nil {
-		return result.Check.CustomPrinter(result, prefix, spinView)
+		return result.Check.CustomPrinter(result, checkData, prefix, spinView)
 	}
-	return result.FormatResult(prefix, spinView)
+	return result.FormatResult(prefix, checkData, spinView)
 }
 
 // Run runs the checks.
-func (e *CheckExecutor) Run(ctx context.Context) []*CheckResult {
+func (e *CheckExecutor) Run(ctx context.Context, checkData CheckData) []*CheckResult {
 	// Start all top-level checks
 	for _, result := range e.Results {
-		result.Run(ctx)
+		result.Run(ctx, checkData)
 	}
 
 	allDone := make(chan struct{})

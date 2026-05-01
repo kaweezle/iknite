@@ -234,6 +234,21 @@ func FileTreeCheck(name, description, path string, expectedFiles []string) *chec
 	}
 }
 
+func NewKubeletHealthCheck(timeout time.Duration) *check.Check {
+	return &check.Check{
+		Name:        "kubelet_health",
+		DependsOn:   []string{"kubelet_running"},
+		Description: "Check if the kubelet is reachable and healthy",
+		CheckFn: func(_ context.Context, checkData check.CheckData) (bool, string, error) {
+			data, ok := checkData.(CheckWorkloadData)
+			if !ok {
+				return false, "", fmt.Errorf("invalid check data type")
+			}
+			return CheckKubeletHealth(data.Host(), timeout)
+		},
+	}
+}
+
 func CheckKubeletHealth(fs host.FileSystem, timeout time.Duration) (bool, string, error) {
 	var client clientset.Interface
 	client, err := k8s.ClientSetFromFile(fs, kubeadmConstants.GetAdminKubeConfigPath())
@@ -258,6 +273,17 @@ func checkKubeletHealthWithClient(
 		return false, "", fmt.Errorf("kubelet health check failed: %w", err)
 	}
 	return true, "Kubelet is healthy", nil
+}
+
+func NewApiServerHealthCheck(timeout time.Duration) *check.Check {
+	return &check.Check{
+		Name:        "apiserver_health",
+		DependsOn:   []string{"kubelet_running"},
+		Description: "Check if the kube-apiserver is healthy",
+		CheckFn: func(_ context.Context, data check.CheckData) (bool, string, error) {
+			return CheckApiServerHealth(timeout, data)
+		},
+	}
 }
 
 func CheckApiServerHealth(
@@ -333,10 +359,10 @@ func PrettyPrintWorkloadState(prefix string, r *v1alpha1.WorkloadState) string {
 	)
 }
 
-func CheckWorkloadResultPrinter(result *check.CheckResult, prefix, spinView string) string {
-	data, ok := result.CheckData.(CheckWorkloadData)
+func CheckWorkloadResultPrinter(result *check.CheckResult, checkData check.CheckData, prefix, spinView string) string {
+	data, ok := checkData.(CheckWorkloadData)
 	if !ok {
-		return result.FormatResult(prefix, spinView)
+		return result.FormatResult(prefix, checkData, spinView)
 	}
 
 	ready := data.ReadyWorkloads()
@@ -364,7 +390,7 @@ func CheckWorkloadResultPrinter(result *check.CheckResult, prefix, spinView stri
 	}
 
 	// Format the global result first
-	output := result.FormatResult(prefix, spinView)
+	output := result.FormatResult(prefix, checkData, spinView)
 	if result.Status == check.StatusSkipped {
 		return output
 	}
@@ -421,6 +447,25 @@ func checkWorkloadsWithConfig(
 	return workloadData.IsOk(), "", nil
 }
 
+func NewIkniteServerHealthCheck() *check.Check {
+	return &check.Check{
+		Name:        "iknite_server_health",
+		DependsOn:   []string{"apiserver_health"},
+		Description: "Check if the iknite status server is healthy",
+		CheckFn: func(ctx context.Context, checkData check.CheckData) (bool, string, error) {
+			data, ok := checkData.(CheckWorkloadData)
+			if !ok {
+				return false, "", fmt.Errorf("invalid check data type")
+			}
+			waitOptions := utils.NewWaitOptions()
+			waitOptions.Retries = 3
+			waitOptions.Timeout = 15 * time.Second
+
+			return CheckIkniteServerHealth(ctx, data.Host(), waitOptions)
+		},
+	}
+}
+
 // CheckIkniteServerHealth checks the /healthz endpoint of the iknite status
 // server using the mTLS client configuration stored in constants.IkniteLocalConfPath
 // (/root/.kube/iknite.conf). It returns true when the server responds with "ok".
@@ -435,7 +480,7 @@ func CheckIkniteServerHealth(
 	}
 
 	restClient, err := k8s.RESTClient(kubeClient)
-	if err != nil {
+	if err != nil { // nocov
 		return false, "", fmt.Errorf("failed to create REST client: %w", err)
 	}
 
@@ -454,7 +499,7 @@ func checkIkniteServerWithConfig(
 		if healthzErr != nil {
 			return false, fmt.Errorf("failed to call /healthz endpoint: %w", healthzErr)
 		}
-		if string(body) != "ok" {
+		if strings.TrimSpace(string(body)) != "ok" {
 			return false, fmt.Errorf("iknite status server returned unexpected response: %s", string(body))
 		}
 		return true, nil
@@ -587,5 +632,71 @@ func DomainNameCheck(domainName string, ip net.IP) *check.Check {
 			}
 			return checkDomainName(ctx, data.Host(), domainName, ip)
 		},
+	}
+}
+
+func NewPreventedServiceCheck(serviceName string) *check.Check {
+	return &check.Check{
+		Name:        fmt.Sprintf("prevented_service_%s", serviceName),
+		Description: fmt.Sprintf("Check if the %s service is not runnable", serviceName),
+		CheckFn: func(_ context.Context, checkData check.CheckData) (bool, string, error) {
+			data, ok := checkData.(host.HostProvider)
+			if !ok {
+				return false, "", fmt.Errorf("invalid check data type")
+			}
+			return checkServiceIsNotRunnable(data.Host(), constants.RcConfFile, serviceName)
+		},
+	}
+}
+
+func checkServiceIsNotRunnable(fs host.FileSystem, confFilePath, serviceName string) (bool, string, error) {
+	runnable, err := k8s.IsServiceRunnable(fs, confFilePath, serviceName)
+	if err != nil {
+		return false, "", fmt.Errorf(
+			"failed to check if %s service is runnable: %w",
+			serviceName,
+			err,
+		)
+	}
+	if runnable {
+		return false, fmt.Sprintf("%s service is runnable", serviceName), nil
+	}
+	return true, fmt.Sprintf("/etc/rc.conf hack preventing %s from running in place", serviceName), nil
+}
+
+func NewIpBoundCheck() *check.Check {
+	return &check.Check{
+		Name:        "ip_bound",
+		Description: "Check if the IP address is bound to an interface",
+		CheckFn: func(_ context.Context, checkData check.CheckData) (bool, string, error) {
+			data, ok := checkData.(CheckWorkloadData)
+			if !ok {
+				return false, "", fmt.Errorf("invalid check data type")
+			}
+			clusterConfig := data.IkniteClusterSpec()
+			return checkIpIsBound(data.Host(), clusterConfig)
+		},
+	}
+}
+
+func checkIpIsBound(nh host.NetworkHost, clusterConfig *v1alpha1.IkniteClusterSpec) (bool, string, error) {
+	if clusterConfig.CreateIp {
+		result, err := nh.CheckIpExists(clusterConfig.Ip)
+		switch {
+		case err != nil:
+			return false, "", fmt.Errorf("failed to check if IP exists: %w", err)
+		case result:
+			return true, fmt.Sprintf(
+				"IP address %s is bound to an interface",
+				clusterConfig.Ip.String(),
+			), nil
+		default:
+			return false, fmt.Sprintf(
+				"IP address %s is not bound to any interface",
+				clusterConfig.Ip.String(),
+			), nil
+		}
+	} else {
+		return true, "Don't need to create IP", nil
 	}
 }

@@ -1,10 +1,12 @@
-// cSpell: words fakefi testdir noresolve
+// cSpell: words fakefi testdir noresolve testutil
 package checkers
 
 import (
 	"context"
+	"embed"
 	"errors"
 	"net"
+	"net/http"
 	"os"
 	"path/filepath"
 	"testing"
@@ -13,11 +15,14 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	mockCheckers "github.com/kaweezle/iknite/mocks/pkg/checkers"
 	mockHost "github.com/kaweezle/iknite/mocks/pkg/host"
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
 	"github.com/kaweezle/iknite/pkg/check"
 	"github.com/kaweezle/iknite/pkg/constants"
 	"github.com/kaweezle/iknite/pkg/host"
+	"github.com/kaweezle/iknite/pkg/k8s"
+	"github.com/kaweezle/iknite/pkg/testutil"
 	"github.com/kaweezle/iknite/pkg/utils"
 )
 
@@ -187,7 +192,10 @@ func TestCheckWorkloadDataAccessors(t *testing.T) {
 
 	alpineHost := host.NewDefaultHost()
 	waitOptions := utils.NewWaitOptions()
-	raw := CreateCheckWorkloadData("10.0.0.1", waitOptions, alpineHost)
+	ikniteConfig := &v1alpha1.IkniteClusterSpec{
+		Ip: net.ParseIP("10.0.0.1"),
+	}
+	raw := CreateCheckWorkloadData(ikniteConfig, waitOptions, alpineHost)
 	data, ok := raw.(*checkWorkloadData)
 	req.True(ok)
 
@@ -226,76 +234,75 @@ func TestWorkloadResultPrinters(t *testing.T) {
 	req.Contains(line, "kube-system")
 	req.Contains(line, "coredns")
 
-	data := &checkWorkloadData{waitOptions: utils.NewWaitOptions()}
+	data := &checkWorkloadData{ikniteConfig: &v1alpha1.IkniteClusterSpec{}, waitOptions: utils.NewWaitOptions()}
 	data.SetWorkloadCount(2)
 	data.SetReadyWorkloads([]*v1alpha1.WorkloadState{{Namespace: "ns", Name: "a", Ok: true, Message: "ok"}})
 	data.SetNotReadyWorkloads([]*v1alpha1.WorkloadState{{Namespace: "ns", Name: "b", Ok: false, Message: "pending"}})
 	data.Start()
 
 	result := &check.CheckResult{
-		Check:     &check.Check{Name: "workloads", Description: "workloads"},
-		Status:    check.StatusRunning,
-		CheckData: data,
+		Check:  &check.Check{Name: "workloads", Description: "workloads"},
+		Status: check.StatusRunning,
 	}
 
-	out := CheckWorkloadResultPrinter(result, "", "*")
+	out := CheckWorkloadResultPrinter(result, data, "", "*")
 	req.Contains(out, "workloads")
 	req.Contains(out, "ns")
 
 	result.Status = check.StatusSkipped
-	out = CheckWorkloadResultPrinter(result, "", "*")
+	out = CheckWorkloadResultPrinter(result, data, "", "*")
 	req.Contains(out, "workloads")
 
 	// elapsed == 0: Start() not called, so Duration() returns 0.
-	dataNoStart := &checkWorkloadData{waitOptions: utils.NewWaitOptions()}
+	dataNoStart := &checkWorkloadData{ikniteConfig: &v1alpha1.IkniteClusterSpec{}, waitOptions: utils.NewWaitOptions()}
 	dataNoStart.SetWorkloadCount(1)
 	dataNoStart.SetReadyWorkloads([]*v1alpha1.WorkloadState{{Namespace: "ns", Name: "c", Ok: true, Message: "ok"}})
 	dataNoStart.SetNotReadyWorkloads(nil)
 	resultNoStart := &check.CheckResult{
-		Check:     &check.Check{Name: "w", Description: "w"},
-		Status:    check.StatusSuccess,
-		CheckData: dataNoStart,
+		Check:  &check.Check{Name: "w", Description: "w"},
+		Status: check.StatusSuccess,
 	}
-	out = CheckWorkloadResultPrinter(resultNoStart, "", "*")
+	out = CheckWorkloadResultPrinter(resultNoStart, dataNoStart, "", "*")
 	req.Contains(out, "w")
 
 	// elapsed > 0: set startTime to 10ms ago so Duration() > 0.5ms after rounding.
 	dataElapsed := &checkWorkloadData{
-		startTime:   time.Now().Add(-10 * time.Millisecond),
-		waitOptions: utils.NewWaitOptions(),
+		ikniteConfig: &v1alpha1.IkniteClusterSpec{},
+		startTime:    time.Now().Add(-10 * time.Millisecond),
+		waitOptions:  utils.NewWaitOptions(),
 	}
 	dataElapsed.SetWorkloadCount(1)
 	dataElapsed.SetReadyWorkloads([]*v1alpha1.WorkloadState{{Namespace: "ns", Name: "e", Ok: true, Message: "ok"}})
 	dataElapsed.SetNotReadyWorkloads(nil)
 	resultElapsed := &check.CheckResult{
-		Check:     &check.Check{Name: "elapsed", Description: "elapsed"},
-		Status:    check.StatusSuccess,
-		CheckData: dataElapsed,
+		Check:  &check.Check{Name: "elapsed", Description: "elapsed"},
+		Status: check.StatusSuccess,
 	}
-	out = CheckWorkloadResultPrinter(resultElapsed, "", "*")
+	out = CheckWorkloadResultPrinter(resultElapsed, dataElapsed, "", "*")
 	req.Contains(out, "elapsed")
 	req.Contains(out, "s - ") // elapsed printed in message
 
 	// Only unready workloads: covers the case where len(ready)==0 inside len(unready)>0.
-	dataUnreadyOnly := &checkWorkloadData{waitOptions: utils.NewWaitOptions()}
+	dataUnreadyOnly := &checkWorkloadData{
+		ikniteConfig: &v1alpha1.IkniteClusterSpec{},
+		waitOptions:  utils.NewWaitOptions(),
+	}
 	dataUnreadyOnly.SetWorkloadCount(1)
 	dataUnreadyOnly.SetReadyWorkloads(nil)
 	dataUnreadyOnly.SetNotReadyWorkloads([]*v1alpha1.WorkloadState{{Namespace: "ns", Name: "d", Ok: false}})
 	dataUnreadyOnly.Start()
 	resultUnready := &check.CheckResult{
-		Check:     &check.Check{Name: "u", Description: "u"},
-		Status:    check.StatusFailed,
-		CheckData: dataUnreadyOnly,
+		Check:  &check.Check{Name: "u", Description: "u"},
+		Status: check.StatusFailed,
 	}
-	out = CheckWorkloadResultPrinter(resultUnready, "", "*")
+	out = CheckWorkloadResultPrinter(resultUnready, dataUnreadyOnly, "", "*")
 	req.Contains(out, "u")
 
 	fallback := &check.CheckResult{
-		Check:     &check.Check{Name: "x", Description: "x"},
-		Status:    check.StatusSuccess,
-		CheckData: "bad-data",
+		Check:  &check.Check{Name: "x", Description: "x"},
+		Status: check.StatusSuccess,
 	}
-	req.Contains(CheckWorkloadResultPrinter(fallback, "", "*"), "x")
+	req.Contains(CheckWorkloadResultPrinter(fallback, "bad-data", "", "*"), "x")
 }
 
 func TestAdditionalCheckerPaths(t *testing.T) {
@@ -632,4 +639,258 @@ func TestCheckDomainName(t *testing.T) {
 	ok, _, err = chk.CheckFn(ctx, mockProvider)
 	req.NoError(err)
 	req.True(ok)
+}
+
+func Test_checkIpIsBound(t *testing.T) {
+	t.Parallel()
+	req := require.New(t)
+	ip := net.ParseIP("192.168.99.2")
+
+	mockNH := mockHost.NewMockNetworkHost(t)
+	mockNH.EXPECT().CheckIpExists(ip).Return(false, errors.New("network error")).Once()
+
+	clusterConfig := &v1alpha1.IkniteClusterSpec{Ip: ip, CreateIp: true}
+	ok, _, err := checkIpIsBound(mockNH, clusterConfig)
+	req.Error(err)
+	req.False(ok)
+
+	clusterConfig.CreateIp = false
+	ok, message, err := checkIpIsBound(mockNH, clusterConfig)
+	req.NoError(err)
+	req.True(ok)
+	req.Contains(message, "Don't need to create IP")
+
+	mockNH = mockHost.NewMockNetworkHost(t)
+	mockNH.EXPECT().CheckIpExists(ip).Return(true, nil).Once()
+	clusterConfig.CreateIp = true
+	ok, message, err = checkIpIsBound(mockNH, clusterConfig)
+	req.NoError(err)
+	req.True(ok)
+	req.Contains(message, "is bound to an interface")
+
+	mockNH = mockHost.NewMockNetworkHost(t)
+	mockNH.EXPECT().CheckIpExists(ip).Return(false, nil).Once()
+	ok, message, err = checkIpIsBound(mockNH, clusterConfig)
+	req.NoError(err)
+	req.False(ok)
+	req.Contains(message, "is not bound to any interface")
+}
+
+func TestNewIpBoundCheck(t *testing.T) {
+	t.Parallel()
+	req := require.New(t)
+
+	ip := net.ParseIP("192.168.99.2")
+	clusterConfig := &v1alpha1.IkniteClusterSpec{Ip: ip, CreateIp: true}
+	mockNH := mockHost.NewMockHost(t)
+	mockNH.EXPECT().CheckIpExists(ip).Return(true, nil).Once()
+
+	mockData := mockCheckers.NewMockCheckWorkloadData(t)
+	mockData.EXPECT().IkniteClusterSpec().Return(clusterConfig).Once()
+	mockData.EXPECT().Host().Return(mockNH).Once()
+
+	ipCheck := NewIpBoundCheck()
+	req.NotNil(ipCheck)
+	ok, message, err := ipCheck.CheckFn(t.Context(), mockData)
+	req.NoError(err)
+	req.True(ok)
+	req.Contains(message, "is bound to an interface")
+
+	ok, _, err = ipCheck.CheckFn(t.Context(), "bad-data")
+	req.Error(err)
+	req.False(ok)
+	req.ErrorContains(err, "invalid check data type")
+}
+
+const (
+	confFilePath                = "/etc/rc.conf"
+	RcConfPreventKubeletRunning = "rc_kubelet_need=\"non-existing-service\""
+	rcConfWithKubelet           = `rc_sys="prefix"
+rc_kubelet_need="non-existing-service"
+    `
+	rcConfWithoutKubelet = `rc_sys="prefix"
+    `
+)
+
+func TestCheckServiceIsNotRunnable(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		setup        func(t *testing.T, fs host.FileSystem)
+		name         string
+		message      string
+		wantRunnable bool
+		wantErr      bool
+	}{
+		{
+			name: "kubelet line present means not runnable",
+			setup: func(t *testing.T, fs host.FileSystem) {
+				t.Helper()
+				require.NoError(t, fs.WriteFile(confFilePath, []byte(rcConfWithKubelet), 0o644))
+			},
+			wantRunnable: false,
+			message:      "/etc/rc.conf hack preventing kubelet from running in place",
+		},
+		{
+			name: "kubelet line absent means runnable",
+			setup: func(t *testing.T, fs host.FileSystem) {
+				t.Helper()
+				require.NoError(t, fs.WriteFile(confFilePath, []byte(rcConfWithoutKubelet), 0o644))
+			},
+			wantRunnable: true,
+			message:      "service is runnable",
+		},
+		{
+			name:    "missing file returns error",
+			setup:   func(_ *testing.T, _ host.FileSystem) {},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			req := require.New(t)
+			fs := host.NewMemMapFS()
+			tt.setup(t, fs)
+
+			ok, message, err := checkServiceIsNotRunnable(fs, confFilePath, "kubelet")
+			if tt.wantErr {
+				req.Error(err)
+				return
+			}
+			req.NoError(err)
+			req.Equal(tt.wantRunnable, !ok)
+			if tt.message != "" {
+				req.Contains(message, tt.message)
+			}
+		})
+	}
+}
+
+func TestNewPreventedServiceCheck(t *testing.T) {
+	t.Parallel()
+	req := require.New(t)
+
+	fs := host.NewMemMapFS()
+	req.NoError(fs.WriteFile(confFilePath, []byte(rcConfWithKubelet), 0o644))
+	h, err := testutil.NewDummyHost(fs, &testutil.DummyHostOptions{})
+	req.NoError(err)
+
+	mockData := mockCheckers.NewMockCheckWorkloadData(t)
+	mockData.EXPECT().Host().Return(h).Once()
+
+	checker := NewPreventedServiceCheck("kubelet")
+	req.NotNil(checker)
+	ok, message, err := checker.CheckFn(t.Context(), mockData)
+	req.NoError(err)
+	req.True(ok)
+	req.Contains(message, "/etc/rc.conf hack preventing kubelet from running in place")
+
+	ok, _, err = checker.CheckFn(t.Context(), "bad-data")
+	req.Error(err)
+	req.False(ok)
+	req.ErrorContains(err, "invalid check data type")
+}
+
+func TestCheckIkniteServerWithConfig(t *testing.T) {
+	t.Parallel()
+	req := require.New(t)
+
+	sOpts := &testutil.TestServerOptions{}
+
+	restConfig := testutil.CreateTestAPIServer(t, testutil.ContentPatchHandler("with_resources", sOpts))
+	client, err := k8s.RESTClientFromConfig(restConfig)
+	req.NoError(err)
+
+	// nominal case
+	waitOptions := &utils.WaitOptions{Wait: false, Watch: false, Timeout: 0}
+	ok, message, err := checkIkniteServerWithConfig(t.Context(), client, waitOptions)
+	req.NoError(err)
+	req.True(ok)
+	req.Contains(message, "Iknite status server is healthy")
+
+	// Bad wait options (negative timeout)
+	waitOptions.Wait = true
+	waitOptions.Watch = true
+	_, _, err = checkIkniteServerWithConfig(t.Context(), client, waitOptions)
+	req.Error(err)
+	req.Contains(err.Error(), "iknite status server health check failed")
+
+	// Error response from /healthz endpoint (simulate server unhealthy).
+	waitOptions.Wait = false
+	waitOptions.Watch = false
+	sOpts.Overrides = map[string]testutil.HandlerOverrideFunc{
+		"/healthz": testutil.FailOverrideHandler,
+	}
+	_, _, err = checkIkniteServerWithConfig(t.Context(), client, waitOptions)
+	req.Error(err)
+	req.Contains(err.Error(), "failed to call /healthz endpoint")
+
+	// Bad content
+	sOpts.Overrides["/healthz"] = func(
+		_ string,
+		w http.ResponseWriter,
+		_ *http.Request,
+		log *testutil.RequestLog,
+		_ embed.FS,
+	) bool {
+		log.StatusCode = http.StatusOK
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("unhealthy")) //nolint:errcheck // No need to check error in test override
+		return true
+	}
+	_, _, err = checkIkniteServerWithConfig(t.Context(), client, waitOptions)
+	req.Error(err)
+	req.Contains(err.Error(), "iknite status server returned unexpected response")
+}
+
+func TestCheckIkniteServerHealth(t *testing.T) {
+	t.Parallel()
+	req := require.New(t)
+	sOpts := &testutil.TestServerOptions{}
+
+	fs := host.NewMemMapFS()
+	restConfig := testutil.CreateTestAPIServer(t, testutil.ContentPatchHandler("with_resources", sOpts))
+	waitOptions := &utils.WaitOptions{Wait: false, Watch: false, Timeout: 0}
+
+	// No configuration file
+	_, _, err := CheckIkniteServerHealth(t.Context(), fs, waitOptions)
+	req.Error(err)
+	req.Contains(err.Error(), "failed to load iknite config")
+
+	// nominal case
+	testutil.WriteRestConfigToFile(t, restConfig, fs, constants.IkniteLocalConfPath, "iknite", "static")
+	ok, message, err := CheckIkniteServerHealth(t.Context(), fs, waitOptions)
+	req.NoError(err)
+	req.True(ok)
+	req.Contains(message, "Iknite status server is healthy")
+}
+
+func TestNewIkniteServerHealthCheck(t *testing.T) {
+	t.Parallel()
+	req := require.New(t)
+
+	sOpts := &testutil.TestServerOptions{}
+	restConfig := testutil.CreateTestAPIServer(t, testutil.ContentPatchHandler("with_resources", sOpts))
+	fs := host.NewMemMapFS()
+	testutil.WriteRestConfigToFile(t, restConfig, fs, constants.IkniteLocalConfPath, "iknite", "static")
+
+	h, err := testutil.NewDummyHost(fs, &testutil.DummyHostOptions{})
+	req.NoError(err)
+
+	mockData := mockCheckers.NewMockCheckWorkloadData(t)
+	mockData.EXPECT().Host().Return(h).Once()
+
+	checker := NewIkniteServerHealthCheck()
+	req.NotNil(checker)
+	ok, message, err := checker.CheckFn(t.Context(), mockData)
+	req.NoError(err)
+	req.True(ok)
+	req.Contains(message, "Iknite status server is healthy")
+
+	ok, _, err = checker.CheckFn(t.Context(), "bad-data")
+	req.Error(err)
+	req.False(ok)
+	req.ErrorContains(err, "invalid check data type")
 }

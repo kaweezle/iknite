@@ -67,7 +67,7 @@ func TestCommandConstructors(t *testing.T) {
 		name string
 	}{
 		{name: "start", fn: func() *cobra.Command { return NewStartCmd(spec, nil) }},
-		{name: "status", fn: func() *cobra.Command { return NewStatusCmd(spec, nil) }},
+		{name: "status", fn: func() *cobra.Command { return NewStatusCmd(spec, nil, nil, nil) }},
 		{name: "prepare", fn: func() *cobra.Command { return NewPrepareCommand(spec) }},
 		{name: "kubelet", fn: func() *cobra.Command { return NewKubeletCmd(spec, nil, nil) }},
 		{name: "mdns", fn: func() *cobra.Command { return NewMdnsCmd(spec) }},

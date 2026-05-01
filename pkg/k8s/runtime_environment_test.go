@@ -38,7 +38,10 @@ const (
 	runlevelIknitePath       = "/etc/runlevels/default/iknite"
 )
 
-const confFilePath = "/etc/rc.conf"
+const (
+	confFilePath                = "/etc/rc.conf"
+	RcConfPreventKubeletRunning = "rc_kubelet_need=\"non-existing-service\""
+)
 
 func TestPreventKubeletServiceFromStarting(t *testing.T) {
 	t.Parallel()
@@ -57,12 +60,12 @@ func TestPreventKubeletServiceFromStarting(t *testing.T) {
 	err := fs.WriteFile(confFilePath, []byte(rcConfFileContent), 0o644)
 	req.NoError(err)
 
-	err = k8s.PreventKubeletServiceFromStarting(fs, confFilePath)
+	err = k8s.PreventServiceFromStarting(fs, confFilePath, "kubelet")
 	req.NoError(err)
 
 	content, err := fs.ReadFile(confFilePath)
 	req.NoError(err)
-	req.Equal(rcConfFileContent+k8s.RcConfPreventKubeletRunning+"\n", string(content))
+	req.Equal(rcConfFileContent+RcConfPreventKubeletRunning+"\n", string(content))
 }
 
 //nolint:paralleltest // Using a global variable util.Exec
@@ -83,7 +86,7 @@ func TestPreventKubeletServiceFromStarting_WhenLineIsPresent(t *testing.T) {
 	err := fs.WriteFile(confFilePath, []byte(existingContent), 0o644)
 	req.NoError(err)
 
-	err = k8s.PreventKubeletServiceFromStarting(fs, confFilePath)
+	err = k8s.PreventServiceFromStarting(fs, confFilePath, "kubelet")
 	req.NoError(err)
 
 	content, err := fs.ReadFile(confFilePath)
@@ -190,7 +193,7 @@ func TestIsKubeletServiceRunnable(t *testing.T) {
 			fs := host.NewMemMapFS()
 			tt.setup(t, fs)
 
-			runnable, err := k8s.IsKubeletServiceRunnable(fs, confFilePath)
+			runnable, err := k8s.IsServiceRunnable(fs, confFilePath, "kubelet")
 			if tt.wantErr {
 				req.Error(err)
 				return
@@ -431,7 +434,7 @@ func setupPreIPSuccessMocks(m *mockHost.MockHost) {
 // All operations succeed.
 func setupPostIPSuccessMocks(m *mockHost.MockHost) {
 	m.On("Pipe", constants.RcConfFile).
-		Return(script.NewPipe().WithReader(strings.NewReader(k8s.RcConfPreventKubeletRunning + "\n"))).Once()
+		Return(script.NewPipe().WithReader(strings.NewReader(RcConfPreventKubeletRunning + "\n"))).Once()
 	m.On("Exists", runlevelIknitePath).Return(true, nil).Once()
 	m.On("Exists", constants.CrictlYaml).Return(true, nil).Once()
 }
@@ -633,7 +636,7 @@ func TestPrepareKubernetesEnvironment(t *testing.T) {
 				m.On("CheckIpExists", mock.Anything).Return(true, nil).Once()
 				m.On("Pipe", constants.RcConfFile).
 					Return(script.NewPipe().WithReader(
-						strings.NewReader(k8s.RcConfPreventKubeletRunning + "\n"))).Once()
+						strings.NewReader(RcConfPreventKubeletRunning + "\n"))).Once()
 				m.On("Exists", runlevelIknitePath).Return(false, errors.New("stat error")).Once()
 			},
 			wantErrContains: "while enabling iknite service",
@@ -646,7 +649,7 @@ func TestPrepareKubernetesEnvironment(t *testing.T) {
 				m.On("CheckIpExists", mock.Anything).Return(true, nil).Once()
 				m.On("Pipe", constants.RcConfFile).
 					Return(script.NewPipe().WithReader(
-						strings.NewReader(k8s.RcConfPreventKubeletRunning + "\n"))).Once()
+						strings.NewReader(RcConfPreventKubeletRunning + "\n"))).Once()
 				m.On("Exists", runlevelIknitePath).Return(true, nil).Once()
 				m.On("Exists", constants.CrictlYaml).Return(false, errors.New("stat error")).Once()
 			},
@@ -660,7 +663,7 @@ func TestPrepareKubernetesEnvironment(t *testing.T) {
 				m.On("CheckIpExists", mock.Anything).Return(true, nil).Once()
 				m.On("Pipe", constants.RcConfFile).
 					Return(script.NewPipe().WithReader(
-						strings.NewReader(k8s.RcConfPreventKubeletRunning + "\n"))).Once()
+						strings.NewReader(RcConfPreventKubeletRunning + "\n"))).Once()
 				m.On("Exists", runlevelIknitePath).Return(true, nil).Once()
 				m.On("Exists", constants.CrictlYaml).Return(false, nil).Once()
 				m.On("WriteFile", constants.CrictlYaml, mock.Anything, mock.Anything).

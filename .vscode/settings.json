@@ -44,6 +44,6 @@
     "go.testFlags": [
         "-coverpkg=./..."
     ],
-    "go.lintOnSave": "file"
+    "go.lintOnSave": "package"
 
 }

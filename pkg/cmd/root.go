@@ -84,7 +84,7 @@ kubernetes.`,
 	rootCmd.AddCommand(NewMdnsCmd(ikniteConfig))
 	rootCmd.AddCommand(NewPrepareCommand(ikniteConfig))
 	rootCmd.AddCommand(NewStartCmd(ikniteConfig, nil))
-	rootCmd.AddCommand(NewStatusCmd(ikniteConfig, nil))
+	rootCmd.AddCommand(NewStatusCmd(ikniteConfig, nil, nil, alpineHost))
 	rootCmd.AddCommand(NewInfoCmd(ikniteConfig))
 
 	util.BindFlagsToViper(rootCmd, viper.GetViper())

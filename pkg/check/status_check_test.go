@@ -51,13 +51,13 @@ func TestCheckResult_WaitForDependencies_CtxDone(t *testing.T) {
 			return true, "", nil
 		},
 	}
-	childResult := childCheck.NewResult(nil)
+	childResult := childCheck.NewResult()
 	childResult.ParentResults = []*check.CheckResult{parentResult}
 
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel() // cancel before Run so ctx.Done() fires immediately
 
-	childResult.Run(ctx)
+	childResult.Run(ctx, nil)
 	<-childResult.Done
 
 	// Status stays StatusPending: ctx canceled before dependency finished.
@@ -82,8 +82,8 @@ func TestCheckResult_WaitForSubChecks_AllSuccess(t *testing.T) {
 		},
 	}
 
-	result := phase.NewResult(nil)
-	result.Run(context.Background())
+	result := phase.NewResult()
+	result.Run(t.Context(), nil)
 	<-result.Done
 
 	req.Equal(check.StatusSuccess, result.Status)
@@ -114,8 +114,8 @@ func TestCheckResult_WaitForSubChecks_CtxDone(t *testing.T) {
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
-	parentResult := parent.NewResult(nil)
-	parentResult.Run(ctx)
+	parentResult := parent.NewResult()
+	parentResult.Run(ctx, nil)
 
 	<-subRunning // wait until sub-check is inside its CheckFn
 	cancel()     // only ctx.Done() can fire; sub-check.Done never closes
@@ -144,7 +144,7 @@ func TestCheckResult_FormatWithSubResults(t *testing.T) {
 		SubResults: []*check.CheckResult{subResult},
 	}
 
-	output := parentResult.FormatResult("", "-")
+	output := parentResult.FormatResult("", nil, "-")
 	req.Contains(output, "parent-desc")
 	req.Contains(output, "sub-desc")
 }
@@ -157,15 +157,15 @@ func TestCheckResult_FormatWithCustomPrinter(t *testing.T) {
 	c := &check.Check{
 		Name:        "custom",
 		Description: "custom-desc",
-		CustomPrinter: func(_ *check.CheckResult, _, _ string) string {
+		CustomPrinter: func(_ *check.CheckResult, _ check.CheckData, _, _ string) string {
 			return customOutput
 		},
 	}
 
-	result := c.NewResult(nil)
+	result := c.NewResult()
 	result.Status = check.StatusSuccess
 
-	req.Equal(customOutput, result.Format("", "-"))
+	req.Equal(customOutput, result.Format("", nil, "-"))
 }
 
 func TestCheckExecutor_Run_CtxCancellation(t *testing.T) {
@@ -188,11 +188,13 @@ func TestCheckExecutor_Run_CtxCancellation(t *testing.T) {
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
-	executor := check.NewCheckExecutor([]*check.Check{blocker}, nil)
+	executor := check.NewCheckExecutor()
+	executor.AddCheck(blocker)
 
 	runDone := make(chan []*check.CheckResult, 1)
+	executor.PrepareRun() // PrepareRun must be called before Run, but we want to set up runDone first
 	go func() {
-		runDone <- executor.Run(ctx)
+		runDone <- executor.Run(ctx, nil)
 	}()
 
 	<-checkRunning // check is running; its Done will never close
@@ -211,7 +213,7 @@ func TestCheck_NewResultAndFillDependencies(t *testing.T) {
 		{Name: "dependent", Description: "dep", DependsOn: []string{"leaf"}},
 	}
 
-	results := check.PrepareChecks(checks, nil)
+	results := check.PrepareChecks(checks)
 	req.Len(results, 2)
 	req.Equal("leaf", results[0].SubResults[0].Name())
 	req.NotNil(results[0].Done)
@@ -270,7 +272,7 @@ func TestCheckResult_CheckFn(t *testing.T) {
 			t.Parallel()
 			req := require.New(t)
 
-			result := tt.check.NewResult(nil).CheckFn(context.Background())
+			result := tt.check.NewResult().CheckFn(t.Context(), nil)
 			if tt.wantError {
 				req.Error(result.Error)
 			} else {
@@ -301,8 +303,8 @@ func TestCheckResult_RunAndDependencies(t *testing.T) {
 		},
 	}
 
-	results := check.PrepareChecks([]*check.Check{parent, child}, nil)
-	check.RunChecks(context.Background(), results)
+	results := check.PrepareChecks([]*check.Check{parent, child})
+	check.RunChecks(t.Context(), results, nil)
 
 	for _, result := range results {
 		<-result.Done
@@ -338,8 +340,8 @@ func TestCheckResult_RunWithSubChecks(t *testing.T) {
 		},
 	}
 
-	result := c.NewResult(nil)
-	result.Run(context.Background())
+	result := c.NewResult()
+	result.Run(t.Context(), nil)
 	<-result.Done
 
 	req.Equal(check.StatusFailed, result.Status)
@@ -361,23 +363,23 @@ func TestFormattingHelpers(t *testing.T) {
 		t.Run(st.String(), func(t *testing.T) {
 			t.Parallel()
 			req := require.New(t)
-			result := (&check.Check{Name: "name", Description: "desc"}).NewResult(nil)
+			result := (&check.Check{Name: "name", Description: "desc"}).NewResult()
 			result.Status = st
 			statusText := result.StatusString("spinner")
 			req.NotEmpty(statusText)
 		})
 	}
 
-	result := (&check.Check{Name: "name", Description: "desc"}).NewResult(nil)
+	result := (&check.Check{Name: "name", Description: "desc"}).NewResult()
 	req := require.New(t)
 
 	result.Status = check.StatusSuccess
 	result.Message = "all good"
-	req.Contains(result.FormatResult("", "-"), "all good")
+	req.Contains(result.FormatResult("", nil, "-"), "all good")
 
 	result.Status = check.StatusFailed
 	result.Error = errors.New("broken")
-	req.Contains(result.Format("", "-"), "broken")
+	req.Contains(result.Format("", nil, "-"), "broken")
 }
 
 func TestCheckExecutor_Run(t *testing.T) {
@@ -397,11 +399,14 @@ func TestCheckExecutor_Run(t *testing.T) {
 		},
 	}
 
-	executor := check.NewCheckExecutor(checks, nil)
+	executor := check.NewCheckExecutor()
+	executor.AddCheck(checks...)
+
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 
-	results := executor.Run(ctx)
+	executor.PrepareRun() // PrepareRun must be called before Run, but we want to set up ctx first
+	results := executor.Run(ctx, nil)
 	req.Len(results, 2)
 	for _, result := range results {
 		req.Equal(check.StatusSuccess, result.Status)
