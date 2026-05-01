@@ -680,7 +680,7 @@ test-nocov: check-prerequisites
 	BUILD_DIR_PATH="$(BUILD_DIR)/coverage"; \
 	rm -rf "$$BUILD_DIR_PATH"; \
 	mkdir -p "$$BUILD_DIR_PATH"; \
-	go test -v -race -covermode=atomic -coverprofile=$$BUILD_DIR_PATH/coverage.out -coverpkg ./... ./...; \
+	go test -race -covermode=atomic -coverprofile=$$BUILD_DIR_PATH/coverage.out -coverpkg ./... ./...; \
 	go run hack/nocov.go $$BUILD_DIR_PATH/coverage.out; \
 	go tool cover -html=$$BUILD_DIR_PATH/coverage.out.nocov -o $$BUILD_DIR_PATH/coverage.html
 

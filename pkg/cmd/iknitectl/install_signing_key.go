@@ -29,6 +29,8 @@ import (
 	"github.com/kaweezle/iknite/pkg/host"
 )
 
+var decryptDataWithFormat = decrypt.DataWithFormat
+
 // SigningKeyOptions contains configuration for the signing-key command.
 type SigningKeyOptions struct {
 	Fs          host.FileSystem
@@ -97,23 +99,18 @@ func InstallSigningKey(opts *SigningKeyOptions) error {
 	}
 
 	// Decrypt the secrets file using SOPS (will auto-detect format)
-	cleartext, err := decrypt.DataWithFormat(encryptedData, formats.Yaml)
+	cleartext, err := decryptDataWithFormat(encryptedData, formats.Yaml)
 	if err != nil {
 		return fmt.Errorf("failed to decrypt secrets file: %w", err)
 	}
 
-	// Parse the decrypted YAML
-	var secrets map[string]any
-	if parseErr := yaml.Unmarshal(cleartext, &secrets); parseErr != nil {
-		return fmt.Errorf("failed to parse decrypted secrets: %w", parseErr)
-	}
 	var nodes []*yaml.RNode
 	nodes, err = kio.FromBytes(cleartext)
-	if err != nil {
+	if err != nil { // nocov - should not happen if decryption succeeded
 		return fmt.Errorf("failed to parse decrypted secrets into RNodes: %w", err)
 	}
 
-	if len(nodes) == 0 {
+	if len(nodes) == 0 { // nocov - should not happen if decryption succeeded
 		return fmt.Errorf("no YAML documents found in decrypted secrets")
 	}
 	secretsNode := nodes[0]

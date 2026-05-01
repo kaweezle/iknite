@@ -1,0 +1,3 @@
+data:
+  apk_signing_key:
+    private_key: private_key_value

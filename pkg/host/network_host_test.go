@@ -50,6 +50,6 @@ func TestIsHostMapped(t *testing.T) {
 	// Check for a non-existent mapping
 	nonexistent := net.ParseIP("10.0.0.16")
 	req.NotNil(nonexistent)
-	result, ips = nh.IsHostMapped(context.Background(), nonexistent, "nonexistent")
+	result, _ = nh.IsHostMapped(context.Background(), nonexistent, "nonexistent")
 	req.False(result, "10.0.0.16 shouldn't be mapped to nonexistent")
 }

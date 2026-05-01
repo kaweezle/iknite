@@ -85,7 +85,6 @@ func TestRunRootCmd_Path(t *testing.T) {
 
 //nolint:paralleltest // Messing with home
 func TestRunRootCmd_ConfigError(t *testing.T) {
-	t.Parallel()
 	req := require.New(t)
 
 	fileExecutor, ok := host.NewMemMapFS().(host.FileExecutor)

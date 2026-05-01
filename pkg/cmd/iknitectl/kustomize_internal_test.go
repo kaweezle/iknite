@@ -15,17 +15,46 @@ limitations under the License.
 */
 package iknitectl
 
-// cSpell: words dvcm
+// cSpell: words dvcm mockhost
 
 import (
 	"bytes"
+	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	mockhost "github.com/kaweezle/iknite/mocks/pkg/host"
 	"github.com/kaweezle/iknite/pkg/host"
 )
+
+type failingFileSystem struct {
+	host.FileSystem
+	writeFileErrs map[string]error
+	mkdirAllErrs  map[string]error
+}
+
+func (f *failingFileSystem) MkdirAll(path string, perm os.FileMode) error {
+	if err := f.mkdirAllErrs[path]; err != nil {
+		return err
+	}
+	if err := f.FileSystem.MkdirAll(path, perm); err != nil {
+		return fmt.Errorf("MkdirAll %s: %w", path, err)
+	}
+	return nil
+}
+
+func (f *failingFileSystem) WriteFile(path string, data []byte, perm os.FileMode) error {
+	if err := f.writeFileErrs[path]; err != nil {
+		return err
+	}
+	if err := f.FileSystem.WriteFile(path, data, perm); err != nil {
+		return fmt.Errorf("WriteFile %s: %w", path, err)
+	}
+	return nil
+}
 
 const (
 	configMapContent = `apiVersion: v1
@@ -76,6 +105,79 @@ func TestRunKustomize_MissingKustomizationFile(t *testing.T) {
 	err = runKustomize(fs, &out, []string{"/test"})
 	if err == nil {
 		t.Error("expected error for missing kustomization.yaml, got nil")
+	}
+}
+
+func TestRunKustomize_DirExistsError(t *testing.T) {
+	t.Parallel()
+
+	fs := mockhost.NewMockFileSystem(t)
+	fs.EXPECT().DirExists("/test").Return(false, errors.New("stat failed"))
+
+	err := runKustomize(fs, &bytes.Buffer{}, []string{"/test"})
+	if err == nil || err.Error() != "failed to check kustomization directory: stat failed" {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestRunKustomize_ExistsError(t *testing.T) {
+	t.Parallel()
+
+	fs := mockhost.NewMockFileSystem(t)
+	fs.EXPECT().DirExists("/test").Return(true, nil)
+	fs.EXPECT().Exists("/test/kustomization.yaml").Return(false, errors.New("stat failed"))
+
+	err := runKustomize(fs, &bytes.Buffer{}, []string{"/test"})
+	if err == nil || err.Error() != "failed to check kustomization.yaml: stat failed" {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestRunKustomize_BuildError(t *testing.T) {
+	t.Parallel()
+
+	fs := newMemFileExecutor(t)
+	writeFile(t, fs, "/test/kustomization.yaml", `apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+- missing.yaml
+`)
+
+	err := runKustomize(fs, &bytes.Buffer{}, []string{"/test"})
+	if err == nil || !strings.Contains(err.Error(), "while building kustomization in /test kustomize") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestRunKustomize_WriteError(t *testing.T) {
+	t.Parallel()
+
+	fs := newMemFileExecutor(t)
+	writeKustomizeApp(t, fs, "/test")
+
+	err := runKustomize(fs, errWriter{err: errors.New("write failed")}, []string{"/test"})
+	if err == nil || err.Error() != "failed to write kustomization output: failed to write output: write failed" {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestRunKustomize_SplitError(t *testing.T) {
+	t.Parallel()
+
+	baseFS := newMemFileExecutor(t)
+	writeKustomizeApp(t, baseFS, "/test")
+	fs := &failingFileSystem{
+		FileSystem: baseFS,
+		writeFileErrs: map[string]error{
+			"/dest/ConfigMap-test-config.yaml": errors.New("write failed"),
+		},
+	}
+
+	err := runKustomize(fs, &bytes.Buffer{}, []string{"/test", "/dest"})
+	if err == nil ||
+		err.Error() != "failed to split kustomization output to directory: "+
+			"failed to write file /dest/ConfigMap-test-config.yaml: write failed" {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }
 
