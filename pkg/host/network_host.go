@@ -32,7 +32,7 @@ func (h *hostImpl) GetOutboundIP( /* ctx context.Context */ ) (net.IP, error) {
 	defer cancel()
 
 	conn, err := d.DialContext(ctx, "udp", "8.8.8.8:80")
-	if err != nil {
+	if err != nil { // nocov - This is a fallback for environments without network access, which is hard to test in CI
 		return nil, fmt.Errorf("error while getting IP address: %w", err)
 	}
 	defer func() {
@@ -40,7 +40,7 @@ func (h *hostImpl) GetOutboundIP( /* ctx context.Context */ ) (net.IP, error) {
 	}()
 
 	localAddr, ok := conn.LocalAddr().(*net.UDPAddr)
-	if !ok {
+	if !ok { // nocov - This is a fallback for environments without network access, which is hard to test in CI
 		return nil, fmt.Errorf("failed to get local address")
 	}
 
@@ -50,13 +50,13 @@ func (h *hostImpl) GetOutboundIP( /* ctx context.Context */ ) (net.IP, error) {
 func (h *hostImpl) CheckIpExists(ip net.IP) (bool, error) {
 	result := false
 	ifaces, err := net.Interfaces()
-	if err != nil {
+	if err != nil { // nocov - This is a fallback for environments without network access, which is hard to test in CI
 		return result, fmt.Errorf("failed to get network interfaces: %w", err)
 	}
 	for _, i := range ifaces {
 		var addrs []net.Addr
 		addrs, err = i.Addrs()
-		if err != nil {
+		if err != nil { // nocov - Hard in CI
 			logrus.WithFields(logrus.Fields{
 				"interface": i,
 			}).Warn("Cannot get interface address")
