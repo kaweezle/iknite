@@ -357,7 +357,7 @@ func GetIkniteImages(fs host.FileSystem, ikniteConfig *v1alpha1.IkniteClusterSpe
 			SkipCRIDetect: true,
 		},
 	)
-	if err != nil {
+	if err != nil { // nocov -- this should never happen as we're providing default configuration
 		return nil, fmt.Errorf("failed to load or default init configuration: %w", err)
 	}
 

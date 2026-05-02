@@ -1,8 +1,12 @@
-// cSpell: words kyaml
+// cSpell: words kyaml paralleltest
+//
+//nolint:paralleltest // kustomization has race conditions
 package config
 
 import (
 	"bytes"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/spf13/pflag"
@@ -13,6 +17,7 @@ import (
 	kyaml "sigs.k8s.io/kustomize/kyaml/yaml"
 
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
+	"github.com/kaweezle/iknite/pkg/host"
 )
 
 func TestIkniteClusterFlagsAndDecode(t *testing.T) {
@@ -159,4 +164,100 @@ spec:
 	image, err := getKGatewayGatewayImage(rn)
 	req.NoError(err)
 	req.Equal("ghcr.io/custom/envoy-wrapper:v9", image)
+}
+
+const badDeploymentYAML = `apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kgateway
+spec:
+  template:
+    spec:
+      containers: {}
+`
+
+const badGatewayDeploymentYAML = `apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kgateway
+spec:
+  template:
+    spec:
+      containers:
+      - name: controller
+        image: ghcr.io/example/controller:v1
+        env: {}
+`
+
+const kustomizationYAML = `apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+- deployment.yaml
+`
+
+func TestGetKustomizationImages(t *testing.T) {
+	req := require.New(t)
+
+	fs := host.NewMemMapFS()
+	kustomization := "/etc/iknite.d"
+	ids, err := getKustomizationImages(fs, kustomization, false)
+	req.NoError(err)
+	req.Len(ids, 11)
+	req.Contains(ids, "public.ecr.aws/docker/library/busybox:1.37.0")
+
+	// Now create a bad kustomization to test error handling
+	req.NoError(fs.MkdirAll(kustomization, os.FileMode(0o755)))
+	req.NoError(
+		fs.WriteFile(filepath.Join(kustomization, "kustomization.yaml"),
+			[]byte("invalid: yaml: :"),
+			os.FileMode(0o644),
+		))
+	_, err = getKustomizationImages(fs, kustomization, false)
+	req.Error(err)
+	req.Contains(err.Error(), "failed to get resources from base kustomizations")
+
+	// Now create a bad deployment YAML to test error handling
+	req.NoError(fs.WriteFile(filepath.Join(kustomization, "deployment.yaml"),
+		[]byte(badDeploymentYAML),
+		os.FileMode(0o644),
+	))
+	req.NoError(fs.WriteFile(filepath.Join(kustomization, "kustomization.yaml"),
+		[]byte(kustomizationYAML),
+		os.FileMode(0o644),
+	))
+	_, err = getKustomizationImages(fs, kustomization, false)
+	req.Error(err)
+	req.Contains(err.Error(), "failed to get images from resource")
+
+	req.NoError(fs.WriteFile(filepath.Join(kustomization, "deployment.yaml"),
+		[]byte(badGatewayDeploymentYAML),
+		os.FileMode(0o644),
+	))
+	_, err = getKustomizationImages(fs, kustomization, false)
+	req.Error(err)
+	req.Contains(err.Error(), "failed to get kgateway gateway image")
+}
+
+func TestGetIkniteImages(t *testing.T) {
+	req := require.New(t)
+	fs := host.NewMemMapFS()
+	kustomization := "/etc/iknite.d"
+	clusterConfig := &v1alpha1.IkniteClusterSpec{
+		Kustomization: kustomization,
+	}
+	v1alpha1.SetDefaults_IkniteClusterSpec(clusterConfig)
+	ids, err := GetIkniteImages(fs, clusterConfig, false)
+	req.NoError(err)
+	req.Len(ids, 16)
+	req.Contains(ids, "public.ecr.aws/docker/library/busybox:1.37.0")
+
+	req.NoError(fs.MkdirAll(kustomization, os.FileMode(0o755)))
+	req.NoError(
+		fs.WriteFile(filepath.Join(kustomization, "kustomization.yaml"),
+			[]byte("invalid: yaml: :"),
+			os.FileMode(0o644),
+		))
+	_, err = GetIkniteImages(fs, clusterConfig, false)
+	req.Error(err)
+	req.Contains(err.Error(), "failed to get images from kustomization")
 }
