@@ -83,7 +83,7 @@ kubernetes.`,
 	rootCmd.AddCommand(NewKubeletCmd(ikniteConfig, nil, alpineHost))
 	rootCmd.AddCommand(NewMdnsCmd(ikniteConfig))
 	rootCmd.AddCommand(NewPrepareCommand(ikniteConfig))
-	rootCmd.AddCommand(NewStartCmd(ikniteConfig, nil))
+	rootCmd.AddCommand(NewStartCmd(ikniteConfig, nil, alpineHost))
 	rootCmd.AddCommand(NewStatusCmd(ikniteConfig, nil, nil, alpineHost))
 	rootCmd.AddCommand(NewInfoCmd(ikniteConfig))
 
