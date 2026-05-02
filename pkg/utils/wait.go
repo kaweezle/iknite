@@ -153,13 +153,15 @@ func (waitOptions *WaitOptions) Poll(ctx context.Context, condition wait.Conditi
 	actualContext := ctx
 	if waitOptions.Retries > 0 {
 		retries := waitOptions.Retries
+		var lastErr error
 		actualCondition = func(ctx context.Context) (bool, error) {
 			if retries <= 0 {
-				return false, context.DeadlineExceeded
+				return false, fmt.Errorf("condition not met after %d retries: %w", waitOptions.Retries, lastErr)
 			}
 			done, err := condition(ctx)
 			if err != nil {
 				retries--
+				lastErr = err
 				err = nil
 			}
 			return done, err

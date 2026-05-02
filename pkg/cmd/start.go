@@ -60,8 +60,8 @@ func NewStartCmd(
 - Allows the use of kubectl from the root account,
 - Installs flannel, metal-lb and local-path-provisioner.
 `,
-		Run: func(cmd *cobra.Command, _ []string) {
-			performStart(cmd.Context(), alpineHost, ikniteConfig, waitOptions)
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			return performStart(cmd.Context(), alpineHost, ikniteConfig, waitOptions)
 		},
 	}
 	flags := startCmd.Flags()
@@ -75,7 +75,7 @@ func NewStartCmd(
 func IsIkniteReady(_ context.Context, fs host.FileSystem) (bool, error) {
 	cluster, err := v1alpha1.LoadIkniteCluster(fs)
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
-		return false, fmt.Errorf("failed to load iknite cluster: %w", err)
+		return false, fmt.Errorf("failed to load iknite cluster state: %w", err)
 	}
 	if errors.Is(err, os.ErrNotExist) {
 		return false, nil
@@ -107,34 +107,39 @@ func performStart(
 	alpineHost host.Host,
 	ikniteConfig *v1alpha1.IkniteClusterSpec,
 	waitOptions *utils.WaitOptions,
-) {
-	cobra.CheckErr(k8s.PrepareKubernetesEnvironment(ctx, alpineHost, ikniteConfig))
+) error {
+	err := k8s.PrepareKubernetesEnvironment(ctx, alpineHost, ikniteConfig)
+	if err != nil {
+		return fmt.Errorf("failed to prepare kubernetes environment: %w", err)
+	}
 
 	// If Kubernetes is already installed, check that the configuration has not
 	// Changed.
 	kubeClient, err := k8s.NewDefaultClient(alpineHost)
 	if err == nil {
-		if k8s.IsConfigServerAddress(kubeClient, ikniteConfig.GetApiEndPoint()) {
-			log.Info("Kubeconfig already exists")
-		} else {
-			// If the configuration has changed, we stop and disable the kubelet
-			// that may be started and clean the configuration, i.e. delete
-			// certificates and manifests.
-			log.Info("Kubernetes configuration has changed. Resetting...")
-			cmd := newCmdReset(os.Stdin, os.Stdout, nil, nil)
-			cobra.CheckErr(cmd.RunE(cmd, []string{}))
+		if !k8s.IsConfigServerAddress(kubeClient, ikniteConfig.GetApiEndPoint()) {
+			return fmt.Errorf("kubeconfig server address does not match iknite config API endpoint." +
+				" Please reset the cluster with `iknite reset` and start again")
 		}
+		log.Info("Existing configuration found. Starting cluster...")
 	} else {
 		if !errors.Is(err, os.ErrNotExist) {
-			cobra.CheckErr(fmt.Errorf("while loading existing kubeconfig: %w", err))
+			return fmt.Errorf("failed to load existing cluster admin.conf: %w", err)
 		}
 		log.Info("No current configuration found. Initializing...")
 	}
 
 	// Start OpenRC. This will perform `iknite init`.
-	cobra.CheckErr(alpine.EnsureOpenRC(alpineHost, "default"))
-	cobra.CheckErr(waitOptions.Poll(ctx, func(ctx context.Context) (bool, error) {
+	err = alpine.EnsureOpenRC(alpineHost, "default")
+	if err != nil {
+		return fmt.Errorf("failed to start OpenRC: %w", err)
+	}
+	err = waitOptions.Poll(ctx, func(ctx context.Context) (bool, error) {
 		return IsIkniteReady(ctx, alpineHost)
-	}))
+	})
+	if err != nil {
+		return fmt.Errorf("cluster did not become ready in time: %w", err)
+	}
 	log.Info("Cluster is ready")
+	return nil
 }

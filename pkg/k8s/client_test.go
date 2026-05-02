@@ -59,20 +59,6 @@ func (jsonMarshalErrorObject) GetObjectKind() schema.ObjectKind { return schema.
 
 func (jsonMarshalErrorObject) DeepCopyObject() runtime.Object { return jsonMarshalErrorObject{} }
 
-func createBasicConfig(fs host.FileSystem, path, url string) error {
-	if url == "" {
-		url = "https://127.0.0.1:6443"
-	}
-	config := &api.Config{
-		Clusters:       map[string]*api.Cluster{"iknite": {Server: url}},
-		Contexts:       map[string]*api.Context{"iknite": {Cluster: "iknite", AuthInfo: "iknite"}},
-		AuthInfos:      map[string]*api.AuthInfo{"iknite": {}},
-		CurrentContext: "iknite",
-	}
-
-	return k8s.WriteToFile(config, fs, path) //nolint:wrapcheck // Wrapping errors is not necessary for this test
-}
-
 func resMapFromFixture(t *testing.T, fixture string) resmap.ResMap {
 	t.Helper()
 	content, err := os.ReadFile(fixture) //nolint:gosec // Test fixture
@@ -138,7 +124,7 @@ func TestNewDefaultClient(t *testing.T) {
 	t.Parallel()
 	req := require.New(t)
 	fs := host.NewMemMapFS()
-	req.NoError(createBasicConfig(fs, kubeadmConstants.GetAdminKubeConfigPath(), ""))
+	req.NoError(testutil.CreateBasicConfig(fs, kubeadmConstants.GetAdminKubeConfigPath(), ""))
 	client, err := k8s.NewDefaultClient(fs)
 	req.NoError(err)
 	req.NotNil(client)
