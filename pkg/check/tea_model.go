@@ -25,6 +25,7 @@ type CheckModel struct {
 }
 
 func (m *CheckModel) Init() tea.Cmd {
+	m.executor.PrepareRun()
 	go m.executor.Run(m.ctx, m.checkData)
 
 	return tea.Batch(

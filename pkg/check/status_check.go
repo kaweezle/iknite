@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"sync"
 
 	"github.com/charmbracelet/lipgloss"
 )
@@ -65,6 +66,7 @@ type CheckResult struct {
 	SubResults    []*CheckResult
 	ParentResults []*CheckResult
 	Status        CheckStatus
+	mu            sync.RWMutex
 }
 
 type CheckExecutor struct {
@@ -91,17 +93,23 @@ func (r *CheckResult) Name() string {
 }
 
 func (r *CheckResult) Success() bool {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
 	return r.Status == StatusSuccess
 }
 
 func (r *CheckResult) Failed() bool {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
 	return r.Status == StatusFailed
 }
 
 func (r *CheckResult) FillDependencies(resultNameMap map[string]*CheckResult) {
 	for _, depName := range r.Check.DependsOn {
 		if depResult, ok := resultNameMap[depName]; ok {
+			r.mu.Lock()
 			r.ParentResults = append(r.ParentResults, depResult)
+			r.mu.Unlock()
 		}
 	}
 
@@ -113,6 +121,8 @@ func (r *CheckResult) FillDependencies(resultNameMap map[string]*CheckResult) {
 func (c *CheckResult) CheckFn(ctx context.Context, checkData CheckData) *CheckResult {
 	if c.Check.CheckFn != nil {
 		success, message, err := c.Check.CheckFn(ctx, checkData)
+		c.mu.Lock()
+		defer c.mu.Unlock()
 		c.Message = message
 		c.Error = err
 		if success {
@@ -123,6 +133,8 @@ func (c *CheckResult) CheckFn(ctx context.Context, checkData CheckData) *CheckRe
 		return c
 	} else {
 		// No check function defined
+		c.mu.Lock()
+		defer c.mu.Unlock()
 		c.Error = fmt.Errorf("no check function defined for %s", c.Name())
 		c.Status = StatusFailed
 	}
@@ -137,8 +149,10 @@ func (c *CheckResult) waitForDependencies(ctx context.Context) bool {
 			return false
 		case <-parent.Done:
 			if !parent.Success() {
+				c.mu.Lock()
 				c.Status = StatusSkipped
 				c.Message = fmt.Sprintf("Skipped due to failure of %s", parent.Name())
+				c.mu.Unlock()
 				return false
 			}
 		}
@@ -160,6 +174,8 @@ func (c *CheckResult) waitForSubChecks(ctx context.Context) bool {
 			}
 		}
 	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	if !result {
 		c.Status = StatusFailed
 		c.Error = fmt.Errorf(" %d subChecks failed", len(errors))
@@ -174,14 +190,18 @@ func (c *CheckResult) Run(ctx context.Context, checkData CheckData) {
 	go func() {
 		defer close(c.Done)
 
+		c.mu.Lock()
 		c.Status = StatusPending
+		c.mu.Unlock()
 
 		// Wait for dependencies
 		if !c.waitForDependencies(ctx) {
 			return
 		}
 
+		c.mu.Lock()
 		c.Status = StatusRunning
+		c.mu.Unlock()
 
 		// If check has subChecks, run them all concurrently
 		if len(c.SubResults) > 0 {
@@ -273,6 +293,8 @@ func (result *CheckResult) StatusString(spinView string) string {
 	var status string
 	var statusStyle lipgloss.Style
 
+	result.mu.RLock()
+	defer result.mu.RUnlock()
 	switch result.Status {
 	case StatusPending:
 		status = "⋯"
@@ -304,11 +326,13 @@ func (result *CheckResult) FormatResult(prefix string, checkData CheckData, spin
 	var output strings.Builder
 	fmt.Fprintf(&output, "%s%s %s", prefix, status, description)
 
+	result.mu.RLock()
 	if result.Error != nil {
 		fmt.Fprintf(&output, " - %s", ErrorStyle.Render(result.Error.Error()))
 	} else if result.Message != "" {
 		fmt.Fprintf(&output, " - %s", GrayStyle.Render(result.Message))
 	}
+	result.mu.RUnlock()
 	output.WriteString("\n")
 
 	if len(result.SubResults) > 0 {
