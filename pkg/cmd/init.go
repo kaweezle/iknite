@@ -286,10 +286,10 @@ func newCmdInit(
 
 			// Skip either kine or etcd based on UseEtcd setting.
 			if data.ikniteCluster.Spec.UseEtcd {
-				skipPhaseIfExists(initRunner.Phases, &(initRunner.Options.SkipPhases), constants.KineBackendName, "")
+				skipPhaseIfExists(initRunner.Phases, &initRunner.Options.SkipPhases, constants.KineBackendName, "")
 				data.ikniteCluster.Spec.APIBackendDatabaseDirectory = data.cfg.Etcd.Local.DataDir
 			} else {
-				skipPhaseIfExists(initRunner.Phases, &(initRunner.Options.SkipPhases), constants.EtcdBackendName, "")
+				skipPhaseIfExists(initRunner.Phases, &initRunner.Options.SkipPhases, constants.EtcdBackendName, "")
 			}
 
 			// force skip CoreDNS as it is injected by the kustomization
@@ -310,6 +310,8 @@ func newCmdInit(
 	return cmd
 }
 
+// skipPhaseIfExists checks if a phase with the given name exists in the list of phases and if it does, it adds it to
+// the list of phases to skip and returns true. Otherwise, it returns false.
 func skipPhaseIfExists(initPhases []workflow.Phase, skipPhases *[]string, phaseName, prefix string) bool {
 	for i := range initPhases {
 		phase := &initPhases[i]

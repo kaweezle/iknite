@@ -14,7 +14,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	kubeadmApi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmConstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
@@ -127,7 +126,7 @@ func (d *initData) KubeConfig() (*clientcmdapi.Config, error) {
 	}
 
 	var err error
-	d.kubeconfig, err = clientcmd.LoadFromFile(d.KubeConfigPath())
+	d.kubeconfig, err = k8s.LoadFromFile(d.Host(), d.KubeConfigPath())
 	if err != nil {
 		return nil, fmt.Errorf("failed to load kubeconfig from file: %w", err)
 	}
@@ -181,11 +180,11 @@ func (d *initData) RESTClientGetter() (genericclioptions.RESTClientGetter, error
 	if d.clientGetter != nil {
 		return d.clientGetter, nil
 	}
-	client, err := k8s.NewDefaultClient(d.alpineHost)
+	kubeConfig, err := d.KubeConfig()
 	if err != nil {
-		return nil, fmt.Errorf("failed to create REST client getter: %w", err)
+		return nil, fmt.Errorf("failed to get kubeconfig for REST client getter: %w", err)
 	}
-	d.clientGetter = client
+	d.clientGetter = k8s.NewClientFromConfig(kubeConfig)
 	return d.clientGetter, nil
 }
 
@@ -220,7 +219,12 @@ func (d *initData) Client() (clientset.Interface, error) {
 		d.adminKubeConfigBootstrapped = true
 	} else {
 		// Alternatively, just load the config pointed at the --kubeconfig path
-		d.client, err = k8s.ClientSetFromFile(d.Host(), d.KubeConfigPath())
+		getter, err := d.RESTClientGetter()
+		if err != nil {
+			return nil, fmt.Errorf("failed to get REST client getter: %w", err)
+		}
+
+		d.client, err = k8s.ClientSet(getter)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create client set from file: %w", err)
 		}
@@ -233,10 +237,11 @@ func (d *initData) Client() (clientset.Interface, error) {
 // It uses the admin.conf as the base, but modifies it to point at the local API server instead
 // of the control plane endpoint.
 func (d *initData) WaitControlPlaneClient() (clientset.Interface, error) {
-	kubeConfig, err := clientcmd.LoadFromFile(d.KubeConfigPath())
+	original, err := d.KubeConfig()
 	if err != nil {
 		return nil, fmt.Errorf("failed to load kubeconfig for wait control plane: %w", err)
 	}
+	kubeConfig := original.DeepCopy() // avoid mutating the original kubeconfig in case it's used elsewhere
 	for _, v := range kubeConfig.Clusters {
 		v.Server = fmt.Sprintf("https://%s",
 			net.JoinHostPort(
@@ -256,22 +261,10 @@ func (d *initData) WaitControlPlaneClient() (clientset.Interface, error) {
 // Unlike Client(), it does not call EnsureAdminClusterRoleBinding() or sets d.client.
 // This means the client only has anonymous permissions and does not persist in initData.
 func (d *initData) ClientWithoutBootstrap() (clientset.Interface, error) {
-	var (
-		client clientset.Interface
-		err    error
-	)
 	if d.dryRun {
-		client, err = getDryRunClient(d)
-		if err != nil {
-			return nil, err
-		}
-	} else { // Use a real client
-		client, err = k8s.ClientSetFromFile(d.Host(), d.KubeConfigPath())
-		if err != nil {
-			return nil, fmt.Errorf("failed to create client without bootstrap: %w", err)
-		}
+		return getDryRunClient(d)
 	}
-	return client, nil
+	return k8s.ClientSetFromFile(d.Host(), d.KubeConfigPath()) //nolint:wrapcheck // on-purpose
 }
 
 // Tokens returns an array of token strings.
