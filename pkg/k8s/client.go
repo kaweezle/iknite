@@ -346,40 +346,22 @@ func ApplyResMapWithServerSideApply(client resource.RESTClientGetter, resources 
 	return ids, nil
 }
 
-func HasApplications(mapper meta.RESTMapper) (bool, error) {
-	_, err := mapper.RESTMapping(
-		ApplicationSchemaGroupVersionKind.GroupKind(),
-		ApplicationSchemaGroupVersionKind.Version,
-	)
-	if err != nil {
-		if meta.IsNoMatchError(err) {
-			return false, nil
-		} else {
-			return false, fmt.Errorf("failed to get REST mapping for applications: %w", err)
-		}
-	}
-	return true, nil
-}
-
 func AllWorkloadStates(client resource.RESTClientGetter) ([]*v1alpha1.WorkloadState, error) {
-	resourceTypes := []string{"deployments", "statefulsets", "daemonsets"}
+	resourceTypes := []string{"deployments", "statefulsets", "daemonsets", "applications"}
 
 	mapper, err := client.ToRESTMapper()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get REST mapper: %w", err)
 	}
-	hasApplications, err := HasApplications(mapper)
+	validResourceTypes, err := ValidateResourceTypes(mapper, resourceTypes)
 	if err != nil {
-		return nil, err
-	}
-	if hasApplications {
-		resourceTypes = append(resourceTypes, "applications")
+		return nil, fmt.Errorf("failed to validate resource types: %w", err)
 	}
 
 	r := resource.NewBuilder(client).
 		Unstructured().
 		AllNamespaces(true).
-		ResourceTypes(resourceTypes...).
+		ResourceTypes(validResourceTypes...).
 		SelectAllParam(true).
 		ContinueOnError().
 		Flatten().
@@ -393,22 +375,19 @@ func AllWorkloadStates(client resource.RESTClientGetter) ([]*v1alpha1.WorkloadSt
 	result := make([]*v1alpha1.WorkloadState, 0, len(infos))
 
 	for _, info := range infos {
-		var u map[string]any
-
-		if u, err = runtime.DefaultUnstructuredConverter.ToUnstructured(info.Object); err != nil { // nocov
-			return nil, fmt.Errorf("failed to convert object to unstructured: %w", err)
+		// We asked for unstructured objects, so this should never fail.
+		u, ok := any(info.Object).(*unstructured.Unstructured)
+		if !ok { // nocov - this should never happen as the builder was set to return unstructured objects
+			return nil, fmt.Errorf("failed to cast object to unstructured: %T", info.Object)
 		}
 
 		var v polymorphichelpers.StatusViewer
-		if v, err = StatusViewerFor(
-			info.Object.GetObjectKind().GroupVersionKind().GroupKind(),
-		); err != nil {
+		if v, err = StatusViewerFor(u.GroupVersionKind().GroupKind()); err != nil {
 			return nil, fmt.Errorf("failed to get status viewer: %w", err)
 		}
 
 		var msg string
-		var ok bool
-		if msg, ok, err = v.Status(&unstructured.Unstructured{Object: u}, 0); err != nil {
+		if msg, ok, err = v.Status(u, 0); err != nil {
 			return nil, fmt.Errorf("failed to get workload status: %w", err)
 		}
 		result = append(result, &v1alpha1.WorkloadState{

@@ -421,31 +421,20 @@ func TestApplyResMapWithServerSideApply_Branches(t *testing.T) {
 	req.Contains(err.Error(), "failed to remove cluster-scoped resource")
 }
 
-func TestHasApplicationsAndAllWorkloadStates(t *testing.T) {
+func TestAllWorkloadStates(t *testing.T) {
 	t.Parallel()
 	req := require.New(t)
 
-	has, err := k8s.HasApplications(testutil.NewWorkloadRESTMapper(false))
-	req.NoError(err)
-	req.False(has)
-	has, err = k8s.HasApplications(testutil.NewWorkloadRESTMapper(true))
-	req.NoError(err)
-	req.True(has)
-	_, err = k8s.HasApplications(
-		errorRESTMapper{RESTMapper: testutil.NewWorkloadRESTMapper(true), err: errors.New("mapping boom")},
-	)
-	req.Error(err)
-
 	getter := genericclioptions.NewMockRESTClientGetter(t)
 	getter.EXPECT().ToRESTMapper().Return(nil, errors.New("mapper unavailable")).Once()
-	_, err = k8s.AllWorkloadStates(getter)
+	_, err := k8s.AllWorkloadStates(getter)
 	req.Error(err)
 
 	getter = genericclioptions.NewMockRESTClientGetter(t)
 	getter.EXPECT().
 		ToRESTMapper().
 		Return(errorRESTMapper{RESTMapper: testutil.NewWorkloadRESTMapper(true), err: errors.New("mapping boom")}, nil).
-		Once()
+		Twice()
 	_, err = k8s.AllWorkloadStates(getter)
 	req.Error(err)
 
