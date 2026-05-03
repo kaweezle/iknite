@@ -87,7 +87,6 @@ func OkString(b bool) string {
 
 func (ikniteCluster *IkniteCluster) Update(
 	state ikniteApi.ClusterState, phase string, ready, unready []*WorkloadState,
-	fs host.FileSystem,
 ) {
 	ikniteCluster.Status.State = state
 	ikniteCluster.Status.CurrentPhase = phase
@@ -97,7 +96,6 @@ func (ikniteCluster *IkniteCluster) Update(
 	ikniteCluster.Status.WorkloadsState.ReadyCount = len(ready)
 	ikniteCluster.Status.WorkloadsState.Unready = unready
 	ikniteCluster.Status.WorkloadsState.UnreadyCount = len(unready)
-	ikniteCluster.Persist(fs)
 }
 
 func (ikniteCluster *IkniteCluster) Persist(fs host.FileSystem) {

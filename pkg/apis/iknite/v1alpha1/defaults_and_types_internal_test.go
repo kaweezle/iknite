@@ -94,7 +94,8 @@ func TestIkniteCluster_Update(t *testing.T) {
 
 	ready := []*WorkloadState{{Namespace: "ns", Name: "a", Ok: true, Message: "ok"}}
 	unready := []*WorkloadState{{Namespace: "ns", Name: "b", Ok: false, Message: "waiting"}}
-	cluster.Update(ikniteapi.Stabilizing, "phase-a", ready, unready, fs)
+	cluster.Update(ikniteapi.Stabilizing, "phase-a", ready, unready)
+	cluster.Persist(fs)
 
 	req.Equal(ikniteapi.Stabilizing, cluster.Status.State)
 	req.Equal("phase-a", cluster.Status.CurrentPhase)

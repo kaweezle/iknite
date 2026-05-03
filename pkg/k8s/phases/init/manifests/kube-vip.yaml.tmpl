@@ -1,8 +1,4 @@
-package init
-
-// cSpell: disable
-
-const kubeVipManifestTemplate = `
+# cSpell: disable
 apiVersion: v1
 kind: Pod
 metadata:
@@ -75,4 +71,3 @@ spec:
     - hostPath:
         path: /etc/kubernetes/admin.conf
       name: kubeconfig
-`

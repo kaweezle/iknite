@@ -76,8 +76,6 @@ func TestRunPhasesRejectInvalidData(t *testing.T) {
 		{name: "pre-clean", run: runPreCleanHost},
 		{name: "prepare", run: runPrepareHost},
 		{name: "kubelet", run: runKubeletStart},
-		{name: "kine", run: runKineControlPlane},
-		{name: "kube-vip", run: runKubeVipControlPlane},
 		{name: "kustomize", run: runKustomize},
 		{name: "mdns", run: runMDnsPublish},
 		{name: "serve", run: runServe},
@@ -160,7 +158,7 @@ func TestWaitForKubelet_ProcessStop(t *testing.T) {
 	process.On("Wait").Return(nil).Once()
 	process.On("State").Return(&os.ProcessState{})
 
-	err := WaitForKubelet(context.Background(), process, nil)
+	err := WaitForKubelet(context.Background(), process)
 	req.NoError(err)
 }
 
@@ -180,7 +178,7 @@ func TestWaitForKubelet_CtxDone(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel() // Cancel the context immediately
 
-	err := WaitForKubelet(ctx, process, nil)
+	err := WaitForKubelet(ctx, process)
 	req.NoError(err)
 }
 
@@ -198,7 +196,7 @@ func TestWaitForKubelet_CtxDoneWithWaitError(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel() // Cancel the context immediately
 
-	err := WaitForKubelet(ctx, process, nil)
+	err := WaitForKubelet(ctx, process)
 	req.Error(err)
 	req.Contains(err.Error(), "failed to wait for kubelet")
 }
@@ -217,7 +215,7 @@ func TestWaitForKubelet_CtxDoneWithSignalError(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel() // Cancel the context immediately
 
-	err := WaitForKubelet(ctx, process, nil)
+	err := WaitForKubelet(ctx, process)
 	req.Error(err)
 	req.Contains(err.Error(), "failed to wait for kubelet")
 }
@@ -236,7 +234,7 @@ func TestWaitForKubelet_CtxDoneWithSignalAndWaitError(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel() // Cancel the context immediately
 
-	err := WaitForKubelet(ctx, process, nil)
+	err := WaitForKubelet(ctx, process)
 	req.Error(err)
 	req.Contains(err.Error(), "failed to wait for kubelet")
 }

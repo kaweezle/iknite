@@ -134,7 +134,8 @@ func persistClusterState(
 	unready []*v1alpha1.WorkloadState,
 ) {
 	cluster := v1alpha1.NewDefaultIkniteCluster()
-	cluster.Update(state, "phase-a", ready, unready, fs)
+	cluster.Update(state, "phase-a", ready, unready)
+	cluster.Persist(fs)
 }
 
 func setupPrepareSuccessMocks(m *mockHost.MockHost) {

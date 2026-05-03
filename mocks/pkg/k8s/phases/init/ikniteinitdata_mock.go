@@ -8,6 +8,7 @@ import (
 	"context"
 	"io"
 
+	"github.com/kaweezle/iknite/pkg/apis/iknite"
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
 	"github.com/kaweezle/iknite/pkg/host"
 	"github.com/kaweezle/iknite/pkg/server"
@@ -15,6 +16,7 @@ import (
 	"github.com/pion/mdns"
 	mock "github.com/stretchr/testify/mock"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
@@ -276,6 +278,50 @@ func (_c *MockIkniteInitData_Client_Call) Return(interfaceParam kubernetes.Inter
 }
 
 func (_c *MockIkniteInitData_Client_Call) RunAndReturn(run func() (kubernetes.Interface, error)) *MockIkniteInitData_Client_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// CloseMDnsConn provides a mock function for the type MockIkniteInitData
+func (_mock *MockIkniteInitData) CloseMDnsConn() error {
+	ret := _mock.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for CloseMDnsConn")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func() error); ok {
+		r0 = returnFunc()
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockIkniteInitData_CloseMDnsConn_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CloseMDnsConn'
+type MockIkniteInitData_CloseMDnsConn_Call struct {
+	*mock.Call
+}
+
+// CloseMDnsConn is a helper method to define mock.On call
+func (_e *MockIkniteInitData_Expecter) CloseMDnsConn() *MockIkniteInitData_CloseMDnsConn_Call {
+	return &MockIkniteInitData_CloseMDnsConn_Call{Call: _e.mock.On("CloseMDnsConn")}
+}
+
+func (_c *MockIkniteInitData_CloseMDnsConn_Call) Run(run func()) *MockIkniteInitData_CloseMDnsConn_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *MockIkniteInitData_CloseMDnsConn_Call) Return(err error) *MockIkniteInitData_CloseMDnsConn_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockIkniteInitData_CloseMDnsConn_Call) RunAndReturn(run func() error) *MockIkniteInitData_CloseMDnsConn_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -831,52 +877,6 @@ func (_c *MockIkniteInitData_KustomizeOptions_Call) RunAndReturn(run func() *uti
 	return _c
 }
 
-// MDnsConn provides a mock function for the type MockIkniteInitData
-func (_mock *MockIkniteInitData) MDnsConn() *mdns.Conn {
-	ret := _mock.Called()
-
-	if len(ret) == 0 {
-		panic("no return value specified for MDnsConn")
-	}
-
-	var r0 *mdns.Conn
-	if returnFunc, ok := ret.Get(0).(func() *mdns.Conn); ok {
-		r0 = returnFunc()
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*mdns.Conn)
-		}
-	}
-	return r0
-}
-
-// MockIkniteInitData_MDnsConn_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'MDnsConn'
-type MockIkniteInitData_MDnsConn_Call struct {
-	*mock.Call
-}
-
-// MDnsConn is a helper method to define mock.On call
-func (_e *MockIkniteInitData_Expecter) MDnsConn() *MockIkniteInitData_MDnsConn_Call {
-	return &MockIkniteInitData_MDnsConn_Call{Call: _e.mock.On("MDnsConn")}
-}
-
-func (_c *MockIkniteInitData_MDnsConn_Call) Run(run func()) *MockIkniteInitData_MDnsConn_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run()
-	})
-	return _c
-}
-
-func (_c *MockIkniteInitData_MDnsConn_Call) Return(conn *mdns.Conn) *MockIkniteInitData_MDnsConn_Call {
-	_c.Call.Return(conn)
-	return _c
-}
-
-func (_c *MockIkniteInitData_MDnsConn_Call) RunAndReturn(run func() *mdns.Conn) *MockIkniteInitData_MDnsConn_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
 // ManifestDir provides a mock function for the type MockIkniteInitData
 func (_mock *MockIkniteInitData) ManifestDir() string {
 	ret := _mock.Called()
@@ -1007,6 +1007,61 @@ func (_c *MockIkniteInitData_PatchesDir_Call) Return(s string) *MockIkniteInitDa
 }
 
 func (_c *MockIkniteInitData_PatchesDir_Call) RunAndReturn(run func() string) *MockIkniteInitData_PatchesDir_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// RESTClientGetter provides a mock function for the type MockIkniteInitData
+func (_mock *MockIkniteInitData) RESTClientGetter() (genericclioptions.RESTClientGetter, error) {
+	ret := _mock.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for RESTClientGetter")
+	}
+
+	var r0 genericclioptions.RESTClientGetter
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func() (genericclioptions.RESTClientGetter, error)); ok {
+		return returnFunc()
+	}
+	if returnFunc, ok := ret.Get(0).(func() genericclioptions.RESTClientGetter); ok {
+		r0 = returnFunc()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(genericclioptions.RESTClientGetter)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func() error); ok {
+		r1 = returnFunc()
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockIkniteInitData_RESTClientGetter_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'RESTClientGetter'
+type MockIkniteInitData_RESTClientGetter_Call struct {
+	*mock.Call
+}
+
+// RESTClientGetter is a helper method to define mock.On call
+func (_e *MockIkniteInitData_Expecter) RESTClientGetter() *MockIkniteInitData_RESTClientGetter_Call {
+	return &MockIkniteInitData_RESTClientGetter_Call{Call: _e.mock.On("RESTClientGetter")}
+}
+
+func (_c *MockIkniteInitData_RESTClientGetter_Call) Run(run func()) *MockIkniteInitData_RESTClientGetter_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *MockIkniteInitData_RESTClientGetter_Call) Return(rESTClientGetter genericclioptions.RESTClientGetter, err error) *MockIkniteInitData_RESTClientGetter_Call {
+	_c.Call.Return(rESTClientGetter, err)
+	return _c
+}
+
+func (_c *MockIkniteInitData_RESTClientGetter_Call) RunAndReturn(run func() (genericclioptions.RESTClientGetter, error)) *MockIkniteInitData_RESTClientGetter_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -1259,48 +1314,46 @@ func (_c *MockIkniteInitData_SkipTokenPrint_Call) RunAndReturn(run func() bool) 
 	return _c
 }
 
-// StatusServer provides a mock function for the type MockIkniteInitData
-func (_mock *MockIkniteInitData) StatusServer() *server.IkniteServer {
+// StopStatusServer provides a mock function for the type MockIkniteInitData
+func (_mock *MockIkniteInitData) StopStatusServer() error {
 	ret := _mock.Called()
 
 	if len(ret) == 0 {
-		panic("no return value specified for StatusServer")
+		panic("no return value specified for StopStatusServer")
 	}
 
-	var r0 *server.IkniteServer
-	if returnFunc, ok := ret.Get(0).(func() *server.IkniteServer); ok {
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func() error); ok {
 		r0 = returnFunc()
 	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*server.IkniteServer)
-		}
+		r0 = ret.Error(0)
 	}
 	return r0
 }
 
-// MockIkniteInitData_StatusServer_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'StatusServer'
-type MockIkniteInitData_StatusServer_Call struct {
+// MockIkniteInitData_StopStatusServer_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'StopStatusServer'
+type MockIkniteInitData_StopStatusServer_Call struct {
 	*mock.Call
 }
 
-// StatusServer is a helper method to define mock.On call
-func (_e *MockIkniteInitData_Expecter) StatusServer() *MockIkniteInitData_StatusServer_Call {
-	return &MockIkniteInitData_StatusServer_Call{Call: _e.mock.On("StatusServer")}
+// StopStatusServer is a helper method to define mock.On call
+func (_e *MockIkniteInitData_Expecter) StopStatusServer() *MockIkniteInitData_StopStatusServer_Call {
+	return &MockIkniteInitData_StopStatusServer_Call{Call: _e.mock.On("StopStatusServer")}
 }
 
-func (_c *MockIkniteInitData_StatusServer_Call) Run(run func()) *MockIkniteInitData_StatusServer_Call {
+func (_c *MockIkniteInitData_StopStatusServer_Call) Run(run func()) *MockIkniteInitData_StopStatusServer_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		run()
 	})
 	return _c
 }
 
-func (_c *MockIkniteInitData_StatusServer_Call) Return(ikniteServer *server.IkniteServer) *MockIkniteInitData_StatusServer_Call {
-	_c.Call.Return(ikniteServer)
+func (_c *MockIkniteInitData_StopStatusServer_Call) Return(err error) *MockIkniteInitData_StopStatusServer_Call {
+	_c.Call.Return(err)
 	return _c
 }
 
-func (_c *MockIkniteInitData_StatusServer_Call) RunAndReturn(run func() *server.IkniteServer) *MockIkniteInitData_StatusServer_Call {
+func (_c *MockIkniteInitData_StopStatusServer_Call) RunAndReturn(run func() error) *MockIkniteInitData_StopStatusServer_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -1348,6 +1401,64 @@ func (_c *MockIkniteInitData_Tokens_Call) Return(strings []string) *MockIkniteIn
 
 func (_c *MockIkniteInitData_Tokens_Call) RunAndReturn(run func() []string) *MockIkniteInitData_Tokens_Call {
 	_c.Call.Return(run)
+	return _c
+}
+
+// UpdateIkniteCluster provides a mock function for the type MockIkniteInitData
+func (_mock *MockIkniteInitData) UpdateIkniteCluster(state iknite.ClusterState, phase string, ready []*v1alpha1.WorkloadState, unready []*v1alpha1.WorkloadState) {
+	_mock.Called(state, phase, ready, unready)
+	return
+}
+
+// MockIkniteInitData_UpdateIkniteCluster_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'UpdateIkniteCluster'
+type MockIkniteInitData_UpdateIkniteCluster_Call struct {
+	*mock.Call
+}
+
+// UpdateIkniteCluster is a helper method to define mock.On call
+//   - state iknite.ClusterState
+//   - phase string
+//   - ready []*v1alpha1.WorkloadState
+//   - unready []*v1alpha1.WorkloadState
+func (_e *MockIkniteInitData_Expecter) UpdateIkniteCluster(state interface{}, phase interface{}, ready interface{}, unready interface{}) *MockIkniteInitData_UpdateIkniteCluster_Call {
+	return &MockIkniteInitData_UpdateIkniteCluster_Call{Call: _e.mock.On("UpdateIkniteCluster", state, phase, ready, unready)}
+}
+
+func (_c *MockIkniteInitData_UpdateIkniteCluster_Call) Run(run func(state iknite.ClusterState, phase string, ready []*v1alpha1.WorkloadState, unready []*v1alpha1.WorkloadState)) *MockIkniteInitData_UpdateIkniteCluster_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 iknite.ClusterState
+		if args[0] != nil {
+			arg0 = args[0].(iknite.ClusterState)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		var arg2 []*v1alpha1.WorkloadState
+		if args[2] != nil {
+			arg2 = args[2].([]*v1alpha1.WorkloadState)
+		}
+		var arg3 []*v1alpha1.WorkloadState
+		if args[3] != nil {
+			arg3 = args[3].([]*v1alpha1.WorkloadState)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+		)
+	})
+	return _c
+}
+
+func (_c *MockIkniteInitData_UpdateIkniteCluster_Call) Return() *MockIkniteInitData_UpdateIkniteCluster_Call {
+	_c.Call.Return()
+	return _c
+}
+
+func (_c *MockIkniteInitData_UpdateIkniteCluster_Call) RunAndReturn(run func(state iknite.ClusterState, phase string, ready []*v1alpha1.WorkloadState, unready []*v1alpha1.WorkloadState)) *MockIkniteInitData_UpdateIkniteCluster_Call {
+	_c.Run(run)
 	return _c
 }
 

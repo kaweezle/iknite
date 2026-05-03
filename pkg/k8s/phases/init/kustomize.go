@@ -24,6 +24,7 @@ type kustomizeData interface {
 	host.HostProvider
 	KustomizeOptionsProvider
 	ContextProvider
+	RESTClientGetterProvider
 }
 
 // runKustomize is a phase that configures the cluster with base Kustomization.
@@ -33,7 +34,7 @@ func runKustomize(c workflow.RunData) error {
 		return fmt.Errorf("configure phase invoked with an invalid data struct. ")
 	}
 
-	kubeClient, err := k8s.NewDefaultClient(data.Host())
+	kubeClient, err := data.RESTClientGetter()
 	if err != nil {
 		return fmt.Errorf("failed to load configuration: %w", err)
 	}

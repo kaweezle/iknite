@@ -10,8 +10,6 @@ import (
 
 	"github.com/kaweezle/iknite/pkg/apis/iknite"
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
-	"github.com/kaweezle/iknite/pkg/constants"
-	"github.com/kaweezle/iknite/pkg/host"
 	"github.com/kaweezle/iknite/pkg/k8s"
 )
 
@@ -27,9 +25,8 @@ func NewWorkloadsPhase() workflow.Phase {
 
 type monitorData interface {
 	ContextProvider
-	StatusServerProvider
-	IkniteClusterProvider
-	host.HostProvider
+	IkniteClusterHolder
+	RESTClientGetterProvider
 }
 
 // runPrepare executes the node initialization process.
@@ -38,17 +35,17 @@ func runMonitorWorkloads(c workflow.RunData) error {
 	if !ok {
 		return fmt.Errorf("prepare phase invoked with an invalid data struct. ")
 	}
-	cluster := data.IkniteCluster()
 	ctx := data.Context()
 
 	ticker := time.NewTicker(5 * time.Second)
-	kubeClient, err := k8s.NewClientFromFile(data.Host(), constants.KubernetesRootConfig)
+	kubeClient, err := data.RESTClientGetter()
 	if err != nil {
 		return fmt.Errorf("cannot load the kubernetes configuration: %w", err)
 	}
 	updateWorkloads := k8s.WorkloadsReadyConditionWithContextFunc(kubeClient,
 		func(allReady bool, _ int, ready, unready []*v1alpha1.WorkloadState, _, _ int) bool {
 			var status iknite.ClusterState
+			cluster := data.IkniteCluster()
 			if allReady && cluster.Status.State != iknite.Running {
 				log.Info("All workloads are ready. Going to 60 seconds interval.")
 				ticker.Reset(60 * time.Second)
@@ -59,12 +56,7 @@ func runMonitorWorkloads(c workflow.RunData) error {
 				status = iknite.Stabilizing
 			}
 
-			cluster.Update(status, "daemonize", ready, unready, data.Host())
-			// Propagate the updated status to the in-memory server cache so
-			// that /status requests reflect the latest state without a file read.
-			if srv := data.StatusServer(); srv != nil {
-				srv.SetCluster(cluster)
-			}
+			data.UpdateIkniteCluster(status, "daemonize", ready, unready)
 			return true
 		})
 

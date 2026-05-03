@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/pion/mdns"
 	log "github.com/sirupsen/logrus"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 
@@ -24,7 +23,7 @@ func NewDaemonizePhase() workflow.Phase {
 	}
 }
 
-func WaitForKubelet(ctx context.Context, process host.Process, conn *mdns.Conn) error {
+func WaitForKubelet(ctx context.Context, process host.Process) error {
 	cmdDone := make(chan error, 1)
 	go func() {
 		cmdDone <- process.Wait()
@@ -47,14 +46,6 @@ func WaitForKubelet(ctx context.Context, process host.Process, conn *mdns.Conn) 
 		}
 	}
 
-	if err == nil && conn != nil {
-		log.Info("Stopping the mdns responder...")
-		err = conn.Close()
-		if err != nil {
-			return fmt.Errorf("failed to close mdns responder: %w", err)
-		}
-	}
-
 	if err != nil {
 		return fmt.Errorf("failed to wait for kubelet: %w", err)
 	}
@@ -64,11 +55,11 @@ func WaitForKubelet(ctx context.Context, process host.Process, conn *mdns.Conn) 
 
 type daemonizeData interface {
 	KubeletProcessHolder
-	MDnsConnectionProvider
-	IkniteClusterProvider
+	MDnsConnectionCloser
+	IkniteClusterHolder
 	host.HostProvider
 	ContextProvider
-	StatusServerHolder
+	StatusServerStopper
 }
 
 // runPrepare executes the node initialization process.
@@ -81,24 +72,31 @@ func runDaemonize(c workflow.RunData) error {
 	if kubeletProcess == nil {
 		return nil
 	}
-	conn := data.MDnsConn()
-	ctx := data.Context()
 
-	err := WaitForKubelet(ctx, kubeletProcess, conn)
+	err := WaitForKubelet(data.Context(), kubeletProcess)
 
-	data.IkniteCluster().Update(iknite.Stopping, "stop", nil, nil, data.Host())
+	data.UpdateIkniteCluster(iknite.Stopping, "stop", nil, nil)
 	if err == nil {
 		// Prevent double stop
 		data.SetKubeletProcess(nil)
+	} else {
+		log.WithError(err).Warn("Error while waiting for kubelet to stop")
 	}
 
-	ensureServerStopped(data)
+	err = data.CloseMDnsConn()
+	if err != nil {
+		log.WithError(err).Warn("Error closing mdns connection")
+	}
 
-	data.IkniteCluster().Update(iknite.Cleaning, "clean", nil, nil, data.Host())
+	err = data.StopStatusServer()
+	if err != nil {
+		log.WithError(err).Warn("Error stopping iknite status server")
+	}
+
 	err = k8s.CleanAll(data.Host(), &data.IkniteCluster().Spec, true, false, false, false)
 	if err != nil {
 		log.WithError(err).Warn("Error during cleanup after kubelet stopped")
 	}
-	data.IkniteCluster().Update(iknite.Stopped, "", nil, nil, data.Host())
+	data.UpdateIkniteCluster(iknite.Stopped, "", nil, nil)
 	return nil
 }

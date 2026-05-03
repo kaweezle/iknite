@@ -48,6 +48,7 @@ packages:
   github.com/kaweezle/iknite/pkg/k8s/phases/init:
     config:
       dir: mocks/{{.InterfaceDirRelative}}
+      structname: "Mock{{.InterfaceName | firstUpper }}"
     interfaces:
       {
         IkniteInitData,
@@ -57,6 +58,7 @@ packages:
         monitorData,
         mdnsData,
         prepareHostData,
+        manifestData,
       }
   github.com/kaweezle/iknite/pkg/checkers:
     config:
