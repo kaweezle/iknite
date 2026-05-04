@@ -56,6 +56,12 @@ func SetDefaults_IkniteClusterSpec(obj *IkniteClusterSpec) {
 	if obj.StatusServerPort == 0 {
 		obj.StatusServerPort = constants.IkniteServerPort
 	}
+	if obj.StatusUpdateIntervalSeconds == 0 {
+		obj.StatusUpdateIntervalSeconds = constants.StatusUpdateIntervalSeconds
+	}
+	if obj.StatusUpdateLongIntervalSeconds == 0 {
+		obj.StatusUpdateLongIntervalSeconds = constants.StatusUpdateLongIntervalSeconds
+	}
 }
 
 func SetDefaults_IkniteClusterStatus(obj *IkniteClusterStatus) {

@@ -1,4 +1,4 @@
-// cSpell: words clientcmdapi clientcmd apimachinery wrapcheck genericclioptions
+// cSpell: words clientcmdapi clientcmd apimachinery wrapcheck genericclioptions errgroup
 package cmd
 
 import (
@@ -11,6 +11,7 @@ import (
 	_ "unsafe"
 
 	"github.com/pion/mdns"
+	"golang.org/x/sync/errgroup"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	clientset "k8s.io/client-go/kubernetes"
@@ -58,6 +59,7 @@ type initData struct {
 	kustomizeOptions            *utils.KustomizeOptions
 	alpineHost                  host.Host
 	clientGetter                genericclioptions.RESTClientGetter
+	errGroup                    *errgroup.Group
 }
 
 // compile-time assert that the local data object satisfies the phases data interface.
@@ -365,4 +367,8 @@ func (d *initData) StopStatusServer() error {
 		d.statusServer = nil
 	}
 	return nil
+}
+
+func (d *initData) ErrGroup() *errgroup.Group {
+	return d.errGroup
 }

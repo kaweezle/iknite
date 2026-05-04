@@ -147,6 +147,8 @@ func Test_performKustomize(t *testing.T) {
 				sOpts.Overrides = map[string]testutil.HandlerOverrideFunc{
 					"/readyz": testutil.FailOverrideHandler,
 				}
+				wOpts.Interval = 100 * time.Millisecond
+				wOpts.Retries = 1
 				return standardPrepareKustomization(t, fs, kOpts, wOpts, sOpts)
 			},
 			wantErr: "failed to check if cluster is running",

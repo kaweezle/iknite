@@ -1,10 +1,11 @@
-// cSpell: words genericclioptions
+// cSpell: words genericclioptions errgroup
 package init
 
 import (
 	"context"
 
 	"github.com/pion/mdns"
+	"golang.org/x/sync/errgroup"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	initPhases "k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/init"
 
@@ -70,6 +71,10 @@ type ManifestDirProvider interface {
 	ManifestDir() string
 }
 
+type ErrGroupProvider interface {
+	ErrGroup() *errgroup.Group
+}
+
 type IkniteInitData interface {
 	initPhases.InitData
 	IkniteClusterHolder
@@ -81,4 +86,5 @@ type IkniteInitData interface {
 	StatusServerStopper
 	KustomizeOptionsProvider
 	RESTClientGetterProvider
+	ErrGroupProvider
 }

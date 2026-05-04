@@ -326,6 +326,17 @@ func CreateDefaultTestClientGetter(t *testing.T, sOpts *TestServerOptions) cliOp
 	)
 }
 
+func CreateFailureGetter(t *testing.T) cliOptions.RESTClientGetter {
+	t.Helper()
+	return CreateClientGetterWithTestServer(
+		t,
+		NewRESTMapper(),
+		func(w http.ResponseWriter, _ *http.Request) {
+			w.WriteHeader(http.StatusInternalServerError)
+		},
+	)
+}
+
 type NoTestMapperError struct{}
 
 func (e *NoTestMapperError) Error() string {

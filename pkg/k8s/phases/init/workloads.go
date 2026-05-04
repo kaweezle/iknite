@@ -27,6 +27,7 @@ type monitorData interface {
 	ContextProvider
 	IkniteClusterHolder
 	RESTClientGetterProvider
+	ErrGroupProvider
 }
 
 // runPrepare executes the node initialization process.
@@ -35,24 +36,26 @@ func runMonitorWorkloads(c workflow.RunData) error {
 	if !ok {
 		return fmt.Errorf("prepare phase invoked with an invalid data struct. ")
 	}
-	ctx := data.Context()
-
-	ticker := time.NewTicker(5 * time.Second)
 	kubeClient, err := data.RESTClientGetter()
 	if err != nil {
 		return fmt.Errorf("cannot load the kubernetes configuration: %w", err)
 	}
+
+	ctx := data.Context()
+	cluster := data.IkniteCluster()
+
+	ticker := time.NewTicker(time.Duration(cluster.Spec.StatusUpdateIntervalSeconds) * time.Second)
 	updateWorkloads := k8s.WorkloadsReadyConditionWithContextFunc(kubeClient,
 		func(allReady bool, _ int, ready, unready []*v1alpha1.WorkloadState, _, _ int) bool {
 			var status iknite.ClusterState
 			cluster := data.IkniteCluster()
 			if allReady && cluster.Status.State != iknite.Running {
 				log.Info("All workloads are ready. Going to 60 seconds interval.")
-				ticker.Reset(60 * time.Second)
+				ticker.Reset(time.Duration(cluster.Spec.StatusUpdateLongIntervalSeconds) * time.Second)
 			}
 			if allReady || cluster.Status.State == iknite.Running {
 				status = iknite.Running
-			} else {
+			} else { // nocov - TODO: add a test case for this branch
 				status = iknite.Stabilizing
 			}
 
@@ -61,24 +64,24 @@ func runMonitorWorkloads(c workflow.RunData) error {
 		})
 
 	log.Debug("Starting workloads timer...")
-	go func() {
+	data.ErrGroup().Go(func() error {
 		for {
 			select {
 			case <-ctx.Done():
 				log.Info("Workloads monitoring stopped.")
 				ticker.Stop()
-				return
+				return ctx.Err()
 			case <-ticker.C:
 				log.Debug("Getting workloads information...")
 				_, err := updateWorkloads(ctx)
 				if err != nil {
 					log.Errorf("While getting workloads information: %v", err)
 					ticker.Stop()
-					return
+					return err
 				}
 			}
 		}
-	}()
+	})
 
 	return nil
 }

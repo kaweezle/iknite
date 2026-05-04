@@ -10,6 +10,7 @@ import (
 	"github.com/kaweezle/iknite/pkg/apis/iknite"
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
 	mock "github.com/stretchr/testify/mock"
+	"golang.org/x/sync/errgroup"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 )
 
@@ -82,6 +83,52 @@ func (_c *MockMonitorData_Context_Call) Return(context1 context.Context) *MockMo
 }
 
 func (_c *MockMonitorData_Context_Call) RunAndReturn(run func() context.Context) *MockMonitorData_Context_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// ErrGroup provides a mock function for the type MockMonitorData
+func (_mock *MockMonitorData) ErrGroup() *errgroup.Group {
+	ret := _mock.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for ErrGroup")
+	}
+
+	var r0 *errgroup.Group
+	if returnFunc, ok := ret.Get(0).(func() *errgroup.Group); ok {
+		r0 = returnFunc()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*errgroup.Group)
+		}
+	}
+	return r0
+}
+
+// MockMonitorData_ErrGroup_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ErrGroup'
+type MockMonitorData_ErrGroup_Call struct {
+	*mock.Call
+}
+
+// ErrGroup is a helper method to define mock.On call
+func (_e *MockMonitorData_Expecter) ErrGroup() *MockMonitorData_ErrGroup_Call {
+	return &MockMonitorData_ErrGroup_Call{Call: _e.mock.On("ErrGroup")}
+}
+
+func (_c *MockMonitorData_ErrGroup_Call) Run(run func()) *MockMonitorData_ErrGroup_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *MockMonitorData_ErrGroup_Call) Return(group *errgroup.Group) *MockMonitorData_ErrGroup_Call {
+	_c.Call.Return(group)
+	return _c
+}
+
+func (_c *MockMonitorData_ErrGroup_Call) RunAndReturn(run func() *errgroup.Group) *MockMonitorData_ErrGroup_Call {
 	_c.Call.Return(run)
 	return _c
 }
