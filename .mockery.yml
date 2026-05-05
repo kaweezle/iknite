@@ -59,6 +59,7 @@ packages:
         mdnsData,
         prepareHostData,
         manifestData,
+        kubeletStartData,
       }
   github.com/kaweezle/iknite/pkg/checkers:
     config:

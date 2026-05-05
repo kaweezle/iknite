@@ -16,19 +16,19 @@ import (
 // It holds the host and kubeClient so callers of StartAndConfigureKubelet do
 // not need to pass them explicitly.
 type defaultKubeletRuntime struct {
-	alpineHost host.Host
+	fileExec   host.FileExecutor
 	kubeClient resource.RESTClientGetter
 }
 
 var _ KubeletRuntime = (*defaultKubeletRuntime)(nil)
 
 // NewKubeletRuntime returns a KubeletRuntime backed by the real k8s functions.
-func NewKubeletRuntime(alpineHost host.Host, kubeClient resource.RESTClientGetter) KubeletRuntime { // nocov
-	return &defaultKubeletRuntime{alpineHost: alpineHost, kubeClient: kubeClient}
+func NewKubeletRuntime(fileExec host.FileExecutor, kubeClient resource.RESTClientGetter) KubeletRuntime { // nocov
+	return &defaultKubeletRuntime{fileExec: fileExec, kubeClient: kubeClient}
 }
 
 func (r *defaultKubeletRuntime) StartKubelet(ctx context.Context) (host.Process, error) { // nocov
-	return StartKubelet(ctx, r.alpineHost)
+	return StartKubelet(ctx, r.fileExec)
 }
 
 func (r *defaultKubeletRuntime) CheckKubeletRunning(
@@ -55,9 +55,9 @@ func (r *defaultKubeletRuntime) Kustomize(
 	ctx context.Context,
 	options *utils.KustomizeOptions,
 ) error { // nocov
-	return Kustomize(ctx, r.kubeClient, r.alpineHost, options)
+	return Kustomize(ctx, r.kubeClient, r.fileExec, options)
 }
 
 func (r *defaultKubeletRuntime) RemovePidFile() { // nocov
-	alpine.RemovePidFile(r.alpineHost, KubeletName)
+	alpine.RemovePidFile(r.fileExec, KubeletName)
 }

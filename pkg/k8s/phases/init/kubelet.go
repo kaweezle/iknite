@@ -13,22 +13,25 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-
+// cSpell: words kubeadmapi
 package init
 
 // cSpell: disable
 import (
 	"errors"
 	"fmt"
+	"io"
 
 	"github.com/sirupsen/logrus"
 	kubeletConfig "k8s.io/kubelet/config/v1beta1"
+	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	cmdUtil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	kubeletPhase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubelet"
 
+	"github.com/kaweezle/iknite/pkg/host"
 	"github.com/kaweezle/iknite/pkg/k8s"
 )
 
@@ -58,9 +61,20 @@ func NewKubeletStartPhase() workflow.Phase {
 	}
 }
 
+type kubeletStartData interface {
+	host.HostProvider
+	ContextProvider
+	KubeletProcessHolder
+	Cfg() *kubeadmapi.InitConfiguration
+	DryRun() bool
+	KubeletDir() string
+	PatchesDir() string
+	OutputWriter() io.Writer
+}
+
 // runKubeletStart executes kubelet start logic.
 func runKubeletStart(c workflow.RunData) error {
-	data, ok := c.(IkniteInitData)
+	data, ok := c.(kubeletStartData)
 	if !ok {
 		return errors.New("kubelet-start phase invoked with an invalid data struct")
 	}
@@ -71,38 +85,40 @@ func runKubeletStart(c workflow.RunData) error {
 	// control-plane, as we handle that ourselves in the mark-control-plane phase.
 	// TODO: Maybe we want to do that some time in the future, in order to remove some logic from the
 	// mark-control-plane phase?
+	cfg := data.Cfg()
+	kubeletDir := data.KubeletDir()
 	if err := kubeletPhase.WriteKubeletDynamicEnvFile(
-		&data.Cfg().ClusterConfiguration,
-		&data.Cfg().NodeRegistration,
+		&cfg.ClusterConfiguration,
+		&cfg.NodeRegistration,
 		false,
-		data.KubeletDir(),
+		kubeletDir,
 	); err != nil {
 		return fmt.Errorf("error writing a dynamic environment file for the kubelet: %w", err)
 	}
 
 	// Write the instance kubelet configuration file to disk.
-	if features.Enabled(data.Cfg().FeatureGates, features.NodeLocalCRISocket) {
+	if features.Enabled(cfg.FeatureGates, features.NodeLocalCRISocket) {
 		kubeletConf := &kubeletConfig.KubeletConfiguration{
-			ContainerRuntimeEndpoint: data.Cfg().NodeRegistration.CRISocket,
+			ContainerRuntimeEndpoint: cfg.NodeRegistration.CRISocket,
 		}
 		if err := kubeletPhase.WriteInstanceConfigToDisk(
 			kubeletConf,
-			data.KubeletDir(),
-		); err != nil {
+			kubeletDir,
+		); err != nil { // nocov -- only fails on disk write errors.
 			return fmt.Errorf("error writing instance kubelet configuration to disk: %w", err)
 		}
-	} else {
+	} else { // nocov - This is enabled by default in kubeadm since v1.35. almost dead code
 		logrus.WithField("phase", "kubelet-start").
 			Info("Skipping writing instance kubelet configuration file as the NodeLocalCRISocket feature gate is disabled")
 	}
 
 	// Write the kubelet configuration file to disk.
 	if err := kubeletPhase.WriteConfigToDisk(
-		&data.Cfg().ClusterConfiguration,
-		data.KubeletDir(),
+		&cfg.ClusterConfiguration,
+		kubeletDir,
 		data.PatchesDir(),
 		data.OutputWriter(),
-	); err != nil {
+	); err != nil { // nocov -- only fails on disk write errors.
 		return fmt.Errorf("error writing kubelet configuration to disk: %w", err)
 	}
 	// Try to start the kubelet service in case it's inactive
