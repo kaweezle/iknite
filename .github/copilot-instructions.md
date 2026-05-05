@@ -227,8 +227,16 @@ Common variables (override with VAR=value):
 - Use `testify` for assertions and stateful test fixtures (see
   [pkg/k8s/runtime_environment_test.go](../pkg/k8s/runtime_environment_test.go))
 - Mock executors via `pkg/testutils.MockExecutor` to avoid shell dependencies
-- Afero filesystem mocking for file I/O tests (see
-  [pkg/utils/filesystem_test.go](../pkg/utils/filesystem_test.go))
+- The platform is abstracted via interfaces in `pkg/host/`:
+  - `host.FileSystem` for file operations
+  - `host.Executor` for command execution
+  - `host.System` for unmounting and other system-level operations
+  - `host.NetworkHost` for network interface management
+  - `host.FileExecutor` for combined file and command operations.
+  - `host.Host` combining all interfaces for convenience
+- Use mocks defined with mockery in [.mockery.yml](../.mockery.yml) for
+  interface-based dependencies. The mocks are located in the `mocks/` directory.
+- `pkg/testutils` provides helpers for creating mocks.
 
 ### Test Duplication Guardrails (Required)
 
@@ -258,7 +266,8 @@ Quick check before adding a new test function:
 
 Follow [pkg/cmd/status.go](../pkg/cmd/status.go) pattern:
 
-1. Create `NewXxxCmd(*v1alpha1.IkniteClusterSpec)` returning `*cobra.Command`
+1. Create `NewXxxCmd(*v1alpha1.IkniteClusterSpec,...)` returning
+   `*cobra.Command`
 2. Implement `performXxx(ikniteConfig)` with main logic
 3. Register in [pkg/cmd/root.go](../pkg/cmd/root.go)'s `NewRootCmd()`
 4. Use `config.ConfigureClusterCommand(flags, ikniteConfig)` for standard flags
@@ -284,13 +293,14 @@ This can be done also with iknite:
 
 #### Error Handling
 
-- Use `cobra.CheckErr()` for command-level errors
+- use `RunE` variants of Cobra commands for automatic error handling.
+- Avoid `cobra.CheckErr()` for command-level errors
 - Wrap errors with context: `fmt.Errorf("failed to start OpenRC: %w", err)`
-- Log with structured fields: `log.WithField("phase", phase).Info(...)`
+- Log with structured fields: `logrus.WithField("phase", phase).Info(...)`
 
 #### Logging
 
-- Use `logrus` (aliased as `log`)
+- Use `logrus` (aliased sometimes as `log`)
 - Verbosity set via `-v` flag: `debug`, `info`, `warn`, `error`
 - JSON output via `--json` flag (see
   [pkg/cmd/util/base_options.go](../pkg/cmd/util/base_options.go).
