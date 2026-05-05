@@ -65,7 +65,7 @@ type initData struct {
 // compile-time assert that the local data object satisfies the phases data interface.
 var _ iknitePhase.IkniteInitData = (*initData)(nil)
 
-// function hooks used for testing error paths around external dependencies.
+// testHooks wrap external dependency calls so tests can inject failures and success paths.
 var (
 	ensureAdminClusterRoleBinding = kubeconfigPhase.EnsureAdminClusterRoleBinding
 	closeMDNSConn                 = func(conn *mdns.Conn) error { return conn.Close() }

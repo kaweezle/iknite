@@ -1,7 +1,5 @@
 // cSpell: words apimachinery bootstraptoken bootstraptokenv1 certutil clientcmdapi
 // cSpell: words clientsetfake genericclioptions paralleltest pkiutil
-//
-//nolint:paralleltest // Tests use shared kubeadm paths and multicast sockets
 package cmd
 
 import (
@@ -47,7 +45,7 @@ import (
 
 const testPKIDir = "pki"
 
-type testContextKey string
+type initDataTestContextKey string
 
 func createTestBootstrapToken(t *testing.T, token string) bootstraptokenv1.BootstrapToken {
 	t.Helper()
@@ -121,10 +119,12 @@ func decodeStatusResponse(t *testing.T, srv *ikniteServer.IkniteServer) *v1alpha
 }
 
 func TestInitDataAccessors(t *testing.T) {
+	t.Parallel()
+
 	req := require.New(t)
 	output := &bytes.Buffer{}
 	kustomizeOptions := &utils.KustomizeOptions{Kustomization: "/kustomization", ForceConfig: true}
-	ctx := context.WithValue(context.Background(), testContextKey("key"), "value")
+	ctx := context.WithValue(context.Background(), initDataTestContextKey("key"), "value")
 	process := mockHost.NewMockProcess(t)
 
 	data := &initData{
@@ -175,6 +175,8 @@ func TestInitDataAccessors(t *testing.T) {
 }
 
 func TestInitDataKubeConfigAndRESTClientGetter(t *testing.T) {
+	t.Parallel()
+
 	req := require.New(t)
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodHead {
@@ -340,6 +342,7 @@ func TestInitDataClientBranches(t *testing.T) {
 	req.NotNil(client)
 }
 
+//nolint:paralleltest // Uses multicast socket and overrides package-level test hooks
 func TestInitDataStatusServerAndMDNS(t *testing.T) {
 	req := require.New(t)
 	originalCloseMDNSConn := closeMDNSConn
