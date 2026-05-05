@@ -173,7 +173,7 @@ func BindFlagValue(f *pflag.Flag, v *viper.Viper, viperName string) error {
 		logrus.WithFields(logrus.Fields{
 			"option":    f.Name,
 			"viper_key": viperName,
-		}).Debug("skipping applying viper config to flag because flag is already set or viper key is not set")
+		}).Trace("skipping applying viper config to flag because flag is already set or viper key is not set")
 		return nil
 	}
 	val := v.Get(viperName)

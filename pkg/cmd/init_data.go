@@ -59,7 +59,7 @@ type initData struct {
 	kustomizeOptions            *utils.KustomizeOptions
 	alpineHost                  host.Host
 	clientGetter                genericclioptions.RESTClientGetter
-	errGroup                    *errgroup.Group
+	errGroup                    errgroup.Group
 }
 
 // compile-time assert that the local data object satisfies the phases data interface.
@@ -370,5 +370,5 @@ func (d *initData) StopStatusServer() error {
 }
 
 func (d *initData) ErrGroup() *errgroup.Group {
-	return d.errGroup
+	return &d.errGroup
 }
