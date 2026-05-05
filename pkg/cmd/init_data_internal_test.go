@@ -1,4 +1,5 @@
-// cSpell: words bootstraptoken certutil clientcmdapi pkiutil
+// cSpell: words apimachinery bootstraptoken bootstraptokenv1 certutil clientcmdapi
+// cSpell: words clientsetfake genericclioptions paralleltest pkiutil
 //
 //nolint:paralleltest // Tests use shared kubeadm paths and multicast sockets
 package cmd
@@ -7,6 +8,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -19,18 +21,21 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/net/ipv4"
-	mockGenericCLI "github.com/kaweezle/iknite/mocks/k8s.io/cli-runtime/pkg/genericclioptions"
-	mockHost "github.com/kaweezle/iknite/mocks/pkg/host"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metaV1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	clientset "k8s.io/client-go/kubernetes"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
+	"k8s.io/client-go/rest"
 	certutil "k8s.io/client-go/util/cert"
-	"k8s.io/kubernetes/cmd/kubeadm/app/apis/bootstraptoken/v1"
+	bootstraptokenv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/bootstraptoken/v1"
 	kubeadmApi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	kubeadmConstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	kubeconfigPhase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubeconfig"
 	pkiutil "k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
 
+	mockGenericCLI "github.com/kaweezle/iknite/mocks/k8s.io/cli-runtime/pkg/genericclioptions"
+	mockHost "github.com/kaweezle/iknite/mocks/pkg/host"
 	ikniteApi "github.com/kaweezle/iknite/pkg/apis/iknite"
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
 	"github.com/kaweezle/iknite/pkg/constants"
@@ -42,13 +47,15 @@ import (
 
 const testPKIDir = "pki"
 
+type testContextKey string
+
 func createTestBootstrapToken(t *testing.T, token string) bootstraptokenv1.BootstrapToken {
 	t.Helper()
 
 	tokenString, err := bootstraptokenv1.NewBootstrapTokenString(token)
 	require.NoError(t, err)
 
-	return bootstraptokenv1.BootstrapToken{Token: *tokenString}
+	return bootstraptokenv1.BootstrapToken{Token: tokenString}
 }
 
 func createTestStatusServer(t *testing.T) *ikniteServer.IkniteServer {
@@ -117,7 +124,7 @@ func TestInitDataAccessors(t *testing.T) {
 	req := require.New(t)
 	output := &bytes.Buffer{}
 	kustomizeOptions := &utils.KustomizeOptions{Kustomization: "/kustomization", ForceConfig: true}
-	ctx := context.WithValue(context.Background(), "key", "value")
+	ctx := context.WithValue(context.Background(), testContextKey("key"), "value")
 	process := mockHost.NewMockProcess(t)
 
 	data := &initData{
@@ -126,9 +133,7 @@ func TestInitDataAccessors(t *testing.T) {
 			BootstrapTokens: []bootstraptokenv1.BootstrapToken{
 				createTestBootstrapToken(t, "abcdef.0123456789abcdef"),
 			},
-			ClusterConfiguration: kubeadmApi.ClusterConfiguration{
-				Patches: &kubeadmApi.Patches{Directory: "/config-patches"},
-			},
+			Patches: &kubeadmApi.Patches{Directory: "/config-patches"},
 		},
 		skipTokenPrint:          true,
 		certificatesDir:         "/etc/kubernetes/pki",
@@ -214,6 +219,19 @@ func TestInitDataKubeConfigAndRESTClientGetter(t *testing.T) {
 	req.NoError(err)
 	req.Equal(server.URL, kubeconfig.Clusters["foo-cluster"].Server)
 
+	invalidWaitClientData := &initData{
+		cfg: &kubeadmApi.InitConfiguration{
+			LocalAPIEndpoint: kubeadmApi.APIEndpoint{
+				AdvertiseAddress: "bad host",
+				BindPort:         6443,
+			},
+		},
+		kubeconfigPath: kubeconfigPath,
+		alpineHost:     host.NewDefaultHost(),
+	}
+	_, err = invalidWaitClientData.WaitControlPlaneClient()
+	req.ErrorContains(err, "failed to create client set from config")
+
 	client, err := data.ClientWithoutBootstrap()
 	req.NoError(err)
 	req.NoError(client.Discovery().RESTClient().Verb(http.MethodHead).Do(context.Background()).Error())
@@ -243,12 +261,30 @@ func TestInitDataKubeConfigAndRESTClientGetter(t *testing.T) {
 
 func TestInitDataClientBranches(t *testing.T) {
 	req := require.New(t)
+	originalEnsureAdminClusterRoleBinding := ensureAdminClusterRoleBinding
+	t.Cleanup(func() {
+		ensureAdminClusterRoleBinding = originalEnsureAdminClusterRoleBinding
+	})
 
 	cachedClient := clientsetfake.NewSimpleClientset()
 	data := &initData{client: cachedClient}
 	client, err := data.Client()
 	req.NoError(err)
 	req.Same(cachedClient, client)
+
+	ensureAdminClusterRoleBinding = func(string, kubeconfigPhase.EnsureRBACFunc) (clientset.Interface, error) {
+		return cachedClient, nil
+	}
+	bootstrapSuccessData := &initData{
+		cfg:            &kubeadmApi.InitConfiguration{},
+		kubeconfigPath: kubeadmConstants.GetAdminKubeConfigPath(),
+	}
+	client, err = bootstrapSuccessData.Client()
+	req.NoError(err)
+	req.Same(cachedClient, client)
+	req.True(bootstrapSuccessData.adminKubeConfigBootstrapped)
+
+	ensureAdminClusterRoleBinding = originalEnsureAdminClusterRoleBinding
 
 	bootstrapErrorData := &initData{
 		cfg:            &kubeadmApi.InitConfiguration{},
@@ -265,6 +301,16 @@ func TestInitDataClientBranches(t *testing.T) {
 	_, err = customPathErrorData.Client()
 	req.ErrorContains(err, "failed to get REST client getter")
 
+	getterMock := mockGenericCLI.NewMockRESTClientGetter(t)
+	getterMock.EXPECT().ToRESTConfig().Return((*rest.Config)(nil), errors.New("bad rest config")).Once()
+	invalidClientData := &initData{
+		cfg:            &kubeadmApi.InitConfiguration{},
+		kubeconfigPath: filepath.Join(t.TempDir(), "custom.conf"),
+		clientGetter:   getterMock,
+	}
+	_, err = invalidClientData.Client()
+	req.ErrorContains(err, "failed to create client set from file")
+
 	opts := newInitOptions()
 	initRunner := workflow.NewRunner()
 	var output bytes.Buffer
@@ -278,6 +324,13 @@ func TestInitDataClientBranches(t *testing.T) {
 	dryRunData, ok := runData.(*initData)
 	req.True(ok)
 
+	err = dryRunData.Host().WriteFile(
+		dryRunData.KubeConfigPath(),
+		fmt.Appendf(nil, testKubeconfigDataFormat, "https://127.0.0.1:6443"),
+		0o600,
+	)
+	req.NoError(err)
+
 	client, err = dryRunData.Client()
 	req.NoError(err)
 	req.NotNil(client)
@@ -289,14 +342,21 @@ func TestInitDataClientBranches(t *testing.T) {
 
 func TestInitDataStatusServerAndMDNS(t *testing.T) {
 	req := require.New(t)
+	originalCloseMDNSConn := closeMDNSConn
+	originalShutdownStatusServer := shutdownStatusServer
+	t.Cleanup(func() {
+		closeMDNSConn = originalCloseMDNSConn
+		shutdownStatusServer = originalShutdownStatusServer
+	})
+
 	alpineHost := mockHost.NewMockHost(t)
 	alpineHost.EXPECT().MkdirAll(constants.StatusDirectory, os.FileMode(0o755)).Return(nil).Twice()
 	alpineHost.EXPECT().WriteFile(constants.StatusFile, mock.Anything, os.FileMode(0o644)).Return(nil).Twice()
 
 	data := &initData{
-		cfg:          &kubeadmApi.InitConfiguration{},
+		cfg:           &kubeadmApi.InitConfiguration{},
 		ikniteCluster: &v1alpha1.IkniteCluster{},
-		alpineHost:   alpineHost,
+		alpineHost:    alpineHost,
 	}
 
 	req.Nil(data.StatusServer())
@@ -305,7 +365,7 @@ func TestInitDataStatusServerAndMDNS(t *testing.T) {
 	req.Same(statusServer, data.StatusServer())
 
 	cluster := &v1alpha1.IkniteCluster{
-		TypeMeta: v1.TypeMeta{
+		TypeMeta: metaV1.TypeMeta{
 			Kind:       ikniteApi.IkniteClusterKind,
 			APIVersion: v1alpha1.SchemeGroupVersion.String(),
 		},
@@ -334,7 +394,20 @@ func TestInitDataStatusServerAndMDNS(t *testing.T) {
 	req.Nil(data.StatusServer())
 	req.NoError(data.StopStatusServer())
 
+	shutdownStatusServer = func(*ikniteServer.IkniteServer) error {
+		return errors.New("shutdown failed")
+	}
+	data.SetStatusServer(&ikniteServer.IkniteServer{})
+	req.ErrorContains(data.StopStatusServer(), "failed to shutdown status server")
+	shutdownStatusServer = originalShutdownStatusServer
+
 	data.SetMDnsConn(createTestMDNSConn(t))
 	req.NoError(data.CloseMDnsConn())
 	req.NoError(data.CloseMDnsConn())
+
+	closeMDNSConn = func(*mdns.Conn) error {
+		return errors.New("close failed")
+	}
+	data.SetMDnsConn(&mdns.Conn{})
+	req.ErrorContains(data.CloseMDnsConn(), "failed to close mdns connection")
 }

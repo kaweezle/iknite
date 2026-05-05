@@ -38,7 +38,6 @@ func TestCreateSigningKeyCmd_AssignsFSAndExecutes(t *testing.T) {
 	}
 }
 
-//nolint:gosec // Test-only false positives and serialized hook overrides.
 func TestInstallSigningKey_ErrorPathsStruct(t *testing.T) {
 	tests := []struct {
 		name            string

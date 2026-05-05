@@ -65,6 +65,13 @@ type initData struct {
 // compile-time assert that the local data object satisfies the phases data interface.
 var _ iknitePhase.IkniteInitData = (*initData)(nil)
 
+// function hooks used for testing error paths around external dependencies.
+var (
+	ensureAdminClusterRoleBinding = kubeconfigPhase.EnsureAdminClusterRoleBinding
+	closeMDNSConn                 = func(conn *mdns.Conn) error { return conn.Close() }
+	shutdownStatusServer          = func(srv *ikniteServer.IkniteServer) error { return srv.Shutdown() }
+)
+
 //go:linkname getDryRunClient k8s.io/kubernetes/cmd/kubeadm/app/cmd.getDryRunClient
 func getDryRunClient(d *initData) (clientset.Interface, error)
 
@@ -210,7 +217,7 @@ func (d *initData) Client() (clientset.Interface, error) {
 	// and if the bootstrapping was not already done
 	if !d.adminKubeConfigBootstrapped && isDefaultKubeConfigPath {
 		// Call EnsureAdminClusterRoleBinding() to obtain a working client from admin.conf.
-		d.client, err = kubeconfigPhase.EnsureAdminClusterRoleBinding(
+		d.client, err = ensureAdminClusterRoleBinding(
 			kubeadmConstants.KubernetesDir,
 			nil,
 		)
@@ -308,7 +315,7 @@ func (d *initData) SetMDnsConn(conn *mdns.Conn) {
 
 func (d *initData) CloseMDnsConn() error {
 	if d.mdnsConn != nil {
-		err := d.mdnsConn.Close()
+		err := closeMDNSConn(d.mdnsConn)
 		if err != nil {
 			return fmt.Errorf("failed to close mdns connection: %w", err)
 		}
@@ -360,7 +367,7 @@ func (d *initData) UpdateIkniteCluster(
 
 func (d *initData) StopStatusServer() error {
 	if d.statusServer != nil {
-		err := d.statusServer.Shutdown()
+		err := shutdownStatusServer(d.statusServer)
 		if err != nil {
 			return fmt.Errorf("failed to shutdown status server: %w", err)
 		}
