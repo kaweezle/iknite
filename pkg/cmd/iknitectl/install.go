@@ -16,12 +16,13 @@ limitations under the License.
 package iknitectl
 
 import (
-	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
+
+	"github.com/kaweezle/iknite/pkg/host"
 )
 
 // CreateInstallCmd creates the install command with the given filesystem.
-func CreateInstallCmd(fs afero.Fs) *cobra.Command {
+func CreateInstallCmd(fs host.FileSystem) *cobra.Command {
 	installCmd := &cobra.Command{
 		Use:   "install",
 		Short: "Install various development artifacts",

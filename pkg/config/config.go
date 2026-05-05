@@ -21,13 +21,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"os"
-	"path/filepath"
 	"slices"
 
 	"github.com/bitfield/script"
 	"github.com/mitchellh/mapstructure"
-	"github.com/spf13/cobra"
 	flag "github.com/spf13/pflag"
 	"github.com/spf13/viper"
 	kubeadmApi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
@@ -44,15 +41,21 @@ import (
 
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
 	"github.com/kaweezle/iknite/pkg/cmd/options"
+	"github.com/kaweezle/iknite/pkg/cmd/util"
 	"github.com/kaweezle/iknite/pkg/constants"
+	"github.com/kaweezle/iknite/pkg/host"
 	"github.com/kaweezle/iknite/pkg/provision"
 )
 
 // cSpell: enable
+const (
+	ForceConfig = "force_config"
+)
 
-func AddIkniteClusterFlags(flagSet *flag.FlagSet, ikniteConfig *v1alpha1.IkniteClusterSpec) {
+func AddIkniteClusterFlags(dest *flag.FlagSet, ikniteConfig *v1alpha1.IkniteClusterSpec) {
 	v1alpha1.SetDefaults_IkniteClusterSpec(ikniteConfig)
 
+	flagSet := flag.NewFlagSet("iknite cluster configuration", flag.ContinueOnError)
 	flagSet.IPVar(&ikniteConfig.Ip, options.Ip, ikniteConfig.Ip, "Cluster IP address")
 	flagSet.BoolVar(
 		&ikniteConfig.CreateIp,
@@ -71,15 +74,12 @@ func AddIkniteClusterFlags(flagSet *flag.FlagSet, ikniteConfig *v1alpha1.IkniteC
 	flagSet.BoolVar(&ikniteConfig.EnableMDNS, options.EnableMDNS, ikniteConfig.EnableMDNS,
 		"Enable mDNS publication of domain name")
 
-	// This flag may already be defined by kubeadm
-	if flagSet.Lookup(koptions.KubernetesVersion) == nil {
-		flagSet.StringVar(
-			&ikniteConfig.KubernetesVersion,
-			koptions.KubernetesVersion,
-			ikniteConfig.KubernetesVersion,
-			"Kubernetes version to install",
-		)
-	}
+	flagSet.StringVar(
+		&ikniteConfig.KubernetesVersion,
+		koptions.KubernetesVersion,
+		ikniteConfig.KubernetesVersion,
+		"Kubernetes version to install",
+	)
 	flagSet.StringVar(
 		&ikniteConfig.ClusterName,
 		options.ClusterName,
@@ -98,55 +98,10 @@ func AddIkniteClusterFlags(flagSet *flag.FlagSet, ikniteConfig *v1alpha1.IkniteC
 		ikniteConfig.UseEtcd,
 		"Use etcd instead of kine as the backing store",
 	)
-}
-
-func StartPersistentPreRun(cmd *cobra.Command, _ []string) {
-	flags := cmd.Flags()
-	//nolint:errcheck // flag exists
-	_ = viper.BindPFlag(
-		IP,
-		flags.Lookup(options.Ip),
-	)
-	//nolint:errcheck // flag exists
-	_ = viper.BindPFlag(
-		IPCreate,
-		flags.Lookup(options.IpCreate),
-	)
-	//nolint:errcheck // flag exists
-	_ = viper.BindPFlag(
-		IPNetworkInterface,
-		flags.Lookup(options.IpNetworkInterface),
-	)
-	//nolint:errcheck // flag exists
-	_ = viper.BindPFlag(
-		DomainName,
-		flags.Lookup(options.DomainName),
-	)
-	//nolint:errcheck // flag exists
-	_ = viper.BindPFlag(
-		KubernetesVersion,
-		flags.Lookup(koptions.KubernetesVersion),
-	)
-	//nolint:errcheck // flag exists
-	_ = viper.BindPFlag(
-		EnableMDNS,
-		flags.Lookup(options.EnableMDNS),
-	)
-	//nolint:errcheck // flag exists
-	_ = viper.BindPFlag(
-		ClusterName,
-		flags.Lookup(options.ClusterName),
-	)
-	//nolint:errcheck // flag exists
-	_ = viper.BindPFlag(
-		Kustomization,
-		flags.Lookup(options.Kustomization),
-	)
-	//nolint:errcheck // flag exists
-	_ = viper.BindPFlag(
-		UseEtcd,
-		flags.Lookup(options.UseEtcd),
-	)
+	flagSet.VisitAll(func(f *flag.Flag) {
+		util.SetFlagConfigSection(flagSet, f.Name, "cluster") //nolint:errcheck // flag exists
+	})
+	dest.AddFlagSet(flagSet)
 }
 
 // DecodeIkniteConfig decodes the configuration from the viper configuration.
@@ -210,22 +165,6 @@ func MarshalIkniteConfig(ikniteConfig *v1alpha1.IkniteClusterSpec, format string
 		return nil, fmt.Errorf("failed to marshal iknite config: %w", err)
 	}
 	return output, nil
-}
-
-func WriteToFile(path string, data []byte) error {
-	file, err := os.Create(filepath.Clean(path))
-	if err != nil {
-		return fmt.Errorf("failed to create file: %w", err)
-	}
-	defer func() {
-		err = file.Close()
-	}()
-
-	if _, err := file.Write(data); err != nil {
-		return fmt.Errorf("failed to write data to file: %w", err)
-	}
-
-	return nil
 }
 
 func ApplyIkniteClusterSpecToClusterConfiguration(
@@ -363,9 +302,9 @@ var workloadKinds = []resid.Gvk{
 	{Group: "batch", Kind: "CronJob"},
 }
 
-func getKustomizationImages(kustomization string, forceEmbedded bool) ([]string, error) {
+func getKustomizationImages(fs host.FileSystem, kustomization string, forceEmbedded bool) ([]string, error) {
 	var containerImages []string
-	resources, err := provision.GetBaseKustomizationResources(kustomization, forceEmbedded)
+	resources, err := provision.GetBaseKustomizationResources(fs, kustomization, forceEmbedded)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get resources from base kustomizations: %w", err)
 	}
@@ -398,7 +337,7 @@ func getKustomizationImages(kustomization string, forceEmbedded bool) ([]string,
 }
 
 // GetIkniteImages returns the list of container images used by iknite.
-func GetIkniteImages(ikniteConfig *v1alpha1.IkniteClusterSpec, embedded bool) ([]string, error) {
+func GetIkniteImages(fs host.FileSystem, ikniteConfig *v1alpha1.IkniteClusterSpec, embedded bool) ([]string, error) {
 	// Load default kubeadm configuration to get the list of control plane images
 	externalInitCfg := &kubeadmApiV1.InitConfiguration{}
 	kubeadmScheme.Scheme.Default(externalInitCfg)
@@ -418,7 +357,7 @@ func GetIkniteImages(ikniteConfig *v1alpha1.IkniteClusterSpec, embedded bool) ([
 			SkipCRIDetect: true,
 		},
 	)
-	if err != nil {
+	if err != nil { // nocov -- this should never happen as we're providing default configuration
 		return nil, fmt.Errorf("failed to load or default init configuration: %w", err)
 	}
 
@@ -437,7 +376,7 @@ func GetIkniteImages(ikniteConfig *v1alpha1.IkniteClusterSpec, embedded bool) ([
 	}
 
 	// Now let's perform the default kustomization to add images.
-	kustomizationImages, err := getKustomizationImages(ikniteConfig.Kustomization, embedded)
+	kustomizationImages, err := getKustomizationImages(fs, ikniteConfig.Kustomization, embedded)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get images from kustomization: %w", err)
 	}

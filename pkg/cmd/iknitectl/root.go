@@ -20,27 +20,35 @@ import (
 	"io"
 	"os"
 
-	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
 	"github.com/kaweezle/iknite/pkg/cmd/secrets"
+	"github.com/kaweezle/iknite/pkg/cmd/util"
+	"github.com/kaweezle/iknite/pkg/host"
 )
 
 // RootOptions contains configuration for the root command.
 type RootOptions struct {
-	Fs      afero.Fs
-	out     io.Writer
-	CfgFile string
+	FileExecutor host.FileExecutor
+	out          io.Writer
+	util.BaseOptions
+}
+
+func NewRootOptions() *RootOptions {
+	defaultHost := host.NewDefaultHost()
+	opts := &RootOptions{
+		BaseOptions:  *util.DefaultBaseOptions(),
+		FileExecutor: defaultHost,
+		out:          os.Stdout,
+	}
+	return opts
 }
 
 // CreateRootCmd creates the root command with the given options.
 func CreateRootCmd(opts *RootOptions) *cobra.Command {
 	if opts == nil {
-		opts = &RootOptions{
-			Fs:  afero.NewOsFs(),
-			out: os.Stdout,
-		}
+		opts = NewRootOptions()
 	}
 
 	rootCmd := &cobra.Command{
@@ -50,48 +58,35 @@ func CreateRootCmd(opts *RootOptions) *cobra.Command {
 
 It provides utilities for managing secrets, building artifacts, and other
 development tasks that are not part of the main iknite binary.`,
+		PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
+			opts.SetUpLogs(cmd.OutOrStderr())
+			err := util.InitializeConfiguration(cmd.Root(), viper.GetViper())
+			if err != nil {
+				return fmt.Errorf("failed to initialize configuration: %w", err)
+			}
+			// Re-setup logs after configuration is loaded to apply any log-related settings from the config file
+			opts.SetUpLogs(cmd.OutOrStderr())
+			return nil
+		},
 	}
+	rootCmd.SetOut(opts.out)
 
-	cobra.OnInitialize(func() { initConfig(opts.CfgFile) })
-
-	rootCmd.PersistentFlags().
-		StringVar(&opts.CfgFile, "config", "", "config file (default is $HOME/.iknitectl.yaml)")
+	opts.AddFlags(rootCmd.PersistentFlags())
 
 	// Add subcommands
-	rootCmd.AddCommand(CreateInstallCmd(opts.Fs))
-	rootCmd.AddCommand(CreateKustomizeCmd(opts.Fs, opts.out))
-	rootCmd.AddCommand(CreateApplicationCmd(opts.Fs, opts.out))
-	rootCmd.AddCommand(secrets.CreateSecretsCmd(opts.Fs, nil))
+	rootCmd.AddCommand(CreateInstallCmd(opts.FileExecutor))
+	rootCmd.AddCommand(CreateKustomizeCmd(opts.FileExecutor, opts.out))
+	rootCmd.AddCommand(CreateApplicationCmd(opts.FileExecutor, opts.out))
+	rootCmd.AddCommand(secrets.CreateSecretsCmd(opts.FileExecutor, nil))
+	util.AddConfigFlag(rootCmd)
+
+	util.BindFlagsToViper(rootCmd, viper.GetViper())
 
 	return rootCmd
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
 // This is called by main.main(). It only needs to happen once to the rootCmd.
-func Execute() {
+func Execute() { // nocov - This is the main entry point for the CLI, which is hard to test in CI
 	cobra.CheckErr(CreateRootCmd(nil).Execute())
-}
-
-// initConfig reads in config file and ENV variables if set.
-func initConfig(cfgFile string) {
-	if cfgFile != "" {
-		// Use config file from the flag.
-		viper.SetConfigFile(cfgFile)
-	} else {
-		// Find home directory.
-		home, err := os.UserHomeDir()
-		cobra.CheckErr(err)
-
-		// Search config in home directory with name ".iknitectl" (without extension).
-		viper.AddConfigPath(home)
-		viper.SetConfigType("yaml")
-		viper.SetConfigName(".iknitectl")
-	}
-
-	viper.AutomaticEnv() // read in environment variables that match
-
-	// If a config file is found, read it in.
-	if err := viper.ReadInConfig(); err == nil {
-		fmt.Fprintln(os.Stderr, "Using config file:", viper.ConfigFileUsed())
-	}
 }

@@ -6,6 +6,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/kubernetes/scheme"
 
 	ikniteapi "github.com/kaweezle/iknite/pkg/apis/iknite"
 )
@@ -17,6 +18,8 @@ var SchemeGroupVersion = schema.GroupVersion{
 	Group:   ikniteapi.GroupName,
 	Version: ikniteapi.V1alpha1Version,
 }
+
+var SchemeGroupVersionWithKind = SchemeGroupVersion.WithKind(ikniteapi.IkniteClusterKind)
 
 var (
 	// SchemeBuilder points to a list of functions added to Scheme.
@@ -32,6 +35,7 @@ func init() {
 	// generated functions takes place in the generated files. The separation
 	// makes the code compile even when the generated files are missing.
 	localSchemeBuilder.Register(addKnownTypes, addDefaultingFuncs)
+	localSchemeBuilder.AddToScheme(scheme.Scheme) //nolint:errcheck // it never returns an error
 }
 
 // Kind takes an unqualified kind and returns a Group qualified GroupKind.
@@ -44,10 +48,10 @@ func Resource(resource string) schema.GroupResource {
 	return SchemeGroupVersion.WithResource(resource).GroupResource()
 }
 
-func addKnownTypes(scheme *runtime.Scheme) error {
-	scheme.AddKnownTypes(SchemeGroupVersion,
+func addKnownTypes(s *runtime.Scheme) error {
+	s.AddKnownTypes(SchemeGroupVersion,
 		&IkniteCluster{},
 	)
-	metav1.AddToGroupVersion(scheme, SchemeGroupVersion)
+	metav1.AddToGroupVersion(s, SchemeGroupVersion)
 	return nil
 }

@@ -29,8 +29,9 @@ import (
 	"github.com/getsops/sops/v3/cmd/sops/formats"
 	"github.com/getsops/sops/v3/config"
 	"github.com/getsops/sops/v3/version"
-	"github.com/spf13/afero"
 	"sigs.k8s.io/yaml"
+
+	"github.com/kaweezle/iknite/pkg/host"
 )
 
 const (
@@ -39,7 +40,7 @@ const (
 
 // Options contains configuration for secrets operations.
 type Options struct {
-	Fs          afero.Fs
+	Fs          host.FileSystem
 	SecretsFile string
 	HomeDir     string
 	KeyFile     string
@@ -117,7 +118,7 @@ func SetSecret(opts *Options, path, value string) error {
 		return fmt.Errorf("failed to encode encrypted secrets: %w", err)
 	}
 
-	if writeErr := afero.WriteFile(opts.Fs, opts.SecretsFile, encryptedData, fileSecrets.Mode); writeErr != nil {
+	if writeErr := opts.Fs.WriteFile(opts.SecretsFile, encryptedData, fileSecrets.Mode); writeErr != nil {
 		return fmt.Errorf("failed to write secrets file: %w", writeErr)
 	}
 
@@ -159,7 +160,7 @@ func RemoveSecret(opts *Options, path string) error {
 		return fmt.Errorf("failed to encode encrypted secrets: %w", err)
 	}
 
-	if writeErr := afero.WriteFile(opts.Fs, opts.SecretsFile, encryptedData, fileSecrets.Mode); writeErr != nil {
+	if writeErr := opts.Fs.WriteFile(opts.SecretsFile, encryptedData, fileSecrets.Mode); writeErr != nil {
 		return fmt.Errorf("failed to write secrets file: %w", writeErr)
 	}
 
@@ -167,7 +168,7 @@ func RemoveSecret(opts *Options, path string) error {
 }
 
 func checkSecretsFilesExists(opts *Options, paths *secretsInitPaths, result *InitResult) error {
-	if exists, existsErr := afero.Exists(opts.Fs, paths.sopsConfigFile); existsErr != nil {
+	if exists, existsErr := opts.Fs.Exists(paths.sopsConfigFile); existsErr != nil {
 		return fmt.Errorf("failed to check .sops.yaml: %w", existsErr)
 	} else if exists {
 		result.Messages = append(
@@ -176,7 +177,7 @@ func checkSecretsFilesExists(opts *Options, paths *secretsInitPaths, result *Ini
 		)
 	}
 
-	if exists, existsErr := afero.Exists(opts.Fs, paths.secretsFile); existsErr != nil {
+	if exists, existsErr := opts.Fs.Exists(paths.secretsFile); existsErr != nil {
 		return fmt.Errorf("failed to check secrets file: %w", existsErr)
 	} else if exists {
 		result.Messages = append(
@@ -245,7 +246,7 @@ func InitSecrets(opts *Options) (*InitResult, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to render SOPS config template: %w", err)
 	}
-	if writeErr := afero.WriteFile(opts.Fs, paths.sopsConfigFile, []byte(sopsConfig), 0o644); writeErr != nil {
+	if writeErr := opts.Fs.WriteFile(paths.sopsConfigFile, []byte(sopsConfig), 0o644); writeErr != nil {
 		return nil, fmt.Errorf("failed to write %s: %w", paths.sopsConfigFile, writeErr)
 	}
 	result.Messages = append(result.Messages, fmt.Sprintf("Wrote %s", paths.sopsConfigFile))
@@ -260,7 +261,7 @@ func InitSecrets(opts *Options) (*InitResult, error) {
 	if err != nil {
 		return nil, err
 	}
-	if writeErr := afero.WriteFile(opts.Fs, paths.secretsFile, encryptedSecrets, 0o644); writeErr != nil {
+	if writeErr := opts.Fs.WriteFile(paths.secretsFile, encryptedSecrets, 0o644); writeErr != nil {
 		return nil, fmt.Errorf("failed to write %s: %w", paths.secretsFile, writeErr)
 	}
 	result.Messages = append(result.Messages, fmt.Sprintf("Wrote %s", paths.secretsFile))
@@ -282,7 +283,7 @@ type FileSecrets struct {
 }
 
 func loadAndDecryptSecrets(opts *Options) (*FileSecrets, error) {
-	exists, err := afero.Exists(opts.Fs, opts.SecretsFile)
+	exists, err := opts.Fs.Exists(opts.SecretsFile)
 	if err != nil {
 		return nil, fmt.Errorf("failed to check secrets file: %w", err)
 	}
@@ -295,7 +296,7 @@ func loadAndDecryptSecrets(opts *Options) (*FileSecrets, error) {
 		return nil, fmt.Errorf("failed to stat secrets file: %w", err)
 	}
 
-	encryptedData, err := afero.ReadFile(opts.Fs, opts.SecretsFile)
+	encryptedData, err := opts.Fs.ReadFile(opts.SecretsFile)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read secrets file: %w", err)
 	}

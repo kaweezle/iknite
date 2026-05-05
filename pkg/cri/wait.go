@@ -22,10 +22,9 @@ import (
 	"time"
 
 	log "github.com/sirupsen/logrus"
-	"github.com/spf13/afero"
 
 	"github.com/kaweezle/iknite/pkg/constants"
-	"github.com/kaweezle/iknite/pkg/utils"
+	"github.com/kaweezle/iknite/pkg/host"
 )
 
 // cSpell: enable
@@ -45,12 +44,7 @@ type CRIStatusResponse struct {
 	Status CRIStatus `json:"status"`
 }
 
-var (
-	fs  = afero.NewOsFs()
-	afs = &afero.Afero{Fs: fs}
-)
-
-func WaitForContainerService() (bool, error) {
+func WaitForContainerService(fs host.FileSystem, exec host.Executor) (bool, error) {
 	retries := 3
 	first := true
 	serviceIsReady := false
@@ -61,7 +55,7 @@ func WaitForContainerService() (bool, error) {
 		}
 		first = false
 
-		exist, err := afs.Exists(constants.ContainerServiceSock)
+		exist, err := fs.Exists(constants.ContainerServiceSock)
 		if err != nil {
 			return false, fmt.Errorf(
 				"error while checking container service sock %s: %w",
@@ -76,7 +70,7 @@ func WaitForContainerService() (bool, error) {
 			)
 			continue
 		}
-		out, err := utils.Exec.Run(false, "/usr/bin/crictl", "--runtime-endpoint",
+		out, err := exec.Run(false, "/usr/bin/crictl", "--runtime-endpoint",
 			"unix://"+constants.ContainerServiceSock, "info")
 		if err != nil {
 			log.WithError(err).Warn("Error while checking container service sock")

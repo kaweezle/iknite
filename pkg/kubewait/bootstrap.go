@@ -32,10 +32,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/joho/godotenv"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/pflag"
 	"k8s.io/apimachinery/pkg/util/wait"
+
+	"github.com/kaweezle/iknite/pkg/host"
 )
 
 const (
@@ -54,8 +55,8 @@ type BootstrapOptions struct {
 	EnvFile         string
 }
 
-func NewBootstrapOptions() BootstrapOptions {
-	return BootstrapOptions{
+func NewBootstrapOptions() *BootstrapOptions {
+	return &BootstrapOptions{
 		BootstrapDir:    defaultBootstrapDir,
 		BootstrapScript: defaultBootstrapScript,
 	}
@@ -74,17 +75,24 @@ func AddBootstrapFlags(flags *pflag.FlagSet, opts *BootstrapOptions) {
 		"Path to an env file to load before running the bootstrap script (default: .env inside --bootstrap-dir)")
 }
 
-func (opts *BootstrapOptions) ReadEnvFile() (bool, error) {
+func (opts *BootstrapOptions) ReadEnvFile(fs host.FileSystem) (bool, error) {
 	// Determine the env file path.
 	envFile := opts.EnvFile
 	if envFile == "" {
 		envFile = filepath.Join(opts.BootstrapDir, defaultEnvFile)
 	}
 
-	if info, err := os.Stat(envFile); err == nil && !info.IsDir() {
+	if info, err := fs.Stat(envFile); err == nil && !info.IsDir() {
 		log.Infof("Loading environment from %s", envFile)
-		if loadErr := godotenv.Load(envFile); loadErr != nil {
-			return false, fmt.Errorf("failed to load env file %s: %w", envFile, loadErr)
+		variables, err := host.ReadEnvFiles(fs, envFile)
+		if err != nil {
+			return false, fmt.Errorf("failed to load env file %s: %w", envFile, err)
+		}
+		for key, value := range variables {
+			err = os.Setenv(key, value)
+			if err != nil {
+				return false, fmt.Errorf("failed to set environment variable %s: %w", key, err)
+			}
 		}
 	}
 
@@ -93,12 +101,12 @@ func (opts *BootstrapOptions) ReadEnvFile() (bool, error) {
 
 // runBootstrap clones the bootstrap repository (if URL and ref are provided), loads the env
 // file (if present), and executes the bootstrap script.
-func runBootstrap(ctx context.Context, opts *Options) error {
+func runBootstrap(ctx context.Context, fse host.FileExecutor, opts *BootstrapOptions) error {
 	// Clone the repository when a ref is also supplied; if no ref is given the clone is skipped.
 
 	baseDir := opts.BootstrapDir
 	if opts.RepoURL != "" && opts.RepoRef != "" {
-		if err := cloneBootstrapRepo(ctx, opts); err != nil {
+		if err := cloneBootstrapRepo(ctx, fse, opts); err != nil {
 			return fmt.Errorf("error during bootstrap: %w", err)
 		}
 		baseDir = filepath.Join(opts.BootstrapDir, bootstrapRepoDirname)
@@ -111,7 +119,7 @@ func runBootstrap(ctx context.Context, opts *Options) error {
 	if !filepath.IsAbs(scriptPath) {
 		scriptPath = filepath.Join(baseDir, opts.BootstrapScript)
 	}
-	if _, err := os.Stat(scriptPath); err != nil {
+	if _, err := fse.Stat(scriptPath); err != nil {
 		log.Infof(
 			"Bootstrap script %s not found in %s with error %v, skipping",
 			opts.BootstrapScript,
@@ -123,27 +131,30 @@ func runBootstrap(ctx context.Context, opts *Options) error {
 
 	// Check if the script is executable, and if not, attempt to make it executable.
 	// Don't touch it if it is already executable because it may reside on a read-only filesystem.
-	info, err := os.Stat(scriptPath)
+	info, err := fse.Stat(scriptPath)
 	if err != nil {
 		return fmt.Errorf("failed to stat bootstrap script %s: %w", scriptPath, err)
 	}
 	if info.Mode()&0o111 == 0 {
 		log.Infof("Bootstrap script %s is not executable, attempting to make it executable", scriptPath)
-		//nolint:gosec // ensure executable, matching bootstrap.sh chmod +x
-		if chmodErr := os.Chmod(scriptPath, 0o755); chmodErr != nil {
+
+		if chmodErr := fse.Chmod(scriptPath, 0o755); chmodErr != nil {
 			return fmt.Errorf("failed to make bootstrap script %s executable: %w", scriptPath, chmodErr)
 		}
 	}
 
 	log.Infof("Running bootstrap script: %s", scriptPath)
-	//nolint:gosec // scriptPath is controlled by the user via --bootstrap-dir / --bootstrap-script flags
-	cmd := exec.CommandContext(ctx, scriptPath)
-	cmd.Dir = baseDir
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	cmd.Stdin = os.Stdin
-
-	if err := cmd.Run(); err != nil {
+	commandOptions := &host.CommandOptions{
+		Cmd:    scriptPath,
+		Args:   []string{},
+		Env:    os.Environ(),
+		Dir:    baseDir,
+		Stdin:  os.Stdin,
+		Stdout: os.Stdout,
+		Stderr: os.Stderr,
+	}
+	err = fse.RunCommand(ctx, commandOptions)
+	if err != nil {
 		return fmt.Errorf("bootstrap script %s failed: %w", scriptPath, err)
 	}
 
@@ -151,42 +162,41 @@ func runBootstrap(ctx context.Context, opts *Options) error {
 }
 
 // cloneBootstrapRepo performs a shallow git clone of the bootstrap repository.
-func cloneBootstrapRepo(ctx context.Context, opts *Options) error {
+func cloneBootstrapRepo(ctx context.Context, fse host.FileExecutor, opts *BootstrapOptions) error {
 	repoPath := filepath.Join(opts.BootstrapDir, bootstrapRepoDirname)
 	log.Infof("Cloning bootstrap repository %s (ref: %s) to %s", opts.RepoURL, opts.RepoRef, repoPath)
 
-	if err := ensureSSHKnownHost(ctx, opts.RepoURL); err != nil {
+	if err := ensureSSHKnownHost(ctx, fse, opts.RepoURL); err != nil {
 		return err
 	}
 
 	// Remove any existing target directory so the clone is clean.
-	if err := os.RemoveAll(repoPath); err != nil {
+	if err := fse.RemoveAll(repoPath); err != nil {
 		return fmt.Errorf("failed to remove existing bootstrap dir %s: %w", repoPath, err)
 	}
 
-	//nolint:gosec // arguments come from CLI flags under user control
-	cmd := exec.CommandContext(
-		ctx,
-		"git",
-		"clone",
-		"--depth",
-		"1",
-		"--branch",
-		opts.RepoRef,
-		opts.RepoURL,
-		repoPath,
-	)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-
-	if err := cmd.Run(); err != nil {
+	commandOptions := &host.CommandOptions{
+		Cmd: "git",
+		Args: []string{
+			"clone",
+			"--depth", "1",
+			"--branch", opts.RepoRef,
+			opts.RepoURL,
+			repoPath,
+		},
+		Env:    os.Environ(),
+		Stdout: os.Stdout,
+		Stderr: os.Stderr,
+	}
+	err := fse.RunCommand(ctx, commandOptions)
+	if err != nil {
 		return fmt.Errorf("git clone of %s failed: %w", opts.RepoURL, err)
 	}
 
 	return nil
 }
 
-func ensureSSHKnownHost(ctx context.Context, repoURL string) error {
+func ensureSSHKnownHost(ctx context.Context, fse host.FileExecutor, repoURL string) error {
 	sshServer := extractDomain(repoURL)
 	if sshServer == "" {
 		log.Warnf(
@@ -213,7 +223,7 @@ func ensureSSHKnownHost(ctx context.Context, repoURL string) error {
 	}
 
 	log.Infof("Adding SSH server %s to known_hosts", sshServer)
-	//nolint:gosec // sshServer is derived from repoURL and only used for ssh-keyscan host lookup.
+
 	sshKeyscanCmd := exec.CommandContext(ctx, "ssh-keyscan", "-t", "rsa", sshServer)
 	keyscanOutput, err := sshKeyscanCmd.Output()
 	if err != nil {
@@ -223,15 +233,13 @@ func ensureSSHKnownHost(ctx context.Context, repoURL string) error {
 	// Ensure $HOME/.ssh directory exists so that ssh-keyscan can write to known_hosts without permission issues.
 	sshDir := filepath.Join(os.Getenv("HOME"), ".ssh")
 
-	//nolint:gosec // path is constrained to user-local HOME and mode is intentionally restrictive.
-	if err := os.MkdirAll(sshDir, 0o700); err != nil {
+	if err := fse.MkdirAll(sshDir, 0o700); err != nil {
 		return fmt.Errorf("failed to create .ssh directory: %w", err)
 	}
 
 	knownHostsPath := filepath.Join(sshDir, "known_hosts")
 
-	//nolint:gosec // path is constrained to user-local HOME and mode is intentionally restrictive.
-	if err := os.WriteFile(knownHostsPath, keyscanOutput, 0o600); err != nil {
+	if err := fse.WriteFile(knownHostsPath, keyscanOutput, 0o600); err != nil {
 		return fmt.Errorf("failed to write known_hosts file: %w", err)
 	}
 

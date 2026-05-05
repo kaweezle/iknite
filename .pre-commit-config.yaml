@@ -4,7 +4,7 @@
 #   pre-commit install
 # Run on all files:
 #   pre-commit run --all-files
-# cSpell: words checkmake
+# cSpell: words checkmake readyz
 
 repos:
   # General, language-agnostic sanity checks
@@ -12,7 +12,7 @@ repos:
     rev: v5.0.0
     hooks:
       - id: check-yaml
-        args: ["--unsafe"]
+        args: [ "--unsafe" ]
       - id: end-of-file-fixer
         # exclude: |
         #   (?x)^(
@@ -20,7 +20,7 @@ repos:
         #   )$
       - id: trailing-whitespace
       - id: mixed-line-ending
-        args: ["--fix=lf"]
+        args: [ "--fix=lf" ]
         # exclude: |
         #   (?x)^(
         #       .*\.sh |
@@ -36,12 +36,17 @@ repos:
               pkg/secrets/templates_internal_test\.go
           )$
       - id: check-added-large-files
-        args: ["--maxkb=10240"] # 10 MB
+        args: [ "--maxkb=10240" ] # 10 MB
 
   - repo: https://gitlab.com/bmares/check-json5
     rev: v1.0.0
     hooks:
       - id: check-json5
+        exclude: |
+          (?x)^(
+            .*/readyz.json |
+            .*/healthz.json
+          )$
 
   # Spell checking via cspell
   - repo: https://github.com/streetsidesoftware/cspell-cli
@@ -64,7 +69,7 @@ repos:
           - "@cspell/dict-terraform@latest"
           - "@cspell/dict-software-terms@latest"
         # Limit to text-like files; binaries are skipped automatically
-        types_or: ["text"]
+        types_or: [ "text" ]
         exclude: |
           (?x)^(
               .*/p10k\.zsh |
@@ -81,7 +86,7 @@ repos:
 
   # golangci-lint for Go files
   - repo: https://github.com/golangci/golangci-lint
-    rev: v2.10.1
+    rev: v2.11.4
     hooks:
       - id: golangci-lint-config-verify
       - id: golangci-lint
@@ -91,7 +96,7 @@ repos:
     rev: v0.11.0.1
     hooks:
       - id: shellcheck
-        args: ["--exclude=SC3014,SC3043"] # Ignore source-related warnings
+        args: [ "--exclude=SC3014,SC3043" ] # Ignore source-related warnings
         exclude: |
           (?x)^(
               .*/p10k\.zsh

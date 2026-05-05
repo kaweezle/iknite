@@ -24,17 +24,17 @@ import (
 
 	"github.com/getsops/sops/v3/cmd/sops/formats"
 	"github.com/getsops/sops/v3/decrypt"
-	"github.com/spf13/afero"
 	"sigs.k8s.io/yaml"
 
 	secretsCmd "github.com/kaweezle/iknite/pkg/cmd/secrets"
+	"github.com/kaweezle/iknite/pkg/host"
 	"github.com/kaweezle/iknite/pkg/secrets"
 )
 
 func TestCreateSecretsCmd(t *testing.T) {
 	t.Parallel()
 
-	fs := afero.NewMemMapFs()
+	fs := host.NewMemMapFS()
 	cmd := secretsCmd.CreateSecretsCmd(fs, nil)
 	if cmd == nil {
 		t.Fatal("CreateSecretsCmd returned nil")
@@ -64,9 +64,9 @@ func TestSecretsSetCommandFromStdin(t *testing.T) {
 	// Cannot use t.Parallel because this test sets process env for SOPS decryption.
 	t.Setenv("SOPS_AGE_KEY", testSecretsAgeKey)
 
-	testFs := afero.NewMemMapFs()
+	testFs := host.NewMemMapFS()
 	secretsPath := "/test/secrets.sops.yaml"
-	if err := afero.WriteFile(testFs, secretsPath, []byte(testSecretsEncryptedWithData), 0o644); err != nil {
+	if err := testFs.WriteFile(secretsPath, []byte(testSecretsEncryptedWithData), 0o644); err != nil {
 		t.Fatalf("failed to write test secrets file: %v", err)
 	}
 
@@ -82,10 +82,10 @@ func TestSecretsSetCommandFromStdin(t *testing.T) {
 	assertSecretValue(t, testFs, secretsPath, "data.github.api_token", "new-token-from-stdin")
 }
 
-func assertSecretValue(t *testing.T, fs afero.Fs, secretsPath, path, want string) {
+func assertSecretValue(t *testing.T, fs host.FileSystem, secretsPath, path, want string) {
 	t.Helper()
 
-	encrypted, err := afero.ReadFile(fs, secretsPath)
+	encrypted, err := fs.ReadFile(secretsPath)
 	if err != nil {
 		t.Fatalf("failed to read secrets file: %v", err)
 	}

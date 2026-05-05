@@ -26,7 +26,6 @@ import (
 	"fmt"
 	"net"
 	"net/http"
-	"os"
 	"path/filepath"
 	"strconv"
 	"sync"
@@ -40,6 +39,9 @@ import (
 
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
 	"github.com/kaweezle/iknite/pkg/constants"
+	"github.com/kaweezle/iknite/pkg/host"
+	"github.com/kaweezle/iknite/pkg/k8s"
+	"github.com/kaweezle/iknite/pkg/pki"
 )
 
 // IkniteServer encapsulates the HTTPS status server together with the
@@ -125,13 +127,13 @@ func (s *IkniteServer) Shutdown() error {
 // exist in certDir. If they don't exist, they are created signed by the
 // Kubernetes CA. DnsNames and ips extend the built-in SANs (iknite, localhost,
 // 127.0.0.1) with values from the cluster configuration.
-func EnsureServerCertAndKey(certDir string, dnsNames []string, ips []net.IP) error {
-	if pkiutil.CertOrKeyExist(certDir, constants.IkniteServerCertName) {
+func EnsureServerCertAndKey(fs host.FileSystem, certDir string, dnsNames []string, ips []net.IP) error {
+	if pki.CertOrKeyExist(fs, certDir, constants.IkniteServerCertName) {
 		log.WithField("certDir", certDir).Debug("Server cert already exists, skipping creation")
 		return nil
 	}
 
-	caCert, caKey, err := pkiutil.TryLoadCertAndKeyFromDisk(certDir, "ca")
+	caCert, caKey, err := pki.TryLoadCertAndKeyFromDisk(fs, certDir, "ca")
 	if err != nil {
 		return fmt.Errorf("failed to load CA cert and key: %w", err)
 	}
@@ -156,7 +158,7 @@ func EnsureServerCertAndKey(certDir string, dnsNames []string, ips []net.IP) err
 		return fmt.Errorf("failed to create server cert and key: %w", err)
 	}
 
-	if err := pkiutil.WriteCertAndKey(certDir, constants.IkniteServerCertName, cert, key); err != nil {
+	if err := pki.WriteCertAndKey(fs, certDir, constants.IkniteServerCertName, cert, key); err != nil {
 		return fmt.Errorf("failed to write server cert and key: %w", err)
 	}
 
@@ -167,13 +169,13 @@ func EnsureServerCertAndKey(certDir string, dnsNames []string, ips []net.IP) err
 // EnsureClientCertAndKey ensures that the iknite client certificate and key
 // exist in certDir. If they don't exist, they are created signed by the
 // Kubernetes CA.
-func EnsureClientCertAndKey(certDir string) error {
-	if pkiutil.CertOrKeyExist(certDir, constants.IkniteClientCertName) {
+func EnsureClientCertAndKey(fs host.FileSystem, certDir string) error {
+	if pki.CertOrKeyExist(fs, certDir, constants.IkniteClientCertName) {
 		log.WithField("certDir", certDir).Debug("Client cert already exists, skipping creation")
 		return nil
 	}
 
-	caCert, caKey, err := pkiutil.TryLoadCertAndKeyFromDisk(certDir, "ca")
+	caCert, caKey, err := pki.TryLoadCertAndKeyFromDisk(fs, certDir, "ca")
 	if err != nil {
 		return fmt.Errorf("failed to load CA cert and key: %w", err)
 	}
@@ -192,7 +194,7 @@ func EnsureClientCertAndKey(certDir string) error {
 		return fmt.Errorf("failed to create client cert and key: %w", err)
 	}
 
-	if err := pkiutil.WriteCertAndKey(certDir, constants.IkniteClientCertName, cert, key); err != nil {
+	if err := pki.WriteCertAndKey(fs, certDir, constants.IkniteClientCertName, cert, key); err != nil {
 		return fmt.Errorf("failed to write client cert and key: %w", err)
 	}
 
@@ -207,8 +209,8 @@ func EnsureClientCertAndKey(certDir string) error {
 // status server. It is (re-)created on every start so that the IP address is
 // always up to date.
 //
-//nolint:gosec // Reading from a protected directory
-func EnsureIkniteConf(certDir, confPath string, spec *v1alpha1.IkniteClusterSpec) error {
+
+func EnsureIkniteConf(fs host.FileSystem, certDir, confPath string, spec *v1alpha1.IkniteClusterSpec) error {
 	// Determine the server address from the cluster spec
 	serverAddr := "localhost"
 	if spec.Ip != nil && !spec.Ip.IsLoopback() {
@@ -218,17 +220,17 @@ func EnsureIkniteConf(certDir, confPath string, spec *v1alpha1.IkniteClusterSpec
 	}
 	serverURL := fmt.Sprintf("https://%s", net.JoinHostPort(serverAddr, strconv.Itoa(spec.StatusServerPort)))
 
-	caCertPEM, err := os.ReadFile(filepath.Join(certDir, "ca.crt"))
+	caCertPEM, err := fs.ReadFile(filepath.Join(certDir, "ca.crt"))
 	if err != nil {
 		return fmt.Errorf("failed to read CA cert: %w", err)
 	}
 
-	clientCertPEM, err := os.ReadFile(filepath.Join(certDir, constants.IkniteClientCertName+".crt"))
+	clientCertPEM, err := fs.ReadFile(filepath.Join(certDir, constants.IkniteClientCertName+".crt"))
 	if err != nil {
 		return fmt.Errorf("failed to read client cert: %w", err)
 	}
 
-	clientKeyPEM, err := os.ReadFile(filepath.Join(certDir, constants.IkniteClientCertName+".key"))
+	clientKeyPEM, err := fs.ReadFile(filepath.Join(certDir, constants.IkniteClientCertName+".key"))
 	if err != nil {
 		return fmt.Errorf("failed to read client key: %w", err)
 	}
@@ -244,7 +246,7 @@ func EnsureIkniteConf(certDir, confPath string, spec *v1alpha1.IkniteClusterSpec
 	// Note: CreateWithCerts (via CreateBasic) already sets CurrentContext to
 	// "<user>@<cluster>" = "iknite@iknite". Do not overwrite it.
 
-	if err := kubeConfigUtil.WriteToDisk(confPath, kubeconfig); err != nil {
+	if err := k8s.WriteToFile(kubeconfig, fs, confPath); err != nil {
 		return fmt.Errorf("failed to write iknite.conf to %s: %w", confPath, err)
 	}
 
@@ -258,9 +260,9 @@ func EnsureIkniteConf(certDir, confPath string, spec *v1alpha1.IkniteClusterSpec
 // NewIkniteServer builds an IkniteServer from spec and the certificates in
 // certDir. The port is taken from spec.StatusServerPort.
 //
-//nolint:gosec // Reading from a protected directory
-func NewIkniteServer(certDir string, spec *v1alpha1.IkniteClusterSpec) (*IkniteServer, error) {
-	caCertPEM, err := os.ReadFile(filepath.Join(certDir, "ca.crt"))
+
+func NewIkniteServer(fs host.FileSystem, certDir string, spec *v1alpha1.IkniteClusterSpec) (*IkniteServer, error) {
+	caCertPEM, err := fs.ReadFile(filepath.Join(certDir, "ca.crt"))
 	if err != nil {
 		return nil, fmt.Errorf("failed to read CA cert: %w", err)
 	}
@@ -269,7 +271,8 @@ func NewIkniteServer(certDir string, spec *v1alpha1.IkniteClusterSpec) (*IkniteS
 		return nil, fmt.Errorf("failed to parse CA cert")
 	}
 
-	tlsCert, err := tls.LoadX509KeyPair(
+	tlsCert, err := pki.LoadX509KeyPair(
+		fs,
 		filepath.Join(certDir, constants.IkniteServerCertName+".crt"),
 		filepath.Join(certDir, constants.IkniteServerCertName+".key"),
 	)
@@ -306,6 +309,7 @@ func NewIkniteServer(certDir string, spec *v1alpha1.IkniteClusterSpec) (*IkniteS
 // It uses the cluster spec to determine the SANs for the server certificate and the server URL for the client
 // configuration.
 func EnsureIkniteServerConfiguration(
+	fs host.FileSystem,
 	certDir string,
 	spec *v1alpha1.IkniteClusterSpec,
 ) error {
@@ -319,13 +323,13 @@ func EnsureIkniteServerConfiguration(
 		ips = append(ips, spec.Ip)
 	}
 
-	if err := EnsureServerCertAndKey(certDir, dnsNames, ips); err != nil {
+	if err := EnsureServerCertAndKey(fs, certDir, dnsNames, ips); err != nil {
 		return fmt.Errorf("failed to ensure server cert: %w", err)
 	}
-	if err := EnsureClientCertAndKey(certDir); err != nil {
+	if err := EnsureClientCertAndKey(fs, certDir); err != nil {
 		return fmt.Errorf("failed to ensure client cert: %w", err)
 	}
-	if err := EnsureIkniteConf(certDir, constants.IkniteConfPath, spec); err != nil {
+	if err := EnsureIkniteConf(fs, certDir, constants.IkniteConfPath, spec); err != nil {
 		return fmt.Errorf("failed to write iknite client config to %s: %w", constants.IkniteConfPath, err)
 	}
 	return nil
@@ -336,17 +340,18 @@ func EnsureIkniteServerConfiguration(
 // The returned IkniteServer's SetCluster method should be called on every
 // subsequent cluster status update.
 func StartIkniteServer(
+	fs host.FileSystem,
 	certDir string,
 	cluster *v1alpha1.IkniteCluster,
 ) (*IkniteServer, error) {
 	spec := &cluster.Spec
 
-	err := EnsureIkniteServerConfiguration(certDir, spec)
+	err := EnsureIkniteServerConfiguration(fs, certDir, spec)
 	if err != nil {
 		return nil, fmt.Errorf("failed to ensure iknite server configuration: %w", err)
 	}
 
-	srv, err := NewIkniteServer(certDir, spec)
+	srv, err := NewIkniteServer(fs, certDir, spec)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create iknite server: %w", err)
 	}

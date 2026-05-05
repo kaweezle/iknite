@@ -112,7 +112,7 @@ These instructions are based on [Effective Go](https://go.dev/doc/effective_go),
 
 ### Formatting
 
-- Always use `gofmt` to format code
+- Always use `golangci-lint fmt` to format code
 - Use `goimports` to manage imports automatically
 - Keep line length BELOW 120 characters; break long lines appropriately
 - Add blank lines to separate logical groups of code
@@ -387,7 +387,7 @@ These instructions are based on [Effective Go](https://go.dev/doc/effective_go),
   func TestSomething(t *testing.T) {
       mockExecutor := host.NewMockExecutor(t)
       // Set up expectations on mockExecutor
-      call := mockExec.On("Run",...)..Return([]byte("ok"), nil)
+      call := mockExec.EXPECT().Run(...)..Return([]byte("ok"), nil)
       ...
       // Use mockExecutor in the code being tested
       // The expectations will be automatically asserted at the end of the test, and any failures
@@ -438,7 +438,7 @@ These instructions are based on [Effective Go](https://go.dev/doc/effective_go),
 - Run tests before committing:
 
   ```console
-  go test -v -race -covermode=atomic -coverprofile=coverage.out  ./...
+  go test -v -race -covermode=atomic -coverprofile=coverage.out -coverpkg ./... ./...
   ```
 
 - Run linters before committing:

@@ -1,4 +1,4 @@
-<!-- cSpell: words testutils apimachinery sirupsen stretchr coverprofile Godoc newpackage -->
+<!-- cSpell: words testutils apimachinery sirupsen coverprofile Godoc newpackage -->
 
 # Package Documentation
 

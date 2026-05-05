@@ -21,9 +21,14 @@ func NewMDnsPublishPhase() workflow.Phase {
 	}
 }
 
+type mdnsData interface {
+	IkniteClusterProvider
+	MDnsConnectionHolder
+}
+
 // runPrepare executes the node initialization process.
 func runMDnsPublish(c workflow.RunData) error {
-	data, ok := c.(IkniteInitData)
+	data, ok := c.(mdnsData)
 	if !ok {
 		return fmt.Errorf("prepare phase invoked with an invalid data struct. ")
 	}

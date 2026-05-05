@@ -25,41 +25,33 @@ import (
 	"context"
 	"fmt"
 
-	log "github.com/sirupsen/logrus"
 	"github.com/spf13/pflag"
 
 	"github.com/kaweezle/iknite/pkg/cmd/util"
+	"github.com/kaweezle/iknite/pkg/host"
 )
 
 type Options struct {
-	Verbosity               log.Level
-	JSONLogs                bool
+	*BootstrapOptions
+	*ResourcesOptions
+	util.BaseOptions
 	SkipWaitingForResources bool
 	SkipBootstrap           bool
-	AllNamespaces           bool
-	ResourcesOptions
-	BootstrapOptions
 }
 
 func NewOptions() *Options {
 	opts := &Options{
 		ResourcesOptions: NewResourcesOptions(),
 		BootstrapOptions: NewBootstrapOptions(),
-		Verbosity:        log.InfoLevel,
+		BaseOptions:      *util.DefaultBaseOptions(),
 	}
 	return opts
 }
 
-func AddKubewaitFlags(flags *pflag.FlagSet, opts *Options) {
-	AddResourcesFlags(flags, &opts.ResourcesOptions)
-	AddBootstrapFlags(flags, &opts.BootstrapOptions)
-	flags.VarP(
-		util.NewLogLevelValue(&opts.Verbosity),
-		"verbosity",
-		"v",
-		"Log level (debug, info, warn, error, fatal, panic)",
-	)
-	flags.BoolVar(&opts.JSONLogs, "json", false, "Emit log messages as JSON")
+func (opts *Options) AddFlags(flags *pflag.FlagSet) {
+	AddResourcesFlags(flags, opts.ResourcesOptions)
+	AddBootstrapFlags(flags, opts.BootstrapOptions)
+	opts.BaseOptions.AddFlags(flags)
 	flags.BoolVar(
 		&opts.SkipWaitingForResources,
 		"skip-wait",
@@ -72,24 +64,18 @@ func AddKubewaitFlags(flags *pflag.FlagSet, opts *Options) {
 		false,
 		"Skip the bootstrap process (for testing purposes)",
 	)
-	flags.BoolVar(
-		&opts.AllNamespaces,
-		"all-namespaces",
-		false,
-		"Watch all namespaces in the cluster (ignored if specific namespaces are provided as arguments)",
-	)
 }
 
 // RunKubewait is the main logic for the kubewait command.
-func RunKubewait(ctx context.Context, opts *Options, namespaces []string) error {
+func RunKubewait(ctx context.Context, fse host.FileExecutor, opts *Options, namespaces []string) error {
 	if !opts.SkipWaitingForResources {
-		if err := waitForResources(ctx, opts, namespaces); err != nil {
+		if err := waitForResources(ctx, fse, opts.ResourcesOptions, namespaces); err != nil {
 			return fmt.Errorf("error while waiting for resources: %w", err)
 		}
 	}
 
 	if !opts.SkipBootstrap {
-		if err := runBootstrap(ctx, opts); err != nil {
+		if err := runBootstrap(ctx, fse, opts.BootstrapOptions); err != nil {
 			return fmt.Errorf("error during bootstrap: %w", err)
 		}
 	}

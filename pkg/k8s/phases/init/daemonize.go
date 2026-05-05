@@ -4,16 +4,12 @@ package init
 import (
 	"context"
 	"fmt"
-	"os"
-	"os/exec"
-	"os/signal"
-	"syscall"
 
-	"github.com/pion/mdns"
 	log "github.com/sirupsen/logrus"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 
 	"github.com/kaweezle/iknite/pkg/apis/iknite"
+	"github.com/kaweezle/iknite/pkg/host"
 	"github.com/kaweezle/iknite/pkg/k8s"
 )
 
@@ -27,14 +23,10 @@ func NewDaemonizePhase() workflow.Phase {
 	}
 }
 
-func WaitForKubelet(cmd *exec.Cmd, conn *mdns.Conn, cancel context.CancelFunc) error {
-	// Wait for SIGTERM and SIGKILL signals
-	stop := make(chan os.Signal, 1)
-	signal.Notify(stop, syscall.SIGTERM)
-
+func WaitForKubelet(ctx context.Context, process host.Process) error {
 	cmdDone := make(chan error, 1)
 	go func() {
-		cmdDone <- cmd.Wait()
+		cmdDone <- process.Wait()
 	}()
 
 	var err error
@@ -42,69 +34,69 @@ func WaitForKubelet(cmd *exec.Cmd, conn *mdns.Conn, cancel context.CancelFunc) e
 	log.Info("Waiting for the kubelet to stop or receive a stop signal...")
 	for alive := true; alive; {
 		select {
-		case <-stop:
+		case <-ctx.Done():
 			// Stop the cmd process
 			log.Info("Received TERM Signal. Stopping kubelet...")
-			err = cmd.Process.Signal(syscall.SIGTERM)
-			if err == nil {
-				err = cmd.Wait()
-				if err != nil {
-					log.WithError(err).Warn("Error while waiting for kubelet to stop")
-				}
-			}
+			err = host.TerminateProcess(process, &alive)
 
-			alive = false
-		case <-cmdDone:
+		case err = <-cmdDone:
 			// Child process has stopped
-			log.Infof("Kubelet stopped with state: %s", cmd.ProcessState.String())
+			log.Infof("Kubelet stopped with state: %s", process.State().String())
 			alive = false
 		}
 	}
 
-	if err == nil && conn != nil {
-		log.Info("Stopping the mdns responder...")
-		err = conn.Close()
-		if err != nil {
-			return fmt.Errorf("failed to close mdns responder: %w", err)
-		}
+	if err != nil {
+		return fmt.Errorf("failed to wait for kubelet: %w", err)
 	}
 
-	if err == nil && cancel != nil {
-		log.Info("Canceling the context...")
-		cancel()
-	}
+	return nil
+}
 
-	return fmt.Errorf("failed to wait for kubelet: %w", err)
+type daemonizeData interface {
+	KubeletProcessHolder
+	MDnsConnectionCloser
+	IkniteClusterHolder
+	host.HostProvider
+	ContextProvider
+	StatusServerStopper
 }
 
 // runPrepare executes the node initialization process.
 func runDaemonize(c workflow.RunData) error {
-	data, ok := c.(IkniteInitData)
+	data, ok := c.(daemonizeData)
 	if !ok {
 		return fmt.Errorf("prepare phase invoked with an invalid data struct. ")
 	}
-	cmd := data.KubeletCmd()
-	if cmd == nil {
+	kubeletProcess := data.KubeletProcess()
+	if kubeletProcess == nil {
 		return nil
 	}
-	conn := data.MDnsConn()
-	_, cancel := data.ContextWithCancel()
 
-	err := WaitForKubelet(cmd, conn, cancel)
+	err := WaitForKubelet(data.Context(), kubeletProcess)
 
-	data.IkniteCluster().Update(iknite.Stopping, "stop", nil, nil)
+	data.UpdateIkniteCluster(iknite.Stopping, "stop", nil, nil)
 	if err == nil {
 		// Prevent double stop
-		data.SetKubeletCmd(nil)
+		data.SetKubeletProcess(nil)
+	} else {
+		log.WithError(err).Warn("Error while waiting for kubelet to stop")
 	}
 
-	ensureServerStopped(data)
+	err = data.CloseMDnsConn()
+	if err != nil {
+		log.WithError(err).Warn("Error closing mdns connection")
+	}
 
-	data.IkniteCluster().Update(iknite.Cleaning, "clean", nil, nil)
-	err = k8s.CleanAll(&data.IkniteCluster().Spec, true, false, false, false)
+	err = data.StopStatusServer()
+	if err != nil {
+		log.WithError(err).Warn("Error stopping iknite status server")
+	}
+
+	err = k8s.CleanAll(data.Host(), &data.IkniteCluster().Spec, true, false, false, false)
 	if err != nil {
 		log.WithError(err).Warn("Error during cleanup after kubelet stopped")
 	}
-	data.IkniteCluster().Update(iknite.Stopped, "", nil, nil)
+	data.UpdateIkniteCluster(iknite.Stopped, "", nil, nil)
 	return nil
 }

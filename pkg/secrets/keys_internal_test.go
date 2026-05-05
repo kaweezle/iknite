@@ -7,24 +7,25 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/spf13/afero"
 	"golang.org/x/crypto/ed25519"
 	"golang.org/x/crypto/ssh"
+
+	"github.com/kaweezle/iknite/pkg/host"
 )
 
 // cSpell: disable-next-line
 const onlyPublicTestKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIC3testonlycomment\n"
 
-func mustWriteFile(t *testing.T, fs afero.Fs, path string, content []byte, perm os.FileMode) {
+func mustWriteFile(t *testing.T, fs host.FileSystem, path string, content []byte, perm os.FileMode) {
 	t.Helper()
-	if err := afero.WriteFile(fs, path, content, perm); err != nil {
+	if err := fs.WriteFile(path, content, perm); err != nil {
 		t.Fatalf("failed to write %s: %v", path, err)
 	}
 }
 
-func mustExist(t *testing.T, fs afero.Fs, path string) {
+func mustExist(t *testing.T, fs host.FileSystem, path string) {
 	t.Helper()
-	exists, err := afero.Exists(fs, path)
+	exists, err := fs.Exists(path)
 	if err != nil {
 		t.Fatalf("failed to check %s existence: %v", path, err)
 	}
@@ -36,7 +37,7 @@ func mustExist(t *testing.T, fs afero.Fs, path string) {
 func Test_ensureSSHKeyPair_internal_generatesNewPair(t *testing.T) {
 	t.Parallel()
 
-	fs := afero.NewMemMapFs()
+	fs := host.NewMemMapFS()
 	keyFile := "/tmp/test_id_ed25519"
 	pubFile := keyFile + ".pub"
 
@@ -54,7 +55,7 @@ func Test_ensureSSHKeyPair_internal_generatesNewPair(t *testing.T) {
 func Test_ensureSSHKeyPair_internal_readsExistingPair(t *testing.T) {
 	t.Parallel()
 
-	fs := afero.NewMemMapFs()
+	fs := host.NewMemMapFS()
 	keyFile := "/tmp/existing_id_ed25519"
 	pubFile := keyFile + ".pub"
 
@@ -88,7 +89,7 @@ func Test_ensureSSHKeyPair_internal_readsExistingPair(t *testing.T) {
 func Test_ensureSSHKeyPair_internal_errorsWhenPublicExistsWithoutPrivate(t *testing.T) {
 	t.Parallel()
 
-	fs := afero.NewMemMapFs()
+	fs := host.NewMemMapFS()
 	pubFile := "/tmp/only.pub"
 	mustWriteFile(t, fs, pubFile, []byte(onlyPublicTestKey), 0o644)
 
@@ -123,7 +124,7 @@ func Test_sshAuthorizedKeyFromPrivateKey_internal(t *testing.T) {
 func Test_readAuthorizedKeyFromPublicKeyFile_internal(t *testing.T) {
 	t.Parallel()
 
-	fs := afero.NewMemMapFs()
+	fs := host.NewMemMapFS()
 	pubFile := "/tmp/test.pub"
 	pub, _, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {

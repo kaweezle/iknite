@@ -1,0 +1,18 @@
+data:
+    apk_signing_key:
+        name: ENC[AES256_GCM,data:3IS3KM4n8UKDpKZMpjI=,iv:qnX3P6+rVGHlowWrTtTj/UlZ3NIKHP4WyfuSXrl5BEU=,tag:lhY9MQXcG7L8hUwZgupyBA==,type:str]
+sops:
+    age:
+        - recipient: age1mjrhxft836jdjm6jem37ue788za2ngk6xaegayst0thf9amc55uqzxtn87
+          enc: |
+            -----BEGIN AGE ENCRYPTED FILE-----
+            YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBSQlFyalFzakl1MUpWSFJI
+            Z1lLNFlKN2NCaEUyc2NXZ1ZjYlBsRHpoL1JBClZUY1pibWhPbWJiYnhSZ2ZiaFBI
+            Q0QyazlySnFCY21vUzhTc3M2ZkV2RlEKLS0tIFlMYTRGbGNpZkJSOW9uTS9WZ1lO
+            MEl5SDMwK0JSMVNFQlBaZVNXUW96aHcKIMcxyqT+F/oVx8oHpXk8wBQrJMEX1QOG
+            P/hbuVBTFKACiloPFtnvulXeYGEFtZBGN4fmYJVwsxoFnuqbSSBY+g==
+            -----END AGE ENCRYPTED FILE-----
+    lastmodified: "2026-05-01T11:54:34Z"
+    mac: ENC[AES256_GCM,data:SrAfHeBWSwhxszx52e/DoC+2M3FKl+zSyKqjh44RDqY+CGtNQ/j3jhI6Edy80JsuL2m7miwOXKUPQ/iBykyBE3SUYWPPaDL+Ih4orwXF+QAXluhMNcSUJ3ndV91fAMi4CZ9Q7lA2wHK650sd6A+C78eMvHnD0NHX7qu2BvFZ22I=,iv:vMfjr3gbuztew/SqMI4k7g+KHOdww3zxeow6aWVxaXw=,tag:91kMmspwT1GzhIWEi4dp8Q==,type:str]
+    encrypted_regex: ^data$
+    version: 3.12.1

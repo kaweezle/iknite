@@ -1,6 +1,6 @@
 # Makefile for building Iknite packages, rootfs images, and VM images.
 # cSpell: words gsub rootfull chainguard apkindex doas vhdx apks covermode coverprofile checkmake
-# cSpell: words moby oras hyperv keygen nistp gomplate iknitectl
+# cSpell: words moby oras hyperv keygen nistp gomplate iknitectl coverpkg
 SHELL := /bin/sh
 
 # Main variables
@@ -251,6 +251,7 @@ help: # ignore checkmake
 	@echo "  make rootfs-image                   Build final rootfs image from rootfs container"
 	@echo "  make rootfs-image-incus-attachment  Attach Incus metadata to rootfs image in container registry with oras"
 	@echo "  make test                           Run go tests with coverage"
+	@echo "  make test-nocov                     Run go tests with coverage, removing // nocov lines/blocks from the report and generating HTML output"
 	@echo "  make vm-images-build                Build VM images (qcow2, vhdx)"
 	@echo "  make vm-images-push                 Publish VM images to registry with oras"
 	@echo "  make vm-images-publish              Publish VM images to public static object storage"
@@ -306,7 +307,6 @@ check-prerequisites:
 	@command -v curl >/dev/null 2>&1 || { echo "Error: curl is not installed"; exit 1; }
 	@command -v bsdtar >/dev/null 2>&1 || { echo "Error: bsdtar is not installed"; exit 1; }
 	@command -v aqua >/dev/null 2>&1 || { echo "Error: aqua is not installed"; exit 1; }
-	@command -v yq >/dev/null 2>&1 || { echo "Error: yq is not installed"; exit 1; }
 	@aqua i
 	@test "$(RUN_CONTAINER_CMD) != :" || { echo "Error: No container runner (either docker or nerdctl) available"; exit 1; }
 	@test "$(BUILD_CONTAINER_CMD) != :" || { echo "Error: No container image builder (either buildctl or docker buildx) available"; exit 1; }
@@ -341,7 +341,7 @@ IKNITE_BINARY := $(DIST_DIR)/iknite_linux_amd64_v1/iknite
 KUBEWAIT_BINARY := $(DIST_DIR)/kubewait_linux_amd64_v1/kubewait
 
 # Goreleaser build produces both iknite and iknitectl packages in a single run
-$(PACKAGES) $(DIST_DIR)/metadata.json $(IKNITE_BINARY) $(KUBEWAIT_BINARY) &: $(GOLANG_FILES) $(APK_FILES) go.mod .goreleaser.yaml | check-prerequisites
+$(PACKAGES) $(DIST_DIR)/metadata.json $(IKNITE_BINARY) $(KUBEWAIT_BINARY) &: $(GOLANG_FILES) $(APK_FILES) $(ROOT_DIR)/$(KEY_NAME) go.mod .goreleaser.yaml | check-prerequisites
 	goreleaser release --skip=publish $(SNAPSHOT) --clean
 
 .PHONY: apk-iknite-build
@@ -673,6 +673,16 @@ clean:
 test: check-prerequisites
 	@echo "Running tests..."
 	go test -v -race -covermode=atomic -coverprofile=coverage.out ./...
+
+.PHONY: test-nocov
+test-nocov: check-prerequisites
+	@echo "Running tests and generating no-coverage report..."
+	BUILD_DIR_PATH="$(BUILD_DIR)/coverage"; \
+	rm -rf "$$BUILD_DIR_PATH"; \
+	mkdir -p "$$BUILD_DIR_PATH"; \
+	go test -race -covermode=atomic -coverprofile=$$BUILD_DIR_PATH/coverage.out -coverpkg ./... ./...; \
+	go run hack/nocov.go $$BUILD_DIR_PATH/coverage.out; \
+	go tool cover -html=$$BUILD_DIR_PATH/coverage.out.nocov -o $$BUILD_DIR_PATH/coverage.html
 
 $(IKNITE_KNOWN_HOSTS_FILE): $(SECRETS_FILE) | check-prerequisites
 	@echo "Extracting VM SSH host public key for known_hosts from $<..."

@@ -18,14 +18,14 @@ package secrets
 import (
 	"os"
 
-	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 
+	"github.com/kaweezle/iknite/pkg/host"
 	pkgSecrets "github.com/kaweezle/iknite/pkg/secrets"
 )
 
 // CreateSecretsCmd creates the secrets command.
-func CreateSecretsCmd(fs afero.Fs, opts *pkgSecrets.Options) *cobra.Command {
+func CreateSecretsCmd(fs host.FileSystem, opts *pkgSecrets.Options) *cobra.Command {
 	if opts == nil {
 		opts = &pkgSecrets.Options{}
 	}

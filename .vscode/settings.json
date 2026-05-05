@@ -23,5 +23,27 @@
   "makefile.configureOnOpen": false,
   "files.associations": {
     "*.gotmpl": "helm"
-  }
+  },
+  "chat.tools.terminal.autoApprove": {
+    "go": true,
+    "golangci-lint": true,
+    "pre-commit": true,
+    "git add": true,
+    "/home/alpine/go/bin/mockery": true,
+    "make": true,
+    "jq": true,
+    "gofmt": true
+  },
+  "go.coverageDecorator": {
+    "type": "gutter"
+  },
+  "go.coverOnSingleTestFile": true,
+  "go.coverOnSingleTest": true,
+  "go.inlayHints.assignVariableTypes": false,
+  "go.lintTool": "golangci-lint",
+    "go.testFlags": [
+        "-coverpkg=./..."
+    ],
+    "go.lintOnSave": "package"
+
 }

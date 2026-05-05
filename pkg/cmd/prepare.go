@@ -17,11 +17,14 @@ package cmd
 
 // cSpell: disable
 import (
+	"context"
+
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
 	"github.com/kaweezle/iknite/pkg/config"
+	"github.com/kaweezle/iknite/pkg/host"
 	"github.com/kaweezle/iknite/pkg/k8s"
 )
 
@@ -39,8 +42,7 @@ func NewPrepareCommand(ikniteConfig *v1alpha1.IkniteClusterSpec) *cobra.Command 
 - Ensures the Virtual IP address is set and mapped to the hostname,
 - Ensures Iknite is started with OpenRC.
 `,
-		PersistentPreRun: config.StartPersistentPreRun,
-		Run:              func(_ *cobra.Command, _ []string) { performPrepare(ikniteConfig) },
+		Run: func(cmd *cobra.Command, _ []string) { performPrepare(cmd.Context(), ikniteConfig) },
 	}
 	flags := prepareCmd.Flags()
 
@@ -49,8 +51,8 @@ func NewPrepareCommand(ikniteConfig *v1alpha1.IkniteClusterSpec) *cobra.Command 
 	return prepareCmd
 }
 
-func performPrepare(ikniteConfig *v1alpha1.IkniteClusterSpec) {
-	cobra.CheckErr(config.DecodeIkniteConfig(ikniteConfig))
-	cobra.CheckErr(k8s.PrepareKubernetesEnvironment(ikniteConfig))
+func performPrepare(ctx context.Context, ikniteConfig *v1alpha1.IkniteClusterSpec) {
+	alpineHost := host.NewDefaultHost()
+	cobra.CheckErr(k8s.PrepareKubernetesEnvironment(ctx, alpineHost, ikniteConfig))
 	log.Info("VM is ready")
 }

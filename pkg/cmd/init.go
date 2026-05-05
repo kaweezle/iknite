@@ -19,28 +19,20 @@ package cmd
 // cSpell:words kubeproxyconfig clientcmdapi clientcmd kubeletconfig conntrack
 // cSpell: disable
 import (
-	"context"
 	"errors"
 	"fmt"
 	"io"
-	"net"
 	"os"
-	"os/exec"
-	"path/filepath"
-	"strconv"
+	"slices"
 	"syscall"
 	"time"
 	_ "unsafe"
 
-	"github.com/pion/mdns"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	flag "github.com/spf13/pflag"
 	metaV1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
-	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/tools/clientcmd"
-	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	kubeproxyconfig "k8s.io/kube-proxy/config/v1alpha1"
 	kubeletconfig "k8s.io/kubelet/config/v1beta1"
 	kubeadmApi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
@@ -58,12 +50,13 @@ import (
 	certsPhase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
 	kubeconfigPhase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubeconfig"
 	configUtil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
-	kubeConfigUtil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 
+	"github.com/kaweezle/iknite/pkg/alpine"
 	ikniteApi "github.com/kaweezle/iknite/pkg/apis/iknite"
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
 	"github.com/kaweezle/iknite/pkg/config"
 	"github.com/kaweezle/iknite/pkg/constants"
+	"github.com/kaweezle/iknite/pkg/host"
 	"github.com/kaweezle/iknite/pkg/k8s"
 	iknitePhase "github.com/kaweezle/iknite/pkg/k8s/phases/init"
 	ikniteServer "github.com/kaweezle/iknite/pkg/server"
@@ -107,42 +100,8 @@ const (
 	addonPhase = "addon"
 )
 
-// compile-time assert that the local data object satisfies the phases data interface.
-var _ iknitePhase.IkniteInitData = (*initData)(nil)
-
-// initData defines all the runtime information used when running the kubeadm init workflow;
-// this data is shared across all the phases that are included in the workflow.
-//
-//nolint:govet // Data structure alignment matches kubeadm
-type initData struct {
-	cfg                         *kubeadmApi.InitConfiguration
-	skipTokenPrint              bool
-	dryRun                      bool
-	kubeconfig                  *clientcmdapi.Config
-	kubeconfigDir               string
-	kubeconfigPath              string
-	ignorePreflightErrors       sets.Set[string]
-	certificatesDir             string
-	dryRunDir                   string
-	externalCA                  bool
-	client                      clientset.Interface
-	outputWriter                io.Writer
-	uploadCerts                 bool
-	skipCertificateKeyPrint     bool
-	patchesDir                  string
-	adminKubeConfigBootstrapped bool
-	ikniteCluster               *v1alpha1.IkniteCluster
-	kubeletCmd                  *exec.Cmd
-	mdnsConn                    *mdns.Conn
-	statusServer                *ikniteServer.IkniteServer
-	ctx                         context.Context //nolint:containedctx // passed around but not stored
-	ctxCancel                   context.CancelFunc
-	kustomizeOptions            *utils.KustomizeOptions
-}
-
-// compile-time assert that the local data object satisfies the IkniteInitData interface, that extends the kubeadm
-// InitData interface with iknite-specific information and methods.
-var _ iknitePhase.IkniteInitData = &initData{}
+// function hook used for testing purposes to mock the addition of phases to the workflow runner in init command.
+var addInitWorkflowPhasesFn = addInitWorkflowPhases
 
 // HACK: This is a hack to allow the use of the unexported initOptions struct in the kubeadm codebase.
 // This is needed because the kubeadm codebase uses the unexported initOptions struct in the AddInitOtherFlags function.
@@ -150,18 +109,66 @@ var _ iknitePhase.IkniteInitData = &initData{}
 //go:linkname AddInitOtherFlags k8s.io/kubernetes/cmd/kubeadm/app/cmd.AddInitOtherFlags
 func AddInitOtherFlags(flagSet *flag.FlagSet, initOptions *initOptions)
 
-//go:linkname getDryRunClient k8s.io/kubernetes/cmd/kubeadm/app/cmd.getDryRunClient
-func getDryRunClient(d *initData) (clientset.Interface, error)
+// addInitWorkflowPhases adds to the workflow runner the list of phases that should be executed when running kubeadm
+// init.
+func addInitWorkflowPhases(initRunner *workflow.Runner) {
+	initRunner.AppendPhase(WrapPhase(iknitePhase.NewPrepareHostPhase(), ikniteApi.Started, nil))
+	initRunner.AppendPhase(WrapPhase(iknitePhase.NewPreCleanHostPhase(), ikniteApi.Started, nil))
+	initRunner.AppendPhase(WrapPhase(phases.NewPreflightPhase(), ikniteApi.Initializing, nil))
+	initRunner.AppendPhase(WrapPhase(phases.NewCertsPhase(), ikniteApi.Initializing, nil))
+	initRunner.AppendPhase(WrapPhase(phases.NewKubeConfigPhase(), ikniteApi.Initializing, nil))
+	initRunner.AppendPhase(WrapPhase(phases.NewEtcdPhase(), ikniteApi.Initializing, nil))
+	initRunner.AppendPhase(WrapPhase(iknitePhase.NewKineControlPlanePhase(), ikniteApi.Initializing, nil))
+	controlPlanePhase := phases.NewControlPlanePhase()
+	controlPlanePhase.Phases = append(controlPlanePhase.Phases, iknitePhase.NewKubeVipControlPlanePhase())
+
+	initRunner.AppendPhase(WrapPhase(controlPlanePhase, ikniteApi.Initializing, nil))
+	initRunner.AppendPhase(
+		WrapPhase(iknitePhase.NewKubeletStartPhase(), ikniteApi.Initializing, nil),
+	)
+	initRunner.AppendPhase(
+		WrapPhase(phases.NewWaitControlPlanePhase(), ikniteApi.Initializing, nil),
+	)
+	initRunner.AppendPhase(WrapPhase(phases.NewUploadConfigPhase(), ikniteApi.Initializing, nil))
+	initRunner.AppendPhase(WrapPhase(phases.NewUploadCertsPhase(), ikniteApi.Initializing, nil))
+	//nolint:gocritic // both control plane and worker
+	// initRunner.AppendPhase(phases.NewMarkControlPlanePhase())
+	initRunner.AppendPhase(WrapPhase(phases.NewBootstrapTokenPhase(), ikniteApi.Initializing, nil))
+	initRunner.AppendPhase(WrapPhase(phases.NewKubeletFinalizePhase(), ikniteApi.Initializing, nil))
+	initRunner.AppendPhase(WrapPhase(phases.NewAddonPhase(), ikniteApi.Initializing, nil))
+	initRunner.AppendPhase(WrapPhase(iknitePhase.NewCopyConfigPhase(), ikniteApi.Stabilizing, nil))
+	initRunner.AppendPhase(WrapPhase(iknitePhase.NewMDnsPublishPhase(), ikniteApi.Stabilizing, nil))
+	initRunner.AppendPhase(
+		WrapPhase(iknitePhase.NewKustomizeClusterPhase(), ikniteApi.Stabilizing, nil),
+	)
+	initRunner.AppendPhase(WrapPhase(iknitePhase.NewServePhase(), ikniteApi.Stabilizing, nil))
+	initRunner.AppendPhase(WrapPhase(iknitePhase.NewWorkloadsPhase(), ikniteApi.Stabilizing, nil))
+	initRunner.AppendPhase(WrapPhase(iknitePhase.NewDaemonizePhase(), ikniteApi.Stabilizing, nil))
+	//nolint:gocritic // standalone node
+	// initRunner.AppendPhase(phases.NewShowJoinCommandPhase())
+}
 
 // newCmdInit returns "kubeadm init" command.
 //
 // NB. InitOptions is exposed as parameter for allowing unit testing of the newInitOptions method, that implements all
 // the command options validation logic.
-func newCmdInit(out io.Writer, initOptions *initOptions) *cobra.Command {
+//
+//nolint:gocyclo // TODO: reduce more
+func newCmdInit(
+	out io.Writer,
+	initOptions *initOptions,
+	initRunner *workflow.Runner,
+	alpineHost host.Host,
+) *cobra.Command {
+	if alpineHost == nil {
+		alpineHost = host.NewDefaultHost()
+	}
 	if initOptions == nil {
 		initOptions = newInitOptions()
 	}
-	initRunner := workflow.NewRunner()
+	if initRunner == nil {
+		initRunner = workflow.NewRunner()
+	}
 
 	cmd := &cobra.Command{
 		Use:   "init",
@@ -197,25 +204,25 @@ func newCmdInit(out io.Writer, initOptions *initOptions) *cobra.Command {
 				log.WithError(shutdownErr).Warn("Failed to stop iknite status server")
 			}
 			// Stop the kubelet process if it was started
-			kubeletCmd := data.KubeletCmd()
-			if kubeletCmd != nil {
-				err = kubeletCmd.Process.Signal(syscall.SIGTERM)
+			kubeletProcess := data.KubeletProcess()
+			if kubeletProcess != nil {
+				err = kubeletProcess.Signal(syscall.SIGTERM)
 				if err != nil {
 					return fmt.Errorf(
 						"failed to terminate the kubelet process %d: %w",
-						kubeletCmd.Process.Pid,
+						kubeletProcess.Pid(),
 						err,
 					)
 				}
-				if err = kubeletCmd.Wait(); err != nil {
+				if err = kubeletProcess.Wait(); err != nil {
 					return fmt.Errorf(
 						"kubelet process %d exited with error: %w",
-						kubeletCmd.Process.Pid,
+						kubeletProcess.Pid(),
 						err,
 					)
 				}
 			}
-			k8s.RemovePidFiles()
+			alpine.RemovePidFile(alpineHost, k8s.KubeletName)
 
 			return nil
 		},
@@ -257,45 +264,7 @@ func newCmdInit(out io.Writer, initOptions *initOptions) *cobra.Command {
 	})
 
 	// initialize the workflow runner with the list of phases
-	initRunner.AppendPhase(WrapPhase(iknitePhase.NewPrepareHostPhase(), ikniteApi.Started, nil))
-	initRunner.AppendPhase(WrapPhase(iknitePhase.NewPreCleanHostPhase(), ikniteApi.Started, nil))
-	initRunner.AppendPhase(WrapPhase(phases.NewPreflightPhase(), ikniteApi.Initializing, nil))
-	initRunner.AppendPhase(WrapPhase(phases.NewCertsPhase(), ikniteApi.Initializing, nil))
-	initRunner.AppendPhase(WrapPhase(phases.NewKubeConfigPhase(), ikniteApi.Initializing, nil))
-	initRunner.AppendPhase(WrapPhase(phases.NewEtcdPhase(), ikniteApi.Initializing, nil))
-	initRunner.AppendPhase(
-		WrapPhase(iknitePhase.NewKineControlPlanePhase(), ikniteApi.Initializing, nil),
-	)
-	controlPlanePhase := phases.NewControlPlanePhase()
-	controlPlanePhase.Phases = append(
-		controlPlanePhase.Phases,
-		iknitePhase.NewKubeVipControlPlanePhase(),
-	)
-
-	initRunner.AppendPhase(WrapPhase(controlPlanePhase, ikniteApi.Initializing, nil))
-	initRunner.AppendPhase(
-		WrapPhase(iknitePhase.NewKubeletStartPhase(), ikniteApi.Initializing, nil),
-	)
-	initRunner.AppendPhase(
-		WrapPhase(phases.NewWaitControlPlanePhase(), ikniteApi.Initializing, nil),
-	)
-	initRunner.AppendPhase(WrapPhase(phases.NewUploadConfigPhase(), ikniteApi.Initializing, nil))
-	initRunner.AppendPhase(WrapPhase(phases.NewUploadCertsPhase(), ikniteApi.Initializing, nil))
-	//nolint:gocritic // both control plane and worker
-	// initRunner.AppendPhase(phases.NewMarkControlPlanePhase())
-	initRunner.AppendPhase(WrapPhase(phases.NewBootstrapTokenPhase(), ikniteApi.Initializing, nil))
-	initRunner.AppendPhase(WrapPhase(phases.NewKubeletFinalizePhase(), ikniteApi.Initializing, nil))
-	initRunner.AppendPhase(WrapPhase(phases.NewAddonPhase(), ikniteApi.Initializing, nil))
-	initRunner.AppendPhase(WrapPhase(iknitePhase.NewCopyConfigPhase(), ikniteApi.Stabilizing, nil))
-	initRunner.AppendPhase(WrapPhase(iknitePhase.NewMDnsPublishPhase(), ikniteApi.Stabilizing, nil))
-	initRunner.AppendPhase(
-		WrapPhase(iknitePhase.NewKustomizeClusterPhase(), ikniteApi.Stabilizing, nil),
-	)
-	initRunner.AppendPhase(WrapPhase(iknitePhase.NewServePhase(), ikniteApi.Stabilizing, nil))
-	initRunner.AppendPhase(WrapPhase(iknitePhase.NewWorkloadsPhase(), ikniteApi.Stabilizing, nil))
-	initRunner.AppendPhase(WrapPhase(iknitePhase.NewDaemonizePhase(), ikniteApi.Stabilizing, nil))
-	//nolint:gocritic // standalone node
-	// initRunner.AppendPhase(phases.NewShowJoinCommandPhase())
+	addInitWorkflowPhasesFn(initRunner)
 
 	// sets the data builder function, that will be used by the runner
 	// both when running the entire workflow or single phases
@@ -306,7 +275,7 @@ func newCmdInit(out io.Writer, initOptions *initOptions) *cobra.Command {
 				// assume that the command execution does not depend on CRISocket when --cri-socket flag is not set
 				initOptions.skipCRIDetect = true
 			}
-			data, err := newInitData(cmd, args, initOptions, out)
+			data, err := newInitData(cmd, args, initOptions, out, alpineHost)
 			if err != nil {
 				return nil, err
 			}
@@ -316,12 +285,15 @@ func newCmdInit(out io.Writer, initOptions *initOptions) *cobra.Command {
 			}
 
 			// Skip either kine or etcd based on UseEtcd setting.
-			if data.IkniteCluster().Spec.UseEtcd {
-				initRunner.Options.SkipPhases = append(initRunner.Options.SkipPhases, constants.KineBackendName)
+			if data.ikniteCluster.Spec.UseEtcd {
+				skipPhaseIfExists(initRunner.Phases, &initRunner.Options.SkipPhases, constants.KineBackendName, "")
 				data.ikniteCluster.Spec.APIBackendDatabaseDirectory = data.cfg.Etcd.Local.DataDir
 			} else {
-				initRunner.Options.SkipPhases = append(initRunner.Options.SkipPhases, constants.EtcdBackendName)
+				skipPhaseIfExists(initRunner.Phases, &initRunner.Options.SkipPhases, constants.EtcdBackendName, "")
 			}
+
+			// force skip CoreDNS as it is injected by the kustomization
+			skipPhaseIfExists(initRunner.Phases, &initRunner.Options.SkipPhases, coreDNSPhase, "")
 
 			initRunner.Options.SkipPhases = manageSkippedAddons(
 				&data.cfg.ClusterConfiguration,
@@ -338,12 +310,30 @@ func newCmdInit(out io.Writer, initOptions *initOptions) *cobra.Command {
 	return cmd
 }
 
+// skipPhaseIfExists checks if a phase with the given name exists in the list of phases and if it does, it adds it to
+// the list of phases to skip and returns true. Otherwise, it returns false.
+func skipPhaseIfExists(initPhases []workflow.Phase, skipPhases *[]string, phaseName, prefix string) bool {
+	for i := range initPhases {
+		phase := &initPhases[i]
+		fullPhaseName := prefix + phase.Name
+		if fullPhaseName == phaseName {
+			*skipPhases = append(*skipPhases, fullPhaseName)
+			return true
+		}
+		if len(phase.Phases) > 0 {
+			if skipPhaseIfExists(phase.Phases, skipPhases, phaseName, fullPhaseName+"/") {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 // newInitOptions returns a struct ready for being used for creating cmd init flags.
 func newInitOptions() *initOptions {
 	// initialize the public kubeadm config API by applying defaults
 	externalInitCfg := &kubeadmApiV1.InitConfiguration{}
 	kubeadmScheme.Scheme.Default(externalInitCfg)
-	externalInitCfg.SkipPhases = []string{coreDNSPhase}
 
 	externalClusterCfg := &kubeadmApiV1.ClusterConfiguration{}
 	kubeadmScheme.Scheme.Default(externalClusterCfg)
@@ -380,6 +370,7 @@ func newInitData(
 	_ []string,
 	initOptions *initOptions,
 	out io.Writer,
+	alpineHost host.Host,
 ) (*initData, error) {
 	// Re-apply defaults to the public kubeadm API (this will set only values not exposed/not set as a flags)
 	kubeadmScheme.Scheme.Default(initOptions.externalInitCfg)
@@ -536,8 +527,6 @@ func newInitData(
 	// Apply ikniteCluster spec to the internal InitConfiguration
 	config.ApplyIkniteClusterSpecToInitConfiguration(&(ikniteCluster.Spec), cfg)
 
-	ctx, cancel := context.WithCancel(context.Background())
-
 	return &initData{
 		cfg:                     cfg,
 		certificatesDir:         cfg.CertificatesDir,
@@ -552,231 +541,15 @@ func newInitData(
 		skipCertificateKeyPrint: initOptions.skipCertificateKeyPrint,
 		patchesDir:              initOptions.patchesDir,
 		ikniteCluster:           ikniteCluster,
-		ctx:                     ctx,
-		ctxCancel:               cancel,
+		ctx:                     cmd.Context(),
 		kustomizeOptions:        initOptions.kustomizeOptions,
 		dryRun: cmdUtil.ValueFromFlagsOrConfig( //nolint:errcheck,forcetypeassert // default value is false
 			cmd.Flags(),
 			options.DryRun,
 			cfg.DryRun,
 			initOptions.dryRun).(bool),
+		alpineHost: alpineHost,
 	}, nil
-}
-
-// UploadCerts returns UploadCerts flag.
-func (d *initData) UploadCerts() bool {
-	return d.uploadCerts
-}
-
-// CertificateKey returns the key used to encrypt the certs.
-func (d *initData) CertificateKey() string {
-	return d.cfg.CertificateKey
-}
-
-// SetCertificateKey set the key used to encrypt the certs.
-func (d *initData) SetCertificateKey(key string) {
-	d.cfg.CertificateKey = key
-}
-
-// SkipCertificateKeyPrint returns the skipCertificateKeyPrint flag.
-func (d *initData) SkipCertificateKeyPrint() bool {
-	return d.skipCertificateKeyPrint
-}
-
-// Cfg returns initConfiguration.
-func (d *initData) Cfg() *kubeadmApi.InitConfiguration {
-	return d.cfg
-}
-
-// DryRun returns the DryRun flag.
-func (d *initData) DryRun() bool {
-	return d.dryRun
-}
-
-// SkipTokenPrint returns the SkipTokenPrint flag.
-func (d *initData) SkipTokenPrint() bool {
-	return d.skipTokenPrint
-}
-
-// IgnorePreflightErrors returns the IgnorePreflightErrors flag.
-func (d *initData) IgnorePreflightErrors() sets.Set[string] {
-	return d.ignorePreflightErrors
-}
-
-// CertificateWriteDir returns the path to the certificate folder or the temporary folder path in case of DryRun.
-func (d *initData) CertificateWriteDir() string {
-	if d.dryRun {
-		return d.dryRunDir
-	}
-	return d.certificatesDir
-}
-
-// CertificateDir returns the CertificateDir as originally specified by the user.
-func (d *initData) CertificateDir() string {
-	return d.certificatesDir
-}
-
-// KubeConfig returns a kubeconfig after loading it from KubeConfigPath().
-func (d *initData) KubeConfig() (*clientcmdapi.Config, error) {
-	if d.kubeconfig != nil {
-		return d.kubeconfig, nil
-	}
-
-	var err error
-	d.kubeconfig, err = clientcmd.LoadFromFile(d.KubeConfigPath())
-	if err != nil {
-		return nil, fmt.Errorf("failed to load kubeconfig from file: %w", err)
-	}
-
-	return d.kubeconfig, nil
-}
-
-// KubeConfigDir returns the path of the Kubernetes configuration folder or the temporary folder path in case of DryRun.
-func (d *initData) KubeConfigDir() string {
-	if d.dryRun {
-		return d.dryRunDir
-	}
-	return d.kubeconfigDir
-}
-
-// KubeConfigPath returns the path to the kubeconfig file to use for connecting to Kubernetes.
-func (d *initData) KubeConfigPath() string {
-	if d.dryRun {
-		d.kubeconfigPath = filepath.Join(d.dryRunDir, kubeadmConstants.AdminKubeConfigFileName)
-	}
-	return d.kubeconfigPath
-}
-
-// ManifestDir returns the path where manifest should be stored or the temporary folder path in case of DryRun.
-func (d *initData) ManifestDir() string {
-	if d.dryRun {
-		return d.dryRunDir
-	}
-	return kubeadmConstants.GetStaticPodDirectory()
-}
-
-// KubeletDir returns path of the kubelet configuration folder or the temporary folder in case of DryRun.
-func (d *initData) KubeletDir() string {
-	if d.dryRun {
-		return d.dryRunDir
-	}
-	return kubeadmConstants.KubeletRunDirectory
-}
-
-// ExternalCA returns true if an external CA is provided by the user.
-func (d *initData) ExternalCA() bool {
-	return d.externalCA
-}
-
-// OutputWriter returns the io.Writer used to write output to by this command.
-func (d *initData) OutputWriter() io.Writer {
-	return d.outputWriter
-}
-
-// Client returns a Kubernetes client to be used by kubeadm.
-//
-// This function is implemented as a singleton, thus avoiding to recreate the client when it is used by different
-// phases.
-//
-// Important. This function must be called after the admin.conf kubeconfig file is created.
-func (d *initData) Client() (clientset.Interface, error) {
-	var err error
-	if d.client != nil {
-		return d.client, nil
-	}
-	if d.dryRun {
-		return getDryRunClient(d)
-	}
-	// Use a real client
-	isDefaultKubeConfigPath := d.KubeConfigPath() == kubeadmConstants.GetAdminKubeConfigPath()
-	// Only bootstrap the admin.conf if it's used by the user (i.e. --kubeconfig has its default value)
-	// and if the bootstrapping was not already done
-	if !d.adminKubeConfigBootstrapped && isDefaultKubeConfigPath {
-		// Call EnsureAdminClusterRoleBinding() to obtain a working client from admin.conf.
-		d.client, err = kubeconfigPhase.EnsureAdminClusterRoleBinding(
-			kubeadmConstants.KubernetesDir,
-			nil,
-		)
-		if err != nil {
-			return nil, fmt.Errorf("could not bootstrap the admin user in file %s: %w",
-				kubeadmConstants.AdminKubeConfigFileName, err)
-		}
-		d.adminKubeConfigBootstrapped = true
-	} else {
-		// Alternatively, just load the config pointed at the --kubeconfig path
-		d.client, err = kubeConfigUtil.ClientSetFromFile(d.KubeConfigPath())
-		if err != nil {
-			return nil, fmt.Errorf("failed to create client set from file: %w", err)
-		}
-	}
-	return d.client, nil
-}
-
-// WaitControlPlaneClient returns a basic client used for the purpose of waiting
-// for control plane components to report 'ok' on their respective health check endpoints.
-// It uses the admin.conf as the base, but modifies it to point at the local API server instead
-// of the control plane endpoint.
-func (d *initData) WaitControlPlaneClient() (clientset.Interface, error) {
-	kubeConfig, err := clientcmd.LoadFromFile(d.KubeConfigPath())
-	if err != nil {
-		return nil, fmt.Errorf("failed to load kubeconfig for wait control plane: %w", err)
-	}
-	for _, v := range kubeConfig.Clusters {
-		v.Server = fmt.Sprintf("https://%s",
-			net.JoinHostPort(
-				d.Cfg().LocalAPIEndpoint.AdvertiseAddress,
-				strconv.Itoa(int(d.Cfg().LocalAPIEndpoint.BindPort)),
-			),
-		)
-	}
-	client, err := kubeConfigUtil.ToClientSet(kubeConfig)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create client set from config: %w", err)
-	}
-	return client, nil
-}
-
-// ClientWithoutBootstrap returns a dry-run client or a regular client from admin.conf.
-// Unlike Client(), it does not call EnsureAdminClusterRoleBinding() or sets d.client.
-// This means the client only has anonymous permissions and does not persist in initData.
-func (d *initData) ClientWithoutBootstrap() (clientset.Interface, error) {
-	var (
-		client clientset.Interface
-		err    error
-	)
-	if d.dryRun {
-		client, err = getDryRunClient(d)
-		if err != nil {
-			return nil, err
-		}
-	} else { // Use a real client
-		client, err = kubeConfigUtil.ClientSetFromFile(d.KubeConfigPath())
-		if err != nil {
-			return nil, fmt.Errorf("failed to create client without bootstrap: %w", err)
-		}
-	}
-	return client, nil
-}
-
-// Tokens returns an array of token strings.
-func (d *initData) Tokens() []string {
-	tokens := make([]string, 0, len(d.cfg.BootstrapTokens))
-	for _, bt := range d.cfg.BootstrapTokens {
-		tokens = append(tokens, bt.Token.String())
-	}
-	return tokens
-}
-
-// PatchesDir returns the folder where patches for components are stored.
-func (d *initData) PatchesDir() string {
-	// If provided, make the flag value override the one in config.
-	if d.patchesDir != "" {
-		return d.patchesDir
-	}
-	if d.cfg.Patches != nil {
-		return d.cfg.Patches.Directory
-	}
-	return ""
 }
 
 // manageSkippedAddons syncs proxy and DNS "Disabled" status and skipPhases.
@@ -787,17 +560,17 @@ func manageSkippedAddons(cfg *kubeadmApi.ClusterConfiguration, skipPhases []stri
 	)
 	// If the DNS or Proxy addons are disabled, skip the corresponding phase.
 	// Alternatively, update the proxy and DNS "Disabled" status based on skipped addon phases.
-	if isPhaseInSkipPhases(addonPhase, skipPhases) {
+	if slices.Contains(skipPhases, addonPhase) {
 		skipDNSPhase = true
 		skipProxyPhase = true
 		cfg.DNS.Disabled = true
 		cfg.Proxy.Disabled = true
 	}
-	if isPhaseInSkipPhases(coreDNSPhase, skipPhases) {
+	if slices.Contains(skipPhases, coreDNSPhase) {
 		skipDNSPhase = true
 		cfg.DNS.Disabled = true
 	}
-	if isPhaseInSkipPhases(kubeProxyPhase, skipPhases) {
+	if slices.Contains(skipPhases, kubeProxyPhase) {
 		skipProxyPhase = true
 		cfg.Proxy.Disabled = true
 	}
@@ -808,51 +581,6 @@ func manageSkippedAddons(cfg *kubeadmApi.ClusterConfiguration, skipPhases []stri
 		skipPhases = append(skipPhases, kubeProxyPhase)
 	}
 	return skipPhases
-}
-
-func isPhaseInSkipPhases(phase string, skipPhases []string) bool {
-	for _, item := range skipPhases {
-		if item == phase {
-			return true
-		}
-	}
-	return false
-}
-
-func (d *initData) IkniteCluster() *v1alpha1.IkniteCluster {
-	return d.ikniteCluster
-}
-
-func (d *initData) KubeletCmd() *exec.Cmd {
-	return d.kubeletCmd
-}
-
-func (d *initData) SetKubeletCmd(cmd *exec.Cmd) {
-	d.kubeletCmd = cmd
-}
-
-func (d *initData) SetMDnsConn(conn *mdns.Conn) {
-	d.mdnsConn = conn
-}
-
-func (d *initData) MDnsConn() *mdns.Conn {
-	return d.mdnsConn
-}
-
-func (d *initData) SetStatusServer(srv *ikniteServer.IkniteServer) {
-	d.statusServer = srv
-}
-
-func (d *initData) StatusServer() *ikniteServer.IkniteServer {
-	return d.statusServer
-}
-
-func (d *initData) ContextWithCancel() (context.Context, context.CancelFunc) {
-	return d.ctx, d.ctxCancel
-}
-
-func (d *initData) KustomizeOptions() *utils.KustomizeOptions {
-	return d.kustomizeOptions
 }
 
 func PhaseName(
@@ -888,7 +616,8 @@ func WrapPhase(
 				return fmt.Errorf("phase %q invoked with an invalid data struct", p.Name)
 			}
 			phaseName := PhaseName(p, parentPhases)
-			data.IkniteCluster().Update(state, phaseName, nil, nil)
+			data.UpdateIkniteCluster(state, phaseName, nil, nil)
+
 			log.WithFields(log.Fields{
 				"phase": phaseName,
 				"state": state.String(),
