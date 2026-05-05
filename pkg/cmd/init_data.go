@@ -10,7 +10,6 @@ import (
 	"strconv"
 	_ "unsafe"
 
-	"github.com/pion/mdns"
 	"golang.org/x/sync/errgroup"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
@@ -26,7 +25,6 @@ import (
 	"github.com/kaweezle/iknite/pkg/host"
 	"github.com/kaweezle/iknite/pkg/k8s"
 	iknitePhase "github.com/kaweezle/iknite/pkg/k8s/phases/init"
-	ikniteServer "github.com/kaweezle/iknite/pkg/server"
 	"github.com/kaweezle/iknite/pkg/utils"
 )
 
@@ -53,17 +51,22 @@ type initData struct {
 	adminKubeConfigBootstrapped bool
 	ikniteCluster               *v1alpha1.IkniteCluster
 	kubeletProcess              host.Process
-	mdnsConn                    *mdns.Conn
-	statusServer                *ikniteServer.IkniteServer
 	ctx                         context.Context //nolint:containedctx // passed around but not stored
 	kustomizeOptions            *utils.KustomizeOptions
 	alpineHost                  host.Host
 	clientGetter                genericclioptions.RESTClientGetter
 	errGroup                    errgroup.Group
+	hookManager                 utils.HookManager
+	clusterUpdateBus            utils.Bus[*v1alpha1.IkniteCluster]
 }
 
 // compile-time assert that the local data object satisfies the phases data interface.
 var _ iknitePhase.IkniteInitData = (*initData)(nil)
+
+// testHooks wrap external dependency calls so tests can inject failures and success paths.
+var (
+	ensureAdminClusterRoleBinding = kubeconfigPhase.EnsureAdminClusterRoleBinding
+)
 
 //go:linkname getDryRunClient k8s.io/kubernetes/cmd/kubeadm/app/cmd.getDryRunClient
 func getDryRunClient(d *initData) (clientset.Interface, error)
@@ -210,7 +213,7 @@ func (d *initData) Client() (clientset.Interface, error) {
 	// and if the bootstrapping was not already done
 	if !d.adminKubeConfigBootstrapped && isDefaultKubeConfigPath {
 		// Call EnsureAdminClusterRoleBinding() to obtain a working client from admin.conf.
-		d.client, err = kubeconfigPhase.EnsureAdminClusterRoleBinding(
+		d.client, err = ensureAdminClusterRoleBinding(
 			kubeadmConstants.KubernetesDir,
 			nil,
 		)
@@ -302,29 +305,6 @@ func (d *initData) SetKubeletProcess(process host.Process) {
 	d.kubeletProcess = process
 }
 
-func (d *initData) SetMDnsConn(conn *mdns.Conn) {
-	d.mdnsConn = conn
-}
-
-func (d *initData) CloseMDnsConn() error {
-	if d.mdnsConn != nil {
-		err := d.mdnsConn.Close()
-		if err != nil {
-			return fmt.Errorf("failed to close mdns connection: %w", err)
-		}
-		d.mdnsConn = nil
-	}
-	return nil
-}
-
-func (d *initData) SetStatusServer(srv *ikniteServer.IkniteServer) {
-	d.statusServer = srv
-}
-
-func (d *initData) StatusServer() *ikniteServer.IkniteServer {
-	return d.statusServer
-}
-
 func (d *initData) Context() context.Context {
 	return d.ctx
 }
@@ -340,10 +320,8 @@ func (d *initData) Host() host.Host {
 func (d *initData) SetIkniteCluster(cluster *v1alpha1.IkniteCluster) {
 	clusterCopy := *cluster
 	d.ikniteCluster = &clusterCopy
-	if d.statusServer != nil {
-		d.statusServer.SetCluster(&clusterCopy)
-	}
 	d.ikniteCluster.Persist(d.Host())
+	d.clusterUpdateBus.Publish(d.ikniteCluster)
 }
 
 func (d *initData) UpdateIkniteCluster(
@@ -352,23 +330,24 @@ func (d *initData) UpdateIkniteCluster(
 	ready, unready []*v1alpha1.WorkloadState,
 ) {
 	d.ikniteCluster.Update(state, phase, ready, unready)
-	if d.statusServer != nil {
-		d.statusServer.SetCluster(d.ikniteCluster)
-	}
 	d.ikniteCluster.Persist(d.Host())
-}
-
-func (d *initData) StopStatusServer() error {
-	if d.statusServer != nil {
-		err := d.statusServer.Shutdown()
-		if err != nil {
-			return fmt.Errorf("failed to shutdown status server: %w", err)
-		}
-		d.statusServer = nil
-	}
-	return nil
+	clusterCopy := d.ikniteCluster.DeepCopy()
+	d.clusterUpdateBus.Publish(clusterCopy)
 }
 
 func (d *initData) ErrGroup() *errgroup.Group {
 	return &d.errGroup
+}
+
+func (d *initData) RegisterShutdownHook(name string, fn func() error) {
+	d.hookManager.Register(name, fn)
+}
+
+func (d *initData) RunShutdownHooks() error {
+	return d.hookManager.Run() //nolint:wrapcheck // on-purpose
+}
+
+// RegisterIkniteClusterListener implements [init.IkniteInitData].
+func (d *initData) RegisterIkniteClusterListener() (<-chan *v1alpha1.IkniteCluster, func()) {
+	return d.clusterUpdateBus.Subscribe(1)
 }

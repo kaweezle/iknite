@@ -25,7 +25,8 @@ func NewServePhase() workflow.Phase {
 type serverData interface {
 	IkniteClusterProvider
 	host.HostProvider
-	StatusServerSetter
+	IkniteClusterListenerRegistrar
+	ShutdownHookRegistrar
 }
 
 func runServe(c workflow.RunData) error {
@@ -41,6 +42,16 @@ func runServe(c workflow.RunData) error {
 	}
 
 	log.WithField("port", ikniteCluster.Spec.StatusServerPort).Info("Iknite status server started")
-	data.SetStatusServer(srv)
+
+	ch, unregister := data.RegisterIkniteClusterListener()
+	go func() {
+		for cluster := range ch {
+			srv.SetCluster(cluster)
+		}
+	}()
+	data.RegisterShutdownHook("serve", func() error {
+		unregister()
+		return srv.Shutdown()
+	})
 	return nil
 }

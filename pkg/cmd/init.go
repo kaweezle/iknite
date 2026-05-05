@@ -59,7 +59,6 @@ import (
 	"github.com/kaweezle/iknite/pkg/host"
 	"github.com/kaweezle/iknite/pkg/k8s"
 	iknitePhase "github.com/kaweezle/iknite/pkg/k8s/phases/init"
-	ikniteServer "github.com/kaweezle/iknite/pkg/server"
 	"github.com/kaweezle/iknite/pkg/utils"
 )
 
@@ -200,7 +199,7 @@ func newCmdInit(
 				return errors.New("invalid data struct")
 			}
 			// Stop the status server if it was started
-			if shutdownErr := ikniteServer.ShutdownServer(data.statusServer); shutdownErr != nil {
+			if shutdownErr := data.RunShutdownHooks(); shutdownErr != nil {
 				log.WithError(shutdownErr).Warn("Failed to stop iknite status server")
 			}
 			// Stop the kubelet process if it was started

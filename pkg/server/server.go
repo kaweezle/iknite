@@ -53,6 +53,7 @@ type IkniteServer struct {
 	spec        *v1alpha1.IkniteClusterSpec
 	clusterJSON []byte
 	mu          sync.RWMutex
+	isShutDown  bool
 }
 
 // SetCluster serializes c to JSON and stores it under the write lock so that
@@ -120,6 +121,7 @@ func (s *IkniteServer) Shutdown() error {
 	if err := s.httpServer.Shutdown(ctx); err != nil {
 		return fmt.Errorf("failed to shutdown iknite status server: %w", err)
 	}
+	s.isShutDown = true
 	return nil
 }
 
@@ -386,6 +388,12 @@ func StartIkniteServer(
 	}
 
 	return srv, nil
+}
+
+func (s *IkniteServer) IsShutDown() bool {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.isShutDown
 }
 
 // ShutdownServer is a convenience wrapper around (*IkniteServer).Shutdown.

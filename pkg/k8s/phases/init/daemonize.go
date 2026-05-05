@@ -55,11 +55,10 @@ func WaitForKubelet(ctx context.Context, process host.Process) error {
 
 type daemonizeData interface {
 	KubeletProcessHolder
-	MDnsConnectionCloser
 	IkniteClusterHolder
 	host.HostProvider
 	ContextProvider
-	StatusServerStopper
+	ShutdownHookRunner
 }
 
 // runPrepare executes the node initialization process.
@@ -83,14 +82,9 @@ func runDaemonize(c workflow.RunData) error {
 		log.WithError(err).Warn("Error while waiting for kubelet to stop")
 	}
 
-	err = data.CloseMDnsConn()
+	err = data.RunShutdownHooks()
 	if err != nil {
-		log.WithError(err).Warn("Error closing mdns connection")
-	}
-
-	err = data.StopStatusServer()
-	if err != nil {
-		log.WithError(err).Warn("Error stopping iknite status server")
+		log.WithError(err).Warn("Error running shutdown hooks")
 	}
 
 	err = k8s.CleanAll(data.Host(), &data.IkniteCluster().Spec, true, false, false, false)

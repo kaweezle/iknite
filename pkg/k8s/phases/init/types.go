@@ -4,7 +4,6 @@ package init
 import (
 	"context"
 
-	"github.com/pion/mdns"
 	"golang.org/x/sync/errgroup"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	initPhases "k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/init"
@@ -12,7 +11,6 @@ import (
 	ikniteApi "github.com/kaweezle/iknite/pkg/apis/iknite"
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
 	"github.com/kaweezle/iknite/pkg/host"
-	"github.com/kaweezle/iknite/pkg/server"
 	"github.com/kaweezle/iknite/pkg/utils"
 )
 
@@ -29,13 +27,8 @@ type IkniteClusterHolder interface {
 	IkniteClusterUpdater
 }
 
-type MDnsConnectionCloser interface {
-	CloseMDnsConn() error
-}
-
-type MDnsConnectionHolder interface {
-	MDnsConnectionCloser
-	SetMDnsConn(conn *mdns.Conn)
+type IkniteClusterListenerRegistrar interface {
+	RegisterIkniteClusterListener() (<-chan *v1alpha1.IkniteCluster, func())
 }
 
 type KubeletProcessProvider interface {
@@ -45,14 +38,6 @@ type KubeletProcessProvider interface {
 type KubeletProcessHolder interface {
 	KubeletProcessProvider
 	SetKubeletProcess(process host.Process)
-}
-
-type StatusServerSetter interface {
-	SetStatusServer(srv *server.IkniteServer)
-}
-
-type StatusServerStopper interface {
-	StopStatusServer() error
 }
 
 type ContextProvider interface {
@@ -75,16 +60,24 @@ type ErrGroupProvider interface {
 	ErrGroup() *errgroup.Group
 }
 
+type ShutdownHookRegistrar interface {
+	RegisterShutdownHook(name string, fn func() error)
+}
+
+type ShutdownHookRunner interface {
+	RunShutdownHooks() error
+}
+
 type IkniteInitData interface {
 	initPhases.InitData
 	IkniteClusterHolder
-	MDnsConnectionHolder
+	IkniteClusterListenerRegistrar
 	KubeletProcessHolder
 	host.HostProvider
 	ContextProvider
-	StatusServerSetter
-	StatusServerStopper
 	KustomizeOptionsProvider
 	RESTClientGetterProvider
 	ErrGroupProvider
+	ShutdownHookRegistrar
+	ShutdownHookRunner
 }
