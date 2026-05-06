@@ -26,6 +26,7 @@ import (
 
 	"github.com/getsops/sops/v3/cmd/sops/formats"
 	"github.com/getsops/sops/v3/decrypt"
+	"github.com/stretchr/testify/require"
 	"sigs.k8s.io/yaml"
 
 	"github.com/kaweezle/iknite/pkg/host"
@@ -263,6 +264,29 @@ func TestInitSecretsWithCustomKeyFile(t *testing.T) {
 	if !hasCfgTip {
 		t.Fatalf("expected result to contain SSH key env var guidance, got: %v", result.Messages)
 	}
+}
+
+func TestOptionsSetDefaults(t *testing.T) {
+	t.Parallel()
+	t.Run("From nothing", func(t *testing.T) {
+		t.Parallel()
+		req := require.New(t)
+		opts := &secrets.Options{}
+		err := opts.SetDefaults()
+		req.NoError(err)
+		req.NotEmpty(opts.HomeDir, "HomeDir should be set")
+		req.NotEmpty(opts.SecretsFile, "SecretsFile should be set")
+		req.NotEmpty(opts.KeyFile, "KeyFile should be set")
+	})
+}
+
+func TestOptionsSetDefaults_Env(t *testing.T) {
+	req := require.New(t)
+	t.Setenv("SOPS_AGE_SSH_PRIVATE_KEY_FILE", "/env/age/key")
+	opts := &secrets.Options{}
+	err := opts.SetDefaults()
+	req.NoError(err)
+	req.Equal("/env/age/key", opts.KeyFile, "KeyFile should be set from env var")
 }
 
 func assertFileExists(t *testing.T, fs host.FileSystem, path string) {

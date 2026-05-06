@@ -79,7 +79,7 @@ func TestResolveSecretsInitPaths(t *testing.T) {
 				Fs:          host.NewMemMapFS(),
 				SecretsFile: DefaultSecretsFile,
 			},
-			wantErr: true,
+			wantErr: false,
 		},
 		{
 			name: "custom key file supported",

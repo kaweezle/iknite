@@ -468,6 +468,10 @@ Keep commits atomic and descriptive (see [CONTRIBUTING.md](../CONTRIBUTING.md)).
    only touch files and `host.FileExecutor` only when command execution is
    required. Do not thread `afero.Fs` through `pkg/cmd/iknitectl` root options
    or command constructors.
+7. **SOPS fixture limits in unit tests**: `LoadEncryptedFile` rejects branchless
+   or metadata-free encrypted YAML before helper code can inspect it. Cover
+   parser-level errors directly; use `// nocov` on guards that only protect
+   against invalid in-memory SOPS state.
 
 ## CI/CD
 
