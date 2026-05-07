@@ -112,6 +112,13 @@ The project provides the following deliverables:
 #### Package Structure
 
 - **`cmd/iknite/`**: Entry point calling [pkg/cmd/root.go](../pkg/cmd/root.go)
+- **Composition roots**:
+  - Binary entrypoints (`cmd/iknite`, `cmd/iknitectl`, `cmd/kubewait`) should
+    assemble concrete dependencies once, then pass them to root command
+    constructors.
+  - Command packages should keep compatibility wrappers, but primary
+    constructor paths should receive explicit dependencies instead of creating
+    runtime defaults in business code.
 - **`pkg/cmd/`**: Cobra command implementations (`start`, `init`, `reset`,
   `status`, `clean`, `info`)
   - `init.go` (~850 lines): Wraps kubeadm init workflow using **unsafe package

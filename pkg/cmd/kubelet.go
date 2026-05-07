@@ -24,6 +24,14 @@ func NewKubeletCmd(
 	if alpineHost == nil {
 		alpineHost = host.NewDefaultHost()
 	}
+	return newKubeletCmd(ikniteConfig, kustomizeOptions, alpineHost)
+}
+
+func newKubeletCmd(
+	ikniteConfig *v1alpha1.IkniteClusterSpec,
+	kustomizeOptions *utils.KustomizeOptions,
+	alpineHost host.Host,
+) *cobra.Command {
 	kubeletCmd := &cobra.Command{
 		Use:   "kubelet",
 		Short: "Start and monitor the kubelet (Experimental)",

@@ -47,6 +47,14 @@ func NewStartCmd(
 	if alpineHost == nil {
 		alpineHost = host.NewDefaultHost()
 	}
+	return newStartCmd(ikniteConfig, waitOptions, alpineHost)
+}
+
+func newStartCmd(
+	ikniteConfig *v1alpha1.IkniteClusterSpec,
+	waitOptions *utils.WaitOptions,
+	alpineHost host.Host,
+) *cobra.Command {
 	// startCmd represents the start command
 	startCmd := &cobra.Command{
 		Use:   "start",

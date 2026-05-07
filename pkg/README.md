@@ -68,6 +68,24 @@ CLI command implementations using Cobra.
 - `root.go` - Root command and global flags
 - `options/` - Command-line options and flags
 
+### Dependency Composition Boundaries
+
+Command packages use explicit composition roots and dependency bundles.
+
+- Binary entrypoints in `cmd/iknite/`, `cmd/iknitectl/`, and `cmd/kubewait/`
+  assemble concrete dependencies once.
+- Root command builders in `pkg/cmd`, `pkg/cmd/iknitectl`, and
+  `pkg/cmd/kubewait` accept injected dependencies instead of constructing
+  concrete runtime objects in business code paths.
+- Command constructors keep compatibility wrappers for existing callers, but
+  non-wrapper paths should pass explicit dependencies.
+
+When adding new commands:
+
+1. Define command behavior in package code with injected dependencies.
+2. Add concrete wiring in the relevant composition root.
+3. Keep interfaces near usage sites and avoid reflection-based DI containers.
+
 ### Utility Packages
 
 #### `config/`

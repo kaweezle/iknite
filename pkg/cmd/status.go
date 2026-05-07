@@ -71,6 +71,16 @@ func NewStatusCmd(
 	if alpineHost == nil {
 		alpineHost = host.NewDefaultHost()
 	}
+	return newStatusCmd(ikniteConfig, waitOptions, configurer, alpineHost, teaOptions...)
+}
+
+func newStatusCmd(
+	ikniteConfig *v1alpha1.IkniteClusterSpec,
+	waitOptions *utils.WaitOptions,
+	configurer CheckExecutorConfigurer,
+	alpineHost host.Host,
+	teaOptions ...tea.ProgramOption,
+) *cobra.Command {
 	// configureCmd represents the start command
 	statusCmd := &cobra.Command{
 		Use:   "status",

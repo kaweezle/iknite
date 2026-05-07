@@ -29,5 +29,5 @@ import (
 func main() { // nocov -- tested by integration tests
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
-	cobra.CheckErr(cmd.NewRootCmd(nil).ExecuteContext(ctx))
+	cobra.CheckErr(cmd.NewRootCmdWithDeps(nil, cmd.DefaultRootDeps()).ExecuteContext(ctx))
 }

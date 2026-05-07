@@ -15,6 +15,7 @@ limitations under the License.
 */
 package cmd
 
+// cSpell: words configurer
 // cSpell: disable
 import (
 	"fmt"
@@ -28,7 +29,6 @@ import (
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
 	"github.com/kaweezle/iknite/pkg/cmd/util"
 	"github.com/kaweezle/iknite/pkg/config"
-	"github.com/kaweezle/iknite/pkg/host"
 )
 
 // cSpell: enable
@@ -43,9 +43,15 @@ var (
 
 // NewRootCmd creates a new root command.
 func NewRootCmd(opts *util.BaseOptions) *cobra.Command {
+	return NewRootCmdWithDeps(opts, nil)
+}
+
+// NewRootCmdWithDeps creates a new root command using explicit dependencies.
+func NewRootCmdWithDeps(opts *util.BaseOptions, deps *RootDeps) *cobra.Command {
 	if opts == nil {
 		opts = util.DefaultBaseOptions()
 	}
+	deps = applyRootDepsDefaults(deps)
 
 	cobra.EnableTraverseRunHooks = true
 
@@ -74,17 +80,15 @@ kubernetes.`,
 	flags := rootCmd.PersistentFlags()
 	opts.AddFlags(flags)
 	util.AddConfigFlag(rootCmd)
-	alpineHost := host.NewDefaultHost()
-
-	rootCmd.AddCommand(NewKustomizeCmd(nil, nil, nil))
-	rootCmd.AddCommand(newCmdInit(os.Stdout, nil, nil, alpineHost))
-	rootCmd.AddCommand(newCmdReset(os.Stdin, os.Stdout, nil, nil))
-	rootCmd.AddCommand(NewCmdClean(ikniteConfig, nil, alpineHost))
-	rootCmd.AddCommand(NewKubeletCmd(ikniteConfig, nil, alpineHost))
+	rootCmd.AddCommand(NewKustomizeCmd(deps.KustomizeOptions, deps.KustomizeWaitOptions, deps.FileSystem))
+	rootCmd.AddCommand(newCmdInit(deps.Stdout, deps.InitOptions, deps.InitRunner, deps.Host))
+	rootCmd.AddCommand(newCmdReset(deps.Stdin, deps.Stdout, deps.ResetOptions, deps.ResetRunner))
+	rootCmd.AddCommand(NewCmdClean(ikniteConfig, deps.CleanOptions, deps.Host))
+	rootCmd.AddCommand(NewKubeletCmd(ikniteConfig, deps.KubeletKustomizeOption, deps.Host))
 	rootCmd.AddCommand(NewMdnsCmd(ikniteConfig))
-	rootCmd.AddCommand(NewPrepareCommand(ikniteConfig))
-	rootCmd.AddCommand(NewStartCmd(ikniteConfig, nil, alpineHost))
-	rootCmd.AddCommand(NewStatusCmd(ikniteConfig, nil, nil, alpineHost))
+	rootCmd.AddCommand(NewPrepareCommandWithHost(ikniteConfig, deps.Host))
+	rootCmd.AddCommand(NewStartCmd(ikniteConfig, deps.StartWaitOptions, deps.Host))
+	rootCmd.AddCommand(NewStatusCmd(ikniteConfig, deps.StatusWaitOptions, deps.StatusConfigurer, deps.Host))
 	rootCmd.AddCommand(NewInfoCmd(ikniteConfig))
 
 	util.BindFlagsToViper(rootCmd, viper.GetViper())

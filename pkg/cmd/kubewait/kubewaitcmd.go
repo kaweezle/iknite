@@ -26,7 +26,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"os"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -38,12 +37,18 @@ import (
 
 // CreateKubewaitCmd creates the root cobra command for kubewait.
 func CreateKubewaitCmd(out io.Writer, fse host.FileExecutor, opts *kubewait.Options) *cobra.Command {
-	if opts == nil {
-		opts = kubewait.NewOptions()
-	}
-	if fse == nil {
-		fse = host.NewDefaultHost()
-	}
+	deps := applyDepsDefaults(&Deps{
+		FileExecutor: fse,
+		Options:      opts,
+		Out:          out,
+	})
+	return createKubewaitCmdWithDeps(deps)
+}
+
+func createKubewaitCmdWithDeps(deps *Deps) *cobra.Command {
+	fse := deps.FileExecutor
+	opts := deps.Options
+	out := deps.Out
 	v := viper.GetViper()
 
 	cmd := &cobra.Command{
@@ -110,8 +115,7 @@ Examples:
 
 // Execute is the entry point called from main.
 func Execute() {
-	fse := host.NewDefaultHost()
-	opts := kubewait.NewOptions()
-	cmd := CreateKubewaitCmd(os.Stdout, fse, opts)
+	deps := DefaultDeps()
+	cmd := CreateKubewaitCmd(deps.Out, deps.FileExecutor, deps.Options)
 	cobra.CheckErr(cmd.ExecuteContext(context.Background()))
 }

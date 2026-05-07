@@ -16,9 +16,11 @@ limitations under the License.
 package main
 
 import (
+	"github.com/spf13/cobra"
+
 	"github.com/kaweezle/iknite/pkg/cmd/iknitectl"
 )
 
 func main() { // nocov -- tested by integration tests
-	iknitectl.Execute()
+	cobra.CheckErr(iknitectl.CreateRootCmd(iknitectl.DefaultDeps()).Execute())
 }

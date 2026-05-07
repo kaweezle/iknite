@@ -151,8 +151,6 @@ func addInitWorkflowPhases(initRunner *workflow.Runner) {
 //
 // NB. InitOptions is exposed as parameter for allowing unit testing of the newInitOptions method, that implements all
 // the command options validation logic.
-//
-//nolint:gocyclo // TODO: reduce more
 func newCmdInit(
 	out io.Writer,
 	initOptions *initOptions,
@@ -168,7 +166,15 @@ func newCmdInit(
 	if initRunner == nil {
 		initRunner = workflow.NewRunner()
 	}
+	return newCmdInitWithDeps(out, initOptions, initRunner, alpineHost)
+}
 
+func newCmdInitWithDeps(
+	out io.Writer,
+	initOptions *initOptions,
+	initRunner *workflow.Runner,
+	alpineHost host.Host,
+) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "init",
 		Short: "Run this command in order to set up the Kubernetes control plane",

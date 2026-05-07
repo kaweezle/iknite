@@ -71,6 +71,7 @@ type resetOptions struct {
 	externalCfg           *v1beta4.ResetConfiguration
 	skipCRIDetect         bool
 	ikniteCfg             *v1alpha1.IkniteClusterSpec
+	alpineHost            host.Host
 }
 
 // resetData defines all the runtime information used when running the kubeadm reset workflow;
@@ -112,6 +113,7 @@ func newResetOptions() *resetOptions {
 		externalCfg:           externalCfg,
 		ikniteCfg:             ikniteConfig,
 		ignorePreflightErrors: []string{"all"}, // Iknite: Ignore all preflight errors
+		alpineHost:            host.NewDefaultHost(),
 	}
 }
 
@@ -154,9 +156,6 @@ func newResetData(
 		return nil, fmt.Errorf("failed to load or default reset configuration: %w", err)
 	}
 
-	// TODO: This should come from upstream
-	alpineHost := host.NewDefaultHost()
-
 	dryRunFlag := cmdUtil.ValueFromFlagsOrConfig( //nolint:errcheck,forcetypeassert // default value is false
 		cmd.Flags(), options.DryRun, resetCfg.DryRun,
 		opts.externalCfg.DryRun).(bool)
@@ -171,7 +170,7 @@ func newResetData(
 			err = dryRun.WithKubeConfigFile(opts.kubeconfigPath)
 		}
 	} else {
-		client, err = k8s.ClientSetFromFile(alpineHost, opts.kubeconfigPath)
+		client, err = k8s.ClientSetFromFile(opts.alpineHost, opts.kubeconfigPath)
 	}
 
 	if err == nil {
@@ -246,7 +245,7 @@ func newResetData(
 			cmd.Flags(), options.CleanupTmpDir, resetCfg.CleanupTmpDir,
 			opts.externalCfg.CleanupTmpDir).(bool),
 		ikniteCluster: ikniteCluster,
-		alpineHost:    alpineHost,
+		alpineHost:    opts.alpineHost,
 	}, nil
 }
 
@@ -258,7 +257,15 @@ func newCmdReset(in io.Reader, out io.Writer, resetOptions *resetOptions, resetR
 	if resetRunner == nil {
 		resetRunner = workflow.NewRunner()
 	}
+	return newCmdResetWithDeps(in, out, resetOptions, resetRunner)
+}
 
+func newCmdResetWithDeps(
+	in io.Reader,
+	out io.Writer,
+	resetOptions *resetOptions,
+	resetRunner *workflow.Runner,
+) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "reset",
 		Short: "Performs a best effort revert of changes made to this host by 'kubeadm init' or 'kubeadm join'",

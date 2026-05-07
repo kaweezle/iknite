@@ -16,9 +16,15 @@ limitations under the License.
 package main
 
 import (
+	"context"
+
+	"github.com/spf13/cobra"
+
 	"github.com/kaweezle/iknite/pkg/cmd/kubewait"
 )
 
 func main() { // nocov -- tested by integration tests
-	kubewait.Execute()
+	deps := kubewait.DefaultDeps()
+	cmd := kubewait.CreateKubewaitCmd(deps.Out, deps.FileExecutor, deps.Options)
+	cobra.CheckErr(cmd.ExecuteContext(context.Background()))
 }

@@ -83,7 +83,14 @@ func NewCmdClean(
 	if alpineHost == nil {
 		alpineHost = host.NewDefaultHost()
 	}
+	return newCmdClean(ikniteConfig, cleanOptions, alpineHost)
+}
 
+func newCmdClean(
+	ikniteConfig *v1alpha1.IkniteClusterSpec,
+	cleanOptions *cleanOptions,
+	alpineHost host.Host,
+) *cobra.Command {
 	cleanCmd := &cobra.Command{
 		Use:   "clean",
 		Short: "Clean up the environment, stopping all services and removing configuration files (optional)",

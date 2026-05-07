@@ -82,6 +82,14 @@ func NewKustomizeCmd(
 	if fs == nil {
 		fs = host.NewOsFS()
 	}
+	return newKustomizeCmd(kustomizeOptions, waitOptions, fs)
+}
+
+func newKustomizeCmd(
+	kustomizeOptions *utils.KustomizeOptions,
+	waitOptions *utils.WaitOptions,
+	fs host.FileSystem,
+) *cobra.Command {
 	kustomizeCmd := &cobra.Command{
 		Use:   "kustomize",
 		Short: "Kustomize the cluster",
