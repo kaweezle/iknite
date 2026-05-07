@@ -43,7 +43,7 @@ rc_add() {
 }
 
 step 'Add services packages...'
-apk add --quiet --no-cache --no-progress less logrotate openssh chrony cloud-init dhcpcd doas acpi e2fsprogs-extra \
+apk add --quiet --no-cache --no-progress less logrotate openssh chrony cloud-init dhcpcd=10.3.0-r0 doas acpi e2fsprogs-extra \
     py3-pyserial py3-netifaces alpine-base virt-what
 
 step 'Set up timezone'

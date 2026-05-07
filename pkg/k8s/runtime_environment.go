@@ -164,7 +164,7 @@ func EnableCGroupSubtreeControl(fs host.FileSystem) error {
 	if err != nil {
 		return fmt.Errorf("while reading cgroup.subtree_control: %w", err)
 	}
-	if strings.Contains(string(content), "+cpuset") {
+	if strings.Contains(string(content), "cpuset") {
 		log.Info("CGroup subtree control is already enabled")
 		return nil
 	}
