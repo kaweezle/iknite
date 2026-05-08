@@ -1,6 +1,6 @@
+// cSpell: words wrapcheck sirupsen apimachinery
 package v1alpha1
 
-// cSpell: disable
 import (
 	"encoding/json"
 	"errors"
@@ -13,9 +13,8 @@ import (
 
 	ikniteApi "github.com/kaweezle/iknite/pkg/apis/iknite"
 	"github.com/kaweezle/iknite/pkg/constants"
+	"github.com/kaweezle/iknite/pkg/host"
 )
-
-// cSpell: enable
 
 // cSpell: disable-next-line
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -29,17 +28,19 @@ type IkniteCluster struct {
 
 //nolint:lll // long struct tags
 type IkniteClusterSpec struct {
-	KubernetesVersion           string `json:"kubernetesVersion,omitempty"           protobuf:"bytes,2,opt,name=kubernetesVersion"            mapstructure:"kubernetes_version"`
-	DomainName                  string `json:"domainName,omitempty"                  protobuf:"bytes,3,opt,name=domainName"                   mapstructure:"domain_name"`
-	NetworkInterface            string `json:"networkInterface,omitempty"            protobuf:"bytes,5,opt,name=networkInterface"             mapstructure:"network_interface"`
-	ClusterName                 string `json:"clusterName,omitempty"                 protobuf:"bytes,7,opt,name=clusterName"                  mapstructure:"cluster_name"`
-	Kustomization               string `json:"kustomization,omitempty"               protobuf:"bytes,8,opt,name=kustomization"`
-	APIBackendDatabaseDirectory string `json:"apiBackendDatabaseDirectory,omitempty" protobuf:"bytes,10,opt,name=apiBackendDatabaseDirectory" mapstructure:"api_backend_database_directory"`
-	Ip                          net.IP `json:"ip,omitempty"                          protobuf:"bytes,1,opt,name=ip"                           mapstructure:"ip"`
-	StatusServerPort            int    `json:"statusServerPort,omitempty"            protobuf:"varint,11,opt,name=statusServerPort"           mapstructure:"status_server_port"`
-	CreateIp                    bool   `json:"createIp,omitempty"                    protobuf:"bytes,4,opt,name=createIp"                     mapstructure:"create_ip"`
-	EnableMDNS                  bool   `json:"enableMDNS,omitempty"                  protobuf:"bytes,6,opt,name=enableMDNS"                   mapstructure:"enable_mdns"`
-	UseEtcd                     bool   `json:"useEtcd,omitempty"                     protobuf:"bytes,9,opt,name=useEtcd"                      mapstructure:"use_etcd"`
+	KubernetesVersion               string `json:"kubernetesVersion,omitempty"               protobuf:"bytes,2,opt,name=kubernetesVersion"                 mapstructure:"kubernetes_version"`
+	DomainName                      string `json:"domainName,omitempty"                      protobuf:"bytes,3,opt,name=domainName"                        mapstructure:"domain_name"`
+	NetworkInterface                string `json:"networkInterface,omitempty"                protobuf:"bytes,5,opt,name=networkInterface"                  mapstructure:"network_interface"`
+	ClusterName                     string `json:"clusterName,omitempty"                     protobuf:"bytes,7,opt,name=clusterName"                       mapstructure:"cluster_name"`
+	Kustomization                   string `json:"kustomization,omitempty"                   protobuf:"bytes,8,opt,name=kustomization"`
+	APIBackendDatabaseDirectory     string `json:"apiBackendDatabaseDirectory,omitempty"     protobuf:"bytes,10,opt,name=apiBackendDatabaseDirectory"      mapstructure:"api_backend_database_directory"`
+	Ip                              net.IP `json:"ip,omitempty"                              protobuf:"bytes,1,opt,name=ip"                                mapstructure:"ip"`
+	StatusServerPort                int    `json:"statusServerPort,omitempty"                protobuf:"varint,11,opt,name=statusServerPort"                mapstructure:"status_server_port"`
+	StatusUpdateIntervalSeconds     int    `json:"statusUpdateIntervalSeconds,omitempty"     protobuf:"varint,12,opt,name=statusUpdateIntervalSeconds"     mapstructure:"status_update_interval_seconds"`
+	StatusUpdateLongIntervalSeconds int    `json:"statusUpdateLongIntervalSeconds,omitempty" protobuf:"varint,13,opt,name=statusUpdateLongIntervalSeconds" mapstructure:"status_update_long_interval_seconds"`
+	CreateIp                        bool   `json:"createIp,omitempty"                        protobuf:"bytes,4,opt,name=createIp"                          mapstructure:"create_ip"`
+	EnableMDNS                      bool   `json:"enableMDNS,omitempty"                      protobuf:"bytes,6,opt,name=enableMDNS"                        mapstructure:"enable_mdns"`
+	UseEtcd                         bool   `json:"useEtcd,omitempty"                         protobuf:"bytes,9,opt,name=useEtcd"                           mapstructure:"use_etcd"`
 }
 
 func (c *IkniteClusterSpec) GetApiEndPoint() string {
@@ -97,19 +98,18 @@ func (ikniteCluster *IkniteCluster) Update(
 	ikniteCluster.Status.WorkloadsState.ReadyCount = len(ready)
 	ikniteCluster.Status.WorkloadsState.Unready = unready
 	ikniteCluster.Status.WorkloadsState.UnreadyCount = len(unready)
-	ikniteCluster.Persist()
 }
 
-func (ikniteCluster *IkniteCluster) Persist() {
+func (ikniteCluster *IkniteCluster) Persist(fs host.FileSystem) {
 	ikniteClusterJSON, err := json.MarshalIndent(ikniteCluster, "", "  ")
 	if err == nil {
 		// Write JSON to file
-		err = os.MkdirAll(constants.StatusDirectory, 0o755) //nolint:gosec // Want read access
+		err = fs.MkdirAll(constants.StatusDirectory, 0o755)
 		if err != nil {
 			log.WithError(err).Warn("Failed to create status directory")
 			return
 		}
-		err = os.WriteFile( //nolint:gosec // Want read access
+		err = fs.WriteFile(
 			constants.StatusFile,
 			ikniteClusterJSON,
 			0o644,
@@ -122,25 +122,35 @@ func (ikniteCluster *IkniteCluster) Persist() {
 	}
 }
 
-func LoadIkniteCluster() (*IkniteCluster, error) {
+func LoadIkniteCluster(fs host.FileSystem) (*IkniteCluster, error) {
 	ikniteCluster := &IkniteCluster{}
-	ikniteClusterJSON, err := os.ReadFile(constants.StatusFile)
+	ikniteClusterJSON, err := fs.ReadFile(constants.StatusFile)
 	if err == nil {
 		err = json.Unmarshal(ikniteClusterJSON, ikniteCluster)
 		if err != nil {
 			return nil, fmt.Errorf("failed to unmarshal iknite cluster: %w", err)
 		}
 	} else {
-		return nil, fmt.Errorf("failed to read status file: %w", err)
+		return nil, err //nolint:wrapcheck // could be os.ErrNotExist or other errors
 	}
 	return ikniteCluster, nil
 }
 
-func LoadIkniteClusterOrDefault() (*IkniteCluster, error) {
-	ikniteCluster, err := LoadIkniteCluster()
+func NewDefaultIkniteCluster() *IkniteCluster {
+	ikniteCluster := &IkniteCluster{
+		TypeMeta: metaV1.TypeMeta{
+			Kind:       ikniteApi.IkniteClusterKind,
+			APIVersion: SchemeGroupVersion.String(),
+		},
+	}
+	SetDefaults_IkniteCluster(ikniteCluster)
+	return ikniteCluster
+}
+
+func LoadIkniteClusterOrDefault(fs host.FileSystem) (*IkniteCluster, error) {
+	ikniteCluster, err := LoadIkniteCluster(fs)
 	if errors.Is(err, os.ErrNotExist) {
-		ikniteCluster = &IkniteCluster{}
-		SetDefaults_IkniteCluster(ikniteCluster)
+		ikniteCluster = NewDefaultIkniteCluster()
 	}
 	return ikniteCluster, nil
 }

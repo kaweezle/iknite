@@ -1,0 +1,130 @@
+{
+  "kind": "IkniteCluster",
+  "apiVersion": "iknite.kaweezle.com/v1alpha1",
+  "spec": {
+    "kubernetesVersion": "1.35.0",
+    "networkInterface": "eth0",
+    "domainName": "iknite.local",
+    "clusterName": "iknite",
+    "kustomization": "/etc/iknite.d",
+    "apiBackendDatabaseDirectory": "/var/lib/kine",
+    "ip": "192.168.99.2",
+    "statusServerPort": 11443,
+    "createIp": true
+  },
+  "status": {
+    "lastUpdateTimeStamp": "2026-04-23T08:13:12Z",
+    "currentPhase": "daemonize",
+    "workloadsState": {
+      "ready": [
+        {
+          "Namespace": "argocd",
+          "Name": "applications/appstage-00-bootstrap",
+          "Message": "application \"appstage-00-bootstrap\" sync status: Synced, health status: Healthy",
+          "Ok": true
+        },
+        {
+          "Namespace": "argocd",
+          "Name": "applications/argocd-server",
+          "Message": "application \"argocd-server\" sync status: Synced, health status: Healthy",
+          "Ok": true
+        },
+        {
+          "Namespace": "argocd",
+          "Name": "deployments/argocd-applicationset-controller",
+          "Message": "deployment \"argocd-applicationset-controller\" successfully rolled out",
+          "Ok": true
+        },
+        {
+          "Namespace": "argocd",
+          "Name": "deployments/argocd-dex-server",
+          "Message": "deployment \"argocd-dex-server\" successfully rolled out",
+          "Ok": true
+        },
+        {
+          "Namespace": "argocd",
+          "Name": "deployments/argocd-gateway",
+          "Message": "deployment \"argocd-gateway\" successfully rolled out",
+          "Ok": true
+        },
+        {
+          "Namespace": "argocd",
+          "Name": "deployments/argocd-notifications-controller",
+          "Message": "deployment \"argocd-notifications-controller\" successfully rolled out",
+          "Ok": true
+        },
+        {
+          "Namespace": "argocd",
+          "Name": "deployments/argocd-redis",
+          "Message": "deployment \"argocd-redis\" successfully rolled out",
+          "Ok": true
+        },
+        {
+          "Namespace": "argocd",
+          "Name": "deployments/argocd-repo-server",
+          "Message": "deployment \"argocd-repo-server\" successfully rolled out",
+          "Ok": true
+        },
+        {
+          "Namespace": "argocd",
+          "Name": "deployments/argocd-server",
+          "Message": "deployment \"argocd-server\" successfully rolled out",
+          "Ok": true
+        },
+        {
+          "Namespace": "argocd",
+          "Name": "statefulsets/argocd-application-controller",
+          "Message": "partitioned roll out complete: 1 new pods have been updated...",
+          "Ok": true
+        },
+        {
+          "Namespace": "kgateway-system",
+          "Name": "deployments/kgateway",
+          "Message": "deployment \"kgateway\" successfully rolled out",
+          "Ok": true
+        },
+        {
+          "Namespace": "kube-flannel",
+          "Name": "daemonsets/kube-flannel-ds",
+          "Message": "daemon set \"kube-flannel-ds\" successfully rolled out",
+          "Ok": true
+        },
+        {
+          "Namespace": "kube-system",
+          "Name": "daemonsets/kube-proxy",
+          "Message": "daemon set \"kube-proxy\" successfully rolled out",
+          "Ok": true
+        },
+        {
+          "Namespace": "kube-system",
+          "Name": "deployments/coredns",
+          "Message": "deployment \"coredns\" successfully rolled out",
+          "Ok": true
+        },
+        {
+          "Namespace": "kube-system",
+          "Name": "deployments/kube-vip-cloud-provider",
+          "Message": "deployment \"kube-vip-cloud-provider\" successfully rolled out",
+          "Ok": true
+        },
+        {
+          "Namespace": "kube-system",
+          "Name": "deployments/metrics-server",
+          "Message": "deployment \"metrics-server\" successfully rolled out",
+          "Ok": true
+        },
+        {
+          "Namespace": "local-path-storage",
+          "Name": "deployments/local-path-provisioner",
+          "Message": "deployment \"local-path-provisioner\" successfully rolled out",
+          "Ok": true
+        }
+      ],
+      "unready": null,
+      "count": 17,
+      "readyCount": 17,
+      "unreadyCount": 0
+    },
+    "state": "Running"
+  }
+}

@@ -1,8 +1,8 @@
 package cmd
 
-// cSpell:words txeh
-// cSpell: disable
+// cSpell:words txeh ikniteapi sirupsen
 import (
+	"fmt"
 	"os"
 	"syscall"
 
@@ -17,11 +17,10 @@ import (
 	"github.com/kaweezle/iknite/pkg/cmd/options"
 	"github.com/kaweezle/iknite/pkg/config"
 	"github.com/kaweezle/iknite/pkg/constants"
+	"github.com/kaweezle/iknite/pkg/host"
 	"github.com/kaweezle/iknite/pkg/k8s"
 	"github.com/kaweezle/iknite/pkg/k8s/phases/reset"
 )
-
-// cSpell: enable
 
 type cleanOptions struct {
 	dryRun             bool
@@ -76,9 +75,13 @@ func (o *cleanOptions) validate() error {
 func NewCmdClean(
 	ikniteConfig *v1alpha1.IkniteClusterSpec,
 	cleanOptions *cleanOptions,
+	alpineHost host.Host,
 ) *cobra.Command {
 	if cleanOptions == nil {
 		cleanOptions = newCleanOptions()
+	}
+	if alpineHost == nil {
+		alpineHost = host.NewDefaultHost()
 	}
 
 	cleanCmd := &cobra.Command{
@@ -91,13 +94,13 @@ removes the network interfaces and the IP address assigned to the cluster.
 
 This command must be run as root.
 `,
-		Run: func(_ *cobra.Command, _ []string) {
+		RunE: func(_ *cobra.Command, _ []string) error {
 			if err := cleanOptions.validate(); err != nil {
 				log.WithError(err).Error("Invalid options")
-				os.Exit(1)
+				return fmt.Errorf("invalid options: %w", err)
 			}
 
-			performClean(ikniteConfig, cleanOptions)
+			return performClean(alpineHost, ikniteConfig, cleanOptions)
 		},
 	}
 
@@ -145,32 +148,47 @@ func initializeClean(flags *flag.FlagSet, cleanOptions *cleanOptions) {
 		cleanOptions.cleanClusterConfig, "Reset cluster configuration")
 }
 
-//nolint:gocyclo // TODO: Should use a runner pattern to reduce complexity
-func performClean(ikniteConfig *v1alpha1.IkniteClusterSpec, cleanOptions *cleanOptions) {
+//nolint:gocyclo,gocognit // TODO: Should use a runner pattern to reduce complexity
+func performClean(alpineHost host.Host, ikniteConfig *v1alpha1.IkniteClusterSpec, cleanOptions *cleanOptions) error {
 	dryRun := cleanOptions.dryRun
 	logger := log.WithField("isDryRun", dryRun)
 
-	ikniteCluster, err := v1alpha1.LoadIkniteClusterOrDefault()
-	cobra.CheckErr(err)
-	state := ikniteCluster.Status.State
-
-	if !state.Stable() {
-		log.WithField("State", state).Error("Cluster is not stable")
-		os.Exit(1)
+	if !cleanOptions.hasActualWorkToDo() {
+		logger.Info("No cleanup actions specified, skipping cleanup")
+		return nil
 	}
 
-	if state == iknite.Running && cleanOptions.hasActualWorkToDo() {
+	state := iknite.Undefined
+	ikniteCluster, err := v1alpha1.LoadIkniteCluster(alpineHost)
+	if err != nil {
+		if !os.IsNotExist(err) {
+			logger.WithError(err).Warn("Failed to load iknite cluster, assuming it does not exist")
+		}
+	} else {
+		logger.Info("Loaded iknite cluster status. Replace cluster config with the one from the status file")
+		state = ikniteCluster.Status.State
+		*ikniteConfig = ikniteCluster.Spec
+	}
+
+	if !state.Stable() {
+		return fmt.Errorf("cluster is not in a stable state: %s", state)
+	}
+
+	if state == iknite.Running {
 		logger.WithField("serviceName", constants.IkniteService).Info("Stopping iknite service...")
 		if !dryRun {
 			// TODO: if reset kubelet, remove his node from etcd cluster
-			cobra.CheckErr(alpine.StopService(constants.IkniteService))
+			err = alpine.StopService(alpineHost, constants.IkniteService)
+			if err != nil {
+				return fmt.Errorf("failed to stop iknite service: %w", err)
+			}
 		}
 	}
 
 	// we assume that starting from here, we are in a stopped state
 	if cleanOptions.stopContainers {
 		logger.Info("Stopping all containers...")
-		if err = k8s.StopAllContainers(dryRun); err != nil {
+		if err = k8s.StopAllContainers(alpineHost, dryRun); err != nil {
 			log.WithError(err).Warn("Error stopping all containers")
 		}
 	}
@@ -179,28 +197,46 @@ func performClean(ikniteConfig *v1alpha1.IkniteClusterSpec, cleanOptions *cleanO
 		logger.WithField("serviceName", constants.ContainerServiceName).
 			Info("Stopping container service...")
 		if !dryRun {
-			cobra.CheckErr(alpine.StopService(constants.ContainerServiceName))
+			err = alpine.StopService(alpineHost, constants.ContainerServiceName)
+			if err != nil {
+				return fmt.Errorf("failed to stop container service: %w", err)
+			}
 		}
 	}
 
 	if cleanOptions.unmountPaths {
 		logger.Info("Unmounting paths...")
-		cobra.CheckErr(k8s.UnmountPaths(true, dryRun))
+		err = k8s.UnmountPaths(alpineHost, true, dryRun)
+		if err != nil {
+			return fmt.Errorf("failed to unmount paths: %w", err)
+		}
 		logger.Info("Removing kubelet runtime files...")
-		cobra.CheckErr(k8s.RemoveKubeletFiles(dryRun))
+		err = k8s.RemoveKubeletFiles(alpineHost, dryRun)
+		if err != nil {
+			return fmt.Errorf("failed to remove kubelet runtime files: %w", err)
+		}
 	}
 
 	if cleanOptions.cleanCni {
-		cobra.CheckErr(k8s.DeleteCniNamespaces(dryRun))
-		cobra.CheckErr(k8s.DeleteNetworkInterfaces(dryRun))
+		err = k8s.DeleteCniNamespaces(alpineHost, dryRun)
+		if err != nil {
+			return fmt.Errorf("failed to delete CNI namespaces: %w", err)
+		}
+		err = k8s.DeleteNetworkInterfaces(alpineHost, dryRun)
+		if err != nil {
+			return fmt.Errorf("failed to delete network interfaces: %w", err)
+		}
 	}
 
 	if cleanOptions.cleanIptables {
-		cobra.CheckErr(k8s.ResetIPTables(dryRun))
+		err = k8s.ResetIPTables(alpineHost, dryRun)
+		if err != nil {
+			return fmt.Errorf("failed to reset iptables: %w", err)
+		}
 	}
 
 	if cleanOptions.cleanIpAddress {
-		err = k8s.ResetIPAddress(ikniteConfig, dryRun)
+		err = k8s.ResetIPAddress(alpineHost, ikniteConfig, dryRun)
 		if err != nil {
 			log.WithError(err).Warn("Error resetting IP address")
 		}
@@ -212,33 +248,45 @@ func performClean(ikniteConfig *v1alpha1.IkniteClusterSpec, cleanOptions *cleanO
 		if ikniteConfig.UseEtcd {
 			apiBackendName = constants.EtcdBackendName
 		}
-		cobra.CheckErr(k8s.DeleteAPIBackendData(dryRun, apiBackendName, ikniteConfig.APIBackendDatabaseDirectory))
+		err = k8s.DeleteAPIBackendData(alpineHost, dryRun, apiBackendName, ikniteConfig.APIBackendDatabaseDirectory)
+		if err != nil {
+			return fmt.Errorf("failed to delete API backend data: %w", err)
+		}
 	}
 
 	if cleanOptions.cleanClusterConfig {
 		logger.Info("Resetting cluster configuration...")
-		reset.CleanConfig(dryRun)
+		reset.CleanConfig(alpineHost, dryRun)
 		logger.WithField("path", constants.KubernetesRootConfig).
 			Info("Removing kubernetes root config...")
 		if !dryRun {
-			cobra.CheckErr(os.RemoveAll(constants.KubernetesRootConfig))
-		}
-	}
-
-	kubeletProcess, err := k8s.IsKubeletRunning()
-	if err != nil {
-		logger.WithError(err).Warn("Error checking kubelet process")
-	} else if kubeletProcess != nil {
-		logger.WithField("pid", kubeletProcess.Pid).Info("Kubelet is still running, stopping it...")
-		if !dryRun {
-			err = kubeletProcess.Signal(syscall.SIGTERM)
-			if err == nil {
-				logger.WithField("pid", kubeletProcess.Pid).Info("Waiting for kubelet to stop...")
-				_, err = kubeletProcess.Wait()
-				cobra.CheckErr(err)
+			err = alpineHost.RemoveAll(constants.KubernetesRootConfig)
+			if err != nil {
+				return fmt.Errorf("failed to remove kubernetes root config: %w", err)
 			}
 		}
 	}
 
+	_, kubeletProcess, err := alpine.CheckPidFile(alpineHost, "kubelet")
+	switch {
+	case err != nil:
+		logger.WithError(err).Warn("Error checking kubelet process")
+	case kubeletProcess != nil:
+		logger.WithField("pid", kubeletProcess.Pid()).Info("Kubelet is still running, stopping it...")
+		if !dryRun {
+			err = kubeletProcess.Signal(syscall.SIGTERM)
+			if err == nil {
+				logger.WithField("pid", kubeletProcess.Pid()).Info("Waiting for kubelet to stop...")
+				err = kubeletProcess.Wait()
+				if err != nil {
+					return fmt.Errorf("failed to wait for kubelet process to stop: %w", err)
+				}
+			}
+		}
+	default:
+		logger.Info("Kubelet is not running")
+	}
+
 	logger.Info("Cleanup completed")
+	return nil
 }

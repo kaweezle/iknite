@@ -1,0 +1,36 @@
+{
+  "kind": "ReplicaSetList",
+  "apiVersion": "apps/v1",
+  "items": [
+    {
+      "apiVersion": "apps/v1",
+      "kind": "ReplicaSet",
+      "metadata": {
+        "name": "deploy-ready-5d4f7c6b8",
+        "namespace": "default",
+        "generation": 1,
+        "labels": {
+          "app": "deploy-ready"
+        },
+        "uid": "replicaset-uid-123",
+        "ownerReferences": [
+          {
+            "apiVersion": "apps/v1",
+            "kind": "Deployment",
+            "name": "deploy-ready",
+            "uid": "deployment-uid-123",
+            "controller": true,
+            "blockOwnerDeletion": true
+          }
+        ]
+      },
+      "spec": { "replicas": 1 },
+      "status": {
+        "observedGeneration": 1,
+        "replicas": 1,
+        "readyReplicas": 1,
+        "availableReplicas": 1
+      }
+    }
+  ]
+}

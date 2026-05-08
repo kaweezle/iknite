@@ -43,11 +43,12 @@ import (
 	kubeadmConstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	apiClient "k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	configUtil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
-	kubeconfigUtil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 
 	ikniteApi "github.com/kaweezle/iknite/pkg/apis/iknite"
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
 	"github.com/kaweezle/iknite/pkg/config"
+	"github.com/kaweezle/iknite/pkg/host"
+	"github.com/kaweezle/iknite/pkg/k8s"
 	iknitePhases "github.com/kaweezle/iknite/pkg/k8s/phases/reset"
 )
 
@@ -89,7 +90,10 @@ type resetData struct {
 	dryRun                bool
 	cleanupTmpDir         bool
 	ikniteCluster         *v1alpha1.IkniteCluster
+	alpineHost            host.Host
 }
+
+var _ iknitePhases.IkniteResetData = (*resetData)(nil)
 
 // newResetOptions returns a struct ready for being used for creating cmd join flags.
 func newResetOptions() *resetOptions {
@@ -150,6 +154,9 @@ func newResetData(
 		return nil, fmt.Errorf("failed to load or default reset configuration: %w", err)
 	}
 
+	// TODO: This should come from upstream
+	alpineHost := host.NewDefaultHost()
+
 	dryRunFlag := cmdUtil.ValueFromFlagsOrConfig( //nolint:errcheck,forcetypeassert // default value is false
 		cmd.Flags(), options.DryRun, resetCfg.DryRun,
 		opts.externalCfg.DryRun).(bool)
@@ -164,7 +171,7 @@ func newResetData(
 			err = dryRun.WithKubeConfigFile(opts.kubeconfigPath)
 		}
 	} else {
-		client, err = kubeconfigUtil.ClientSetFromFile(opts.kubeconfigPath)
+		client, err = k8s.ClientSetFromFile(alpineHost, opts.kubeconfigPath)
 	}
 
 	if err == nil {
@@ -239,15 +246,18 @@ func newResetData(
 			cmd.Flags(), options.CleanupTmpDir, resetCfg.CleanupTmpDir,
 			opts.externalCfg.CleanupTmpDir).(bool),
 		ikniteCluster: ikniteCluster,
+		alpineHost:    alpineHost,
 	}, nil
 }
 
 // newCmdReset returns the "kubeadm reset" command.
-func newCmdReset(in io.Reader, out io.Writer, resetOptions *resetOptions) *cobra.Command {
+func newCmdReset(in io.Reader, out io.Writer, resetOptions *resetOptions, resetRunner *workflow.Runner) *cobra.Command {
 	if resetOptions == nil {
 		resetOptions = newResetOptions()
 	}
-	resetRunner := workflow.NewRunner()
+	if resetRunner == nil {
+		resetRunner = workflow.NewRunner()
+	}
 
 	cmd := &cobra.Command{
 		Use:   "reset",
@@ -359,4 +369,8 @@ func (r *resetData) CRISocketPath() string {
 // IkniteCluster returns the IkniteCluster.
 func (r *resetData) IkniteCluster() *v1alpha1.IkniteCluster {
 	return r.ikniteCluster
+}
+
+func (r *resetData) Host() host.Host {
+	return r.alpineHost
 }

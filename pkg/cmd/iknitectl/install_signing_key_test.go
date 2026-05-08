@@ -20,9 +20,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/spf13/afero"
-
 	iknitectl "github.com/kaweezle/iknite/pkg/cmd/iknitectl"
+	"github.com/kaweezle/iknite/pkg/host"
 )
 
 // cSpell: disable
@@ -67,7 +66,7 @@ func TestInstallSigningKey(t *testing.T) {
 	// Note: Cannot use t.Parallel() in parent when child tests use t.Setenv()
 
 	// Create a memory filesystem for testing
-	fs := afero.NewMemMapFs()
+	fs := host.NewMemMapFS()
 
 	t.Run("CreateSigningKeyCmd with nil options", func(t *testing.T) {
 		t.Parallel()
@@ -106,7 +105,7 @@ func TestInstallSigningKey(t *testing.T) {
 
 	t.Run("InstallSigningKey with missing secrets file", func(t *testing.T) {
 		t.Parallel()
-		testFs := afero.NewMemMapFs()
+		testFs := host.NewMemMapFS()
 		opts := &iknitectl.SigningKeyOptions{
 			KeyName:     "apk_signing_key",
 			SecretsFile: "/nonexistent/secrets.yaml",
@@ -120,9 +119,9 @@ func TestInstallSigningKey(t *testing.T) {
 		}
 	})
 
-	t.Run("Filesystem operations use afero", func(t *testing.T) {
+	t.Run("Filesystem operations use host filesystem", func(t *testing.T) {
 		t.Parallel()
-		testFs := afero.NewMemMapFs()
+		testFs := host.NewMemMapFS()
 		// Create test directory structure
 		testDir := "/test/dest"
 		err := testFs.MkdirAll(testDir, 0o755)
@@ -131,7 +130,7 @@ func TestInstallSigningKey(t *testing.T) {
 		}
 
 		// Verify directory was created in memory filesystem
-		exists, err := afero.DirExists(testFs, testDir)
+		exists, err := testFs.DirExists(testDir)
 		if err != nil {
 			t.Fatalf("Failed to check directory existence: %v", err)
 		}
@@ -141,13 +140,13 @@ func TestInstallSigningKey(t *testing.T) {
 
 		// Test writing a file
 		testFile := filepath.Join(testDir, "test-key.rsa")
-		err = afero.WriteFile(testFs, testFile, []byte("test content"), 0o400)
+		err = testFs.WriteFile(testFile, []byte("test content"), 0o400)
 		if err != nil {
 			t.Fatalf("Failed to write test file: %v", err)
 		}
 
 		// Verify file was written
-		content, err := afero.ReadFile(testFs, testFile)
+		content, err := testFs.ReadFile(testFile)
 		if err != nil {
 			t.Fatalf("Failed to read test file: %v", err)
 		}
@@ -170,7 +169,7 @@ func TestInstallSigningKey(t *testing.T) {
 		// This demonstrates how to test the InstallSigningKey function directly
 		// without going through the Cobra command, which is useful for testing
 		// the business logic in isolation.
-		testFs := afero.NewMemMapFs()
+		testFs := host.NewMemMapFS()
 
 		opts := &iknitectl.SigningKeyOptions{
 			KeyName:     "test_key",
@@ -199,11 +198,11 @@ func TestInstallSigningKey(t *testing.T) {
 		t.Setenv("SOPS_AGE_KEY", testAgeKey)
 
 		// Create a memory filesystem
-		testFs := afero.NewMemMapFs()
+		testFs := host.NewMemMapFS()
 
 		// Write the encrypted secrets file to the memory filesystem
 		secretsPath := "/test/secrets.sops.yaml"
-		if err := afero.WriteFile(testFs, secretsPath, []byte(testSecretsEncrypted), 0o644); err != nil {
+		if err := testFs.WriteFile(secretsPath, []byte(testSecretsEncrypted), 0o644); err != nil {
 			t.Fatalf("Failed to write encrypted secrets file: %v", err)
 		}
 
@@ -224,7 +223,7 @@ func TestInstallSigningKey(t *testing.T) {
 
 		// Verify the output file was created
 		outputFile := filepath.Join(destDir, "test-signing-key.rsa")
-		exists, err := afero.Exists(testFs, outputFile)
+		exists, err := testFs.Exists(outputFile)
 		if err != nil {
 			t.Fatalf("Failed to check if output file exists: %v", err)
 		}
@@ -233,7 +232,7 @@ func TestInstallSigningKey(t *testing.T) {
 		}
 
 		// Read and verify the content
-		content, err := afero.ReadFile(testFs, outputFile)
+		content, err := testFs.ReadFile(outputFile)
 		if err != nil {
 			t.Fatalf("Failed to read output file: %v", err)
 		}

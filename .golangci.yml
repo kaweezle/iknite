@@ -155,6 +155,7 @@ linters:
     gosec:
       excludes:
         - G104
+        - G204
 
     nolintlint:
       allow-unused: false

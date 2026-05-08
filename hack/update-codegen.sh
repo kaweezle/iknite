@@ -19,9 +19,10 @@
 set -o errexit
 set -o nounset
 set -o pipefail
+set -x
 
 SCRIPT_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
-CODEGEN_PKG=${CODEGEN_PKG:-$(cd "${SCRIPT_ROOT}"; go list -f '{{ .Dir }}' -m k8s.io/code-generator 2>/dev/null || echo "${GOPATH}/pkg/mod/k8s.io/code-generator@v0.34.3")}
+CODEGEN_PKG=${CODEGEN_PKG:-$(cd "${SCRIPT_ROOT}"; go list -f '{{ .Dir }}' -m k8s.io/code-generator 2>/dev/null || echo "${GOPATH}/pkg/mod/k8s.io/code-generator@v0.35.3")}
 
 # shellcheck disable=SC1091
 source "${CODEGEN_PKG}/kube_codegen.sh"

@@ -9,6 +9,7 @@ import (
 	kubeadmApi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
+	"github.com/kaweezle/iknite/pkg/host"
 )
 
 // cSpell: enable
@@ -27,4 +28,5 @@ type IkniteResetData interface {
 	CleanupTmpDir() bool
 
 	IkniteCluster() *v1alpha1.IkniteCluster
+	Host() host.Host
 }

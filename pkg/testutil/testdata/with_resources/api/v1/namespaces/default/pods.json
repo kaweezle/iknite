@@ -1,0 +1,107 @@
+{
+  "kind": "PodList",
+  "apiVersion": "v1",
+  "items": [
+    {
+      "apiVersion": "v1",
+      "kind": "Pod",
+      "metadata": {
+        "name": "deploy-ready-5d4f7c6b8-abc12",
+        "namespace": "default",
+        "labels": {
+          "app": "deploy-ready"
+        },
+        "generation": 1,
+        "uid": "pod-uid-123",
+        "ownerReferences": [
+          {
+            "apiVersion": "apps/v1",
+            "kind": "ReplicaSet",
+            "name": "deploy-ready-5d4f7c6b8",
+            "uid": "replicaset-uid-123",
+            "controller": true,
+            "blockOwnerDeletion": true
+          }
+        ]
+      },
+      "spec": { "containers": [{ "name": "app", "image": "app:latest" }] },
+      "status": {
+        "phase": "Running",
+        "conditions": [
+          { "type": "Ready", "status": "True" },
+          { "type": "Initialized", "status": "True" },
+          { "type": "PodScheduled", "status": "True" }
+        ],
+        "containerStatuses": [
+          { "name": "app", "ready": true, "state": { "running": {} } }
+        ]
+      }
+    },
+    {
+      "apiVersion": "v1",
+      "kind": "Pod",
+      "metadata": {
+        "name": "stateful-ready-0",
+        "namespace": "default",
+        "generation": 1,
+        "labels": {
+          "app": "stateful-ready"
+        },
+        "uid": "pod-uid-456",
+        "ownerReferences": [
+          {
+            "apiVersion": "apps/v1",
+            "kind": "StatefulSet",
+            "name": "stateful-ready",
+            "uid": "statefulset-uid-123",
+            "controller": true,
+            "blockOwnerDeletion": true
+          }
+        ]
+      },
+      "spec": { "containers": [{ "name": "app", "image": "app:latest" }] },
+      "status": {
+        "phase": "Running",
+        "conditions": [
+          { "type": "Ready", "status": "True" },
+          { "type": "Initialized", "status": "True" },
+          { "type": "PodScheduled", "status": "True" }
+        ],
+        "containerStatuses": [
+          { "name": "app", "ready": true, "state": { "running": {} } }
+        ]
+      }
+    },
+    {
+      "apiVersion": "v1",
+      "kind": "Pod",
+      "metadata": {
+        "name": "daemon-ready-node1",
+        "namespace": "default",
+        "generation": 1,
+        "ownerReferences": [
+          {
+            "apiVersion": "apps/v1",
+            "kind": "DaemonSet",
+            "name": "daemon-ready",
+            "uid": "daemonset-uid-123",
+            "controller": true,
+            "blockOwnerDeletion": true
+          }
+        ]
+      },
+      "spec": { "containers": [{ "name": "app", "image": "app:latest" }] },
+      "status": {
+        "phase": "Running",
+        "conditions": [
+          { "type": "Ready", "status": "True" },
+          { "type": "Initialized", "status": "True" },
+          { "type": "PodScheduled", "status": "True" }
+        ],
+        "containerStatuses": [
+          { "name": "app", "ready": true, "state": { "running": {} } }
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,33 @@
+{
+  "kind": "StatefulSetList",
+  "apiVersion": "apps/v1",
+  "items": [
+    {
+      "apiVersion": "apps/v1",
+      "kind": "StatefulSet",
+      "metadata": {
+        "name": "stateful-ready",
+        "namespace": "default",
+        "generation": 1,
+        "labels": {
+          "app": "stateful-ready"
+        },
+        "uid": "statefulset-uid-123"
+      },
+      "spec": {
+        "replicas": 1,
+        "selector": { "matchLabels": { "app": "stateful-ready" } },
+        "updateStrategy": {
+          "type": "RollingUpdate",
+          "rollingUpdate": { "partition": 0 }
+        }
+      },
+      "status": {
+        "observedGeneration": 1,
+        "replicas": 1,
+        "readyReplicas": 1,
+        "updatedReplicas": 1
+      }
+    }
+  ]
+}

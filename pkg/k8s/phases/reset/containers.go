@@ -52,7 +52,7 @@ func runCleanupNode(c workflow.RunData) error {
 		return errors.New("cleanup-node phase invoked with an invalid data struct")
 	}
 
-	if err := k8s.CleanAll(&r.IkniteCluster().Spec, true, true, true, r.DryRun()); err != nil {
+	if err := k8s.CleanAll(r.Host(), &r.IkniteCluster().Spec, true, true, true, r.DryRun()); err != nil {
 		return fmt.Errorf("failed to cleanup node: %w", err)
 	}
 	return nil

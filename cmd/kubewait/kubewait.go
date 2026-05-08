@@ -19,6 +19,6 @@ import (
 	"github.com/kaweezle/iknite/pkg/cmd/kubewait"
 )
 
-func main() {
+func main() { // nocov -- tested by integration tests
 	kubewait.Execute()
 }

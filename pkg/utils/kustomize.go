@@ -16,18 +16,23 @@ limitations under the License.
 package utils
 
 import (
+	"fmt"
+
 	flag "github.com/spf13/pflag"
 
 	"github.com/kaweezle/iknite/pkg/cmd/options"
+	"github.com/kaweezle/iknite/pkg/constants"
 )
 
 type KustomizeOptions struct {
+	Kustomization string
 	ForceConfig   bool
 	ForceEmbedded bool
 }
 
 func NewKustomizeOptions() *KustomizeOptions {
 	result := &KustomizeOptions{
+		Kustomization: constants.DefaultKustomization,
 		ForceConfig:   false,
 		ForceEmbedded: false,
 	}
@@ -49,4 +54,65 @@ func AddKustomizeOptionsFlags(flagSet *flag.FlagSet, kustomizeConfig *KustomizeO
 		kustomizeConfig.ForceEmbedded,
 		"Force use of embedded kustomization even if a custom one is available",
 	)
+
+	existing := flagSet.Lookup(options.Kustomization)
+	if existing == nil {
+		flagSet.StringVar(
+			&kustomizeConfig.Kustomization,
+			options.Kustomization,
+			kustomizeConfig.Kustomization,
+			"Kustomization location (URL or directory)",
+		)
+	} else {
+		AddStringFlagDestination(existing, &kustomizeConfig.Kustomization)
+	}
+}
+
+type MultiStringValue struct {
+	values []flag.Value
+}
+
+// Set implements [pflag.Value].
+func (k *MultiStringValue) Set(value string) error {
+	for _, v := range k.values {
+		err := v.Set(value)
+		if err != nil {
+			return fmt.Errorf("while setting a multi string value: %w", err)
+		}
+	}
+	return nil
+}
+
+// String implements [pflag.Value].
+func (k *MultiStringValue) String() string {
+	if len(k.values) == 0 {
+		return ""
+	}
+	return k.values[0].String()
+}
+
+// Type implements [pflag.Value].
+func (k *MultiStringValue) Type() string {
+	return "string"
+}
+
+var _ flag.Value = (*MultiStringValue)(nil)
+
+func NewMultiStringValue(values ...flag.Value) *MultiStringValue {
+	return &MultiStringValue{
+		values: values,
+	}
+}
+
+func AddStringFlagDestination(existing *flag.Flag, destination *string) {
+	ev := existing.Value
+	fs := flag.NewFlagSet("temp", flag.ContinueOnError)
+	fs.StringVar(
+		destination,
+		existing.Name,
+		existing.Value.String(),
+		existing.Usage,
+	)
+	nv := fs.Lookup(options.Kustomization)
+	existing.Value = NewMultiStringValue(ev, nv.Value)
 }

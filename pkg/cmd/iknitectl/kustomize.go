@@ -20,14 +20,14 @@ import (
 	"io"
 	"path/filepath"
 
-	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 
+	"github.com/kaweezle/iknite/pkg/host"
 	"github.com/kaweezle/iknite/pkg/kustomize"
 )
 
 // CreateKustomizeCmd creates the kustomize command.
-func CreateKustomizeCmd(fs afero.Fs, out io.Writer) *cobra.Command {
+func CreateKustomizeCmd(fs host.FileSystem, out io.Writer) *cobra.Command {
 	kustomizeCmd := &cobra.Command{
 		Use:   "kustomize <directory> [destination]",
 		Short: "Run kustomize on a directory",
@@ -54,14 +54,14 @@ Examples:
 // runKustomize validates the kustomization directory and delegates to the
 // kustomize package: it either writes all resources to out or splits them
 // into individual files under destDir.
-func runKustomize(fs afero.Fs, out io.Writer, args []string) error {
+func runKustomize(fs host.FileSystem, out io.Writer, args []string) error {
 	kustomizationDir := args[0]
 	var destDir string
 	if len(args) > 1 {
 		destDir = args[1]
 	}
 
-	exists, err := afero.DirExists(fs, kustomizationDir)
+	exists, err := fs.DirExists(kustomizationDir)
 	if err != nil {
 		return fmt.Errorf("failed to check kustomization directory: %w", err)
 	}
@@ -70,7 +70,7 @@ func runKustomize(fs afero.Fs, out io.Writer, args []string) error {
 	}
 
 	kustomizationFile := filepath.Join(kustomizationDir, "kustomization.yaml")
-	kustomizationExists, err := afero.Exists(fs, kustomizationFile)
+	kustomizationExists, err := fs.Exists(kustomizationFile)
 	if err != nil {
 		return fmt.Errorf("failed to check kustomization.yaml: %w", err)
 	}
@@ -78,7 +78,7 @@ func runKustomize(fs afero.Fs, out io.Writer, args []string) error {
 		return fmt.Errorf("kustomization.yaml not found in: %s", kustomizationDir)
 	}
 
-	resources, err := kustomize.Build(kustomizationDir)
+	resources, err := kustomize.BuildOnFileSystem(host.NewKustomizeFSWrapper(fs), kustomizationDir)
 	if err != nil {
 		return fmt.Errorf("while building kustomization in %s kustomize: %w", kustomizationDir, err)
 	}

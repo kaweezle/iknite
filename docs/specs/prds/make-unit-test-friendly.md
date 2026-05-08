@@ -1,4 +1,4 @@
-<!-- cSpell: words testutils depguard runlevels softlevel iface testhelpers stretchr coverprofile godoc -->
+<!-- cSpell: words testutils depguard runlevels softlevel iface testhelpers coverprofile godoc -->
 
 # Plan: Make Iknite Unit-Test Friendly (1.5% → 80% Coverage)
 

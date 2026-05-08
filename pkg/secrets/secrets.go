@@ -1,4 +1,4 @@
-// cSpell: words getsops sopsage
+// cSpell: words getsops sopsage agessh filippo sirupsen
 /*
 Copyright © 2025 Antoine Martin <antoine@openance.com>
 
@@ -17,11 +17,14 @@ limitations under the License.
 package secrets
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 
+	"filippo.io/age"
+	"filippo.io/age/agessh"
 	"github.com/getsops/sops/v3"
 	"github.com/getsops/sops/v3/aes"
 	sopsage "github.com/getsops/sops/v3/age"
@@ -29,8 +32,10 @@ import (
 	"github.com/getsops/sops/v3/cmd/sops/formats"
 	"github.com/getsops/sops/v3/config"
 	"github.com/getsops/sops/v3/version"
-	"github.com/spf13/afero"
+	"github.com/sirupsen/logrus"
 	"sigs.k8s.io/yaml"
+
+	"github.com/kaweezle/iknite/pkg/host"
 )
 
 const (
@@ -39,11 +44,36 @@ const (
 
 // Options contains configuration for secrets operations.
 type Options struct {
-	Fs          afero.Fs
+	Fs          host.FileSystem
 	SecretsFile string
 	HomeDir     string
 	KeyFile     string
 	Force       bool
+}
+
+func (o *Options) SetDefaults() error {
+	if o.Fs == nil {
+		o.Fs = host.NewOsFS()
+	}
+	if o.HomeDir == "" {
+		homeDir, err := os.UserHomeDir()
+		if err != nil { // nocov -- Only happens if there is no home directory, which is very unlikely
+			return fmt.Errorf("failed to get user home directory: %w", err)
+		}
+		o.HomeDir = homeDir
+	}
+	if o.SecretsFile == "" {
+		o.SecretsFile = DefaultSecretsFile
+	}
+	if o.KeyFile == "" {
+		envFile := os.Getenv("SOPS_AGE_SSH_PRIVATE_KEY_FILE")
+		if envFile != "" {
+			o.KeyFile = envFile
+		} else {
+			o.KeyFile = filepath.Join(o.HomeDir, ".ssh", "id_ed25519")
+		}
+	}
+	return nil
 }
 
 // InitResult contains messages produced during secrets init.
@@ -65,7 +95,7 @@ func GetSecret(opts *Options, path string) (string, error) {
 
 	tree := fileSecrets.Tree
 
-	if len(tree.Branches) == 0 {
+	if len(tree.Branches) == 0 { // nocov
 		return "", fmt.Errorf("secrets file has no data")
 	}
 
@@ -79,7 +109,7 @@ func GetSecret(opts *Options, path string) (string, error) {
 		return typed, nil
 	default:
 		yamlData, marshalErr := yaml.Marshal(typed)
-		if marshalErr != nil {
+		if marshalErr != nil { // nocov
 			return "", fmt.Errorf("failed to marshal value at %q: %w", path, marshalErr)
 		}
 		return strings.TrimRight(string(yamlData), "\n"), nil
@@ -100,7 +130,7 @@ func SetSecret(opts *Options, path, value string) error {
 
 	tree := fileSecrets.Tree
 
-	if len(tree.Branches) == 0 {
+	if len(tree.Branches) == 0 { // nocov
 		tree.Branches = sops.TreeBranches{{}}
 	}
 
@@ -108,16 +138,16 @@ func SetSecret(opts *Options, path, value string) error {
 
 	if err = common.EncryptTree(
 		common.EncryptTreeOpts{Tree: tree, Cipher: aes.NewCipher(), DataKey: fileSecrets.DataKey},
-	); err != nil {
+	); err != nil { // nocov
 		return fmt.Errorf("failed to encrypt updated secrets: %w", err)
 	}
 
 	encryptedData, err := fileSecrets.Store.EmitEncryptedFile(*tree)
-	if err != nil {
+	if err != nil { // nocov
 		return fmt.Errorf("failed to encode encrypted secrets: %w", err)
 	}
 
-	if writeErr := afero.WriteFile(opts.Fs, opts.SecretsFile, encryptedData, fileSecrets.Mode); writeErr != nil {
+	if writeErr := opts.Fs.WriteFile(opts.SecretsFile, encryptedData, fileSecrets.Mode); writeErr != nil {
 		return fmt.Errorf("failed to write secrets file: %w", writeErr)
 	}
 
@@ -138,7 +168,7 @@ func RemoveSecret(opts *Options, path string) error {
 
 	tree := fileSecrets.Tree
 
-	if len(tree.Branches) == 0 {
+	if len(tree.Branches) == 0 { // nocov
 		return fmt.Errorf("secret path %q not found", path)
 	}
 
@@ -150,16 +180,16 @@ func RemoveSecret(opts *Options, path string) error {
 
 	if err = common.EncryptTree(
 		common.EncryptTreeOpts{Tree: tree, Cipher: aes.NewCipher(), DataKey: fileSecrets.DataKey},
-	); err != nil {
+	); err != nil { // nocov
 		return fmt.Errorf("failed to encrypt updated secrets: %w", err)
 	}
 
 	encryptedData, err := fileSecrets.Store.EmitEncryptedFile(*tree)
-	if err != nil {
+	if err != nil { // nocov
 		return fmt.Errorf("failed to encode encrypted secrets: %w", err)
 	}
 
-	if writeErr := afero.WriteFile(opts.Fs, opts.SecretsFile, encryptedData, fileSecrets.Mode); writeErr != nil {
+	if writeErr := opts.Fs.WriteFile(opts.SecretsFile, encryptedData, fileSecrets.Mode); writeErr != nil {
 		return fmt.Errorf("failed to write secrets file: %w", writeErr)
 	}
 
@@ -167,7 +197,7 @@ func RemoveSecret(opts *Options, path string) error {
 }
 
 func checkSecretsFilesExists(opts *Options, paths *secretsInitPaths, result *InitResult) error {
-	if exists, existsErr := afero.Exists(opts.Fs, paths.sopsConfigFile); existsErr != nil {
+	if exists, existsErr := opts.Fs.Exists(paths.sopsConfigFile); existsErr != nil {
 		return fmt.Errorf("failed to check .sops.yaml: %w", existsErr)
 	} else if exists {
 		result.Messages = append(
@@ -176,7 +206,7 @@ func checkSecretsFilesExists(opts *Options, paths *secretsInitPaths, result *Ini
 		)
 	}
 
-	if exists, existsErr := afero.Exists(opts.Fs, paths.secretsFile); existsErr != nil {
+	if exists, existsErr := opts.Fs.Exists(paths.secretsFile); existsErr != nil {
 		return fmt.Errorf("failed to check secrets file: %w", existsErr)
 	} else if exists {
 		result.Messages = append(
@@ -192,7 +222,7 @@ func InitSecrets(opts *Options) (*InitResult, error) {
 	result := &InitResult{}
 
 	paths, err := resolveSecretsInitPaths(opts)
-	if err != nil {
+	if err != nil { // nocov -- Only happens if there is no home directory
 		return nil, err
 	}
 
@@ -242,25 +272,25 @@ func InitSecrets(opts *Options) (*InitResult, error) {
 
 	var sopsConfig string
 	sopsConfig, err = renderTemplate(SopsConfigTemplateName, templateData)
-	if err != nil {
+	if err != nil { // nocov
 		return nil, fmt.Errorf("failed to render SOPS config template: %w", err)
 	}
-	if writeErr := afero.WriteFile(opts.Fs, paths.sopsConfigFile, []byte(sopsConfig), 0o644); writeErr != nil {
+	if writeErr := opts.Fs.WriteFile(paths.sopsConfigFile, []byte(sopsConfig), 0o644); writeErr != nil {
 		return nil, fmt.Errorf("failed to write %s: %w", paths.sopsConfigFile, writeErr)
 	}
 	result.Messages = append(result.Messages, fmt.Sprintf("Wrote %s", paths.sopsConfigFile))
 
 	var plaintextSecrets string
 	plaintextSecrets, err = renderTemplate(SecretsTemplateName, templateData)
-	if err != nil {
+	if err != nil { // nocov
 		return nil, fmt.Errorf("failed to render secrets template: %w", err)
 	}
 
 	encryptedSecrets, err := encryptSecretsPlaintext(paths.secretsFile, []byte(plaintextSecrets), keyInfo.AuthorizedKey)
-	if err != nil {
+	if err != nil { // nocov
 		return nil, err
 	}
-	if writeErr := afero.WriteFile(opts.Fs, paths.secretsFile, encryptedSecrets, 0o644); writeErr != nil {
+	if writeErr := opts.Fs.WriteFile(paths.secretsFile, encryptedSecrets, 0o644); writeErr != nil {
 		return nil, fmt.Errorf("failed to write %s: %w", paths.secretsFile, writeErr)
 	}
 	result.Messages = append(result.Messages, fmt.Sprintf("Wrote %s", paths.secretsFile))
@@ -282,7 +312,7 @@ type FileSecrets struct {
 }
 
 func loadAndDecryptSecrets(opts *Options) (*FileSecrets, error) {
-	exists, err := afero.Exists(opts.Fs, opts.SecretsFile)
+	exists, err := opts.Fs.Exists(opts.SecretsFile)
 	if err != nil {
 		return nil, fmt.Errorf("failed to check secrets file: %w", err)
 	}
@@ -295,7 +325,7 @@ func loadAndDecryptSecrets(opts *Options) (*FileSecrets, error) {
 		return nil, fmt.Errorf("failed to stat secrets file: %w", err)
 	}
 
-	encryptedData, err := afero.ReadFile(opts.Fs, opts.SecretsFile)
+	encryptedData, err := opts.Fs.ReadFile(opts.SecretsFile)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read secrets file: %w", err)
 	}
@@ -306,11 +336,31 @@ func loadAndDecryptSecrets(opts *Options) (*FileSecrets, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse encrypted secrets: %w", err)
 	}
-
-	dataKey, err := tree.Metadata.GetDataKey()
-	if err != nil {
-		return nil, fmt.Errorf("failed to retrieve data key: %w", err)
+	masterKey := tree.Metadata.KeyGroups[0][0]
+	var dataKey []byte
+	// convert to age.MasterKey to use the Decrypt method
+	ageMasterKey, ok := masterKey.(*sopsage.MasterKey)
+	if ok {
+		dataKey, err = getDataKeyFromOpts(opts, ageMasterKey)
+		if err != nil {
+			logrus.WithError(err).Debug("failed to decrypt data key with SSH identity")
+		}
 	}
+	if dataKey == nil {
+		// As a backup, we try to get the data key the standard way.
+		// This allows the use of a SOPS_AGE_KEY environment variable with an age SSH recipient, *
+		// which is a common setup for CI environments.
+		var standardErr error
+		dataKey, standardErr = tree.Metadata.GetDataKey()
+		if standardErr != nil { // nocov
+			if err != nil {
+				standardErr = errors.Join(standardErr, err)
+			}
+			return nil, fmt.Errorf("failed to retrieve data key: %w", standardErr)
+		}
+	}
+
+	tree.Metadata.DataKey = dataKey
 
 	if _, err := tree.Decrypt(dataKey, aes.NewCipher()); err != nil {
 		return nil, fmt.Errorf("failed to decrypt secrets file: %w", err)
@@ -326,7 +376,7 @@ func loadAndDecryptSecrets(opts *Options) (*FileSecrets, error) {
 
 func buildSecretsPath(path string) ([]any, error) {
 	parts := strings.Split(path, ".")
-	if len(parts) == 0 {
+	if len(parts) == 0 { // nocov
 		return nil, fmt.Errorf("secret path cannot be empty")
 	}
 
@@ -359,14 +409,15 @@ func resolveSecretsInitPaths(opts *Options) (*secretsInitPaths, error) {
 	}
 
 	secretsDir := filepath.Dir(secretsFile)
-	if secretsDir == "" {
-		secretsDir = "."
-	}
 
 	keyFile := opts.KeyFile
 	if keyFile == "" {
 		if opts.HomeDir == "" {
-			return nil, fmt.Errorf("home directory is required to determine the default key file")
+			var err error
+			opts.HomeDir, err = os.UserHomeDir()
+			if err != nil { // nocov
+				return nil, fmt.Errorf("failed to determine home directory: %w", err)
+			}
 		}
 		keyFile = filepath.Join(opts.HomeDir, ".ssh", "id_ed25519")
 	}
@@ -390,7 +441,7 @@ func encryptSecretsPlaintext(secretsFile string, plaintext []byte, recipient str
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse plaintext secrets template: %w", err)
 	}
-	if len(branches) == 0 {
+	if len(branches) == 0 { // nocov
 		return nil, fmt.Errorf("plaintext secrets template produced no YAML documents")
 	}
 
@@ -414,18 +465,18 @@ func encryptSecretsPlaintext(secretsFile string, plaintext []byte, recipient str
 	}
 
 	dataKey, errs := tree.GenerateDataKey()
-	if len(errs) > 0 {
+	if len(errs) > 0 { // nocov
 		return nil, fmt.Errorf("failed to generate data key: %v", errs)
 	}
 
 	if err = common.EncryptTree(
 		common.EncryptTreeOpts{Tree: &tree, Cipher: aes.NewCipher(), DataKey: dataKey},
-	); err != nil {
+	); err != nil { // nocov
 		return nil, fmt.Errorf("failed to encrypt initial secrets file: %w", err)
 	}
 
 	encryptedData, err := store.EmitEncryptedFile(tree)
-	if err != nil {
+	if err != nil { // nocov
 		return nil, fmt.Errorf("failed to encode encrypted secrets file: %w", err)
 	}
 
@@ -458,4 +509,34 @@ func displayPath(homeDir, path string) string {
 		return "~"
 	}
 	return path
+}
+
+func getDataKeyFromOpts(opts *Options, ageMasterKey *sopsage.MasterKey) ([]byte, error) {
+	paths, err := resolveSecretsInitPaths(opts)
+	if err != nil { // nocov -- Only happens if there is no home directory
+		return nil, fmt.Errorf("failed to resolve secrets init paths: %w", err)
+	}
+	id, err := parseSSHIdentityFromPrivateKeyFile(opts.Fs, paths.keyFile)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse SSH identity from private key file: %w", err)
+	}
+	var ids sopsage.ParsedIdentities = []age.Identity{id}
+	ids.ApplyToMasterKey(ageMasterKey)
+	dataKey, err := ageMasterKey.Decrypt()
+	if err != nil {
+		return nil, fmt.Errorf("failed to decrypt data key with SSH identity: %w", err)
+	}
+	return dataKey, nil
+}
+
+func parseSSHIdentityFromPrivateKeyFile(fs host.FileSystem, keyPath string) (age.Identity, error) {
+	key, err := fs.ReadFile(keyPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read private key file: %w", err)
+	}
+	id, err := agessh.ParseIdentity(key)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse SSH identity: %w", err)
+	}
+	return id, nil
 }

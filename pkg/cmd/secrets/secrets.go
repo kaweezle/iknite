@@ -16,33 +16,22 @@ limitations under the License.
 package secrets
 
 import (
-	"os"
+	"fmt"
 
-	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 
+	"github.com/kaweezle/iknite/pkg/host"
 	pkgSecrets "github.com/kaweezle/iknite/pkg/secrets"
 )
 
 // CreateSecretsCmd creates the secrets command.
-func CreateSecretsCmd(fs afero.Fs, opts *pkgSecrets.Options) *cobra.Command {
+func CreateSecretsCmd(fs host.FileSystem, opts *pkgSecrets.Options) *cobra.Command {
 	if opts == nil {
 		opts = &pkgSecrets.Options{}
 	}
 	if opts.Fs == nil {
 		opts.Fs = fs
 	}
-	if opts.HomeDir == "" {
-		homeDir, err := os.UserHomeDir()
-		if err == nil {
-			opts.HomeDir = homeDir
-		}
-	}
-	if opts.SecretsFile == "" {
-		opts.SecretsFile = pkgSecrets.DefaultSecretsFile
-	}
-
-	defaultSecretsFile := opts.SecretsFile
 
 	secretsCmd := &cobra.Command{
 		Use:   "secrets",
@@ -51,13 +40,20 @@ func CreateSecretsCmd(fs afero.Fs, opts *pkgSecrets.Options) *cobra.Command {
 
 Paths are specified in dot notation under the data key.
 For example, github.api_token targets data.github.api_token.`,
+		PersistentPreRunE: func(_ *cobra.Command, _ []string) error {
+			err := opts.SetDefaults()
+			if err != nil {
+				return fmt.Errorf("error setting default opts: %w", err)
+			}
+			return nil
+		},
 	}
 
 	secretsCmd.PersistentFlags().StringVarP(
 		&opts.SecretsFile,
 		"secrets-file",
 		"s",
-		defaultSecretsFile,
+		pkgSecrets.DefaultSecretsFile,
 		"Path to the SOPS secrets file",
 	)
 

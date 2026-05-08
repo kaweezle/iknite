@@ -3,13 +3,13 @@ package init
 // cSpell: disable
 import (
 	"fmt"
-	"os"
 	"path/filepath"
 
 	log "github.com/sirupsen/logrus"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 
 	"github.com/kaweezle/iknite/pkg/constants"
+	"github.com/kaweezle/iknite/pkg/host"
 	"github.com/kaweezle/iknite/pkg/k8s"
 	"github.com/kaweezle/iknite/pkg/server"
 )
@@ -39,18 +39,22 @@ func runCopyConfig(c workflow.RunData) error {
 	ikniteConfig := data.IkniteCluster().Spec
 
 	// Copy admin.conf to /root/.kube/config (renamed to the cluster name).
-	if err := copyAdminConf(ikniteConfig.ClusterName); err != nil {
+	if err := copyAdminConf(data.Host(), ikniteConfig.ClusterName); err != nil {
 		return fmt.Errorf("failed to copy admin.conf to %s: %w", constants.KubernetesRootConfig, err)
 	}
 
 	// Ensure the iknite configuration actually exists
 	// TODO: This should be done where all the certificates are done.
-	if err := server.EnsureIkniteServerConfiguration(constants.KubernetesPKIDir, &ikniteConfig); err != nil {
+	if err := server.EnsureIkniteServerConfiguration(
+		data.Host(),
+		constants.KubernetesPKIDir,
+		&ikniteConfig,
+	); err != nil {
 		return fmt.Errorf("failed to ensure iknite server configuration: %w", err)
 	}
 
 	// Copy iknite.conf to /root/.kube/iknite.conf.
-	if err := copyFile(constants.IkniteConfPath, constants.IkniteLocalConfPath); err != nil {
+	if err := copyFile(data.Host(), constants.IkniteConfPath, constants.IkniteLocalConfPath); err != nil {
 		return fmt.Errorf("failed to copy iknite.conf to %s: %w", constants.IkniteLocalConfPath, err)
 	}
 
@@ -60,14 +64,14 @@ func runCopyConfig(c workflow.RunData) error {
 // copyAdminConf loads the admin kubeconfig from /etc/kubernetes/admin.conf,
 // renames the cluster/context/user to clusterName, and writes the result to
 // /root/.kube/config.
-func copyAdminConf(clusterName string) error {
-	k8sConfig, err := k8s.LoadFromDefault()
+func copyAdminConf(fs host.FileSystem, clusterName string) error {
+	k8sConfig, err := k8s.LoadFromDefault(fs)
 	if err != nil {
 		return fmt.Errorf("failed to load admin kubeconfig: %w", err)
 	}
 
-	if err := k8sConfig.RenameConfig(clusterName).
-		WriteToFile(constants.KubernetesRootConfig); err != nil {
+	k8sConfig = k8s.RenameConfig(k8sConfig, clusterName)
+	if err := k8s.WriteToFile(k8sConfig, fs, constants.KubernetesRootConfig); err != nil {
 		return fmt.Errorf("failed to write kubeconfig to %s: %w", constants.KubernetesRootConfig, err)
 	}
 
@@ -76,17 +80,17 @@ func copyAdminConf(clusterName string) error {
 }
 
 // copyFile copies the file at src to dst, creating parent directories as needed.
-func copyFile(src, dst string) error {
-	data, err := os.ReadFile(src) //nolint:gosec // Copying files from constant file paths, not user input.
+func copyFile(fs host.FileSystem, src, dst string) error {
+	data, err := fs.ReadFile(src)
 	if err != nil {
 		return fmt.Errorf("failed to read %s: %w", src, err)
 	}
 
-	if err := os.MkdirAll(filepath.Dir(dst), 0o700); err != nil {
+	if err := fs.MkdirAll(filepath.Dir(dst), 0o700); err != nil {
 		return fmt.Errorf("failed to create directory for %s: %w", dst, err)
 	}
 
-	if err := os.WriteFile(dst, data, 0o600); err != nil {
+	if err := fs.WriteFile(dst, data, 0o600); err != nil {
 		return fmt.Errorf("failed to write %s: %w", dst, err)
 	}
 

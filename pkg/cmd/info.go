@@ -23,15 +23,28 @@ import (
 	"path/filepath"
 
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
 	"github.com/kaweezle/iknite/pkg/cmd/options"
 	"github.com/kaweezle/iknite/pkg/config"
+	"github.com/kaweezle/iknite/pkg/host"
 	"github.com/kaweezle/iknite/pkg/utils"
 )
 
+type infoOptions struct {
+	outputFormat      string
+	outputDestination string
+}
+
+func newInfoOptions() *infoOptions {
+	return &infoOptions{
+		outputFormat:      "yaml",
+		outputDestination: "",
+	}
+}
+
 func NewInfoCmd(ikniteConfig *v1alpha1.IkniteClusterSpec) *cobra.Command {
+	infoOptions := newInfoOptions()
 	// infoCmd represents the start command
 	infoCmd := &cobra.Command{
 		Use:   "info",
@@ -45,29 +58,21 @@ func NewInfoCmd(ikniteConfig *v1alpha1.IkniteClusterSpec) *cobra.Command {
 - Allows the use of kubectl from the root account,
 - Installs flannel, metal-lb and local-path-provisioner.
 `,
-		PersistentPreRun: func(cmd *cobra.Command, args []string) {
-			config.StartPersistentPreRun(cmd, args)
-			flags := cmd.Flags()
-			_ = viper.BindPFlag( //nolint:errcheck // flag exists
-				options.OutputFormat,
-				flags.Lookup(options.OutputFormat))
-			_ = viper.BindPFlag( //nolint:errcheck // flag exists
-				options.OutputDestination,
-				flags.Lookup(options.OutputDestination))
-		},
-		Run: func(_ *cobra.Command, _ []string) { performInfo(ikniteConfig) },
+		Run: func(_ *cobra.Command, _ []string) { performInfo(ikniteConfig, infoOptions) },
 	}
 	flags := infoCmd.PersistentFlags()
 	config.AddIkniteClusterFlags(flags, ikniteConfig)
 
 	flags = infoCmd.Flags()
-	flags.StringP(
+	flags.StringVarP(
+		&infoOptions.outputFormat,
 		options.OutputFormat,
 		"o",
 		"yaml",
 		"Output format. One of: yaml|json",
 	)
-	flags.String(
+	flags.StringVar(
+		&infoOptions.outputDestination,
 		options.OutputDestination,
 		"",
 		"Output destination file. If not set, output to stdout.",
@@ -75,7 +80,7 @@ func NewInfoCmd(ikniteConfig *v1alpha1.IkniteClusterSpec) *cobra.Command {
 
 	infoCmd.AddCommand(NewImagesCmd(ikniteConfig))
 	infoCmd.AddCommand(NewVersionsCmd())
-	infoCmd.AddCommand(NewInfoStatusCmd())
+	infoCmd.AddCommand(NewInfoStatusCmd(nil))
 
 	return infoCmd
 }
@@ -88,7 +93,7 @@ func NewImagesCmd(ikniteConfig *v1alpha1.IkniteClusterSpec) *cobra.Command {
 		Short: "Lists the container images used by iknite",
 		Long:  `Lists the container images used by iknite.`,
 		Run: func(_ *cobra.Command, _ []string) {
-			performImages(ikniteConfig, kustomizeOptions)
+			performImages(host.NewOsFS(), ikniteConfig, kustomizeOptions)
 		},
 	}
 	utils.AddKustomizeOptionsFlags(imagesCmd.Flags(), kustomizeOptions)
@@ -118,11 +123,10 @@ func NewVersionsCmd() *cobra.Command {
 	return versionsCmd
 }
 
-func performInfo(ikniteConfig *v1alpha1.IkniteClusterSpec) {
-	cobra.CheckErr(config.DecodeIkniteConfig(ikniteConfig))
+func performInfo(ikniteConfig *v1alpha1.IkniteClusterSpec, opts *infoOptions) {
 	// Marshal config into YAML and print it to the output
-	outputFormat := viper.GetString(options.OutputFormat)
-	outputDestination := viper.GetString(options.OutputDestination)
+	outputFormat := opts.outputFormat
+	outputDestination := opts.outputDestination
 
 	// Determine the writer based on output destination
 	writer := os.Stdout
@@ -136,10 +140,12 @@ func performInfo(ikniteConfig *v1alpha1.IkniteClusterSpec) {
 	cobra.CheckErr(config.PrintIkniteConfig(writer, ikniteConfig, outputFormat))
 }
 
-func performImages(ikniteConfig *v1alpha1.IkniteClusterSpec, kustomizeOptions *utils.KustomizeOptions) {
-	cobra.CheckErr(config.DecodeIkniteConfig(ikniteConfig))
-
-	containerImages, err := config.GetIkniteImages(ikniteConfig, kustomizeOptions.ForceEmbedded)
+func performImages(
+	fs host.FileSystem,
+	ikniteConfig *v1alpha1.IkniteClusterSpec,
+	kustomizeOptions *utils.KustomizeOptions,
+) {
+	containerImages, err := config.GetIkniteImages(fs, ikniteConfig, kustomizeOptions.ForceEmbedded)
 	cobra.CheckErr(err)
 
 	for _, image := range containerImages {

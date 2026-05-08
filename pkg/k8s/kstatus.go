@@ -16,7 +16,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/resource"
-	clientRest "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling/engine"
 	"sigs.k8s.io/cli-utils/pkg/kstatus/polling/event"
@@ -25,28 +24,26 @@ import (
 	runTimeClient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
+	"github.com/kaweezle/iknite/pkg/host"
 )
 
-// NewRESTClientGetterFromKubeconfig creates a RESTClientGetter using the default kubeconfig
+// NewClientFromKubeconfig creates a RESTClientGetter using the default kubeconfig
 // loading rules. If kubeconfigPath is non-empty it is used directly; otherwise KUBECONFIG
 // env var and ~/.kube/config are tried in turn, with a final fall-back to in-cluster config.
-func NewRESTClientGetterFromKubeconfig(kubeconfigPath string) *RESTClientGetter {
-	restConfig, err := clientRest.InClusterConfig()
+func NewClientFromKubeconfig(fs host.FileSystem, kubeconfigPath string) (*Client, error) {
+	restConfig, err := InClusterConfig(fs)
 	if err == nil {
 		log.Info("Using in-cluster configuration")
-		return &RESTClientGetter{
-			clientconfig: nil, // Not needed for in-cluster config
-			restConfig:   restConfig,
-		}
+		return NewClientFromRestConfig(restConfig), nil
 	}
-	loadingRules := clientcmd.NewDefaultClientConfigLoadingRules()
 	if kubeconfigPath != "" {
-		loadingRules.ExplicitPath = kubeconfigPath
+		return NewClientFromFile(fs, kubeconfigPath)
 	}
-	overrides := &clientcmd.ConfigOverrides{}
-	return &RESTClientGetter{
-		clientconfig: clientcmd.NewNonInteractiveDeferredLoadingClientConfig(loadingRules, overrides),
-	}
+
+	// TODO: the following works with KUBECONFIG and home directory,
+	// but it doesn't support merging and default localhost access.
+	loadingRules := clientcmd.NewDefaultClientConfigLoadingRules()
+	return NewClientFromFile(fs, loadingRules.Precedence[0])
 }
 
 // workloadStatesToSlice converts resource.Info objects to WorkloadState using kstatus.
@@ -87,12 +84,7 @@ func workloadStatesToSlice(infos []*resource.Info) ([]*v1alpha1.WorkloadState, e
 // ValidateResourceTypes checks if the provided resource types are valid by attempting to find their corresponding
 // GroupVersionKind in the REST mapper. It returns a slice of valid resource types and an error if the
 // validation process encounters an issue.
-func (client *RESTClientGetter) ValidateResourceTypes(types []string) ([]string, error) {
-	restMapper, err := client.ToRESTMapper()
-	if err != nil {
-		return nil, fmt.Errorf("while getting REST mapper: %w", err)
-	}
-
+func ValidateResourceTypes(restMapper meta.RESTMapper, types []string) ([]string, error) {
 	validTypes := make([]string, 0, len(types))
 	noMatchError := &meta.NoResourceMatchError{}
 	for _, t := range types {
@@ -126,7 +118,8 @@ func (client *RESTClientGetter) ValidateResourceTypes(types []string) ([]string,
 }
 
 // ResourceInfosForNamespace returns resource.Info objects for the given namespace and resource types.
-func (client *RESTClientGetter) ResourceInfosForNamespace(
+func ResourceInfosForNamespace(
+	client resource.RESTClientGetter,
 	namespace string,
 	resourceTypes []string,
 ) ([]*resource.Info, error) {
@@ -165,13 +158,14 @@ func infosToObjectMetadataSet(infos []*resource.Info) object.ObjMetadataSet {
 	return set
 }
 
-func (client *RESTClientGetter) ObjectMetadataSetForNamespace(
+func ObjectMetadataSetForNamespace(
+	client resource.RESTClientGetter,
 	namespace string, resourceTypes []string,
 ) (object.ObjMetadataSet, error) {
 	const maxAttempts = 3
 	const retryDelay = 2 * time.Second
 
-	infos, err := client.ResourceInfosForNamespace(namespace, resourceTypes)
+	infos, err := ResourceInfosForNamespace(client, namespace, resourceTypes)
 	for attempt := 2; err != nil && attempt <= maxAttempts; attempt++ {
 		log.WithError(err).WithFields(log.Fields{
 			"resourceTypes": resourceTypes,
@@ -179,7 +173,7 @@ func (client *RESTClientGetter) ObjectMetadataSetForNamespace(
 			"namespace":     namespace,
 		}).Warn("Failed to get resource infos, retrying")
 		time.Sleep(retryDelay)
-		infos, err = client.ResourceInfosForNamespace(namespace, resourceTypes)
+		infos, err = ResourceInfosForNamespace(client, namespace, resourceTypes)
 	}
 	if err != nil {
 		return nil, fmt.Errorf("while getting object metadata set for namespace %s: %w", namespace, err)
@@ -189,10 +183,11 @@ func (client *RESTClientGetter) ObjectMetadataSetForNamespace(
 
 // WorkloadStatesForNamespace returns the readiness state of deployments, statefulsets, and
 // daemonsets in a single namespace using kstatus to evaluate each resource.
-func (client *RESTClientGetter) WorkloadStatesForNamespace(
+func WorkloadStatesForNamespace(
+	client resource.RESTClientGetter,
 	namespace string, resourceTypes []string,
 ) ([]*v1alpha1.WorkloadState, error) {
-	infos, err := client.ResourceInfosForNamespace(namespace, resourceTypes)
+	infos, err := ResourceInfosForNamespace(client, namespace, resourceTypes)
 	if err != nil {
 		return nil, fmt.Errorf("while getting workload states for namespace %s: %w", namespace, err)
 	}

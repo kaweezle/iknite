@@ -25,6 +25,7 @@ import (
 
 	"github.com/spf13/afero"
 
+	"github.com/kaweezle/iknite/pkg/host"
 	"github.com/kaweezle/iknite/pkg/kustomize"
 )
 
@@ -226,12 +227,12 @@ resources:
 		t.Fatalf("Build: %v", err)
 	}
 
-	fs := afero.NewOsFs()
+	fs := host.NewDefaultHost()
 	if err := kustomize.SplitResMapToDir(fs, resources, destDir); err != nil { //nolint:govet // integration test
 		t.Fatalf("SplitResMapToDir: %v", err)
 	}
 
-	files, err := afero.ReadDir(fs, destDir)
+	files, err := fs.ReadDir(destDir)
 	if err != nil {
 		t.Fatalf("ReadDir: %v", err)
 	}

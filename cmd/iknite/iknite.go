@@ -16,11 +16,18 @@ limitations under the License.
 package main
 
 import (
+	"context"
+	"os"
+	"os/signal"
+	"syscall"
+
 	"github.com/spf13/cobra"
 
 	"github.com/kaweezle/iknite/pkg/cmd"
 )
 
-func main() {
-	cobra.CheckErr(cmd.NewRootCmd().Execute())
+func main() { // nocov -- tested by integration tests
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer cancel()
+	cobra.CheckErr(cmd.NewRootCmd(nil).ExecuteContext(ctx))
 }

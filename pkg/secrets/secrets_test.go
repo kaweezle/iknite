@@ -26,9 +26,10 @@ import (
 
 	"github.com/getsops/sops/v3/cmd/sops/formats"
 	"github.com/getsops/sops/v3/decrypt"
-	"github.com/spf13/afero"
+	"github.com/stretchr/testify/require"
 	"sigs.k8s.io/yaml"
 
+	"github.com/kaweezle/iknite/pkg/host"
 	"github.com/kaweezle/iknite/pkg/secrets"
 )
 
@@ -40,9 +41,9 @@ func TestGetSecret(t *testing.T) {
 	// Cannot use t.Parallel because this test sets process env for SOPS decryption.
 	t.Setenv("SOPS_AGE_KEY", testSecretsAgeKey)
 
-	testFs := afero.NewMemMapFs()
+	testFs := host.NewMemMapFS()
 
-	if err := afero.WriteFile(testFs, secretsPath, []byte(testSecretsEncryptedWithData), 0o600); err != nil {
+	if err := testFs.WriteFile(secretsPath, []byte(testSecretsEncryptedWithData), 0o600); err != nil {
 		t.Fatalf("failed to write test secrets file: %v", err)
 	}
 
@@ -61,8 +62,8 @@ func TestGetSecretMissingPath(t *testing.T) {
 	// Cannot use t.Parallel because this test sets process env for SOPS decryption.
 	t.Setenv("SOPS_AGE_KEY", testSecretsAgeKey)
 
-	testFs := afero.NewMemMapFs()
-	if err := afero.WriteFile(testFs, secretsPath, []byte(testSecretsEncryptedWithData), 0o600); err != nil {
+	testFs := host.NewMemMapFS()
+	if err := testFs.WriteFile(secretsPath, []byte(testSecretsEncryptedWithData), 0o600); err != nil {
 		t.Fatalf("failed to write test secrets file: %v", err)
 	}
 
@@ -80,8 +81,8 @@ func TestSetSecret(t *testing.T) {
 	// Cannot use t.Parallel because this test sets process env for SOPS decryption.
 	t.Setenv("SOPS_AGE_KEY", testSecretsAgeKey)
 
-	testFs := afero.NewMemMapFs()
-	if err := afero.WriteFile(testFs, secretsPath, []byte(testSecretsEncryptedWithData), 0o600); err != nil {
+	testFs := host.NewMemMapFS()
+	if err := testFs.WriteFile(secretsPath, []byte(testSecretsEncryptedWithData), 0o600); err != nil {
 		t.Fatalf("failed to write test secrets file: %v", err)
 	}
 
@@ -97,8 +98,8 @@ func TestRemoveSecret(t *testing.T) {
 	// Cannot use t.Parallel because this test sets process env for SOPS decryption.
 	t.Setenv("SOPS_AGE_KEY", testSecretsAgeKey)
 
-	testFs := afero.NewMemMapFs()
-	if err := afero.WriteFile(testFs, secretsPath, []byte(testSecretsEncryptedWithData), 0o600); err != nil {
+	testFs := host.NewMemMapFS()
+	if err := testFs.WriteFile(secretsPath, []byte(testSecretsEncryptedWithData), 0o600); err != nil {
 		t.Fatalf("failed to write test secrets file: %v", err)
 	}
 
@@ -114,8 +115,8 @@ func TestRemoveSecretMissingPath(t *testing.T) {
 	// Cannot use t.Parallel because this test sets process env for SOPS decryption.
 	t.Setenv("SOPS_AGE_KEY", testSecretsAgeKey)
 
-	testFs := afero.NewMemMapFs()
-	if err := afero.WriteFile(testFs, secretsPath, []byte(testSecretsEncryptedWithData), 0o600); err != nil {
+	testFs := host.NewMemMapFS()
+	if err := testFs.WriteFile(secretsPath, []byte(testSecretsEncryptedWithData), 0o600); err != nil {
 		t.Fatalf("failed to write test secrets file: %v", err)
 	}
 
@@ -130,7 +131,7 @@ func TestRemoveSecretMissingPath(t *testing.T) {
 }
 
 func TestInitSecrets(t *testing.T) {
-	fs := afero.NewOsFs()
+	fs := host.NewDefaultHost()
 	tempDir := t.TempDir()
 	homeDir := filepath.Join(tempDir, "home")
 	workspaceDir := filepath.Join(tempDir, "workspace")
@@ -155,7 +156,7 @@ func TestInitSecrets(t *testing.T) {
 	assertFileExists(t, fs, keyPath)
 	assertFileExists(t, fs, keyPath+".pub")
 
-	configBytes, err := afero.ReadFile(fs, filepath.Join(workspaceDir, ".sops.yaml"))
+	configBytes, err := fs.ReadFile(filepath.Join(workspaceDir, ".sops.yaml"))
 	if err != nil {
 		t.Fatalf("failed to read .sops.yaml: %v", err)
 	}
@@ -185,7 +186,7 @@ func TestInitSecrets(t *testing.T) {
 
 func TestInitSecretsDoesNotOverwriteExistingFiles(t *testing.T) {
 	t.Parallel()
-	fs := afero.NewOsFs()
+	fs := host.NewDefaultHost()
 	tempDir := t.TempDir()
 	workspaceDir := filepath.Join(tempDir, "workspace")
 	secretsPath := filepath.Join(workspaceDir, secrets.DefaultSecretsFile)
@@ -237,7 +238,7 @@ func TestInitSecretsDoesNotOverwriteExistingFiles(t *testing.T) {
 
 func TestInitSecretsWithCustomKeyFile(t *testing.T) {
 	t.Parallel()
-	fs := afero.NewOsFs()
+	fs := host.NewDefaultHost()
 	tempDir := t.TempDir()
 	workspaceDir := filepath.Join(tempDir, "workspace")
 	secretsPath := filepath.Join(workspaceDir, secrets.DefaultSecretsFile)
@@ -265,10 +266,33 @@ func TestInitSecretsWithCustomKeyFile(t *testing.T) {
 	}
 }
 
-func assertFileExists(t *testing.T, fs afero.Fs, path string) {
+func TestOptionsSetDefaults(t *testing.T) {
+	t.Parallel()
+	t.Run("From nothing", func(t *testing.T) {
+		t.Parallel()
+		req := require.New(t)
+		opts := &secrets.Options{}
+		err := opts.SetDefaults()
+		req.NoError(err)
+		req.NotEmpty(opts.HomeDir, "HomeDir should be set")
+		req.NotEmpty(opts.SecretsFile, "SecretsFile should be set")
+		req.NotEmpty(opts.KeyFile, "KeyFile should be set")
+	})
+}
+
+func TestOptionsSetDefaults_Env(t *testing.T) {
+	req := require.New(t)
+	t.Setenv("SOPS_AGE_SSH_PRIVATE_KEY_FILE", "/env/age/key")
+	opts := &secrets.Options{}
+	err := opts.SetDefaults()
+	req.NoError(err)
+	req.Equal("/env/age/key", opts.KeyFile, "KeyFile should be set from env var")
+}
+
+func assertFileExists(t *testing.T, fs host.FileSystem, path string) {
 	t.Helper()
 
-	exists, err := afero.Exists(fs, path)
+	exists, err := fs.Exists(path)
 	if err != nil {
 		t.Fatalf("failed to check if %s exists: %v", path, err)
 	}
@@ -277,10 +301,10 @@ func assertFileExists(t *testing.T, fs afero.Fs, path string) {
 	}
 }
 
-func assertSecretValue(t *testing.T, fs afero.Fs, secretsPath, path, want string) {
+func assertSecretValue(t *testing.T, fs host.FileSystem, secretsPath, path, want string) {
 	t.Helper()
 
-	encrypted, err := afero.ReadFile(fs, secretsPath)
+	encrypted, err := fs.ReadFile(secretsPath)
 	if err != nil {
 		t.Fatalf("failed to read secrets file: %v", err)
 	}
@@ -359,10 +383,10 @@ func assertSecretValueFromCleartextContains(t *testing.T, cleartext []byte, path
 	}
 }
 
-func assertSecretPathMissing(t *testing.T, fs afero.Fs, secretsPath, path string) {
+func assertSecretPathMissing(t *testing.T, fs host.FileSystem, secretsPath, path string) {
 	t.Helper()
 
-	encrypted, err := afero.ReadFile(fs, secretsPath)
+	encrypted, err := fs.ReadFile(secretsPath)
 	if err != nil {
 		t.Fatalf("failed to read secrets file: %v", err)
 	}

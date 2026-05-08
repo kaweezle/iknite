@@ -5,6 +5,7 @@ import (
 
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 
+	"github.com/kaweezle/iknite/pkg/host"
 	"github.com/kaweezle/iknite/pkg/k8s"
 )
 
@@ -16,15 +17,20 @@ func NewPreCleanHostPhase() workflow.Phase {
 	}
 }
 
-// runPrepare executes the node initialization process.
+type preCleanHostData interface {
+	IkniteClusterProvider
+	host.HostProvider
+}
+
+// runPreCleanHost executes the node initialization process.
 func runPreCleanHost(c workflow.RunData) error {
-	data, ok := c.(IkniteInitData)
+	data, ok := c.(preCleanHostData)
 	if !ok {
 		return fmt.Errorf("pre-clean host phase invoked with an invalid data struct. ")
 	}
 	ikniteConfig := &data.IkniteCluster().Spec
 
-	if err := k8s.CleanAll(ikniteConfig, false, false, true, false); err != nil {
+	if err := k8s.CleanAll(data.Host(), ikniteConfig, false, false, true, false); err != nil {
 		return fmt.Errorf("failed to pre-clean host: %w", err)
 	}
 	return nil

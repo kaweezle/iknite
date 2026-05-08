@@ -9,7 +9,7 @@ import (
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 
-	"github.com/kaweezle/iknite/pkg/utils"
+	"github.com/kaweezle/iknite/pkg/host"
 )
 
 // cSpell: enable
@@ -18,16 +18,17 @@ const (
 	netfilter_module = "br_netfilter"
 	brNetfilterDir   = "/proc/sys/net/bridge"
 	machineIDFile    = "/etc/machine-id"
+	modProbeCmd      = "/sbin/modprobe"
 )
 
 // EnsureNetFilter ensures net filtering is available. It does so by checking
 // The availability of the /proc/sys/net/bridge directory. On Windows 11, WSL2
 // includes br_netfilter in the kernel and modprobe is not available.
 // On other linuxes, netfilter is provided as a module.
-func EnsureNetFilter() error {
-	if err := utils.ExecuteIfNotExist(brNetfilterDir, func() error {
+func EnsureNetFilter(fsExe host.FileExecutor) error {
+	if err := host.ExecuteIfNotExist(fsExe, brNetfilterDir, func() error {
 		log.Debug("Enabling netfilter...")
-		if out, err := utils.Exec.Run(true, "/sbin/modprobe", netfilter_module); err == nil {
+		if out, err := fsExe.Run(true, modProbeCmd, netfilter_module); err == nil {
 			log.Trace(string(out))
 		} else {
 			return fmt.Errorf("error while enabling netfilter: %s: %w", string(out), err)
@@ -39,15 +40,15 @@ func EnsureNetFilter() error {
 	return nil
 }
 
-func EnsureMachineID() error {
-	if err := utils.ExecuteIfNotExist(machineIDFile, func() error {
+func EnsureMachineID(fs host.FileSystem) error {
+	if err := host.ExecuteIfNotExist(fs, machineIDFile, func() error {
 		id := uuid.New()
 		log.WithFields(log.Fields{
 			"uuid":     id,
 			"filename": machineIDFile,
 		}).Info("Generating machine ID...")
 
-		if err := utils.FS.WriteFile(
+		if err := fs.WriteFile(
 			machineIDFile,
 			[]byte(id.String()),
 			os.FileMode(int(0o644)),

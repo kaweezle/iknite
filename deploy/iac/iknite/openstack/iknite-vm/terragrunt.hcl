@@ -1,4 +1,4 @@
-# cSpell: words apkrepo kwzl
+# cSpell: words apkrepo kwzl pwauth
 include "root" {
   path   = find_in_parent_folders("root.hcl")
   expose = true
@@ -29,6 +29,7 @@ locals {
   kubernetes_version = include.root.locals.kubernetes_version
   git_url            = include.root.locals.github_repo_url
   git_ref            = include.root.locals.github_repo_ref
+  debug_password     = include.root.locals.secret.argocd.admin_password
 }
 
 inputs = {
@@ -53,6 +54,9 @@ inputs = {
       key_name    = "iknite"
       user_data   = <<-EOF
 #cloud-config
+#password: "${local.debug_password}"
+#chpasswd: { expire: False }
+#ssh_pwauth: True
 ssh_keys:
     ecdsa_private: |
         ${indent(8, local.iknite_vm.ssh_host_ecdsa_private)}

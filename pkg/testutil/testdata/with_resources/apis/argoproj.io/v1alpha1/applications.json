@@ -1,0 +1,1 @@
+{"kind":"ApplicationList","apiVersion":"argoproj.io/v1alpha1","items":[{"apiVersion":"argoproj.io/v1alpha1","kind":"Application","metadata":{"name":"argocd-app","namespace":"argocd"},"status":{"sync":{"status":"Synced"},"health":{"status":"Healthy"}}}]}

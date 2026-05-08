@@ -30,6 +30,8 @@ import (
 	"sigs.k8s.io/kustomize/api/types"
 	"sigs.k8s.io/kustomize/kyaml/filesys"
 	"sigs.k8s.io/yaml"
+
+	"github.com/kaweezle/iknite/pkg/host"
 )
 
 // EnablePlugins configures kustomize options with plugins and exec enabled.
@@ -76,7 +78,8 @@ func WriteToWriter(resources resmap.ResMap, out io.Writer) error {
 
 // SplitResMapToDir splits a resource map into individual <Kind>-<name>.yaml files
 // in the given directory. The directory is created if it does not exist.
-func SplitResMapToDir(fs afero.Fs, resources resmap.ResMap, destDir string) error {
+
+func SplitResMapToDir(fs host.FileSystem, resources resmap.ResMap, destDir string) error {
 	if err := fs.MkdirAll(destDir, 0o755); err != nil {
 		return fmt.Errorf("failed to create directory %s: %w", destDir, err)
 	}
@@ -93,10 +96,10 @@ func SplitResMapToDir(fs afero.Fs, resources resmap.ResMap, destDir string) erro
 		filename := fmt.Sprintf("%s-%s.yaml", kind, safeName)
 		path := filepath.Join(destDir, filename)
 
-		if err := afero.WriteFile(fs, path, yamlData, 0o644); err != nil {
+		if err := fs.WriteFile(path, yamlData, 0o644); err != nil {
 			return fmt.Errorf("failed to write file %s: %w", path, err)
 		}
-		fmt.Fprintf(os.Stderr, "Created: %s\n", path)
+		_, _ = fmt.Fprintf(os.Stderr, "Created: %s\n", path)
 	}
 	return nil
 }

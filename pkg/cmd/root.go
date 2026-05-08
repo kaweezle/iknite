@@ -18,25 +18,23 @@ package cmd
 // cSpell: disable
 import (
 	"fmt"
-	"io"
 	"os"
 	"strings"
 
-	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
-	"github.com/kaweezle/iknite/pkg/cmd/options"
+	"github.com/kaweezle/iknite/pkg/cmd/util"
+	"github.com/kaweezle/iknite/pkg/config"
+	"github.com/kaweezle/iknite/pkg/host"
 )
 
 // cSpell: enable
 
 var (
 	cfgFile       string
-	v             string
-	jsonLogs      bool
 	IkniteVersion = "v0.5.2"
 	Commit        = "unknown"
 	BuildDate     = "unknown"
@@ -44,9 +42,14 @@ var (
 )
 
 // NewRootCmd creates a new root command.
-func NewRootCmd() *cobra.Command {
-	cobra.OnInitialize(initConfig)
+func NewRootCmd(opts *util.BaseOptions) *cobra.Command {
+	if opts == nil {
+		opts = util.DefaultBaseOptions()
+	}
+
 	cobra.EnableTraverseRunHooks = true
+
+	ikniteConfig := &v1alpha1.IkniteClusterSpec{}
 
 	// rootCmd represents the base command when called without any subcommands
 	rootCmd := &cobra.Command{
@@ -57,40 +60,40 @@ Makes the appropriate initialization of a WSL 2 Alpine distribution for running
 kubernetes.`,
 		Example: `> iknite start`,
 		Version: IkniteVersion,
+		PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
+			opts.SetUpLogs(cmd.OutOrStderr())
+			initConfig(cmd.Root())
+			if err := config.DecodeIkniteConfig(ikniteConfig); err != nil {
+				return fmt.Errorf("while decoding iknite config: %w", err)
+			}
+
+			return nil
+		},
 	}
 
-	rootCmd.PersistentPreRunE = func(_ *cobra.Command, _ []string) error {
-		if err := SetUpLogs(os.Stderr, v, jsonLogs); err != nil {
-			return err
-		}
-		return nil
-	}
 	flags := rootCmd.PersistentFlags()
+	opts.AddFlags(flags)
+	util.AddConfigFlag(rootCmd)
+	alpineHost := host.NewDefaultHost()
 
-	flags.StringVar(&cfgFile, options.Config, "",
-		"config file (default is $HOME/.config/iknite/iknite.yaml or /etc/iknite.d/iknite.yaml)")
-	flags.StringVarP(&v, options.Verbosity, "v", log.InfoLevel.String(),
-		"Log level (debug, info, warn, error, fatal, panic)")
-	flags.BoolVar(&jsonLogs, options.Json, false, "Log messages in JSON")
-
-	ikniteConfig := &v1alpha1.IkniteClusterSpec{}
-
-	rootCmd.AddCommand(NewKustomizeCmd(ikniteConfig, nil, nil))
-	rootCmd.AddCommand(newCmdInit(os.Stdout, nil))
-	rootCmd.AddCommand(newCmdReset(os.Stdin, os.Stdout, nil))
-	rootCmd.AddCommand(NewCmdClean(ikniteConfig, nil))
-	rootCmd.AddCommand(NewKubeletCmd(ikniteConfig, nil))
-	rootCmd.AddCommand(NewMdnsCmd())
+	rootCmd.AddCommand(NewKustomizeCmd(nil, nil, nil))
+	rootCmd.AddCommand(newCmdInit(os.Stdout, nil, nil, alpineHost))
+	rootCmd.AddCommand(newCmdReset(os.Stdin, os.Stdout, nil, nil))
+	rootCmd.AddCommand(NewCmdClean(ikniteConfig, nil, alpineHost))
+	rootCmd.AddCommand(NewKubeletCmd(ikniteConfig, nil, alpineHost))
+	rootCmd.AddCommand(NewMdnsCmd(ikniteConfig))
 	rootCmd.AddCommand(NewPrepareCommand(ikniteConfig))
-	rootCmd.AddCommand(NewStartCmd(ikniteConfig, nil))
-	rootCmd.AddCommand(NewStatusCmd(ikniteConfig, nil))
+	rootCmd.AddCommand(NewStartCmd(ikniteConfig, nil, alpineHost))
+	rootCmd.AddCommand(NewStatusCmd(ikniteConfig, nil, nil, alpineHost))
 	rootCmd.AddCommand(NewInfoCmd(ikniteConfig))
+
+	util.BindFlagsToViper(rootCmd, viper.GetViper())
 
 	return rootCmd
 }
 
 // initConfig reads in config file and ENV variables if set.
-func initConfig() {
+func initConfig(cmd *cobra.Command) {
 	if cfgFile != "" {
 		// Use config file from the flag.
 		viper.SetConfigFile(cfgFile)
@@ -109,19 +112,7 @@ func initConfig() {
 	if err := viper.ReadInConfig(); err == nil {
 		fmt.Fprintln(os.Stderr, "Using config file:", viper.ConfigFileUsed())
 	}
-}
-
-func SetUpLogs(out io.Writer, level string, json bool) error {
-	log.SetOutput(out)
-	if json {
-		log.SetFormatter(&log.JSONFormatter{})
-	}
-	lvl, err := log.ParseLevel(level)
-	if err != nil {
-		return fmt.Errorf("parsing log level: %w", err)
-	}
-	log.SetLevel(lvl)
-	return nil
+	util.ApplyViperConfigToFlags(cmd, viper.GetViper())
 }
 
 func inheritsFlags(sourceFlags, targetFlags *pflag.FlagSet, cmdFlags ...string) {

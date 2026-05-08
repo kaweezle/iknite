@@ -10,7 +10,6 @@ import (
 
 	"github.com/kaweezle/iknite/pkg/apis/iknite"
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
-	"github.com/kaweezle/iknite/pkg/constants"
 	"github.com/kaweezle/iknite/pkg/k8s"
 )
 
@@ -24,61 +23,65 @@ func NewWorkloadsPhase() workflow.Phase {
 	}
 }
 
+type monitorData interface {
+	ContextProvider
+	IkniteClusterHolder
+	RESTClientGetterProvider
+	ErrGroupProvider
+}
+
 // runPrepare executes the node initialization process.
 func runMonitorWorkloads(c workflow.RunData) error {
-	data, ok := c.(IkniteInitData)
+	data, ok := c.(monitorData)
 	if !ok {
 		return fmt.Errorf("prepare phase invoked with an invalid data struct. ")
 	}
-	cluster := data.IkniteCluster()
-	ctx, _ := data.ContextWithCancel()
-
-	ticker := time.NewTicker(5 * time.Second)
-	config, err := k8s.LoadFromFile(constants.KubernetesRootConfig)
+	kubeClient, err := data.RESTClientGetter()
 	if err != nil {
 		return fmt.Errorf("cannot load the kubernetes configuration: %w", err)
 	}
-	updateWorkloads := config.RESTClient().WorkloadsReadyConditionWithContextFunc(
+
+	ctx := data.Context()
+	cluster := data.IkniteCluster()
+
+	ticker := time.NewTicker(time.Duration(cluster.Spec.StatusUpdateIntervalSeconds) * time.Second)
+	updateWorkloads := k8s.WorkloadsReadyConditionWithContextFunc(kubeClient,
 		func(allReady bool, _ int, ready, unready []*v1alpha1.WorkloadState, _, _ int) bool {
 			var status iknite.ClusterState
+			cluster := data.IkniteCluster()
 			if allReady && cluster.Status.State != iknite.Running {
 				log.Info("All workloads are ready. Going to 60 seconds interval.")
-				ticker.Reset(60 * time.Second)
+				ticker.Reset(time.Duration(cluster.Spec.StatusUpdateLongIntervalSeconds) * time.Second)
 			}
 			if allReady || cluster.Status.State == iknite.Running {
 				status = iknite.Running
-			} else {
+			} else { // nocov - TODO: add a test case for this branch
 				status = iknite.Stabilizing
 			}
 
-			cluster.Update(status, "daemonize", ready, unready)
-			// Propagate the updated status to the in-memory server cache so
-			// that /status requests reflect the latest state without a file read.
-			if srv := data.StatusServer(); srv != nil {
-				srv.SetCluster(cluster)
-			}
+			data.UpdateIkniteCluster(status, "daemonize", ready, unready)
 			return true
 		})
 
 	log.Debug("Starting workloads timer...")
-	go func() {
+	data.ErrGroup().Go(func() error {
 		for {
 			select {
 			case <-ctx.Done():
 				log.Info("Workloads monitoring stopped.")
 				ticker.Stop()
-				return
+				return ctx.Err()
 			case <-ticker.C:
 				log.Debug("Getting workloads information...")
 				_, err := updateWorkloads(ctx)
 				if err != nil {
 					log.Errorf("While getting workloads information: %v", err)
 					ticker.Stop()
-					return
+					return err
 				}
 			}
 		}
-	}()
+	})
 
 	return nil
 }
