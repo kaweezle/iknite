@@ -21,8 +21,6 @@ import (
 	v1beta12 "k8s.io/client-go/kubernetes/typed/authorization/v1beta1"
 	v13 "k8s.io/client-go/kubernetes/typed/autoscaling/v1"
 	"k8s.io/client-go/kubernetes/typed/autoscaling/v2"
-	"k8s.io/client-go/kubernetes/typed/autoscaling/v2beta1"
-	"k8s.io/client-go/kubernetes/typed/autoscaling/v2beta2"
 	v14 "k8s.io/client-go/kubernetes/typed/batch/v1"
 	v1beta13 "k8s.io/client-go/kubernetes/typed/batch/v1beta1"
 	v15 "k8s.io/client-go/kubernetes/typed/certificates/v1"
@@ -56,10 +54,10 @@ import (
 	v1beta114 "k8s.io/client-go/kubernetes/typed/resource/v1beta1"
 	v1beta21 "k8s.io/client-go/kubernetes/typed/resource/v1beta2"
 	v116 "k8s.io/client-go/kubernetes/typed/scheduling/v1"
-	v1alpha15 "k8s.io/client-go/kubernetes/typed/scheduling/v1alpha1"
+	v1alpha20 "k8s.io/client-go/kubernetes/typed/scheduling/v1alpha2"
 	v1beta115 "k8s.io/client-go/kubernetes/typed/scheduling/v1beta1"
 	v117 "k8s.io/client-go/kubernetes/typed/storage/v1"
-	v1alpha16 "k8s.io/client-go/kubernetes/typed/storage/v1alpha1"
+	v1alpha15 "k8s.io/client-go/kubernetes/typed/storage/v1alpha1"
 	v1beta116 "k8s.io/client-go/kubernetes/typed/storage/v1beta1"
 	v1beta117 "k8s.io/client-go/kubernetes/typed/storagemigration/v1beta1"
 )
@@ -685,98 +683,6 @@ func (_c *MockInterface_AutoscalingV2_Call) Return(autoscalingV2Interface v2.Aut
 }
 
 func (_c *MockInterface_AutoscalingV2_Call) RunAndReturn(run func() v2.AutoscalingV2Interface) *MockInterface_AutoscalingV2_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// AutoscalingV2beta1 provides a mock function for the type MockInterface
-func (_mock *MockInterface) AutoscalingV2beta1() v2beta1.AutoscalingV2beta1Interface {
-	ret := _mock.Called()
-
-	if len(ret) == 0 {
-		panic("no return value specified for AutoscalingV2beta1")
-	}
-
-	var r0 v2beta1.AutoscalingV2beta1Interface
-	if returnFunc, ok := ret.Get(0).(func() v2beta1.AutoscalingV2beta1Interface); ok {
-		r0 = returnFunc()
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(v2beta1.AutoscalingV2beta1Interface)
-		}
-	}
-	return r0
-}
-
-// MockInterface_AutoscalingV2beta1_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'AutoscalingV2beta1'
-type MockInterface_AutoscalingV2beta1_Call struct {
-	*mock.Call
-}
-
-// AutoscalingV2beta1 is a helper method to define mock.On call
-func (_e *MockInterface_Expecter) AutoscalingV2beta1() *MockInterface_AutoscalingV2beta1_Call {
-	return &MockInterface_AutoscalingV2beta1_Call{Call: _e.mock.On("AutoscalingV2beta1")}
-}
-
-func (_c *MockInterface_AutoscalingV2beta1_Call) Run(run func()) *MockInterface_AutoscalingV2beta1_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run()
-	})
-	return _c
-}
-
-func (_c *MockInterface_AutoscalingV2beta1_Call) Return(autoscalingV2beta1Interface v2beta1.AutoscalingV2beta1Interface) *MockInterface_AutoscalingV2beta1_Call {
-	_c.Call.Return(autoscalingV2beta1Interface)
-	return _c
-}
-
-func (_c *MockInterface_AutoscalingV2beta1_Call) RunAndReturn(run func() v2beta1.AutoscalingV2beta1Interface) *MockInterface_AutoscalingV2beta1_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// AutoscalingV2beta2 provides a mock function for the type MockInterface
-func (_mock *MockInterface) AutoscalingV2beta2() v2beta2.AutoscalingV2beta2Interface {
-	ret := _mock.Called()
-
-	if len(ret) == 0 {
-		panic("no return value specified for AutoscalingV2beta2")
-	}
-
-	var r0 v2beta2.AutoscalingV2beta2Interface
-	if returnFunc, ok := ret.Get(0).(func() v2beta2.AutoscalingV2beta2Interface); ok {
-		r0 = returnFunc()
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(v2beta2.AutoscalingV2beta2Interface)
-		}
-	}
-	return r0
-}
-
-// MockInterface_AutoscalingV2beta2_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'AutoscalingV2beta2'
-type MockInterface_AutoscalingV2beta2_Call struct {
-	*mock.Call
-}
-
-// AutoscalingV2beta2 is a helper method to define mock.On call
-func (_e *MockInterface_Expecter) AutoscalingV2beta2() *MockInterface_AutoscalingV2beta2_Call {
-	return &MockInterface_AutoscalingV2beta2_Call{Call: _e.mock.On("AutoscalingV2beta2")}
-}
-
-func (_c *MockInterface_AutoscalingV2beta2_Call) Run(run func()) *MockInterface_AutoscalingV2beta2_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run()
-	})
-	return _c
-}
-
-func (_c *MockInterface_AutoscalingV2beta2_Call) Return(autoscalingV2beta2Interface v2beta2.AutoscalingV2beta2Interface) *MockInterface_AutoscalingV2beta2_Call {
-	_c.Call.Return(autoscalingV2beta2Interface)
-	return _c
-}
-
-func (_c *MockInterface_AutoscalingV2beta2_Call) RunAndReturn(run func() v2beta2.AutoscalingV2beta2Interface) *MockInterface_AutoscalingV2beta2_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -2391,48 +2297,48 @@ func (_c *MockInterface_SchedulingV1_Call) RunAndReturn(run func() v116.Scheduli
 	return _c
 }
 
-// SchedulingV1alpha1 provides a mock function for the type MockInterface
-func (_mock *MockInterface) SchedulingV1alpha1() v1alpha15.SchedulingV1alpha1Interface {
+// SchedulingV1alpha2 provides a mock function for the type MockInterface
+func (_mock *MockInterface) SchedulingV1alpha2() v1alpha20.SchedulingV1alpha2Interface {
 	ret := _mock.Called()
 
 	if len(ret) == 0 {
-		panic("no return value specified for SchedulingV1alpha1")
+		panic("no return value specified for SchedulingV1alpha2")
 	}
 
-	var r0 v1alpha15.SchedulingV1alpha1Interface
-	if returnFunc, ok := ret.Get(0).(func() v1alpha15.SchedulingV1alpha1Interface); ok {
+	var r0 v1alpha20.SchedulingV1alpha2Interface
+	if returnFunc, ok := ret.Get(0).(func() v1alpha20.SchedulingV1alpha2Interface); ok {
 		r0 = returnFunc()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(v1alpha15.SchedulingV1alpha1Interface)
+			r0 = ret.Get(0).(v1alpha20.SchedulingV1alpha2Interface)
 		}
 	}
 	return r0
 }
 
-// MockInterface_SchedulingV1alpha1_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SchedulingV1alpha1'
-type MockInterface_SchedulingV1alpha1_Call struct {
+// MockInterface_SchedulingV1alpha2_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SchedulingV1alpha2'
+type MockInterface_SchedulingV1alpha2_Call struct {
 	*mock.Call
 }
 
-// SchedulingV1alpha1 is a helper method to define mock.On call
-func (_e *MockInterface_Expecter) SchedulingV1alpha1() *MockInterface_SchedulingV1alpha1_Call {
-	return &MockInterface_SchedulingV1alpha1_Call{Call: _e.mock.On("SchedulingV1alpha1")}
+// SchedulingV1alpha2 is a helper method to define mock.On call
+func (_e *MockInterface_Expecter) SchedulingV1alpha2() *MockInterface_SchedulingV1alpha2_Call {
+	return &MockInterface_SchedulingV1alpha2_Call{Call: _e.mock.On("SchedulingV1alpha2")}
 }
 
-func (_c *MockInterface_SchedulingV1alpha1_Call) Run(run func()) *MockInterface_SchedulingV1alpha1_Call {
+func (_c *MockInterface_SchedulingV1alpha2_Call) Run(run func()) *MockInterface_SchedulingV1alpha2_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		run()
 	})
 	return _c
 }
 
-func (_c *MockInterface_SchedulingV1alpha1_Call) Return(schedulingV1alpha1Interface v1alpha15.SchedulingV1alpha1Interface) *MockInterface_SchedulingV1alpha1_Call {
-	_c.Call.Return(schedulingV1alpha1Interface)
+func (_c *MockInterface_SchedulingV1alpha2_Call) Return(schedulingV1alpha2Interface v1alpha20.SchedulingV1alpha2Interface) *MockInterface_SchedulingV1alpha2_Call {
+	_c.Call.Return(schedulingV1alpha2Interface)
 	return _c
 }
 
-func (_c *MockInterface_SchedulingV1alpha1_Call) RunAndReturn(run func() v1alpha15.SchedulingV1alpha1Interface) *MockInterface_SchedulingV1alpha1_Call {
+func (_c *MockInterface_SchedulingV1alpha2_Call) RunAndReturn(run func() v1alpha20.SchedulingV1alpha2Interface) *MockInterface_SchedulingV1alpha2_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -2530,19 +2436,19 @@ func (_c *MockInterface_StorageV1_Call) RunAndReturn(run func() v117.StorageV1In
 }
 
 // StorageV1alpha1 provides a mock function for the type MockInterface
-func (_mock *MockInterface) StorageV1alpha1() v1alpha16.StorageV1alpha1Interface {
+func (_mock *MockInterface) StorageV1alpha1() v1alpha15.StorageV1alpha1Interface {
 	ret := _mock.Called()
 
 	if len(ret) == 0 {
 		panic("no return value specified for StorageV1alpha1")
 	}
 
-	var r0 v1alpha16.StorageV1alpha1Interface
-	if returnFunc, ok := ret.Get(0).(func() v1alpha16.StorageV1alpha1Interface); ok {
+	var r0 v1alpha15.StorageV1alpha1Interface
+	if returnFunc, ok := ret.Get(0).(func() v1alpha15.StorageV1alpha1Interface); ok {
 		r0 = returnFunc()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(v1alpha16.StorageV1alpha1Interface)
+			r0 = ret.Get(0).(v1alpha15.StorageV1alpha1Interface)
 		}
 	}
 	return r0
@@ -2565,12 +2471,12 @@ func (_c *MockInterface_StorageV1alpha1_Call) Run(run func()) *MockInterface_Sto
 	return _c
 }
 
-func (_c *MockInterface_StorageV1alpha1_Call) Return(storageV1alpha1Interface v1alpha16.StorageV1alpha1Interface) *MockInterface_StorageV1alpha1_Call {
+func (_c *MockInterface_StorageV1alpha1_Call) Return(storageV1alpha1Interface v1alpha15.StorageV1alpha1Interface) *MockInterface_StorageV1alpha1_Call {
 	_c.Call.Return(storageV1alpha1Interface)
 	return _c
 }
 
-func (_c *MockInterface_StorageV1alpha1_Call) RunAndReturn(run func() v1alpha16.StorageV1alpha1Interface) *MockInterface_StorageV1alpha1_Call {
+func (_c *MockInterface_StorageV1alpha1_Call) RunAndReturn(run func() v1alpha15.StorageV1alpha1Interface) *MockInterface_StorageV1alpha1_Call {
 	_c.Call.Return(run)
 	return _c
 }

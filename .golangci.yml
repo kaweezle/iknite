@@ -171,6 +171,10 @@ linters:
     interfacebloat:
       max: 15
 
+    gomoddirectives:
+      replace-allow-list:
+        - github.com/argoproj/argo-cd/gitops-engine
+
   exclusions:
     rules:
       - linters:

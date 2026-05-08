@@ -116,7 +116,7 @@ spec:
           command: ["sh", "-c", "sleep 10"]
       containers:
         - name: coredns
-          image: registry.k8s.io/coredns/coredns:v1.13.1
+          image: registry.k8s.io/coredns/coredns:v1.14.2
           imagePullPolicy: IfNotPresent
           resources:
             limits:
