@@ -202,7 +202,7 @@ func ApplyIkniteClusterSpecToInitConfiguration(
 }
 
 func GetKubeVipImage() string {
-	return "ghcr.io/kube-vip/kube-vip:v0.8.9"
+	return "ghcr.io/kube-vip/kube-vip:v1.1.2"
 }
 
 func GetKineImage() string {
