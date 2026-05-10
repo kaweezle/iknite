@@ -249,7 +249,7 @@ func ContentPatchHandler(subdir string, options *TestServerOptions) http.Handler
 			w.WriteHeader(http.StatusOK)
 			log.StatusCode = http.StatusOK
 			_, _ = w.Write(body) //nolint:errcheck // test server, ignore error
-		case http.MethodPost:
+		case http.MethodPost, http.MethodPut:
 			body, err := io.ReadAll(r.Body)
 			log.Body = string(body)
 			content_type := r.Header.Get("Content-Type")

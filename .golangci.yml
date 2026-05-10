@@ -69,7 +69,7 @@ linters:
     # - godox
     - goheader
     - gomoddirectives
-    - gomodguard
+    - gomodguard_v2
     - goprintffuncname
     - gosec
     - govet
@@ -125,7 +125,7 @@ linters:
 
     goconst:
       min-len: 3
-      min-occurrences: 3
+      min-occurrences: 5
 
     misspell:
       locale: US

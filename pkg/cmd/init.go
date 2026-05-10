@@ -16,7 +16,7 @@ limitations under the License.
 
 package cmd
 
-// cSpell:words kubeproxyconfig clientcmdapi clientcmd kubeletconfig conntrack
+// cSpell:words kubeproxyconfig clientcmdapi clientcmd kubeletconfig conntrack lbip
 // cSpell: disable
 import (
 	"errors"
@@ -143,6 +143,7 @@ func addInitWorkflowPhases(initRunner *workflow.Runner) {
 	initRunner.AppendPhase(WrapPhase(iknitePhase.NewServePhase(), ikniteApi.Stabilizing, nil))
 	//nolint:gocritic // Keep the following for reference
 	// initRunner.AppendPhase(WrapPhase(iknitePhase.NewProxyAPIPhase(), ikniteApi.Stabilizing, nil))
+	initRunner.AppendPhase(WrapPhase(iknitePhase.NewSetLBIPPhase(), ikniteApi.Stabilizing, nil))
 	initRunner.AppendPhase(WrapPhase(iknitePhase.NewWorkloadsPhase(), ikniteApi.Stabilizing, nil))
 	initRunner.AppendPhase(WrapPhase(iknitePhase.NewDaemonizePhase(), ikniteApi.Stabilizing, nil))
 	//nolint:gocritic // standalone node

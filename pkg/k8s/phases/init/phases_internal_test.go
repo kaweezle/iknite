@@ -13,6 +13,8 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
+
+// cSpell: words LBIP
 package init
 
 import (
@@ -49,6 +51,7 @@ func TestPhaseConstructors(t *testing.T) {
 		{name: "mdns", constructor: NewMDnsPublishPhase, wantName: "mdns-publish"},
 		{name: "serve", constructor: NewServePhase, wantName: "serve"},
 		{name: proxyAPIPhaseName, constructor: NewProxyAPIPhase, wantName: proxyAPIPhaseName},
+		{name: setLBIPPhaseName, constructor: NewSetLBIPPhase, wantName: setLBIPPhaseName},
 		{name: "copy-config", constructor: NewCopyConfigPhase, wantName: "copy-config"},
 		{name: "workloads", constructor: NewWorkloadsPhase, wantName: "workloads"},
 		{name: "daemonize", constructor: NewDaemonizePhase, wantName: "daemonize"},
@@ -81,6 +84,7 @@ func TestRunPhasesRejectInvalidData(t *testing.T) {
 		{name: "mdns", run: runMDnsPublish},
 		{name: "serve", run: runServe},
 		{name: proxyAPIPhaseName, run: runProxyAPI},
+		{name: setLBIPPhaseName, run: runSetLBIP},
 		{name: "copy-config", run: runCopyConfig},
 		{name: "workloads", run: runMonitorWorkloads},
 		{name: "daemonize", run: runDaemonize},

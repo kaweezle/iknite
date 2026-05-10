@@ -147,11 +147,12 @@ func setupPrepareSuccessMocks(m *mockHost.MockHost) {
 	m.EXPECT().Exists(machineIDPath).Return(true, nil).Once()
 	m.EXPECT().GetOutboundIP().Return(net.ParseIP("10.0.0.1"), nil).Once()
 	m.EXPECT().CheckIpExists(mock.Anything).Return(true, nil).Once()
+	// It depends if the configuration contains a domain name
+	m.EXPECT().IsHostMapped(mock.Anything, mock.Anything, mock.Anything).Return(true, nil).Maybe()
 	m.EXPECT().Pipe(constants.RcConfFile).
 		Return(script.NewPipe().WithReader(strings.NewReader(RcConfPreventKubeletRunning + "\n"))).Once()
 	m.EXPECT().Exists(runlevelIknitePath).Return(true, nil).Once()
 	m.EXPECT().Exists(constants.CrictlYaml).Return(true, nil).Once()
-	m.EXPECT().IsHostMapped(mock.Anything, mock.Anything, mock.Anything).Return(true, nil).Maybe()
 }
 
 func setupFirstStartMocks(t *testing.T, m *mockHost.MockHost, configExists bool) {
