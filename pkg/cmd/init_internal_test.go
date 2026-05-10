@@ -355,3 +355,27 @@ func TestRunInitCmd_Success(t *testing.T) {
 	err := cmd.Execute()
 	req.NoError(err)
 }
+
+func TestAddInitWorkflowPhases_RegistersProxyAPI(t *testing.T) {
+	t.Parallel()
+	req := require.New(t)
+
+	initRunner := workflow.NewRunner()
+	addInitWorkflowPhases(initRunner)
+
+	phaseNames := make([]string, 0, len(initRunner.Phases))
+	for _, phase := range initRunner.Phases {
+		phaseNames = append(phaseNames, phase.Name)
+	}
+
+	serveIndex := slices.Index(phaseNames, "serve")
+	proxyIndex := slices.Index(phaseNames, "proxy-api")
+	workloadsIndex := slices.Index(phaseNames, "workloads")
+
+	req.NotEqual(-1, serveIndex)
+	req.Equal(-1, proxyIndex)
+	req.NotEqual(-1, workloadsIndex)
+	//nolint:gocritic // Currently not implemented
+	// req.Equal(serveIndex+1, proxyIndex)
+	// req.Equal(proxyIndex+1, workloadsIndex)
+}

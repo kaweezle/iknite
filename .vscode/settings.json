@@ -44,6 +44,7 @@
     "go.testFlags": [
         "-coverpkg=./..."
     ],
-    "go.lintOnSave": "package"
+    "go.lintOnSave": "package",
+    "git.inputValidation": true
 
 }

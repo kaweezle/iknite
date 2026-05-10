@@ -318,6 +318,7 @@ func (result *CheckResult) StatusString(spinView string) string {
 func (result *CheckResult) FormatResult(prefix string, checkData CheckData, spinView string) string {
 	status := result.StatusString(spinView)
 
+	result.mu.RLock()
 	description := result.Check.Description
 	if result.Error != nil || result.Status == StatusFailed {
 		description = ErrorStyle.Render(description)
@@ -326,7 +327,6 @@ func (result *CheckResult) FormatResult(prefix string, checkData CheckData, spin
 	var output strings.Builder
 	fmt.Fprintf(&output, "%s%s %s", prefix, status, description)
 
-	result.mu.RLock()
 	if result.Error != nil {
 		fmt.Fprintf(&output, " - %s", ErrorStyle.Render(result.Error.Error()))
 	} else if result.Message != "" {

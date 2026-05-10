@@ -151,6 +151,7 @@ func setupPrepareSuccessMocks(m *mockHost.MockHost) {
 		Return(script.NewPipe().WithReader(strings.NewReader(RcConfPreventKubeletRunning + "\n"))).Once()
 	m.EXPECT().Exists(runlevelIknitePath).Return(true, nil).Once()
 	m.EXPECT().Exists(constants.CrictlYaml).Return(true, nil).Once()
+	m.EXPECT().IsHostMapped(mock.Anything, mock.Anything, mock.Anything).Return(true, nil).Maybe()
 }
 
 func setupFirstStartMocks(t *testing.T, m *mockHost.MockHost, configExists bool) {
