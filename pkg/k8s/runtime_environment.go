@@ -234,7 +234,7 @@ func PrepareKubernetesEnvironment(
 		"network_interface":  ikniteConfig.NetworkInterface,
 		"enable_mdns":        ikniteConfig.EnableMDNS,
 		"cluster_name":       ikniteConfig.ClusterName,
-		"kustomization":      ikniteConfig.Kustomization,
+		kustKey:              ikniteConfig.Kustomization,
 	}).Info("Cluster configuration")
 
 	// Allow forwarding (kubeadm requirement)
@@ -319,7 +319,7 @@ func PrepareKubernetesEnvironment(
 	}
 
 	log.Info("Preventing Kubelet from being started by OpenRC...")
-	if err := PreventServiceFromStarting(alpineHost, constants.RcConfFile, "kubelet"); err != nil {
+	if err := PreventServiceFromStarting(alpineHost, constants.RcConfFile, KubeletName); err != nil {
 		return fmt.Errorf("while preventing kubelet service from starting: %w", err)
 	}
 

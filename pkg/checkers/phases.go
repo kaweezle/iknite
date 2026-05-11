@@ -7,6 +7,7 @@ import (
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
 	"github.com/kaweezle/iknite/pkg/check"
 	"github.com/kaweezle/iknite/pkg/constants"
+	"github.com/kaweezle/iknite/pkg/k8s"
 	"github.com/kaweezle/iknite/pkg/utils"
 )
 
@@ -28,7 +29,7 @@ func NewEnvironmentCheckPhase(ikniteConfig *v1alpha1.IkniteClusterSpec) *check.C
 			"",
 		),
 		//   - Check if the kubelet service is not runnable
-		NewPreventedServiceCheck("kubelet"),
+		NewPreventedServiceCheck(k8s.KubeletName),
 		//   - Check if the iknite service is set to run in default mode
 		FileCheck("iknite_service", "Check if iknite is active on default runlevel",
 			"/etc/runlevels/default/iknite", ""),
@@ -116,7 +117,7 @@ func NewRuntimeCheckPhase(waitOptions *utils.WaitOptions) *check.Check {
 		ServiceCheck("containerd_running", "containerd", ServiceTypeOpenRC),
 		ServiceCheck("buildkitd_running", "buildkitd", ServiceTypeOpenRC),
 		//  - Check if the kubelet process is running
-		ServiceCheck("kubelet_running", "kubelet", ServiceTypePidFile, "iknite_running"),
+		ServiceCheck("kubelet_running", k8s.KubeletName, ServiceTypePidFile, "iknite_running"),
 		//   - Check if the kubelet api endpoint (socket) is reachable and healthy
 		NewKubeletHealthCheck(waitOptions.CheckTimeout),
 		//   - Check if the kube-apiserver is healthy

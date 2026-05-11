@@ -15,7 +15,7 @@ limitations under the License.
 */
 package k8s
 
-// cSpell: words clientcmd readyz polymorphichelpers objectrestarter
+// cSpell: words clientcmd readyz polymorphichelpers objectrestarter kust
 // cSpell: disable
 import (
 	"context"
@@ -43,7 +43,11 @@ import (
 
 // cSpell: enable
 
-const configuredValueTrue = "true"
+const (
+	configuredValueTrue = "true"
+	errKey              = "err"
+	kustKey             = "kustomization"
+)
 
 // LoadFromFile loads the configuration from the file specified by filename.
 func LoadFromFile(fs host.FileSystem, filename string) (*api.Config, error) {
@@ -155,7 +159,7 @@ func CheckClusterRunning(
 	for ; retries > 0; retries-- {
 		if !first {
 			log.WithFields(log.Fields{
-				"err":       err,
+				errKey:      err,
 				"wait_time": interval,
 			}).Debug("Waiting...")
 			select {
@@ -279,7 +283,7 @@ func Kustomize(
 	}
 
 	log.WithFields(log.Fields{
-		"kustomization": options.Kustomization,
+		kustKey: options.Kustomization,
 	}).Info("Performing configuration")
 
 	resources, err := provision.GetBaseKustomizationResources(fs, options.Kustomization, options.ForceEmbedded)
@@ -300,8 +304,8 @@ func Kustomize(
 	}
 
 	log.WithFields(log.Fields{
-		"kustomization": options.Kustomization,
-		"resources":     ids,
+		kustKey:     options.Kustomization,
+		"resources": ids,
 	}).Info("Configuration applied")
 
 	return nil

@@ -24,13 +24,16 @@ import (
 	"github.com/kaweezle/iknite/pkg/pki"
 )
 
-const pkiDir = "pki"
+const (
+	pkiDir       = "pki"
+	caCommonName = "test-ca"
+)
 
 func newTestCACert(t *testing.T, fs host.FileSystem) {
 	t.Helper()
 	caCert, caKey, err := pkiutil.NewCertificateAuthority(&pkiutil.CertConfig{
 		Config: certutil.Config{
-			CommonName: "test-ca",
+			CommonName: caCommonName,
 		},
 		EncryptionAlgorithm: kubeadmapi.EncryptionAlgorithmRSA2048,
 	})
@@ -96,7 +99,7 @@ func TestWriteKey(t *testing.T) {
 		t.Parallel()
 		fs := host.NewMemMapFS()
 		_, caKey, err := pkiutil.NewCertificateAuthority(&pkiutil.CertConfig{
-			Config:              certutil.Config{CommonName: "test-ca"},
+			Config:              certutil.Config{CommonName: caCommonName},
 			EncryptionAlgorithm: kubeadmapi.EncryptionAlgorithmRSA2048,
 		})
 		require.NoError(t, err)
@@ -152,7 +155,7 @@ func TestWriteCert(t *testing.T) {
 		t.Parallel()
 		fs := host.NewMemMapFS()
 		caCert, _, err := pkiutil.NewCertificateAuthority(&pkiutil.CertConfig{
-			Config:              certutil.Config{CommonName: "test-ca"},
+			Config:              certutil.Config{CommonName: caCommonName},
 			EncryptionAlgorithm: kubeadmapi.EncryptionAlgorithmRSA2048,
 		})
 		require.NoError(t, err)
@@ -173,7 +176,7 @@ func TestWriteCertAndKey(t *testing.T) {
 		t.Parallel()
 		fs := host.NewMemMapFS()
 		caCert, caKey, err := pkiutil.NewCertificateAuthority(&pkiutil.CertConfig{
-			Config:              certutil.Config{CommonName: "test-ca"},
+			Config:              certutil.Config{CommonName: caCommonName},
 			EncryptionAlgorithm: kubeadmapi.EncryptionAlgorithmRSA2048,
 		})
 		require.NoError(t, err)
@@ -198,7 +201,7 @@ func TestWrite_MkdirAllError(t *testing.T) {
 	t.Parallel()
 
 	caCert, caKey, err := pkiutil.NewCertificateAuthority(&pkiutil.CertConfig{
-		Config:              certutil.Config{CommonName: "test-ca"},
+		Config:              certutil.Config{CommonName: caCommonName},
 		EncryptionAlgorithm: kubeadmapi.EncryptionAlgorithmRSA2048,
 	})
 	require.NoError(t, err)
@@ -248,7 +251,7 @@ func TestCertOrKeyExist(t *testing.T) {
 		t.Parallel()
 		fs := host.NewMemMapFS()
 		caCert, _, err := pkiutil.NewCertificateAuthority(&pkiutil.CertConfig{
-			Config:              certutil.Config{CommonName: "test-ca"},
+			Config:              certutil.Config{CommonName: caCommonName},
 			EncryptionAlgorithm: kubeadmapi.EncryptionAlgorithmRSA2048,
 		})
 		require.NoError(t, err)
@@ -260,7 +263,7 @@ func TestCertOrKeyExist(t *testing.T) {
 		t.Parallel()
 		fs := host.NewMemMapFS()
 		_, caKey, err := pkiutil.NewCertificateAuthority(&pkiutil.CertConfig{
-			Config:              certutil.Config{CommonName: "test-ca"},
+			Config:              certutil.Config{CommonName: caCommonName},
 			EncryptionAlgorithm: kubeadmapi.EncryptionAlgorithmRSA2048,
 		})
 		require.NoError(t, err)
@@ -272,7 +275,7 @@ func TestCertOrKeyExist(t *testing.T) {
 		t.Parallel()
 		fs := host.NewMemMapFS()
 		caCert, caKey, err := pkiutil.NewCertificateAuthority(&pkiutil.CertConfig{
-			Config:              certutil.Config{CommonName: "test-ca"},
+			Config:              certutil.Config{CommonName: caCommonName},
 			EncryptionAlgorithm: kubeadmapi.EncryptionAlgorithmRSA2048,
 		})
 		require.NoError(t, err)
@@ -288,7 +291,7 @@ func TestTryLoadCertFromDisk(t *testing.T) {
 		t.Parallel()
 		fs := host.NewMemMapFS()
 		caCert, caKey, err := pkiutil.NewCertificateAuthority(&pkiutil.CertConfig{
-			Config:              certutil.Config{CommonName: "test-ca"},
+			Config:              certutil.Config{CommonName: caCommonName},
 			EncryptionAlgorithm: kubeadmapi.EncryptionAlgorithmRSA2048,
 		})
 		require.NoError(t, err)
@@ -297,7 +300,7 @@ func TestTryLoadCertFromDisk(t *testing.T) {
 		loaded, err := pki.TryLoadCertFromDisk(fs, pkiDir, "ca")
 		require.NoError(t, err)
 		require.NotNil(t, loaded)
-		require.Equal(t, "test-ca", loaded.Subject.CommonName)
+		require.Equal(t, caCommonName, loaded.Subject.CommonName)
 	})
 
 	t.Run("returns error when cert does not exist", func(t *testing.T) {
@@ -326,7 +329,7 @@ func TestTryLoadKeyFromDisk(t *testing.T) {
 		t.Parallel()
 		fs := host.NewMemMapFS()
 		caCert, caKey, err := pkiutil.NewCertificateAuthority(&pkiutil.CertConfig{
-			Config:              certutil.Config{CommonName: "test-ca"},
+			Config:              certutil.Config{CommonName: caCommonName},
 			EncryptionAlgorithm: kubeadmapi.EncryptionAlgorithmRSA2048,
 		})
 		require.NoError(t, err)
@@ -341,7 +344,7 @@ func TestTryLoadKeyFromDisk(t *testing.T) {
 		t.Parallel()
 		fs := host.NewMemMapFS()
 		caCert, caKey, err := pkiutil.NewCertificateAuthority(&pkiutil.CertConfig{
-			Config:              certutil.Config{CommonName: "test-ca"},
+			Config:              certutil.Config{CommonName: caCommonName},
 			EncryptionAlgorithm: kubeadmapi.EncryptionAlgorithmECDSAP256,
 		})
 		require.NoError(t, err)
@@ -401,7 +404,7 @@ func TestTryLoadCertAndKeyFromDisk(t *testing.T) {
 		t.Parallel()
 		fs := host.NewMemMapFS()
 		caCert, caKey, err := pkiutil.NewCertificateAuthority(&pkiutil.CertConfig{
-			Config:              certutil.Config{CommonName: "test-ca"},
+			Config:              certutil.Config{CommonName: caCommonName},
 			EncryptionAlgorithm: kubeadmapi.EncryptionAlgorithmRSA2048,
 		})
 		require.NoError(t, err)
@@ -411,14 +414,14 @@ func TestTryLoadCertAndKeyFromDisk(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, loadedCert)
 		require.NotNil(t, loadedKey)
-		require.Equal(t, "test-ca", loadedCert.Subject.CommonName)
+		require.Equal(t, caCommonName, loadedCert.Subject.CommonName)
 	})
 
 	t.Run("returns error when cert is missing", func(t *testing.T) {
 		t.Parallel()
 		fs := host.NewMemMapFS()
 		_, caKey, err := pkiutil.NewCertificateAuthority(&pkiutil.CertConfig{
-			Config:              certutil.Config{CommonName: "test-ca"},
+			Config:              certutil.Config{CommonName: caCommonName},
 			EncryptionAlgorithm: kubeadmapi.EncryptionAlgorithmRSA2048,
 		})
 		require.NoError(t, err)
@@ -432,7 +435,7 @@ func TestTryLoadCertAndKeyFromDisk(t *testing.T) {
 		t.Parallel()
 		fs := host.NewMemMapFS()
 		caCert, _, err := pkiutil.NewCertificateAuthority(&pkiutil.CertConfig{
-			Config:              certutil.Config{CommonName: "test-ca"},
+			Config:              certutil.Config{CommonName: caCommonName},
 			EncryptionAlgorithm: kubeadmapi.EncryptionAlgorithmRSA2048,
 		})
 		require.NoError(t, err)
@@ -450,7 +453,7 @@ func TestPrivateKeyFromFile(t *testing.T) {
 		t.Parallel()
 		fs := host.NewMemMapFS()
 		_, caKey, err := pkiutil.NewCertificateAuthority(&pkiutil.CertConfig{
-			Config:              certutil.Config{CommonName: "test-ca"},
+			Config:              certutil.Config{CommonName: caCommonName},
 			EncryptionAlgorithm: kubeadmapi.EncryptionAlgorithmRSA2048,
 		})
 		require.NoError(t, err)
@@ -488,7 +491,7 @@ func TestCertsFromFile(t *testing.T) {
 		t.Parallel()
 		fs := host.NewMemMapFS()
 		caCert, caKey, err := pkiutil.NewCertificateAuthority(&pkiutil.CertConfig{
-			Config:              certutil.Config{CommonName: "test-ca"},
+			Config:              certutil.Config{CommonName: caCommonName},
 			EncryptionAlgorithm: kubeadmapi.EncryptionAlgorithmRSA2048,
 		})
 		require.NoError(t, err)
@@ -498,7 +501,7 @@ func TestCertsFromFile(t *testing.T) {
 		certs, err := pki.CertsFromFile(fs, certPath)
 		require.NoError(t, err)
 		require.Len(t, certs, 1)
-		require.Equal(t, "test-ca", certs[0].Subject.CommonName)
+		require.Equal(t, caCommonName, certs[0].Subject.CommonName)
 	})
 
 	t.Run("returns error when file does not exist", func(t *testing.T) {

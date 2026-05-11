@@ -125,7 +125,8 @@ linters:
 
     goconst:
       min-len: 3
-      min-occurrences: 5
+      min-occurrences: 3
+      ignore-tests: true
 
     misspell:
       locale: US

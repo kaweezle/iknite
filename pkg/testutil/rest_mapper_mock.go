@@ -51,18 +51,21 @@ func NewRESTMapper() meta.RESTMapper {
 	return mapper
 }
 
+const authorizationGroupName = "authorization.k8s.io"
+
 // hardcoded is good enough for the test we're running.
+// TODO: There are items here that are not part of the test mapper. Clean it or add the missing items to the test.
 var rootScopedKinds = map[schema.GroupKind]bool{
 	{Group: "admission.k8s.io", Kind: "AdmissionReview"}: true,
 
-	{Group: "admissionregistration.k8s.io", Kind: "ValidatingWebhookConfiguration"}: true,
-	{Group: "admissionregistration.k8s.io", Kind: "MutatingWebhookConfiguration"}:   true,
+	{Group: admissionregistrationv1.GroupName, Kind: "ValidatingWebhookConfiguration"}: true,
+	{Group: admissionregistrationv1.GroupName, Kind: "MutatingWebhookConfiguration"}:   true,
 
 	{Group: "authentication.k8s.io", Kind: "TokenReview"}: true,
 
-	{Group: "authorization.k8s.io", Kind: "SubjectAccessReview"}:     true,
-	{Group: "authorization.k8s.io", Kind: "SelfSubjectAccessReview"}: true,
-	{Group: "authorization.k8s.io", Kind: "SelfSubjectRulesReview"}:  true,
+	{Group: authorizationGroupName, Kind: "SubjectAccessReview"}:     true,
+	{Group: authorizationGroupName, Kind: "SelfSubjectAccessReview"}: true,
+	{Group: authorizationGroupName, Kind: "SelfSubjectRulesReview"}:  true,
 
 	{Group: "certificates.k8s.io", Kind: "CertificateSigningRequest"}: true,
 
@@ -71,22 +74,22 @@ var rootScopedKinds = map[schema.GroupKind]bool{
 	{Group: "", Kind: "PersistentVolume"}: true,
 	{Group: "", Kind: "ComponentStatus"}:  true,
 
-	{Group: "rbac.authorization.k8s.io", Kind: "ClusterRole"}:        true,
-	{Group: "rbac.authorization.k8s.io", Kind: "ClusterRoleBinding"}: true,
+	{Group: rbacv1.GroupName, Kind: "ClusterRole"}:        true,
+	{Group: rbacv1.GroupName, Kind: "ClusterRoleBinding"}: true,
 
 	{Group: "scheduling.k8s.io", Kind: "PriorityClass"}: true,
 
-	{Group: "storage.k8s.io", Kind: "StorageClass"}:     true,
-	{Group: "storage.k8s.io", Kind: "VolumeAttachment"}: true,
+	{Group: storagev1.GroupName, Kind: "StorageClass"}:     true,
+	{Group: storagev1.GroupName, Kind: "VolumeAttachment"}: true,
 
-	{Group: "apiextensions.k8s.io", Kind: "CustomResourceDefinition"}: true,
+	{Group: apiextensionsv1.GroupName, Kind: "CustomResourceDefinition"}: true,
 
 	{Group: "apiserver.k8s.io", Kind: "AdmissionConfiguration"}: true,
 
 	{Group: "audit.k8s.io", Kind: "Event"}:  true,
 	{Group: "audit.k8s.io", Kind: "Policy"}: true,
 
-	{Group: "apiregistration.k8s.io", Kind: "APIService"}: true,
+	{Group: apiregistrationv1.GroupName, Kind: "APIService"}: true,
 
 	{Group: "metrics.k8s.io", Kind: "NodeMetrics"}: true,
 }

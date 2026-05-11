@@ -32,6 +32,9 @@ const (
 	ConfigSectionAnnotation = "config-section"
 	SkipViperBindAnnotation = "skip-viper-bind"
 	ConfigFlag              = "config"
+	optionKey               = "option"
+	viperKey                = "viper_key"
+	valueKey                = "value"
 )
 
 // GetBaseDirectory returns the first parent directory that contains a .git directory.
@@ -171,8 +174,8 @@ func BindFlagValue(f *pflag.Flag, v *viper.Viper, viperName string) error {
 	// Apply the viper config value to the flag when the flag is not set and viper has a value
 	if f.Changed || !v.IsSet(viperName) {
 		logrus.WithFields(logrus.Fields{
-			"option":    f.Name,
-			"viper_key": viperName,
+			optionKey: f.Name,
+			viperKey:  viperName,
 		}).Trace("skipping applying viper config to flag because flag is already set or viper key is not set")
 		return nil
 	}
@@ -182,17 +185,17 @@ func BindFlagValue(f *pflag.Flag, v *viper.Viper, viperName string) error {
 		stringValues, err := toStringSlice(val)
 		if err != nil {
 			logrus.WithFields(logrus.Fields{
-				"option":    f.Name,
-				"viper_key": viperName,
-				"value":     val,
+				optionKey: f.Name,
+				viperKey:  viperName,
+				valueKey:  val,
 			}).WithError(err).Error("error converting options")
 			return fmt.Errorf("while getting viper array value for %s: %w", viperName, err)
 		}
 		if err := vi.Replace(stringValues); err != nil {
 			logrus.WithFields(logrus.Fields{
-				"option":    f.Name,
-				"viper_key": viperName,
-				"value":     val,
+				optionKey: f.Name,
+				viperKey:  viperName,
+				valueKey:  val,
 			}).WithError(err).Error("error replacing options")
 			return fmt.Errorf(
 				"while replacing viper array value for %s from viper key %s with value %v: %w",
@@ -205,9 +208,9 @@ func BindFlagValue(f *pflag.Flag, v *viper.Viper, viperName string) error {
 	} else {
 		if err := f.Value.Set(fmt.Sprintf("%v", val)); err != nil {
 			logrus.WithFields(logrus.Fields{
-				"option":    f.Name,
-				"viper_key": viperName,
-				"value":     val,
+				optionKey: f.Name,
+				viperKey:  viperName,
+				valueKey:  val,
 			}).WithError(err).Error("error replacing options")
 			return fmt.Errorf(
 				"while setting viper value for %s from viper key %s with value %v: %w",
@@ -239,8 +242,8 @@ func BindFlagSet(
 			viperName := GetFlagViperName(f, prefix)
 			if err := binder(f, v, viperName); err != nil {
 				logrus.WithFields(logrus.Fields{
-					"option":    f.Name,
-					"viper_key": viperName,
+					optionKey: f.Name,
+					viperKey:  viperName,
 				}).WithError(err).Error("error binding flag to viper")
 			}
 		}
