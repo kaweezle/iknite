@@ -25,17 +25,11 @@ func SetDefaults_IkniteClusterSpec(obj *IkniteClusterSpec) {
 	// values with defaults on subsequent calls.
 	fs := host.NewOsFS()
 	wsl := host.IsOnWSL(fs)
-	incus := host.IsOnIncus(fs)
-	outboundSet := false
 	if obj.Ip == nil {
-		if wsl || incus {
-			obj.Ip = net.ParseIP(constants.WslIPAddress)
-		} else {
-			outboundSet = true
-			obj.Ip, _ = host.NewDefaultNetworkHost().GetOutboundIP() //nolint:errcheck // it fails, no default
-		}
+		obj.Ip = net.ParseIP(constants.WslIPAddress)
+		obj.CreateIp = true
 	}
-	if obj.DomainName == "" && !outboundSet {
+	if obj.DomainName == "" && obj.CreateIp {
 		obj.DomainName = constants.WSLHostName
 	}
 	obj.EnableMDNS = wsl
@@ -45,7 +39,6 @@ func SetDefaults_IkniteClusterSpec(obj *IkniteClusterSpec) {
 	if obj.NetworkInterface == "" {
 		obj.NetworkInterface = constants.NetworkInterface
 	}
-	obj.CreateIp = wsl || incus
 	if obj.ClusterName == "" {
 		obj.ClusterName = constants.DefaultClusterName
 	}

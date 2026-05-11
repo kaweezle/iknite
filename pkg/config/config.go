@@ -366,8 +366,6 @@ func GetIkniteImages(fs host.FileSystem, ikniteConfig *v1alpha1.IkniteClusterSpe
 	ApplyIkniteClusterSpecToInitConfiguration(ikniteConfig, cfg)
 
 	containerImages := images.GetControlPlaneImages(&cfg.ClusterConfiguration)
-	// Add kube vip image
-	containerImages = append(containerImages, GetKubeVipImage())
 	if !ikniteConfig.UseEtcd {
 		// Add kine image if not using etcd
 		containerImages = append(containerImages, GetKineImage())

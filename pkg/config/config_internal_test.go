@@ -202,7 +202,7 @@ func TestGetKustomizationImages(t *testing.T) {
 	kustomization := "/etc/iknite.d"
 	ids, err := getKustomizationImages(fs, kustomization, false)
 	req.NoError(err)
-	req.Len(ids, 11)
+	req.Len(ids, 9)
 	req.Contains(ids, "public.ecr.aws/docker/library/busybox:1.37.0")
 
 	// Now create a bad kustomization to test error handling
@@ -248,7 +248,7 @@ func TestGetIkniteImages(t *testing.T) {
 	v1alpha1.SetDefaults_IkniteClusterSpec(clusterConfig)
 	ids, err := GetIkniteImages(fs, clusterConfig, false)
 	req.NoError(err)
-	req.Len(ids, 16)
+	req.Len(ids, 14)
 	req.Contains(ids, "public.ecr.aws/docker/library/busybox:1.37.0")
 
 	req.NoError(fs.MkdirAll(kustomization, os.FileMode(0o755)))

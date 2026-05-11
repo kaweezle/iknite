@@ -258,6 +258,17 @@ extraObjects:
     stringData:
       token: {{ .Values.data.github.api_token | quote }}
   -
+    apiVersion: gateway.kgateway.dev/v1alpha1
+    kind: GatewayParameters
+    metadata:
+      name: iknite-gw-params
+      namespace: argocd
+    spec:
+      kube:
+        service:
+          extraAnnotations:
+            config.iknite.app/outbound-ip: "true"
+  -
     apiVersion: gateway.networking.k8s.io/v1
     kind: Gateway
     metadata:
@@ -265,6 +276,11 @@ extraObjects:
       namespace: argocd
     spec:
       gatewayClassName: kgateway
+      infrastructure:
+        parametersRef:
+          name: iknite-gw-params
+          group: gateway.kgateway.dev
+          kind: GatewayParameters
       listeners:
         - name: web
           protocol: HTTP

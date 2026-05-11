@@ -119,7 +119,8 @@ func addInitWorkflowPhases(initRunner *workflow.Runner) {
 	initRunner.AppendPhase(WrapPhase(phases.NewEtcdPhase(), ikniteApi.Initializing, nil))
 	initRunner.AppendPhase(WrapPhase(iknitePhase.NewKineControlPlanePhase(), ikniteApi.Initializing, nil))
 	controlPlanePhase := phases.NewControlPlanePhase()
-	controlPlanePhase.Phases = append(controlPlanePhase.Phases, iknitePhase.NewKubeVipControlPlanePhase())
+	//nolint:gocritic // Keep the following for reference
+	//controlPlanePhase.Phases = append(controlPlanePhase.Phases, iknitePhase.NewKubeVipControlPlanePhase())
 
 	initRunner.AppendPhase(WrapPhase(controlPlanePhase, ikniteApi.Initializing, nil))
 	initRunner.AppendPhase(
