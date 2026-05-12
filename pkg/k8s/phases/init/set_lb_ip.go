@@ -34,6 +34,7 @@ func NewSetLBIPPhase() workflow.Phase {
 
 type setLBIPData interface {
 	host.HostProvider
+	IkniteClusterProvider
 	ContextProvider
 	RESTClientGetterProvider
 	ErrGroupProvider
@@ -47,9 +48,17 @@ func runSetLBIP(c workflow.RunData) error {
 
 	alpineHost := data.Host()
 
+	ips := make([]string, 0)
+
 	outboundIP, err := alpineHost.GetOutboundIP()
 	if err != nil {
 		return fmt.Errorf("failed to get outbound IP: %w", err)
+	}
+	ips = append(ips, outboundIP.String())
+
+	clusterIp := data.IkniteCluster().Spec.Ip
+	if !clusterIp.Equal(outboundIP) {
+		ips = append(ips, clusterIp.String())
 	}
 
 	getter, err := data.RESTClientGetter()
@@ -64,7 +73,7 @@ func runSetLBIP(c workflow.RunData) error {
 
 	ctx := data.Context()
 	data.ErrGroup().Go(func() error {
-		return watchSetLBIPServices(ctx, cs, outboundIP.String())
+		return watchSetLBIPServices(ctx, cs, ips...)
 	})
 
 	return nil
@@ -73,7 +82,7 @@ func runSetLBIP(c workflow.RunData) error {
 func watchSetLBIPServices(
 	ctx context.Context,
 	cs clientset.Interface,
-	outboundIP string,
+	outboundIPs ...string,
 ) error {
 	listOptions := metav1.ListOptions{
 		FieldSelector: fields.OneTermEqualSelector("spec.type", string(corev1.ServiceTypeLoadBalancer)).String(),
@@ -111,10 +120,10 @@ func watchSetLBIPServices(
 
 		logger.Info("Received service event")
 
-		if shouldPatchServiceLBIP(service, outboundIP) {
-			logger.WithField("outboundIP", outboundIP).Info("Patching LoadBalancer service with outbound IP")
+		if shouldPatchServiceLBIP(service, outboundIPs) {
+			logger.WithField("outboundIPs", outboundIPs).Info("Patching LoadBalancer service with outbound IP")
 
-			if err := patchServiceLBIP(ctx, cs, service, outboundIP); err != nil {
+			if err := patchServiceLBIP(ctx, cs, service, outboundIPs); err != nil {
 				log.WithError(err).WithField("service", service.Name).
 					Warn("Failed to patch LoadBalancer service")
 			}
@@ -126,7 +135,7 @@ func watchSetLBIPServices(
 	return nil
 }
 
-func shouldPatchServiceLBIP(service *corev1.Service, outboundIP string) bool {
+func shouldPatchServiceLBIP(service *corev1.Service, outboundIPs []string) bool {
 	if service.Spec.Type != corev1.ServiceTypeLoadBalancer {
 		return false
 	}
@@ -142,19 +151,28 @@ func shouldPatchServiceLBIP(service *corev1.Service, outboundIP string) bool {
 		return false
 	}
 	// Now check if the service already has the correct IP to avoid unnecessary patching
-	if len(service.Status.LoadBalancer.Ingress) > 0 {
-		if service.Status.LoadBalancer.Ingress[0].IP == outboundIP {
-			return false
+	if len(service.Status.LoadBalancer.Ingress) != len(outboundIPs) {
+		return true
+	}
+
+	ips := make(map[string]struct{})
+	for _, ingress := range service.Status.LoadBalancer.Ingress {
+		ips[ingress.IP] = struct{}{}
+	}
+
+	for _, ip := range outboundIPs {
+		if _, exists := ips[ip]; !exists {
+			return true
 		}
 	}
-	return true
+	return false
 }
 
 func patchServiceLBIP(
 	ctx context.Context,
 	cs clientset.Interface,
 	service *corev1.Service,
-	outboundIP string,
+	outboundIPs []string,
 ) error {
 	serviceCopy := service.DeepCopy()
 	// Create ports
@@ -166,11 +184,14 @@ func patchServiceLBIP(
 		}
 	}
 	ipMode := corev1.LoadBalancerIPModeVIP
-	ingress := []corev1.LoadBalancerIngress{{
-		IP:     outboundIP,
-		Ports:  portStatuses,
-		IPMode: &ipMode,
-	}}
+	ingress := make([]corev1.LoadBalancerIngress, 0, len(outboundIPs))
+	for _, outboundIP := range outboundIPs {
+		ingress = append(ingress, corev1.LoadBalancerIngress{
+			IP:     outboundIP,
+			Ports:  portStatuses,
+			IPMode: &ipMode,
+		})
+	}
 	serviceCopy.Status.LoadBalancer.Ingress = ingress
 
 	// update the service status with the new LoadBalancer IP and ports
@@ -185,9 +206,9 @@ func patchServiceLBIP(
 		return fmt.Errorf("failed to update service status: %w", err)
 	}
 	log.WithFields(log.Fields{
-		"service":    service.Name,
-		"namespace":  service.Namespace,
-		"outboundIP": outboundIP,
+		"service":     service.Name,
+		"namespace":   service.Namespace,
+		"outboundIPs": outboundIPs,
 	}).Info("Successfully patched LoadBalancer service with outbound IP")
 
 	return nil

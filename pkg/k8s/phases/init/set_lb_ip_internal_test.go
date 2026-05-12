@@ -17,6 +17,7 @@ import (
 
 	mockGenericCLI "github.com/kaweezle/iknite/mocks/k8s.io/cli-runtime/pkg/genericclioptions"
 	mockHost "github.com/kaweezle/iknite/mocks/pkg/host"
+	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
 	"github.com/kaweezle/iknite/pkg/host"
 	"github.com/kaweezle/iknite/pkg/testutil"
 )
@@ -70,6 +71,7 @@ func createGetter(t *testing.T, sOpts *testutil.TestServerOptions) genericcliopt
 type setLBIPPhaseData struct {
 	host     *mockHost.MockHost
 	ctx      context.Context
+	cluster  *v1alpha1.IkniteCluster
 	getter   genericclioptions.RESTClientGetter
 	errGroup *errgroup.Group
 }
@@ -82,6 +84,10 @@ func (d *setLBIPPhaseData) Host() host.Host {
 
 func (d *setLBIPPhaseData) Context() context.Context {
 	return d.ctx
+}
+
+func (d *setLBIPPhaseData) IkniteCluster() *v1alpha1.IkniteCluster {
+	return d.cluster
 }
 
 func (d *setLBIPPhaseData) RESTClientGetter() (genericclioptions.RESTClientGetter, error) {
@@ -124,6 +130,7 @@ func TestRunSetLBIP_NominalCase(t *testing.T) {
 		ctx:      t.Context(),
 		errGroup: &errgroup.Group{},
 		host:     createMockHostWithOutboundIP(t, ""),
+		cluster:  &v1alpha1.IkniteCluster{Spec: v1alpha1.IkniteClusterSpec{Ip: net.ParseIP(testOutboundIP)}},
 		getter:   createGetter(t, sOpts),
 	}
 
@@ -144,6 +151,7 @@ func TestRunSetLBIP_FailsOnRESTClientGetterError(t *testing.T) {
 		getter:   nil,
 		errGroup: &errgroup.Group{},
 		host:     createMockHostWithOutboundIP(t, ""),
+		cluster:  &v1alpha1.IkniteCluster{Spec: v1alpha1.IkniteClusterSpec{Ip: net.ParseIP(testOutboundIP)}},
 	}
 
 	err := runSetLBIP(data)
@@ -162,7 +170,7 @@ func TestShouldPatchServiceLBIP_WithValidAnnotation(t *testing.T) {
 		},
 	}
 
-	req.True(shouldPatchServiceLBIP(service, ""))
+	req.True(shouldPatchServiceLBIP(service, []string{testOutboundIP}))
 }
 
 func TestShouldPatchServiceLBIP_IgnoresNonLoadBalancer(t *testing.T) {
@@ -176,7 +184,7 @@ func TestShouldPatchServiceLBIP_IgnoresNonLoadBalancer(t *testing.T) {
 		},
 	}
 
-	req.False(shouldPatchServiceLBIP(service, testOutboundIP))
+	req.False(shouldPatchServiceLBIP(service, []string{testOutboundIP}))
 }
 
 func TestShouldPatchServiceLBIP_IgnoresWrongAnnotationValue(t *testing.T) {
@@ -190,7 +198,7 @@ func TestShouldPatchServiceLBIP_IgnoresWrongAnnotationValue(t *testing.T) {
 		},
 	}
 
-	req.False(shouldPatchServiceLBIP(service, testOutboundIP))
+	req.False(shouldPatchServiceLBIP(service, []string{testOutboundIP}))
 }
 
 func TestShouldPatchServiceLBIP_IgnoresMissingAnnotation(t *testing.T) {
@@ -202,7 +210,7 @@ func TestShouldPatchServiceLBIP_IgnoresMissingAnnotation(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{},
 	}
 
-	req.False(shouldPatchServiceLBIP(service, testOutboundIP))
+	req.False(shouldPatchServiceLBIP(service, []string{testOutboundIP}))
 }
 
 func TestRunSetLBIP_StartsWatcher(t *testing.T) {
@@ -222,6 +230,7 @@ func TestRunSetLBIP_StartsWatcher(t *testing.T) {
 		getter:   mockGetter,
 		errGroup: eg,
 		host:     createMockHostWithOutboundIP(t, ""),
+		cluster:  &v1alpha1.IkniteCluster{Spec: v1alpha1.IkniteClusterSpec{Ip: net.ParseIP(testOutboundIP)}},
 	}
 
 	// This will fail because the mock returns an error
@@ -270,7 +279,7 @@ func TestShouldPatchServiceLBIP_AnnotationVariations(t *testing.T) {
 				},
 			}
 
-			req.Equal(tt.wantPatch, shouldPatchServiceLBIP(service, testOutboundIP))
+			req.Equal(tt.wantPatch, shouldPatchServiceLBIP(service, []string{testOutboundIP}))
 		})
 	}
 }
@@ -289,6 +298,7 @@ func TestRunSetLBIP_ContextCancellation(t *testing.T) {
 		ctx:      ctx,
 		errGroup: eg,
 		host:     createMockHostWithOutboundIP(t, ""),
+		cluster:  &v1alpha1.IkniteCluster{Spec: v1alpha1.IkniteClusterSpec{Ip: net.ParseIP(testOutboundIP)}},
 		getter:   createGetter(t, sOpts),
 	}
 
@@ -305,7 +315,7 @@ func TestShouldPatchServiceLBIP_NilAnnotations(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{Annotations: nil},
 	}
 
-	req.False(shouldPatchServiceLBIP(service, testOutboundIP))
+	req.False(shouldPatchServiceLBIP(service, []string{testOutboundIP}))
 }
 
 func TestSetLBIPPatchGeneration(t *testing.T) {
@@ -319,8 +329,8 @@ func TestSetLBIPPatchGeneration(t *testing.T) {
 
 	// Test that shouldPatchServiceLBIP correctly identifies services
 	service.Annotations = map[string]string{setLBIPAnnotation: "true"}
-	req.True(shouldPatchServiceLBIP(service, testOutboundIP))
+	req.True(shouldPatchServiceLBIP(service, []string{testOutboundIP}))
 
 	service.Annotations = map[string]string{setLBIPAnnotation: "false"}
-	req.False(shouldPatchServiceLBIP(service, testOutboundIP))
+	req.False(shouldPatchServiceLBIP(service, []string{testOutboundIP}))
 }
