@@ -11,7 +11,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/watch"
-	clientset "k8s.io/client-go/kubernetes"
+	v1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 
 	"github.com/kaweezle/iknite/pkg/host"
@@ -51,7 +51,7 @@ func runSetLBIP(c workflow.RunData) error {
 	ips := make([]string, 0)
 
 	outboundIP, err := alpineHost.GetOutboundIP()
-	if err != nil {
+	if err != nil { // nocov -- Unlikely to fail and hard to test, so skipping coverage
 		return fmt.Errorf("failed to get outbound IP: %w", err)
 	}
 	ips = append(ips, outboundIP.String())
@@ -71,9 +71,11 @@ func runSetLBIP(c workflow.RunData) error {
 		return fmt.Errorf("failed to get kubernetes clientset: %w", err)
 	}
 
+	core := cs.CoreV1()
+
 	ctx := data.Context()
 	data.ErrGroup().Go(func() error {
-		return watchSetLBIPServices(ctx, cs, ips...)
+		return watchSetLBIPServices(ctx, core, ips...)
 	})
 
 	return nil
@@ -81,14 +83,14 @@ func runSetLBIP(c workflow.RunData) error {
 
 func watchSetLBIPServices(
 	ctx context.Context,
-	cs clientset.Interface,
+	core v1.CoreV1Interface,
 	outboundIPs ...string,
 ) error {
 	listOptions := metav1.ListOptions{
 		FieldSelector: fields.OneTermEqualSelector("spec.type", string(corev1.ServiceTypeLoadBalancer)).String(),
 	}
 
-	watcher, err := cs.CoreV1().Services(metav1.NamespaceAll).Watch(ctx, listOptions)
+	watcher, err := core.Services(metav1.NamespaceAll).Watch(ctx, listOptions)
 	if err != nil {
 		return fmt.Errorf("failed to watch services in all namespaces: %w", err)
 	}
@@ -107,7 +109,7 @@ func watchSetLBIPServices(
 		}
 
 		service, ok := event.Object.(*corev1.Service)
-		if !ok {
+		if !ok { // nocov -- Should never happen, and hard to test, so skipping coverage
 			log.WithField("eventObject", event.Object).Warn("Received unexpected object type in service watch")
 			continue
 		}
@@ -123,9 +125,9 @@ func watchSetLBIPServices(
 		if shouldPatchServiceLBIP(service, outboundIPs) {
 			logger.WithField("outboundIPs", outboundIPs).Info("Patching LoadBalancer service with outbound IP")
 
-			if err := patchServiceLBIP(ctx, cs, service, outboundIPs); err != nil {
+			if err := patchServiceLBIP(ctx, core, service, outboundIPs); err != nil {
 				log.WithError(err).WithField("service", service.Name).
-					Warn("Failed to patch LoadBalancer service")
+					Error("Failed to patch LoadBalancer service")
 			}
 		} else {
 			logger.Debug("No patch needed for service")
@@ -136,7 +138,7 @@ func watchSetLBIPServices(
 }
 
 func shouldPatchServiceLBIP(service *corev1.Service, outboundIPs []string) bool {
-	if service.Spec.Type != corev1.ServiceTypeLoadBalancer {
+	if service.Spec.Type != corev1.ServiceTypeLoadBalancer { // nocov -- watcher is filtered
 		return false
 	}
 
@@ -170,7 +172,7 @@ func shouldPatchServiceLBIP(service *corev1.Service, outboundIPs []string) bool 
 
 func patchServiceLBIP(
 	ctx context.Context,
-	cs clientset.Interface,
+	core v1.CoreV1Interface,
 	service *corev1.Service,
 	outboundIPs []string,
 ) error {
@@ -195,12 +197,12 @@ func patchServiceLBIP(
 	serviceCopy.Status.LoadBalancer.Ingress = ingress
 
 	// update the service status with the new LoadBalancer IP and ports
-	_, err := cs.CoreV1().Services(service.Namespace).
+	_, err := core.Services(service.Namespace).
 		UpdateStatus(ctx, serviceCopy, metav1.UpdateOptions{FieldManager: "iknite"})
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			log.WithField("service", service.Name).
-				Info("Service not found when patching LB IP, it may have been deleted")
+				Warn("Service not found when patching LB IP, it may have been deleted")
 			return nil
 		}
 		return fmt.Errorf("failed to update service status: %w", err)

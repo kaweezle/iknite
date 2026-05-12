@@ -1,4 +1,5 @@
 // cSpell: words clientset corev metav apimachinery errgroup genericclioptions lbip testutil errchkjson sirupsen
+// cSpell: words paralleltest
 package init
 
 import (
@@ -9,14 +10,21 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/sirupsen/logrus"
+	logTest "github.com/sirupsen/logrus/hooks/test"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sync/errgroup"
 	corev1 "k8s.io/api/core/v1"
+	apiErrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 
 	mockGenericCLI "github.com/kaweezle/iknite/mocks/k8s.io/cli-runtime/pkg/genericclioptions"
+	mockV1 "github.com/kaweezle/iknite/mocks/k8s.io/client-go/kubernetes/typed/core/v1"
 	mockHost "github.com/kaweezle/iknite/mocks/pkg/host"
+
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
 	"github.com/kaweezle/iknite/pkg/host"
 	"github.com/kaweezle/iknite/pkg/testutil"
@@ -24,11 +32,11 @@ import (
 
 const (
 	testOutboundIP = "10.196.248.109"
+	testClusterIP  = "10.196.248.110"
 	//nolint:lll // JSON string is long and difficult to break into multiple lines without losing readability
 	serviceEvent = `{"type":"ADDED","object":{"kind":"Service","apiVersion":"v1","metadata":{"name":"argocd-gateway","namespace":"argocd","uid":"53bb5ca7-e030-41c0-9dd2-47d5acb43f6c","resourceVersion":"1065","creationTimestamp":"2026-05-10T16:14:31Z","labels":{"app.kubernetes.io/instance":"argocd-gateway","app.kubernetes.io/managed-by":"kgateway","app.kubernetes.io/name":"argocd-gateway","app.kubernetes.io/version":"v2.2.2"},"annotations":{"config.iknite.app/outbound-ip":"true"}},"spec":{"ports":[{"name":"listener-80","protocol":"TCP","port":80,"targetPort":80,"nodePort":30818},{"name":"listener-443","protocol":"TCP","port":443,"targetPort":443,"nodePort":32243}],"selector":{"app.kubernetes.io/instance":"argocd-gateway","app.kubernetes.io/name":"argocd-gateway","gateway.networking.k8s.io/gateway-name":"argocd-gateway"},"type":"LoadBalancer","sessionAffinity":"None","externalTrafficPolicy":"Cluster","ipFamilies":["IPv4"],"ipFamilyPolicy":"SingleStack","allocateLoadBalancerNodePorts":true,"internalTrafficPolicy":"Cluster"}}}`
 )
 
-//nolint:unparam // For future test cases we may want to specify different IPs
 func createMockHostWithOutboundIP(t *testing.T, ip string) *mockHost.MockHost {
 	t.Helper()
 	if ip == "" {
@@ -140,6 +148,31 @@ func TestRunSetLBIP_NominalCase(t *testing.T) {
 	writeLog := sOpts.Requests[1]
 	req.Equal(http.MethodPut, writeLog.Method)
 	req.Equal("/api/v1/namespaces/argocd/services/argocd-gateway/status", writeLog.Path)
+}
+
+func TestRunSetLBIP_UsesOutboundAndClusterIPWhenDifferent(t *testing.T) {
+	t.Parallel()
+	req := require.New(t)
+
+	sOpts := toUpdateServiceOptions()
+
+	data := &setLBIPPhaseData{
+		ctx:      t.Context(),
+		errGroup: &errgroup.Group{},
+		host:     createMockHostWithOutboundIP(t, testOutboundIP),
+		cluster:  &v1alpha1.IkniteCluster{Spec: v1alpha1.IkniteClusterSpec{Ip: net.ParseIP(testClusterIP)}},
+		getter:   createGetter(t, sOpts),
+	}
+
+	req.NoError(runSetLBIP(data))
+	req.NoError(data.errGroup.Wait())
+	req.Len(sOpts.Requests, 2)
+
+	writeLog := sOpts.Requests[1]
+	req.Equal(http.MethodPut, writeLog.Method)
+	req.Equal("/api/v1/namespaces/argocd/services/argocd-gateway/status", writeLog.Path)
+	req.Contains(writeLog.Body, testOutboundIP)
+	req.Contains(writeLog.Body, testClusterIP)
 }
 
 func TestRunSetLBIP_FailsOnRESTClientGetterError(t *testing.T) {
@@ -333,4 +366,224 @@ func TestSetLBIPPatchGeneration(t *testing.T) {
 
 	service.Annotations = map[string]string{setLBIPAnnotation: "false"}
 	req.False(shouldPatchServiceLBIP(service, []string{testOutboundIP}))
+}
+
+func TestWatchSetLBIPServices(t *testing.T) {
+	t.Parallel()
+	req := require.New(t)
+	mockServiceInterface := mockV1.NewMockServiceInterface(t)
+	mockCoreV1Interface := mockV1.NewMockCoreV1Interface(t)
+	mockCoreV1Interface.EXPECT().Services(metav1.NamespaceAll).Return(mockServiceInterface).Once()
+	mockCoreV1Interface.EXPECT().Services("argocd").Return(mockServiceInterface).Once()
+	fakeWatcher := watch.NewFake()
+	var updatedService *corev1.Service
+	mockServiceInterface.EXPECT().Watch(mock.Anything, mock.Anything).Return(fakeWatcher, nil).Once()
+	updateChannel := make(chan struct{}, 1) // Buffered channel to avoid blocking
+	mockServiceInterface.EXPECT().UpdateStatus(mock.Anything, mock.Anything, mock.Anything).RunAndReturn(
+		func(_ context.Context, service *corev1.Service, _ metav1.UpdateOptions) (*corev1.Service, error) {
+			updatedService = service
+			updateChannel <- struct{}{} // Signal that the update was called
+			return service, nil
+		}).Once()
+
+	service := &corev1.Service{
+		Spec: corev1.ServiceSpec{
+			Type: corev1.ServiceTypeLoadBalancer,
+			Ports: []corev1.ServicePort{
+				{Name: "http", Port: 80, Protocol: corev1.ProtocolTCP},
+				{Name: "https", Port: 443, Protocol: corev1.ProtocolTCP},
+			},
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        "argocd-gateway",
+			Namespace:   "argocd",
+			Annotations: map[string]string{setLBIPAnnotation: "true"},
+		},
+	}
+
+	var eg errgroup.Group
+	eg.Go(func() error {
+		return watchSetLBIPServices(t.Context(), mockCoreV1Interface, testOutboundIP)
+	})
+
+	fakeWatcher.Add(service)
+	<-updateChannel // Wait for the update to be called
+	req.NotNil(updatedService)
+	req.Len(updatedService.Status.LoadBalancer.Ingress, 1)
+	fakeWatcher.Modify(updatedService)               // IPs as expected, should not trigger another update
+	fakeWatcher.Delete(service)                      // Clean up by simulating deletion of the service
+	service.Annotations[setLBIPAnnotation] = "false" // Change annotation to avoid patch
+	fakeWatcher.Add(service)                         // Should not patch (Once still valid)
+	fakeWatcher.Stop()                               // Stop the watcher to end the test
+
+	err := eg.Wait()
+	req.NoError(err)
+}
+
+// Same test as before, but with update error because the service has been deleted between the watch event and the patch
+// attempt. This tests that we handle NotFound errors gracefully.
+//
+//nolint:paralleltest // Messing with logs
+func TestWatchSetLBIPServices_ServiceDeletedBeforePatch(t *testing.T) {
+	hook := logTest.NewGlobal()
+	defer hook.Reset()
+	req := require.New(t)
+	mockServiceInterface := mockV1.NewMockServiceInterface(t)
+	mockCoreV1Interface := mockV1.NewMockCoreV1Interface(t)
+	mockCoreV1Interface.EXPECT().Services(metav1.NamespaceAll).Return(mockServiceInterface).Once()
+	mockCoreV1Interface.EXPECT().Services("argocd").Return(mockServiceInterface).Once()
+	fakeWatcher := watch.NewFake()
+	mockServiceInterface.EXPECT().Watch(mock.Anything, mock.Anything).Return(fakeWatcher, nil).Once()
+	mockServiceInterface.EXPECT().UpdateStatus(mock.Anything, mock.Anything, mock.Anything).
+		Return(nil, apiErrors.NewNotFound(corev1.Resource("services"), "argocd-gateway")).Once()
+
+	service := &corev1.Service{
+		Spec: corev1.ServiceSpec{
+			Type: corev1.ServiceTypeLoadBalancer,
+			Ports: []corev1.ServicePort{
+				{Name: "http", Port: 80, Protocol: corev1.ProtocolTCP},
+				{Name: "https", Port: 443, Protocol: corev1.ProtocolTCP},
+			},
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        "argocd-gateway",
+			Namespace:   "argocd",
+			Annotations: map[string]string{setLBIPAnnotation: "true"},
+		},
+	}
+
+	var eg errgroup.Group
+	eg.Go(func() error {
+		return watchSetLBIPServices(t.Context(), mockCoreV1Interface, testOutboundIP)
+	})
+
+	fakeWatcher.Add(service)
+	fakeWatcher.Stop() // Stop the watcher to end the test
+
+	err := eg.Wait()
+	req.NoError(err) // Should not return an error even though the update failed with NotFound
+	req.Equal(logrus.WarnLevel, hook.LastEntry().Level)
+	req.Equal("Service not found when patching LB IP, it may have been deleted", hook.LastEntry().Message)
+}
+
+// Same test as before, but other kind of error when patching, to verify that we log an error but keep watching for
+// other events.
+//
+//nolint:paralleltest // Messing with logs
+func TestWatchSetLBIPServices_PatchError(t *testing.T) {
+	hook := logTest.NewGlobal()
+	defer hook.Reset()
+	req := require.New(t)
+	mockServiceInterface := mockV1.NewMockServiceInterface(t)
+	mockCoreV1Interface := mockV1.NewMockCoreV1Interface(t)
+	mockCoreV1Interface.EXPECT().Services(metav1.NamespaceAll).Return(mockServiceInterface).Once()
+	mockCoreV1Interface.EXPECT().Services("argocd").Return(mockServiceInterface).Once()
+	fakeWatcher := watch.NewFake()
+	mockServiceInterface.EXPECT().Watch(mock.Anything, mock.Anything).Return(fakeWatcher, nil).Once()
+	mockServiceInterface.EXPECT().UpdateStatus(mock.Anything, mock.Anything, mock.Anything).
+		Return(nil, errors.New("mock update error")).Once()
+
+	service := &corev1.Service{
+		Spec: corev1.ServiceSpec{
+			Type: corev1.ServiceTypeLoadBalancer,
+			Ports: []corev1.ServicePort{
+				{Name: "http", Port: 80, Protocol: corev1.ProtocolTCP},
+				{Name: "https", Port: 443, Protocol: corev1.ProtocolTCP},
+			},
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        "argocd-gateway",
+			Namespace:   "argocd",
+			Annotations: map[string]string{setLBIPAnnotation: "true"},
+		},
+	}
+
+	var eg errgroup.Group
+	eg.Go(func() error {
+		return watchSetLBIPServices(t.Context(), mockCoreV1Interface, testOutboundIP)
+	})
+
+	fakeWatcher.Add(service)
+	fakeWatcher.Stop() // Stop the watcher to end the test
+
+	err := eg.Wait()
+	req.NoError(err) // Should not return an error even though the update failed
+	req.Equal(logrus.ErrorLevel, hook.LastEntry().Level)
+	req.Equal("Failed to patch LoadBalancer service", hook.LastEntry().Message)
+}
+
+func TestWatchSetLBIPServices_WatchError(t *testing.T) {
+	t.Parallel()
+	req := require.New(t)
+	mockServiceInterface := mockV1.NewMockServiceInterface(t)
+	mockCoreV1Interface := mockV1.NewMockCoreV1Interface(t)
+	mockCoreV1Interface.EXPECT().Services(metav1.NamespaceAll).Return(mockServiceInterface).Once()
+	mockServiceInterface.EXPECT().Watch(mock.Anything, mock.Anything).Return(nil, errors.New("mock watch error")).Once()
+
+	var eg errgroup.Group
+	eg.Go(func() error {
+		return watchSetLBIPServices(t.Context(), mockCoreV1Interface, testOutboundIP)
+	})
+
+	err := eg.Wait()
+	req.Error(err)
+}
+
+func TestWatchSetLBIPServices_ChangeOneIpAddress(t *testing.T) {
+	t.Parallel()
+	req := require.New(t)
+	mockServiceInterface := mockV1.NewMockServiceInterface(t)
+	mockCoreV1Interface := mockV1.NewMockCoreV1Interface(t)
+	mockCoreV1Interface.EXPECT().Services(metav1.NamespaceAll).Return(mockServiceInterface).Once()
+	mockCoreV1Interface.EXPECT().Services("argocd").Return(mockServiceInterface).Twice()
+	fakeWatcher := watch.NewFake()
+	var updatedService *corev1.Service
+	mockServiceInterface.EXPECT().Watch(mock.Anything, mock.Anything).Return(fakeWatcher, nil).Once()
+	updateChannel := make(chan struct{}, 1) // Buffered channel to avoid blocking
+	mockServiceInterface.EXPECT().UpdateStatus(mock.Anything, mock.Anything, mock.Anything).RunAndReturn(
+		func(_ context.Context, service *corev1.Service, _ metav1.UpdateOptions) (*corev1.Service, error) {
+			updatedService = service
+			updateChannel <- struct{}{} // Signal that the update was called
+			return service, nil
+		}).Twice()
+
+	service := &corev1.Service{
+		Spec: corev1.ServiceSpec{
+			Type: corev1.ServiceTypeLoadBalancer,
+			Ports: []corev1.ServicePort{
+				{Name: "http", Port: 80, Protocol: corev1.ProtocolTCP},
+				{Name: "https", Port: 443, Protocol: corev1.ProtocolTCP},
+			},
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        "argocd-gateway",
+			Namespace:   "argocd",
+			Annotations: map[string]string{setLBIPAnnotation: "true"},
+		},
+	}
+
+	var eg errgroup.Group
+	eg.Go(func() error {
+		return watchSetLBIPServices(t.Context(), mockCoreV1Interface, testOutboundIP, testClusterIP)
+	})
+
+	fakeWatcher.Add(service)
+	<-updateChannel // Wait for the update to be called
+	req.NotNil(updatedService)
+	req.Len(updatedService.Status.LoadBalancer.Ingress, 2)
+	otherService := updatedService.DeepCopy()
+	otherService.Status.LoadBalancer.Ingress[0].IP = "192.168.1.19" // Simulate change of one IP address
+
+	fakeWatcher.Modify(otherService) // Should trigger another update since one IP address changed
+	<-updateChannel                  // Wait for the second update to be called
+	req.NotNil(updatedService)
+	req.Len(updatedService.Status.LoadBalancer.Ingress, 2)
+	req.Contains(updatedService.Status.LoadBalancer.Ingress[0].IP, testOutboundIP)
+	req.Contains(updatedService.Status.LoadBalancer.Ingress[1].IP, testClusterIP)
+	fakeWatcher.Error(&apiErrors.NewInternalError(errors.New("internal error")).ErrStatus)
+	fakeWatcher.Stop() // Stop the watcher to end the test
+
+	err := eg.Wait()
+	req.Error(err)
+	req.Contains(err.Error(), "watch error: Internal error occurred: internal error")
 }

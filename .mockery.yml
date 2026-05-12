@@ -31,6 +31,10 @@ packages:
     interfaces: { Interface }
     config:
       include-auto-generated: true
+  k8s.io/client-go/kubernetes/typed/core/v1:
+    interfaces: { ServiceInterface, CoreV1Interface }
+    config:
+      include-auto-generated: true
   k8s.io/client-go/discovery:
     interfaces: { DiscoveryInterface, CachedDiscoveryInterface }
   k8s.io/client-go/tools/clientcmd:
