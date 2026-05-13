@@ -199,6 +199,20 @@ func (d *DelegateHost) Chmod(path string, mode os.FileMode) error {
 	return d.Fs.Chmod(path, mode)
 }
 
+// DialTimeout implements [host.Host].
+func (d *DelegateHost) DialTimeout(
+	ctx context.Context,
+	network, address string,
+	timeout time.Duration,
+) (net.Conn, error) {
+	return d.Net.DialTimeout(ctx, network, address, timeout)
+}
+
+// Listen implements [host.Host].
+func (d *DelegateHost) Listen(ctx context.Context, network, address string) (net.Listener, error) {
+	return d.Net.Listen(ctx, network, address)
+}
+
 var _ host.Host = (*DelegateHost)(nil)
 
 func NewDelegateHost(fs host.FileSystem, exec host.Executor, sys host.System, n host.NetworkHost) *DelegateHost {
@@ -216,6 +230,22 @@ type DummyNetworkHost struct {
 	mappedHosts map[string][]string
 	hostConfig  *txeh.HostsConfig
 	ipAddresses []net.IP
+}
+
+// DialTimeout implements [host.NetworkHost].
+func (d *DummyNetworkHost) DialTimeout(
+	ctx context.Context,
+	network, address string,
+	timeout time.Duration,
+) (net.Conn, error) {
+	dialer := &net.Dialer{Timeout: timeout}
+	return dialer.DialContext(ctx, network, address) //nolint:wrapcheck // intentional
+}
+
+// Listen implements [host.NetworkHost].
+func (d *DummyNetworkHost) Listen(ctx context.Context, network, address string) (net.Listener, error) {
+	lc := &net.ListenConfig{}
+	return lc.Listen(ctx, network, address) //nolint:wrapcheck // intentional
 }
 
 func (d *DummyNetworkHost) GetOutboundIP() (net.IP, error) {

@@ -21,12 +21,12 @@ spec:
               fieldPath: spec.nodeName
         - name: vip_interface
           value: eth0
-        - name: vip_cidr
-          value: "32"
         - name: vip_subnet
-          value: "/32"
+          value: "32"
         - name: dns_mode
           value: first
+        - name: dhcp_mode
+          value: ipv4
         - name: cp_enable
           value: "true"
         - name: cp_namespace
@@ -40,17 +40,15 @@ spec:
         - name: vip_leasename
           value: plndr-cp-lock
         - name: vip_leaseduration
-          value: "5"
+          value: "15"
         - name: vip_renewdeadline
-          value: "3"
+          value: "10"
         - name: vip_retryperiod
-          value: "1"
+          value: "2"
         - name: address
           value: {{ .Ip }}
         - name: prometheus_server
           value: :2112
-        - name: dhcp_mode
-          value: ipv4
       image: {{ KubeVipImage }}
       imagePullPolicy: IfNotPresent
       name: kube-vip

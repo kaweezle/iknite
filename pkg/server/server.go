@@ -215,10 +215,10 @@ func EnsureClientCertAndKey(fs host.FileSystem, certDir string) error {
 func EnsureIkniteConf(fs host.FileSystem, certDir, confPath string, spec *v1alpha1.IkniteClusterSpec) error {
 	// Determine the server address from the cluster spec
 	serverAddr := "localhost"
-	if spec.Ip != nil && !spec.Ip.IsLoopback() {
-		serverAddr = spec.Ip.String()
-	} else if spec.DomainName != "" {
+	if spec.DomainName != "" {
 		serverAddr = spec.DomainName
+	} else if spec.Ip != nil && !spec.Ip.IsLoopback() {
+		serverAddr = spec.Ip.String()
 	}
 	serverURL := fmt.Sprintf("https://%s", net.JoinHostPort(serverAddr, strconv.Itoa(spec.StatusServerPort)))
 

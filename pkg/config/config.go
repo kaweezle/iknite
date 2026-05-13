@@ -27,6 +27,8 @@ import (
 	"github.com/mitchellh/mapstructure"
 	flag "github.com/spf13/pflag"
 	"github.com/spf13/viper"
+	appsV1 "k8s.io/api/apps/v1"
+	batchV1 "k8s.io/api/batch/v1"
 	kubeadmApi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmScheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
 	kubeadmApiV1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta4"
@@ -202,7 +204,7 @@ func ApplyIkniteClusterSpecToInitConfiguration(
 }
 
 func GetKubeVipImage() string {
-	return "ghcr.io/kube-vip/kube-vip:v0.8.9"
+	return "ghcr.io/kube-vip/kube-vip:v1.1.2"
 }
 
 func GetKineImage() string {
@@ -293,13 +295,13 @@ func getKGatewayGatewayImage(rn *kyaml.RNode) (string, error) {
 }
 
 var workloadKinds = []resid.Gvk{
-	{Group: "apps", Kind: "DaemonSet"},
-	{Group: "apps", Kind: "Deployment"},
-	{Group: "apps", Kind: "StatefulSet"},
-	{Group: "apps", Kind: "ReplicaSet"},
-	{Group: "apps", Kind: "ReplicationController"},
-	{Group: "batch", Kind: "Job"},
-	{Group: "batch", Kind: "CronJob"},
+	{Group: appsV1.GroupName, Kind: "DaemonSet"},
+	{Group: appsV1.GroupName, Kind: "Deployment"},
+	{Group: appsV1.GroupName, Kind: "StatefulSet"},
+	{Group: appsV1.GroupName, Kind: "ReplicaSet"},
+	{Group: appsV1.GroupName, Kind: "ReplicationController"},
+	{Group: batchV1.GroupName, Kind: "Job"},
+	{Group: batchV1.GroupName, Kind: "CronJob"},
 }
 
 func getKustomizationImages(fs host.FileSystem, kustomization string, forceEmbedded bool) ([]string, error) {
@@ -364,8 +366,6 @@ func GetIkniteImages(fs host.FileSystem, ikniteConfig *v1alpha1.IkniteClusterSpe
 	ApplyIkniteClusterSpecToInitConfiguration(ikniteConfig, cfg)
 
 	containerImages := images.GetControlPlaneImages(&cfg.ClusterConfiguration)
-	// Add kube vip image
-	containerImages = append(containerImages, GetKubeVipImage())
 	if !ikniteConfig.UseEtcd {
 		// Add kine image if not using etcd
 		containerImages = append(containerImages, GetKineImage())

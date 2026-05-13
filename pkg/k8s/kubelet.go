@@ -55,7 +55,7 @@ func StartKubelet(ctx context.Context, h host.FileExecutor) (host.Process, error
 
 	// Check if a process with the value contained in kubeletPidFile exists
 	// ignore the error if for some reason the pid file is not found
-	kubeletPid, p, err := alpine.CheckPidFile(h, "kubelet")
+	kubeletPid, p, err := alpine.CheckPidFile(h, KubeletName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to check kubelet pid file: %w", err)
 	}
@@ -136,7 +136,7 @@ func StartKubelet(ctx context.Context, h host.FileExecutor) (host.Process, error
 	if err != nil {
 		log.WithFields(log.Fields{
 			"pid":     p.Pid(),
-			"err":     err,
+			errKey:    err,
 			"pidFile": pidFilePath,
 		}).Warn("Failed to write kubelet PID file")
 	}
@@ -237,7 +237,7 @@ func CheckServerRunning(
 	for ; retries > 0; retries-- {
 		if !first {
 			log.WithFields(log.Fields{
-				"err":       err,
+				errKey:      err,
 				"wait_time": waitTime,
 			}).Debug("Waiting...")
 			time.Sleep(waitTime)

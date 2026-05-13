@@ -19,6 +19,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	appsV1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -43,10 +44,19 @@ import (
 var content embed.FS
 
 func NewWorkloadRESTMapper(includeApplications bool) meta.RESTMapper {
-	mapper := meta.NewDefaultRESTMapper([]schema.GroupVersion{{Group: "apps", Version: "v1"}})
-	mapper.Add(schema.GroupVersionKind{Group: "apps", Version: "v1", Kind: "Deployment"}, meta.RESTScopeNamespace)
-	mapper.Add(schema.GroupVersionKind{Group: "apps", Version: "v1", Kind: "StatefulSet"}, meta.RESTScopeNamespace)
-	mapper.Add(schema.GroupVersionKind{Group: "apps", Version: "v1", Kind: "DaemonSet"}, meta.RESTScopeNamespace)
+	mapper := meta.NewDefaultRESTMapper([]schema.GroupVersion{{Group: appsV1.GroupName, Version: "v1"}})
+	mapper.Add(
+		schema.GroupVersionKind{Group: appsV1.GroupName, Version: "v1", Kind: "Deployment"},
+		meta.RESTScopeNamespace,
+	)
+	mapper.Add(
+		schema.GroupVersionKind{Group: appsV1.GroupName, Version: "v1", Kind: "StatefulSet"},
+		meta.RESTScopeNamespace,
+	)
+	mapper.Add(
+		schema.GroupVersionKind{Group: appsV1.GroupName, Version: "v1", Kind: "DaemonSet"},
+		meta.RESTScopeNamespace,
+	)
 	if includeApplications {
 		mapper.Add(argoprojv1.ApplicationSchemaGroupVersionKind, meta.RESTScopeNamespace)
 	}
@@ -249,7 +259,7 @@ func ContentPatchHandler(subdir string, options *TestServerOptions) http.Handler
 			w.WriteHeader(http.StatusOK)
 			log.StatusCode = http.StatusOK
 			_, _ = w.Write(body) //nolint:errcheck // test server, ignore error
-		case http.MethodPost:
+		case http.MethodPost, http.MethodPut:
 			body, err := io.ReadAll(r.Body)
 			log.Body = string(body)
 			content_type := r.Header.Get("Content-Type")

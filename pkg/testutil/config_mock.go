@@ -10,15 +10,17 @@ import (
 	"github.com/kaweezle/iknite/pkg/host"
 )
 
+const clusterName = "iknite"
+
 func GetBasicConfigContent(url string) ([]byte, error) {
 	if url == "" {
 		url = "https://127.0.0.1:6443"
 	}
 	config := &api.Config{
-		Clusters:       map[string]*api.Cluster{"iknite": {Server: url}},
-		Contexts:       map[string]*api.Context{"iknite": {Cluster: "iknite", AuthInfo: "iknite"}},
-		AuthInfos:      map[string]*api.AuthInfo{"iknite": {}},
-		CurrentContext: "iknite",
+		Clusters:       map[string]*api.Cluster{clusterName: {Server: url}},
+		Contexts:       map[string]*api.Context{clusterName: {Cluster: clusterName, AuthInfo: clusterName}},
+		AuthInfos:      map[string]*api.AuthInfo{clusterName: {}},
+		CurrentContext: clusterName,
 	}
 
 	content, err := clientcmd.Write(*config)

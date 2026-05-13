@@ -1,0 +1,67 @@
+{
+  "type": "ADDED",
+  "object": {
+    "kind": "Service",
+    "apiVersion": "v1",
+    "metadata": {
+      "name": "argocd-gateway",
+      "namespace": "argocd",
+      "uid": "53bb5ca7-e030-41c0-9dd2-47d5acb43f6c",
+      "resourceVersion": "1065",
+      "creationTimestamp": "2026-05-10T16:14:31Z",
+      "labels": {
+        "app.kubernetes.io/instance": "argocd-gateway",
+        "app.kubernetes.io/managed-by": "kgateway",
+        "app.kubernetes.io/name": "argocd-gateway",
+        "app.kubernetes.io/version": "v2.2.2"
+      },
+      "annotations": {
+        "config.iknite.app/outbound-ip": "true"
+      }
+    },
+    "spec": {
+      "ports": [
+        {
+          "name": "listener-80",
+          "protocol": "TCP",
+          "port": 80,
+          "targetPort": 80,
+          "nodePort": 30818
+        },
+        {
+          "name": "listener-443",
+          "protocol": "TCP",
+          "port": 443,
+          "targetPort": 443,
+          "nodePort": 32243
+        }
+      ],
+      "selector": {
+        "app.kubernetes.io/instance": "argocd-gateway",
+        "app.kubernetes.io/name": "argocd-gateway",
+        "gateway.networking.k8s.io/gateway-name": "argocd-gateway"
+      },
+      "type": "LoadBalancer",
+      "sessionAffinity": "None",
+      "externalTrafficPolicy": "Cluster",
+      "ipFamilies": ["IPv4"],
+      "ipFamilyPolicy": "SingleStack",
+      "allocateLoadBalancerNodePorts": true,
+      "internalTrafficPolicy": "Cluster"
+    },
+    "status": {
+      "loadBalancer": {
+        "ingress": [
+          {
+            "ip": "192.168.99.2",
+            "ipMode": "VIP",
+            "ports": [
+              { "port": 80, "protocol": "TCP" },
+              { "port": 443, "protocol": "TCP" }
+            ]
+          }
+        ]
+      }
+    }
+  }
+}

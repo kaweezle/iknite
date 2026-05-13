@@ -7,6 +7,7 @@ package host
 import (
 	"context"
 	"net"
+	"time"
 
 	mock "github.com/stretchr/testify/mock"
 	"github.com/txn2/txeh"
@@ -95,6 +96,86 @@ func (_c *MockNetworkHost_CheckIpExists_Call) Return(b bool, err error) *MockNet
 }
 
 func (_c *MockNetworkHost_CheckIpExists_Call) RunAndReturn(run func(ip net.IP) (bool, error)) *MockNetworkHost_CheckIpExists_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// DialTimeout provides a mock function for the type MockNetworkHost
+func (_mock *MockNetworkHost) DialTimeout(ctx context.Context, network string, address string, timeout time.Duration) (net.Conn, error) {
+	ret := _mock.Called(ctx, network, address, timeout)
+
+	if len(ret) == 0 {
+		panic("no return value specified for DialTimeout")
+	}
+
+	var r0 net.Conn
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string, time.Duration) (net.Conn, error)); ok {
+		return returnFunc(ctx, network, address, timeout)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string, time.Duration) net.Conn); ok {
+		r0 = returnFunc(ctx, network, address, timeout)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(net.Conn)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, string, string, time.Duration) error); ok {
+		r1 = returnFunc(ctx, network, address, timeout)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockNetworkHost_DialTimeout_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DialTimeout'
+type MockNetworkHost_DialTimeout_Call struct {
+	*mock.Call
+}
+
+// DialTimeout is a helper method to define mock.On call
+//   - ctx context.Context
+//   - network string
+//   - address string
+//   - timeout time.Duration
+func (_e *MockNetworkHost_Expecter) DialTimeout(ctx interface{}, network interface{}, address interface{}, timeout interface{}) *MockNetworkHost_DialTimeout_Call {
+	return &MockNetworkHost_DialTimeout_Call{Call: _e.mock.On("DialTimeout", ctx, network, address, timeout)}
+}
+
+func (_c *MockNetworkHost_DialTimeout_Call) Run(run func(ctx context.Context, network string, address string, timeout time.Duration)) *MockNetworkHost_DialTimeout_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		var arg3 time.Duration
+		if args[3] != nil {
+			arg3 = args[3].(time.Duration)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+		)
+	})
+	return _c
+}
+
+func (_c *MockNetworkHost_DialTimeout_Call) Return(conn net.Conn, err error) *MockNetworkHost_DialTimeout_Call {
+	_c.Call.Return(conn, err)
+	return _c
+}
+
+func (_c *MockNetworkHost_DialTimeout_Call) RunAndReturn(run func(ctx context.Context, network string, address string, timeout time.Duration) (net.Conn, error)) *MockNetworkHost_DialTimeout_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -270,6 +351,80 @@ func (_c *MockNetworkHost_IsHostMapped_Call) Return(b bool, iPs []net.IP) *MockN
 }
 
 func (_c *MockNetworkHost_IsHostMapped_Call) RunAndReturn(run func(ctx context.Context, ip net.IP, domainName string) (bool, []net.IP)) *MockNetworkHost_IsHostMapped_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// Listen provides a mock function for the type MockNetworkHost
+func (_mock *MockNetworkHost) Listen(ctx context.Context, network string, address string) (net.Listener, error) {
+	ret := _mock.Called(ctx, network, address)
+
+	if len(ret) == 0 {
+		panic("no return value specified for Listen")
+	}
+
+	var r0 net.Listener
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string) (net.Listener, error)); ok {
+		return returnFunc(ctx, network, address)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string) net.Listener); ok {
+		r0 = returnFunc(ctx, network, address)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(net.Listener)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, string, string) error); ok {
+		r1 = returnFunc(ctx, network, address)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockNetworkHost_Listen_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Listen'
+type MockNetworkHost_Listen_Call struct {
+	*mock.Call
+}
+
+// Listen is a helper method to define mock.On call
+//   - ctx context.Context
+//   - network string
+//   - address string
+func (_e *MockNetworkHost_Expecter) Listen(ctx interface{}, network interface{}, address interface{}) *MockNetworkHost_Listen_Call {
+	return &MockNetworkHost_Listen_Call{Call: _e.mock.On("Listen", ctx, network, address)}
+}
+
+func (_c *MockNetworkHost_Listen_Call) Run(run func(ctx context.Context, network string, address string)) *MockNetworkHost_Listen_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *MockNetworkHost_Listen_Call) Return(listener net.Listener, err error) *MockNetworkHost_Listen_Call {
+	_c.Call.Return(listener, err)
+	return _c
+}
+
+func (_c *MockNetworkHost_Listen_Call) RunAndReturn(run func(ctx context.Context, network string, address string) (net.Listener, error)) *MockNetworkHost_Listen_Call {
 	_c.Call.Return(run)
 	return _c
 }

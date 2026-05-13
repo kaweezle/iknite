@@ -454,6 +454,12 @@ func TestStartIkniteServer(t *testing.T) {
 
 	kubeClient, err := k8s.NewClientFromFile(fs, constants.IkniteConfPath)
 	require.NoError(t, err)
+
+	restConfig, err := kubeClient.ToRESTConfig()
+	require.NoError(t, err)
+	require.Equal(t, "https://cluster.iknite:11443", restConfig.Host) // Should use the domain name, not the IP
+	restConfig.Host = "https://localhost:11443"                       // Override for test since we dialed localhost
+
 	restClient, err := k8s.RESTClient(kubeClient)
 	require.NoError(t, err)
 

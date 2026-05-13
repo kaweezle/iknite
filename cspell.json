@@ -101,6 +101,7 @@
     "kubeconform",
     "kubelet",
     "kubewait",
+    "kust",
     "Kustomization",
     "Kustomizations",
     "kwzl",

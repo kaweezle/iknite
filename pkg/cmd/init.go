@@ -16,7 +16,7 @@ limitations under the License.
 
 package cmd
 
-// cSpell:words kubeproxyconfig clientcmdapi clientcmd kubeletconfig conntrack
+// cSpell:words kubeproxyconfig clientcmdapi clientcmd kubeletconfig conntrack lbip
 // cSpell: disable
 import (
 	"errors"
@@ -119,7 +119,8 @@ func addInitWorkflowPhases(initRunner *workflow.Runner) {
 	initRunner.AppendPhase(WrapPhase(phases.NewEtcdPhase(), ikniteApi.Initializing, nil))
 	initRunner.AppendPhase(WrapPhase(iknitePhase.NewKineControlPlanePhase(), ikniteApi.Initializing, nil))
 	controlPlanePhase := phases.NewControlPlanePhase()
-	controlPlanePhase.Phases = append(controlPlanePhase.Phases, iknitePhase.NewKubeVipControlPlanePhase())
+	//nolint:gocritic // Keep the following for reference
+	//controlPlanePhase.Phases = append(controlPlanePhase.Phases, iknitePhase.NewKubeVipControlPlanePhase())
 
 	initRunner.AppendPhase(WrapPhase(controlPlanePhase, ikniteApi.Initializing, nil))
 	initRunner.AppendPhase(
@@ -141,6 +142,9 @@ func addInitWorkflowPhases(initRunner *workflow.Runner) {
 		WrapPhase(iknitePhase.NewKustomizeClusterPhase(), ikniteApi.Stabilizing, nil),
 	)
 	initRunner.AppendPhase(WrapPhase(iknitePhase.NewServePhase(), ikniteApi.Stabilizing, nil))
+	//nolint:gocritic // Keep the following for reference
+	// initRunner.AppendPhase(WrapPhase(iknitePhase.NewProxyAPIPhase(), ikniteApi.Stabilizing, nil))
+	initRunner.AppendPhase(WrapPhase(iknitePhase.NewSetLBIPPhase(), ikniteApi.Stabilizing, nil))
 	initRunner.AppendPhase(WrapPhase(iknitePhase.NewWorkloadsPhase(), ikniteApi.Stabilizing, nil))
 	initRunner.AppendPhase(WrapPhase(iknitePhase.NewDaemonizePhase(), ikniteApi.Stabilizing, nil))
 	//nolint:gocritic // standalone node

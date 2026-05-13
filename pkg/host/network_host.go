@@ -1,4 +1,4 @@
-// cSpell: words iface ifaces sirupsen
+// cSpell: words iface ifaces sirupsen wrapcheck
 package host
 
 import (
@@ -16,6 +16,8 @@ type NetworkHost interface {
 	CheckIpExists(ip net.IP) (bool, error)
 	GetHostsConfig() *txeh.HostsConfig
 	IsHostMapped(ctx context.Context, ip net.IP, domainName string) (bool, []net.IP)
+	Listen(ctx context.Context, network, address string) (net.Listener, error)
+	DialTimeout(ctx context.Context, network, address string, timeout time.Duration) (net.Conn, error)
 }
 
 type NetworkHostImpl struct{}
@@ -92,4 +94,14 @@ func (h *hostImpl) IsHostMapped(ctx context.Context, ip net.IP, domainName strin
 		}
 	}
 	return contains, ips
+}
+
+func (h *hostImpl) Listen(ctx context.Context, network, address string) (net.Listener, error) {
+	lc := &net.ListenConfig{}
+	return lc.Listen(ctx, network, address) //nolint:wrapcheck // intentional
+}
+
+func (h *hostImpl) DialTimeout(ctx context.Context, network, address string, timeout time.Duration) (net.Conn, error) {
+	d := &net.Dialer{Timeout: timeout}
+	return d.DialContext(ctx, network, address) //nolint:wrapcheck // intentional
 }
