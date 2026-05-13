@@ -43,7 +43,11 @@ import (
 	"github.com/kaweezle/iknite/pkg/utils"
 )
 
-const testPKIDir = "pki"
+const (
+	testPKIDir       = "pki"
+	defaultNamespace = "default"
+	readyStateLabel  = "ready"
+)
 
 type initDataTestContextKey string
 
@@ -275,7 +279,11 @@ func TestInitDataClientBranches(t *testing.T) {
 	req.NoError(err)
 	req.Same(cachedClient, client)
 
-	ensureAdminClusterRoleBinding = func(string, kubeconfigPhase.EnsureRBACFunc) (clientset.Interface, error) {
+	ensureAdminClusterRoleBinding = func(
+		string,
+		*kubeadmApi.APIEndpoint,
+		kubeconfigPhase.EnsureRBACFunc,
+	) (clientset.Interface, error) {
 		return cachedClient, nil
 	}
 	bootstrapSuccessData := &initData{
@@ -388,8 +396,8 @@ func TestInitDataStatusServerAndMDNS(t *testing.T) {
 	<-updateCh
 	req.Equal("initial-cluster", decodeStatusResponse(t, statusServer).Spec.ClusterName)
 
-	ready := []*v1alpha1.WorkloadState{{Namespace: "default", Name: "ready", Ok: true}}
-	unready := []*v1alpha1.WorkloadState{{Namespace: "default", Name: "unready", Ok: false}}
+	ready := []*v1alpha1.WorkloadState{{Namespace: defaultNamespace, Name: readyStateLabel, Ok: true}}
+	unready := []*v1alpha1.WorkloadState{{Namespace: defaultNamespace, Name: "unready", Ok: false}}
 	data.UpdateIkniteCluster(ikniteApi.Stabilizing, "workloads", ready, unready)
 	req.Equal(ikniteApi.Stabilizing, data.IkniteCluster().Status.State)
 	req.Equal("workloads", data.IkniteCluster().Status.CurrentPhase)

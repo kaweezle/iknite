@@ -24,6 +24,11 @@ import (
 	"github.com/kaweezle/iknite/pkg/utils"
 )
 
+const (
+	kubeSystemNamespace = "kube-system"
+	flannelWorkloadName = "flannel"
+)
+
 func TestIsIkniteReady(t *testing.T) {
 	t.Parallel()
 
@@ -55,10 +60,10 @@ func TestIsIkniteReady(t *testing.T) {
 				t.Helper()
 
 				persistClusterState(fs, ikniteapi.Initializing, []*v1alpha1.WorkloadState{{
-					Namespace: "kube-system",
-					Name:      "flannel",
+					Namespace: kubeSystemNamespace,
+					Name:      flannelWorkloadName,
 					Ok:        true,
-					Message:   "ready",
+					Message:   readyStateLabel,
 				}}, nil)
 			},
 			wantReady: false,
@@ -78,12 +83,12 @@ func TestIsIkniteReady(t *testing.T) {
 				t.Helper()
 
 				persistClusterState(fs, ikniteapi.Stabilizing, []*v1alpha1.WorkloadState{{
-					Namespace: "kube-system",
+					Namespace: kubeSystemNamespace,
 					Name:      "metrics-server",
 					Ok:        true,
-					Message:   "ready",
+					Message:   readyStateLabel,
 				}}, []*v1alpha1.WorkloadState{{
-					Namespace: "kube-system",
+					Namespace: kubeSystemNamespace,
 					Name:      "local-path-provisioner",
 					Ok:        false,
 					Message:   "waiting",
@@ -164,7 +169,7 @@ func setupFirstStartMocks(t *testing.T, m *mockHost.MockHost, configExists bool)
 	} else {
 		m.EXPECT().ReadFile(kubeadmConstants.GetAdminKubeConfigPath()).Return(nil, os.ErrNotExist).Once()
 	}
-	m.EXPECT().Run(true, "/sbin/openrc", []string{"default"}).Return([]byte("ok"), nil).Once()
+	m.EXPECT().Run(true, "/sbin/openrc", []string{defaultNamespace}).Return([]byte("ok"), nil).Once()
 	count := 0
 	statuses := []struct {
 		ready   []*v1alpha1.WorkloadState
@@ -174,20 +179,20 @@ func setupFirstStartMocks(t *testing.T, m *mockHost.MockHost, configExists bool)
 		{
 			state: ikniteapi.Initializing,
 			ready: []*v1alpha1.WorkloadState{{
-				Namespace: "kube-system",
-				Name:      "flannel",
+				Namespace: kubeSystemNamespace,
+				Name:      flannelWorkloadName,
 				Ok:        true,
-				Message:   "ready",
+				Message:   readyStateLabel,
 			}},
 			unready: nil,
 		},
 		{
 			state: ikniteapi.Stabilizing,
 			ready: []*v1alpha1.WorkloadState{{
-				Namespace: "kube-system",
-				Name:      "flannel",
+				Namespace: kubeSystemNamespace,
+				Name:      flannelWorkloadName,
 				Ok:        true,
-				Message:   "ready",
+				Message:   readyStateLabel,
 			}},
 			unready: nil,
 		},
