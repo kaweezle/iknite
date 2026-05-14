@@ -37,6 +37,7 @@ type initData struct {
 	skipTokenPrint              bool
 	dryRun                      bool
 	kubeconfig                  *clientcmdapi.Config
+	kubeconfigOriginal          *clientcmdapi.Config
 	kubeconfigDir               string
 	kubeconfigPath              string
 	ignorePreflightErrors       sets.Set[string]
@@ -135,8 +136,24 @@ func (d *initData) KubeConfig() (*clientcmdapi.Config, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to load kubeconfig from file: %w", err)
 	}
+	d.kubeconfigOriginal = d.kubeconfig.DeepCopy()
+
+	if d.kubeconfigPath == kubeadmConstants.GetAdminKubeConfigPath() {
+		kubeConfigUtil.PointKubeConfigToLocalAPIEndpoint(d.kubeconfig, &d.Cfg().LocalAPIEndpoint)
+	}
 
 	return d.kubeconfig, nil
+}
+
+// KubeConfigOriginal returns the original kubeconfig loaded from file, without any modifications.
+func (d *initData) KubeConfigOriginal() (*clientcmdapi.Config, error) {
+	if d.kubeconfigOriginal == nil {
+		if _, err := d.KubeConfig(); err != nil {
+			return nil, err
+		}
+	}
+
+	return d.kubeconfigOriginal, nil
 }
 
 // KubeConfigDir returns the path of the Kubernetes configuration folder or the temporary folder path in case of DryRun.
@@ -215,6 +232,7 @@ func (d *initData) Client() (clientset.Interface, error) {
 		// Call EnsureAdminClusterRoleBinding() to obtain a working client from admin.conf.
 		d.client, err = ensureAdminClusterRoleBinding(
 			kubeadmConstants.KubernetesDir,
+			&d.Cfg().LocalAPIEndpoint,
 			nil,
 		)
 		if err != nil {

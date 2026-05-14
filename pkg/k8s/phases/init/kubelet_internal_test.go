@@ -26,7 +26,7 @@ import (
 func createInitConfiguration() (*kubeadmapi.InitConfiguration, error) {
 	cfg := &kubeadmapi.InitConfiguration{
 		ClusterConfiguration: kubeadmapi.ClusterConfiguration{
-			KubernetesVersion: "1.36.0",
+			KubernetesVersion: "1.36.1",
 			FeatureGates: map[string]bool{
 				features.NodeLocalCRISocket: true,
 			},
@@ -44,7 +44,7 @@ func createInitConfiguration() (*kubeadmapi.InitConfiguration, error) {
 	}
 	kubeadmScheme.Scheme.Default(cfg)
 	kubeadmScheme.Scheme.Default(&cfg.ClusterConfiguration)
-	err := config.SetInitDynamicDefaults(cfg, true)
+	err := config.SetInitDynamicDefaults(cfg, true, false)
 	if err != nil {
 		return nil, fmt.Errorf("cannot set defaults: %w", err)
 	}
