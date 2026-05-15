@@ -278,13 +278,13 @@ func TestRunProxyAPI_ForwardsTrafficAndStops(t *testing.T) {
 	req.NoError(data.RunShutdownHooks())
 	req.NoError(data.ErrGroup().Wait())
 
-	_, err := (&net.Dialer{Timeout: 200 * time.Millisecond}).DialContext(
+	_, err := (&net.Dialer{Timeout: 500 * time.Millisecond}).DialContext(
 		context.Background(),
 		"tcp",
 		net.JoinHostPort("127.0.0.1", fmt.Sprint(statusPort)),
 	)
 	req.Error(err)
-	_, err = (&net.Dialer{Timeout: 200 * time.Millisecond}).DialContext(
+	_, err = (&net.Dialer{Timeout: 500 * time.Millisecond}).DialContext(
 		context.Background(),
 		"tcp",
 		net.JoinHostPort("127.0.0.1", fmt.Sprint(apiPort)),

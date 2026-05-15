@@ -15,10 +15,11 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/pion/mdns"
+	"github.com/pion/mdns/v2"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/net/ipv4"
+	"golang.org/x/net/ipv6"
 	metaV1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
@@ -92,13 +93,19 @@ func createTestStatusServer(t *testing.T) *ikniteServer.IkniteServer {
 func createTestMDNSConn(t *testing.T) *mdns.Conn {
 	t.Helper()
 
-	addr, err := net.ResolveUDPAddr("udp", mdns.DefaultAddress)
+	addr4, err := net.ResolveUDPAddr("udp", mdns.DefaultAddressIPv4)
 	require.NoError(t, err)
 
-	socket, err := net.ListenUDP("udp4", addr)
+	socket4, err := net.ListenUDP("udp4", addr4)
 	require.NoError(t, err)
 
-	conn, err := mdns.Server(ipv4.NewPacketConn(socket), &mdns.Config{
+	addr6, err := net.ResolveUDPAddr("udp", mdns.DefaultAddressIPv6)
+	require.NoError(t, err)
+
+	socket6, err := net.ListenUDP("udp6", addr6)
+	require.NoError(t, err)
+
+	conn, err := mdns.Server(ipv4.NewPacketConn(socket4), ipv6.NewPacketConn(socket6), &mdns.Config{
 		LocalNames: []string{"iknite.local"},
 	})
 	require.NoError(t, err)
