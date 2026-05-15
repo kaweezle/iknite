@@ -5,9 +5,10 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/pion/mdns"
+	"github.com/pion/mdns/v2"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/net/ipv4"
+	"golang.org/x/net/ipv6"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 )
 
@@ -35,22 +36,40 @@ func runMDnsPublish(c workflow.RunData) error {
 	ikniteConfig := data.IkniteCluster().Spec
 
 	if !ikniteConfig.EnableMDNS {
+		log.WithField("phase", "mdns-publish").Info("MDNS is disabled, skipping mdns publish phase.")
 		return nil
 	}
 
-	addr, err := net.ResolveUDPAddr("udp", mdns.DefaultAddress)
+	addr4, err := net.ResolveUDPAddr("udp", mdns.DefaultAddressIPv4)
 	if err != nil {
 		return fmt.Errorf("cannot resolve default address: %w", err)
 	}
 
-	l, err := net.ListenUDP("udp4", addr)
+	l4, err := net.ListenUDP("udp4", addr4)
 	if err != nil {
 		return fmt.Errorf("cannot listen on default address: %w", err)
 	}
 
+	addr6, err := net.ResolveUDPAddr("udp6", mdns.DefaultAddressIPv6)
+	if err != nil {
+		return fmt.Errorf("cannot resolve default address: %w", err)
+	}
+
+	l6, err := net.ListenUDP("udp6", addr6)
+	if err != nil {
+		return fmt.Errorf("cannot listen on default address: %w", err)
+	}
+
+	log.WithField("phase", "mdns-publish").WithFields(log.Fields{
+		"addr4":      addr4,
+		"addr6":      addr6,
+		"interface4": l4.LocalAddr(),
+		"interface6": l6.LocalAddr(),
+	}).Debug("Start mdns responder...")
+
 	var conn *mdns.Conn
 	log.WithField("phase", "mdns-publish").Info("Starting the mdns responder...")
-	conn, err = mdns.Server(ipv4.NewPacketConn(l), &mdns.Config{
+	conn, err = mdns.Server(ipv4.NewPacketConn(l4), ipv6.NewPacketConn(l6), &mdns.Config{
 		LocalNames: []string{ikniteConfig.DomainName},
 	})
 	if err != nil {
