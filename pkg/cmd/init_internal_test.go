@@ -26,6 +26,7 @@ import (
 
 	mockHost "github.com/kaweezle/iknite/mocks/pkg/host"
 	ikniteApi "github.com/kaweezle/iknite/pkg/apis/iknite"
+	"github.com/kaweezle/iknite/pkg/cmd/util"
 	"github.com/kaweezle/iknite/pkg/host"
 	k8sInit "github.com/kaweezle/iknite/pkg/k8s/phases/init"
 )
@@ -143,6 +144,8 @@ func TestNewInitData(t *testing.T) {
 			var output bytes.Buffer // dummy output for validation
 
 			cmd := newCmdInit(&output, opts, initRunner, host.NewDefaultHost())
+			cmdIf := util.NewCmdInterface()
+			cmd.SetContext(util.WithCmdInterface(t.Context(), cmdIf))
 			if tt.customizeOptions != nil {
 				cleanup, err := tt.customizeOptions(t, cmd, opts)
 				req.NoError(err)
@@ -182,6 +185,7 @@ current-context: foo-context
 kind: Config
 `
 
+//nolint:gocyclo // This test is necessarily complex as it tests the integration of multiple components.
 func TestInitDataClientWithNonDefaultKubeconfig(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodHead {
@@ -201,7 +205,15 @@ func TestInitDataClientWithNonDefaultKubeconfig(t *testing.T) {
 	initOptions.kubeconfigPath = kubeconfigPath
 	initRunner := workflow.NewRunner()
 	var output bytes.Buffer // dummy output for validation
-	_ = newCmdInit(&output, initOptions, initRunner, host.NewDefaultHost())
+	cmd := newCmdInit(&output, initOptions, initRunner, host.NewDefaultHost())
+
+	_, err := initRunner.InitData([]string{})
+	if err == nil {
+		t.Fatalf("initRunner.InitData expected error when context is nil, got nil")
+	}
+
+	cmdIf := util.NewCmdInterface()
+	cmd.SetContext(util.WithCmdInterface(t.Context(), cmdIf))
 
 	d, err := initRunner.InitData([]string{})
 	if err != nil {

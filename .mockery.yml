@@ -69,3 +69,7 @@ packages:
     config:
       dir: mocks/{{.InterfaceDirRelative}}
     interfaces: { CheckWorkloadData}
+  github.com/kaweezle/iknite/pkg/cmd/util:
+    config:
+      dir: mocks/{{.InterfaceDirRelative}}
+    interfaces: { CmdInterface }

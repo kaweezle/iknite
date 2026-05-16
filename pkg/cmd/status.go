@@ -18,6 +18,7 @@ package cmd
 // cSpell: words runlevels runlevel apiserver controllermanager healthcheck logrus configurer
 // cSpell: disable
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"os"
@@ -29,6 +30,7 @@ import (
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
 	"github.com/kaweezle/iknite/pkg/check"
 	"github.com/kaweezle/iknite/pkg/checkers"
+	"github.com/kaweezle/iknite/pkg/cmd/util"
 	"github.com/kaweezle/iknite/pkg/config"
 	"github.com/kaweezle/iknite/pkg/host"
 	"github.com/kaweezle/iknite/pkg/utils"
@@ -82,7 +84,15 @@ func NewStatusCmd(
 - Statefulsets
 `,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			return performStatus(cmd.Context(), alpineHost, ikniteConfig, waitOptions, configurer, teaOptions...)
+			logger := util.GetLoggerFromContext(cmd.Context())
+			return performStatus(
+				cmd.Context(),
+				alpineHost,
+				ikniteConfig,
+				waitOptions,
+				configurer,
+				logger,
+				teaOptions...)
 		},
 	}
 
@@ -99,19 +109,27 @@ func performStatus(
 	ikniteConfig *v1alpha1.IkniteClusterSpec,
 	waitOptions *utils.WaitOptions,
 	configurer CheckExecutorConfigurer,
+	logger logrus.FieldLogger,
 	teaOptions ...tea.ProgramOption,
 ) error {
 	executor := check.NewCheckExecutor()
 	configurer.Configure(executor, ikniteConfig, waitOptions)
 
-	// Run all checks
-	logrus.SetLevel(logrus.FatalLevel)
+	// Inhibit logging
+	var output bytes.Buffer
+	logger.WithField("t", nil).Logger.Out = &output
 
-	checkData := checkers.CreateCheckWorkloadData(ikniteConfig, waitOptions, alpineHost)
+	checkData := checkers.CreateCheckWorkloadData(ikniteConfig, waitOptions, alpineHost, logger)
 	teaOptions = append(teaOptions, tea.WithOutput(os.Stderr))
 	p := tea.NewProgram(check.NewCheckModel(ctx, executor, checkData), teaOptions...)
 	tmp := os.Stdout
-	defer func() { os.Stdout = tmp }()
+	defer func() {
+		os.Stdout = tmp
+		if output.Len() > 0 {
+			fmt.Fprintln(os.Stderr, "Additional logs:")
+			fmt.Fprintln(os.Stderr, output.String())
+		}
+	}()
 	os.Stdout = nil
 	_, err := p.Run()
 	if err != nil { // nocov -- hard to cover in all test scenarios.

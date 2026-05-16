@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"sync"
 
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 )
 
 type hook struct {
@@ -20,8 +20,15 @@ type hookError struct {
 }
 
 type HookManager struct {
+	LogEnabled
 	hooks []hook
 	mu    sync.Mutex
+}
+
+func NewHookManager(log logrus.FieldLogger) *HookManager {
+	return &HookManager{
+		LogEnabled: LogEnabled{LogEntry: log},
+	}
 }
 
 func (m *HookManager) Register(name string, fn func() error) {
@@ -43,7 +50,7 @@ func (m *HookManager) Run() error {
 			defer wg.Done()
 			if err := h.fn(); err != nil {
 				errs <- hookError{name: h.name, err: err}
-				log.WithField("hook", h.name).WithError(err).Error("Error while running hook")
+				m.Logger().WithField("hook", h.name).WithError(err).Error("Error while running hook")
 			}
 		}(h)
 	}

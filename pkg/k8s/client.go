@@ -15,7 +15,7 @@ import (
 	"strings"
 	"time"
 
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -346,14 +346,14 @@ func ApplyResMapWithServerSideApply(client resource.RESTClientGetter, resources 
 	return ids, nil
 }
 
-func AllWorkloadStates(client resource.RESTClientGetter) ([]*v1alpha1.WorkloadState, error) {
+func AllWorkloadStates(client resource.RESTClientGetter, logger logrus.FieldLogger) ([]*v1alpha1.WorkloadState, error) {
 	resourceTypes := []string{"deployments", "statefulsets", "daemonsets", "applications"}
 
 	mapper, err := client.ToRESTMapper()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get REST mapper: %w", err)
 	}
-	validResourceTypes, err := ValidateResourceTypes(mapper, resourceTypes)
+	validResourceTypes, err := ValidateResourceTypes(mapper, resourceTypes, logger)
 	if err != nil {
 		return nil, fmt.Errorf("failed to validate resource types: %w", err)
 	}
@@ -408,12 +408,13 @@ type WorkloadStateCallbackFunc func(allReady bool, total int, ready []*v1alpha1.
 
 func WorkloadsReadyConditionWithContextFunc(
 	client resource.RESTClientGetter,
+	logger logrus.FieldLogger,
 	callback WorkloadStateCallbackFunc,
 ) wait.ConditionWithContextFunc {
 	iteration := 0
 	okIterations := 0
 	return func(_ context.Context) (bool, error) {
-		states, err := AllWorkloadStates(client)
+		states, err := AllWorkloadStates(client, logger)
 		if err != nil {
 			return false, err
 		}
@@ -428,7 +429,7 @@ func WorkloadsReadyConditionWithContextFunc(
 				ready = append(ready, state)
 			}
 		}
-		log.WithFields(log.Fields{
+		logrus.WithFields(logrus.Fields{
 			"total":        len(states),
 			"ready":        len(ready),
 			"unready":      len(unready),
@@ -467,11 +468,11 @@ func InClusterConfig(fs host.FileSystem) (*rest.Config, error) {
 
 	pemBlock, err := fs.ReadFile(rootCAFile)
 	if err != nil {
-		log.Errorf("Expected to load root CA config from %s, but got err: %v", rootCAFile, err)
+		logrus.Errorf("Expected to load root CA config from %s, but got err: %v", rootCAFile, err)
 	} else {
 		_, err := cert.NewPoolFromBytes(pemBlock)
 		if err != nil {
-			log.Errorf("Expected to parse root CA config from %s, but got err: %v", rootCAFile, err)
+			logrus.Errorf("Expected to parse root CA config from %s, but got err: %v", rootCAFile, err)
 		} else {
 			// Only set the CA data if it can be parsed successfully,
 			// otherwise the client will fail to connect to the API server.

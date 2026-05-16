@@ -23,7 +23,6 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
-	"github.com/spf13/viper"
 
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
 	"github.com/kaweezle/iknite/pkg/cmd/util"
@@ -50,6 +49,7 @@ func NewRootCmd(opts *util.BaseOptions) *cobra.Command {
 	cobra.EnableTraverseRunHooks = true
 
 	ikniteConfig := &v1alpha1.IkniteClusterSpec{}
+	cmdIf := util.NewCmdInterface()
 
 	// rootCmd represents the base command when called without any subcommands
 	rootCmd := &cobra.Command{
@@ -61,8 +61,9 @@ kubernetes.`,
 		Example: `> iknite start`,
 		Version: IkniteVersion,
 		PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
-			opts.SetUpLogs(cmd.OutOrStderr())
-			initConfig(cmd.Root())
+			opts.SetUpLogs(cmd.OutOrStderr(), cmdIf.Logger().WithField("cmd", cmd.Name()).Logger)
+			cmd.SetContext(util.WithCmdInterface(cmd.Context(), cmdIf))
+			initConfig(cmd.Root(), cmdIf)
 			if err := config.DecodeIkniteConfig(ikniteConfig); err != nil {
 				return fmt.Errorf("while decoding iknite config: %w", err)
 			}
@@ -87,32 +88,33 @@ kubernetes.`,
 	rootCmd.AddCommand(NewStatusCmd(ikniteConfig, nil, nil, alpineHost))
 	rootCmd.AddCommand(NewInfoCmd(ikniteConfig))
 
-	util.BindFlagsToViper(rootCmd, viper.GetViper())
+	util.BindFlagsToViper(rootCmd, cmdIf)
 
 	return rootCmd
 }
 
 // initConfig reads in config file and ENV variables if set.
-func initConfig(cmd *cobra.Command) {
+func initConfig(cmd *cobra.Command, cmdIf util.CmdInterface) {
+	v := cmdIf.Viper()
 	if cfgFile != "" {
 		// Use config file from the flag.
-		viper.SetConfigFile(cfgFile)
+		cmdIf.Viper().SetConfigFile(cfgFile)
 	} else {
-		viper.SetConfigType("yaml")
-		viper.SetConfigName("iknite")
-		viper.AddConfigPath("$HOME/.config/iknite/")
-		viper.AddConfigPath("/etc/iknite.d/")
+		v.SetConfigType("yaml")
+		v.SetConfigName("iknite")
+		v.AddConfigPath("$HOME/.config/iknite/")
+		v.AddConfigPath("/etc/iknite.d/")
 	}
 
-	viper.AutomaticEnv() // read in environment variables that match
-	viper.SetEnvPrefix("iknite")
-	viper.SetEnvKeyReplacer(strings.NewReplacer("-", "_", ".", "_"))
+	v.AutomaticEnv() // read in environment variables that match
+	v.SetEnvPrefix("iknite")
+	v.SetEnvKeyReplacer(strings.NewReplacer("-", "_", ".", "_"))
 
 	// If a config file is found, read it in.
-	if err := viper.ReadInConfig(); err == nil {
-		fmt.Fprintln(os.Stderr, "Using config file:", viper.ConfigFileUsed())
+	if err := v.ReadInConfig(); err == nil {
+		fmt.Fprintln(os.Stderr, "Using config file:", v.ConfigFileUsed())
 	}
-	util.ApplyViperConfigToFlags(cmd, viper.GetViper())
+	util.ApplyViperConfigToFlags(cmd, cmdIf)
 }
 
 func inheritsFlags(sourceFlags, targetFlags *pflag.FlagSet, cmdFlags ...string) {

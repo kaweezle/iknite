@@ -9,7 +9,7 @@ import (
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 )
 
 // cSpell: enable
@@ -40,7 +40,7 @@ func (m *CheckModel) Update(
 ) (tea.Model, tea.Cmd) {
 	switch msg.(type) {
 	case tea.KeyMsg:
-		log.Infof("Canceling checks %v", m.cancel)
+		logrus.Infof("Canceling checks %v", m.cancel)
 		m.cancel()
 		return m, tea.Batch(
 			// tea.ExitAltScreen,

@@ -26,7 +26,7 @@ import (
 	"path"
 	"path/filepath"
 
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 	"k8s.io/klog/v2"
 	kubeadmApiV1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
@@ -76,7 +76,7 @@ func runCleanupConfig(c workflow.RunData) error {
 			dirsToClean = append(dirsToClean, kubeletRunDirectory)
 		}
 	} else {
-		log.Infof("[reset] Would clean directory %q\n", kubeadmConstants.KubeletRunDirectory)
+		logrus.Infof("[reset] Would clean directory %q\n", kubeadmConstants.KubeletRunDirectory)
 	}
 
 	certsDir := r.CertificatesDir()
@@ -122,14 +122,14 @@ func CleanConfig(fs host.FileSystem, isDryRun bool) {
 
 func resetConfigDir(fs host.FileSystem, configPathDir string, dirsToClean []string, isDryRun bool) {
 	if !isDryRun {
-		log.Infof("[reset] Deleting contents of directories: %v\n", dirsToClean)
+		logrus.Infof("[reset] Deleting contents of directories: %v\n", dirsToClean)
 		for _, dir := range dirsToClean {
 			if err := CleanDir(fs, dir); err != nil {
 				klog.Warningf("[reset] Failed to delete contents of %q directory: %v", dir, err)
 			}
 		}
 	} else {
-		log.Infof("[reset] Would delete contents of directories: %v\n", dirsToClean)
+		logrus.Infof("[reset] Would delete contents of directories: %v\n", dirsToClean)
 	}
 
 	filesToClean := []string{
@@ -142,14 +142,14 @@ func resetConfigDir(fs host.FileSystem, configPathDir string, dirsToClean []stri
 	}
 
 	if !isDryRun {
-		log.Infof("[reset] Deleting files: %v\n", filesToClean)
+		logrus.Infof("[reset] Deleting files: %v\n", filesToClean)
 		for _, path := range filesToClean {
 			if err := fs.RemoveAll(path); err != nil {
 				klog.Warningf("[reset] Failed to remove file: %q [%v]\n", path, err)
 			}
 		}
 	} else {
-		log.Infof("[reset] Would delete files: %v\n", filesToClean)
+		logrus.Infof("[reset] Would delete files: %v\n", filesToClean)
 	}
 }
 

@@ -431,7 +431,9 @@ func checkWorkloadsWithConfig(
 	kubeClient resource.RESTClientGetter,
 ) (bool, string, error) { // nocov -- requires a running Kubernetes cluster
 	workloadData.Start()
-	err := workloadData.WaitOptions().Poll(ctx, k8s.WorkloadsReadyConditionWithContextFunc(kubeClient,
+	err := workloadData.WaitOptions().Poll(ctx, k8s.WorkloadsReadyConditionWithContextFunc(
+		kubeClient,
+		workloadData.Logger(),
 		func(allReady bool, total int, ready, unready []*v1alpha1.WorkloadState, iteration, okIterations int) bool {
 			workloadData.SetOk(allReady)
 			workloadData.SetWorkloadCount(total)

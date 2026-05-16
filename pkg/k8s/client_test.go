@@ -424,10 +424,11 @@ func TestApplyResMapWithServerSideApply_Branches(t *testing.T) {
 func TestAllWorkloadStates(t *testing.T) {
 	t.Parallel()
 	req := require.New(t)
+	logger, _ := testutil.TestLogger(t)
 
 	getter := genericclioptions.NewMockRESTClientGetter(t)
 	getter.EXPECT().ToRESTMapper().Return(nil, errors.New("mapper unavailable")).Once()
-	_, err := k8s.AllWorkloadStates(getter)
+	_, err := k8s.AllWorkloadStates(getter, logger)
 	req.Error(err)
 
 	getter = genericclioptions.NewMockRESTClientGetter(t)
@@ -435,15 +436,15 @@ func TestAllWorkloadStates(t *testing.T) {
 		ToRESTMapper().
 		Return(errorRESTMapper{RESTMapper: testutil.NewWorkloadRESTMapper(true), err: errors.New("mapping boom")}, nil).
 		Twice()
-	_, err = k8s.AllWorkloadStates(getter)
+	_, err = k8s.AllWorkloadStates(getter, logger)
 	req.Error(err)
 
 	failServer := createWorkloadServer(t, "/apis/apps/v1/deployments", false)
-	_, err = k8s.AllWorkloadStates(failServer)
+	_, err = k8s.AllWorkloadStates(failServer, logger)
 	req.Error(err)
 
 	readyServer := createWorkloadServer(t, "", true)
-	states, err := k8s.AllWorkloadStates(readyServer)
+	states, err := k8s.AllWorkloadStates(readyServer, logger)
 	req.NoError(err)
 	req.Len(states, 4)
 
@@ -461,7 +462,7 @@ func TestAllWorkloadStates(t *testing.T) {
 	getter = genericclioptions.NewMockRESTClientGetter(t)
 	getter.EXPECT().ToRESTMapper().Return(newUnknownWorkloadRESTMapper(), nil).Maybe()
 	getter.EXPECT().ToRESTConfig().Return(&rest.Config{Host: unknownServer.URL}, nil).Maybe()
-	_, err = k8s.AllWorkloadStates(getter)
+	_, err = k8s.AllWorkloadStates(getter, logger)
 	req.Error(err)
 
 	statusErrServerGetter := testutil.CreateClientGetterWithTestServer(
@@ -487,7 +488,7 @@ func TestAllWorkloadStates(t *testing.T) {
 		},
 	)
 
-	_, err = k8s.AllWorkloadStates(statusErrServerGetter)
+	_, err = k8s.AllWorkloadStates(statusErrServerGetter, logger)
 	req.Error(err)
 	req.Contains(err.Error(), "failed to get workload status")
 }
@@ -498,7 +499,8 @@ func TestWorkloadsReadyConditionWithContextFunc(t *testing.T) {
 
 	getter := genericclioptions.NewMockRESTClientGetter(t)
 	getter.EXPECT().ToRESTMapper().Return(nil, errors.New("mapper unavailable")).Once()
-	condition := k8s.WorkloadsReadyConditionWithContextFunc(getter, nil)
+	logger, _ := testutil.TestLogger(t)
+	condition := k8s.WorkloadsReadyConditionWithContextFunc(getter, logger, nil)
 	ready, err := condition(t.Context())
 	req.Error(err)
 	req.False(ready)
@@ -506,7 +508,7 @@ func TestWorkloadsReadyConditionWithContextFunc(t *testing.T) {
 	server := createWorkloadServer(t, "", true)
 	iterations := make([]int, 0, 2)
 	okIterations := make([]int, 0, 2)
-	condition = k8s.WorkloadsReadyConditionWithContextFunc(server, func(allReady bool, total int,
+	condition = k8s.WorkloadsReadyConditionWithContextFunc(server, logger, func(allReady bool, total int,
 		readyStates []*v1alpha1.WorkloadState, unready []*v1alpha1.WorkloadState, iteration, okIteration int,
 	) bool {
 		req.True(allReady)
@@ -550,7 +552,7 @@ func TestWorkloadsReadyConditionWithContextFunc(t *testing.T) {
 			_, _ = w.Write([]byte(`{"kind":"DaemonSetList","apiVersion":"apps/v1","items":[]}`))
 		},
 	)
-	condition = k8s.WorkloadsReadyConditionWithContextFunc(unreadyServerGetter, nil)
+	condition = k8s.WorkloadsReadyConditionWithContextFunc(unreadyServerGetter, logger, nil)
 	ready, err = condition(t.Context())
 	req.NoError(err)
 	req.False(ready)

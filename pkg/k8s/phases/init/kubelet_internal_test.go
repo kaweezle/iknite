@@ -20,7 +20,8 @@ import (
 	mockHost "github.com/kaweezle/iknite/mocks/pkg/host"
 	mockData "github.com/kaweezle/iknite/mocks/pkg/k8s/phases/init"
 	"github.com/kaweezle/iknite/pkg/host"
-	"github.com/kaweezle/iknite/pkg/k8s/testutil"
+	k8sTestUtil "github.com/kaweezle/iknite/pkg/k8s/testutil"
+	"github.com/kaweezle/iknite/pkg/testutil"
 )
 
 func createInitConfiguration() (*kubeadmapi.InitConfiguration, error) {
@@ -60,6 +61,8 @@ func configureKubeletStartDataMock(
 ) {
 	t.Helper()
 
+	logger, _ := testutil.TestLogger(t)
+	m.EXPECT().Logger().Return(logger).Once()
 	cfg, err := createInitConfiguration()
 	require.NoError(t, err)
 	m.EXPECT().Cfg().Return(cfg).Once()
@@ -76,7 +79,7 @@ func configureKubeletStartDataMock(
 		mh.EXPECT().ReadFile("/run/kubelet.pid").Return(nil, errors.New("file error")).Maybe()
 		mh.EXPECT().ReadFile("/var/run/supervise-kubelet.pid").Return(nil, os.ErrNotExist).Maybe()
 	} else {
-		testutil.MockKubeletStartHost(t, mh)
+		k8sTestUtil.MockKubeletStartHost(t, mh)
 		m.EXPECT().SetKubeletProcess(mock.Anything).RunAndReturn(func(process host.Process) {
 			*createdProcess = process
 		}).Once()
@@ -100,7 +103,7 @@ func TestRunKubeletStart(t *testing.T) {
 	req.FileExists(kubeletConfigFilePath)
 	content, err := os.ReadFile(kubeletEnvFilePath) //nolint:gosec // This is a test.
 	req.NoError(err)
-	req.Contains(strings.TrimSpace(string(content)), strings.TrimSpace(testutil.KubeAdmFlagsFileContent))
+	req.Contains(strings.TrimSpace(string(content)), strings.TrimSpace(k8sTestUtil.KubeAdmFlagsFileContent))
 	req.NotNil(createdProcess)
 }
 
@@ -110,6 +113,7 @@ func TestRunKubeletStart_Errors(t *testing.T) {
 		t.Parallel()
 		req := require.New(t)
 		m := mockData.NewMockKubeletStartData(t)
+		m.EXPECT().Logger().Return(newTestLogger(t)).Once()
 		dir := "/dev/null"
 		m.EXPECT().KubeletDir().Return(dir).Once()
 		cfg, err := createInitConfiguration()

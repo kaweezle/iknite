@@ -5,12 +5,12 @@ import (
 	"fmt"
 	"time"
 
-	log "github.com/sirupsen/logrus"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 
 	"github.com/kaweezle/iknite/pkg/apis/iknite"
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
 	"github.com/kaweezle/iknite/pkg/k8s"
+	"github.com/kaweezle/iknite/pkg/utils"
 )
 
 // cSpell: enable
@@ -28,6 +28,7 @@ type monitorData interface {
 	IkniteClusterHolder
 	RESTClientGetterProvider
 	ErrGroupProvider
+	utils.LoggerProvider
 }
 
 // runPrepare executes the node initialization process.
@@ -43,14 +44,15 @@ func runMonitorWorkloads(c workflow.RunData) error {
 
 	ctx := data.Context()
 	cluster := data.IkniteCluster()
+	logger := data.Logger()
 
 	ticker := time.NewTicker(time.Duration(cluster.Spec.StatusUpdateIntervalSeconds) * time.Second)
-	updateWorkloads := k8s.WorkloadsReadyConditionWithContextFunc(kubeClient,
+	updateWorkloads := k8s.WorkloadsReadyConditionWithContextFunc(kubeClient, logger,
 		func(allReady bool, _ int, ready, unready []*v1alpha1.WorkloadState, _, _ int) bool {
 			var status iknite.ClusterState
 			cluster := data.IkniteCluster()
 			if allReady && cluster.Status.State != iknite.Running {
-				log.Info("All workloads are ready. Going to 60 seconds interval.")
+				logger.Info("All workloads are ready. Going to 60 seconds interval.")
 				ticker.Reset(time.Duration(cluster.Spec.StatusUpdateLongIntervalSeconds) * time.Second)
 			}
 			if allReady || cluster.Status.State == iknite.Running {
@@ -63,19 +65,19 @@ func runMonitorWorkloads(c workflow.RunData) error {
 			return true
 		})
 
-	log.Debug("Starting workloads timer...")
+	logger.Debug("Starting workloads timer...")
 	data.ErrGroup().Go(func() error {
 		for {
 			select {
 			case <-ctx.Done():
-				log.Info("Workloads monitoring stopped.")
+				logger.Info("Workloads monitoring stopped.")
 				ticker.Stop()
 				return ctx.Err()
 			case <-ticker.C:
-				log.Debug("Getting workloads information...")
+				logger.Debug("Getting workloads information...")
 				_, err := updateWorkloads(ctx)
 				if err != nil {
-					log.Errorf("While getting workloads information: %v", err)
+					logger.Errorf("While getting workloads information: %v", err)
 					ticker.Stop()
 					return err
 				}

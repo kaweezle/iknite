@@ -29,7 +29,7 @@ import (
 	"sync"
 	"time"
 
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/pflag"
 	coreV1 "k8s.io/api/core/v1"
 	k8errors "k8s.io/apimachinery/pkg/api/errors"
@@ -112,7 +112,13 @@ func AddResourcesFlags(flags *pflag.FlagSet, opts *ResourcesOptions) {
 }
 
 // waitForResources waits for all resources in the specified namespaces to become ready.
-func waitForResources(ctx context.Context, fs host.FileSystem, opts *ResourcesOptions, namespaces []string) error {
+func waitForResources(
+	ctx context.Context,
+	fs host.FileSystem,
+	opts *ResourcesOptions,
+	namespaces []string,
+	logger logrus.FieldLogger,
+) error {
 	if opts.Timeout > 0 {
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(ctx, opts.Timeout)
@@ -130,7 +136,7 @@ func waitForResources(ctx context.Context, fs host.FileSystem, opts *ResourcesOp
 	}
 
 	// Validate that the requested resource types are supported by the cluster before starting the wait loops.
-	validTypes, err := k8s.ValidateResourceTypes(mapper, opts.ResourceTypes)
+	validTypes, err := k8s.ValidateResourceTypes(mapper, opts.ResourceTypes, logger)
 	if err != nil {
 		return fmt.Errorf("resource type validation failed: %w", err)
 	}
@@ -139,19 +145,19 @@ func waitForResources(ctx context.Context, fs host.FileSystem, opts *ResourcesOp
 	}
 	opts.ResourceTypes = validTypes
 
-	namespaces, err = resolveNamespaces(ctx, client, fs, opts, namespaces)
+	namespaces, err = resolveNamespaces(ctx, client, fs, opts, namespaces, logger)
 	if err != nil {
 		return err
 	}
 
-	log.Infof("Watching %d namespace(s) concurrently: %v", len(namespaces), namespaces)
+	logger.Infof("Watching %d namespace(s) concurrently: %v", len(namespaces), namespaces)
 
 	// Launch one goroutine per namespace; collect errors via a buffered channel.
 	errCh := make(chan error, len(namespaces))
 	var wg sync.WaitGroup
 	for _, ns := range namespaces {
 		wg.Go(func() {
-			if err := waitNamespaceResources(ctx, client, ns, opts); err != nil {
+			if err := waitNamespaceResources(ctx, client, ns, opts, logger); err != nil {
 				errCh <- err
 			}
 		})
@@ -167,7 +173,7 @@ func waitForResources(ctx context.Context, fs host.FileSystem, opts *ResourcesOp
 		return errors.Join(errs...)
 	}
 
-	log.Info("All resources in all namespaces are ready")
+	logger.Info("All resources in all namespaces are ready")
 	return nil
 }
 
@@ -177,19 +183,20 @@ func resolveNamespaces(
 	fs host.FileSystem,
 	opts *ResourcesOptions,
 	namespaces []string,
+	logger logrus.FieldLogger,
 ) ([]string, error) {
 	if len(namespaces) != 0 {
 		return namespaces, nil
 	}
 
 	if info, err := fs.Stat(currentNamespaceFile); err == nil && !info.IsDir() && !opts.AllNamespaces {
-		log.Infof("Getting namespace from %s", currentNamespaceFile)
+		logger.Infof("Getting namespace from %s", currentNamespaceFile)
 		namespaceBytes, readErr := fs.ReadFile(currentNamespaceFile)
 		if readErr != nil { // nocov
 			return nil, fmt.Errorf("failed to read namespace from file %s: %w", currentNamespaceFile, readErr)
 		}
 		namespace := string(namespaceBytes)
-		log.Infof("Watching current namespace: %s", namespace)
+		logger.Infof("Watching current namespace: %s", namespace)
 		return []string{namespace}, nil
 	}
 
@@ -198,7 +205,7 @@ func resolveNamespaces(
 		return nil, fmt.Errorf("failed to create Kubernetes client: %w", err)
 	}
 
-	namespaces, err = listNamespaces(ctx, k8sInterface, opts.StatusUpdateInterval)
+	namespaces, err = listNamespaces(ctx, k8sInterface, opts.StatusUpdateInterval, logger)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list namespaces: %w", err)
 	}
@@ -211,14 +218,15 @@ func listNamespaces(
 	ctx context.Context,
 	k8sInterface kubernetes.Interface,
 	interval time.Duration,
+	logger logrus.FieldLogger,
 ) ([]string, error) {
-	log.Info("No namespaces specified, listing all namespaces from the cluster...")
+	logger.Info("No namespaces specified, listing all namespaces from the cluster...")
 
 	var names []string
 	if err := wait.PollUntilContextCancel(ctx, interval, true, func(ctx context.Context) (bool, error) {
 		list, listErr := k8sInterface.CoreV1().Namespaces().List(ctx, metav1.ListOptions{})
 		if listErr != nil {
-			log.WithError(listErr).Debug("API not available yet, retrying...")
+			logger.WithError(listErr).Debug("API not available yet, retrying...")
 			return false, nil
 		}
 		names = make([]string, 0, len(list.Items))
@@ -235,7 +243,7 @@ func listNamespaces(
 }
 
 type resourceWaiter struct {
-	logger             log.FieldLogger
+	logger             logrus.FieldLogger
 	client             genericclioptions.RESTClientGetter
 	poller             *polling.StatusPoller
 	pollCancel         context.CancelFunc
@@ -261,7 +269,7 @@ func newResourceWaiter(
 		return nil, fmt.Errorf("failed to create status poller: %w", err)
 	}
 
-	logger := log.WithField("namespace", namespace)
+	logger := logrus.WithField("namespace", namespace)
 
 	return &resourceWaiter{
 		client:         client,
@@ -359,7 +367,7 @@ func (w *resourceWaiter) startPolling(ctx context.Context, dataSet object.ObjMet
 	w.pollCancel = cancel
 	w.mu.Unlock()
 
-	w.logger.WithFields(log.Fields{
+	w.logger.WithFields(logrus.Fields{
 		"pollInterval":  w.opts.StatusUpdateInterval.Round(time.Second),
 		"resourceCount": len(dataSet),
 	}).Info("Waiting for resources to become ready")
@@ -445,7 +453,7 @@ func (w *resourceWaiter) watchDataSetChanges(ctx context.Context) {
 				return
 			}
 
-			w.logger.WithFields(log.Fields{
+			w.logger.WithFields(logrus.Fields{
 				"previousCount": len(currentDataSet),
 				"currentCount":  len(newDataSet),
 				"interval":      w.opts.ResourcesUpdateInterval.Round(time.Second),
@@ -461,7 +469,7 @@ func (w *resourceWaiter) watchDataSetChanges(ctx context.Context) {
 
 func (w *resourceWaiter) processEvent(rsc *collector.ResourceStatusCollector, event pollingEvent.Event) {
 	if event.Type == pollingEvent.ResourceUpdateEvent {
-		w.logger.WithFields(log.Fields{
+		w.logger.WithFields(logrus.Fields{
 			"group":     event.Resource.Identifier.GroupKind.Group,
 			"kind":      event.Resource.Identifier.GroupKind.Kind,
 			"name":      event.Resource.Identifier.Name,
@@ -516,8 +524,9 @@ func waitNamespaceResources(
 	client genericclioptions.RESTClientGetter,
 	namespace string,
 	opts *ResourcesOptions,
+	l logrus.FieldLogger,
 ) error {
-	logger := log.WithField("namespace", namespace)
+	logger := l.WithField("namespace", namespace)
 	// 1. Wait for the namespace to exist.
 	logger.Infof("Waiting for namespace to exist...")
 	var ns *coreV1.Namespace
@@ -548,7 +557,7 @@ func waitNamespaceResources(
 	nsExistence := time.Since(ns.CreationTimestamp.Time)
 	timeToWait := max(0, opts.NamespaceSettlePeriod-nsExistence)
 	logger2 := logger.WithFields(
-		log.Fields{
+		logrus.Fields{
 			"namespaceAge": nsExistence.Round(time.Second),
 			"settlePeriod": opts.NamespaceSettlePeriod.Round(time.Second),
 			"timeToWait":   timeToWait.Round(time.Second),

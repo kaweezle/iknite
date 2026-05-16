@@ -9,6 +9,7 @@ import (
 
 	"github.com/kaweezle/iknite/pkg/apis/iknite"
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
+	"github.com/sirupsen/logrus"
 	mock "github.com/stretchr/testify/mock"
 	"golang.org/x/sync/errgroup"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
@@ -175,6 +176,52 @@ func (_c *MockMonitorData_IkniteCluster_Call) Return(ikniteCluster *v1alpha1.Ikn
 }
 
 func (_c *MockMonitorData_IkniteCluster_Call) RunAndReturn(run func() *v1alpha1.IkniteCluster) *MockMonitorData_IkniteCluster_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// Logger provides a mock function for the type MockMonitorData
+func (_mock *MockMonitorData) Logger() logrus.FieldLogger {
+	ret := _mock.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for Logger")
+	}
+
+	var r0 logrus.FieldLogger
+	if returnFunc, ok := ret.Get(0).(func() logrus.FieldLogger); ok {
+		r0 = returnFunc()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(logrus.FieldLogger)
+		}
+	}
+	return r0
+}
+
+// MockMonitorData_Logger_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Logger'
+type MockMonitorData_Logger_Call struct {
+	*mock.Call
+}
+
+// Logger is a helper method to define mock.On call
+func (_e *MockMonitorData_Expecter) Logger() *MockMonitorData_Logger_Call {
+	return &MockMonitorData_Logger_Call{Call: _e.mock.On("Logger")}
+}
+
+func (_c *MockMonitorData_Logger_Call) Run(run func()) *MockMonitorData_Logger_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *MockMonitorData_Logger_Call) Return(fieldLogger logrus.FieldLogger) *MockMonitorData_Logger_Call {
+	_c.Call.Return(fieldLogger)
+	return _c
+}
+
+func (_c *MockMonitorData_Logger_Call) RunAndReturn(run func() logrus.FieldLogger) *MockMonitorData_Logger_Call {
 	_c.Call.Return(run)
 	return _c
 }

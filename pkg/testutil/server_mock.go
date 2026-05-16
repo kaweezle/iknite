@@ -202,9 +202,19 @@ func FailOverrideHandler(path string, w http.ResponseWriter, _ *http.Request, lo
 }
 
 type TestServerOptions struct {
+	Entry     *logrus.Entry
 	Overrides map[string]HandlerOverrideFunc
 	Requests  []RequestLog
 	RequestMu sync.Mutex
+}
+
+func (o *TestServerOptions) Logger() *logrus.Entry {
+	if o.Entry == nil {
+		l := logrus.New()
+		l.SetLevel(logrus.DebugLevel)
+		o.Entry = logrus.NewEntry(l)
+	}
+	return o.Entry
 }
 
 func ContentPatchHandler(subdir string, options *TestServerOptions) http.HandlerFunc {
@@ -218,12 +228,12 @@ func ContentPatchHandler(subdir string, options *TestServerOptions) http.Handler
 			options.RequestMu.Lock()
 			defer options.RequestMu.Unlock()
 			options.Requests = append(options.Requests, *log)
-			logrus.Info(log.String())
+			options.Logger().Info(log.String())
 		}()
 		path := strings.TrimSuffix(r.URL.Path, "/")
 		if override, exists := options.Overrides[path]; exists {
 			if override(path, w, r, log, content) {
-				logrus.Infof("Override handled the request for path: %s", path)
+				options.Logger().Infof("Override handled the request for path: %s", path)
 				return
 			}
 		}
@@ -233,13 +243,13 @@ func ContentPatchHandler(subdir string, options *TestServerOptions) http.Handler
 			content, err := content.ReadFile(filename)
 			if err != nil {
 				if os.IsNotExist(err) {
-					logrus.Errorf("File not found: %s", filename)
+					options.Logger().Errorf("File not found: %s", filename)
 					log.StatusCode = http.StatusNotFound
 					w.WriteHeader(http.StatusNotFound)
 					w.Header().Set("Content-Type", "application/json")
 					_, _ = w.Write([]byte(notFoundResponse)) //nolint:errcheck // test server, ignore error
 				} else {
-					logrus.Errorf("Failed to read file %s: %v", filename, err)
+					options.Logger().Errorf("Failed to read file %s: %v", filename, err)
 					log.StatusCode = http.StatusInternalServerError
 					w.WriteHeader(http.StatusInternalServerError)
 				}
@@ -252,7 +262,7 @@ func ContentPatchHandler(subdir string, options *TestServerOptions) http.Handler
 		case http.MethodPatch:
 			body, err := io.ReadAll(r.Body)
 			if err != nil {
-				logrus.Errorf("Failed to read request body: %v", err)
+				options.Logger().Errorf("Failed to read request body: %v", err)
 			}
 			log.Body = string(body)
 			w.Header().Set("Content-Type", "application/json")
@@ -264,17 +274,17 @@ func ContentPatchHandler(subdir string, options *TestServerOptions) http.Handler
 			log.Body = string(body)
 			content_type := r.Header.Get("Content-Type")
 			if err != nil {
-				logrus.Errorf("Failed to read request body: %v", err)
+				options.Logger().Errorf("Failed to read request body: %v", err)
 			} else {
-				logrus.Infof("Request body: %s", string(body))
-				logrus.Infof("Content-Type: %s", content_type)
+				options.Logger().Infof("Request body: %s", string(body))
+				options.Logger().Infof("Content-Type: %s", content_type)
 			}
 			w.Header().Set("Content-Type", content_type)
 			w.WriteHeader(http.StatusOK)
 			log.StatusCode = http.StatusOK
 			_, _ = w.Write(body) //nolint:errcheck // test server, ignore error
 		default:
-			logrus.Warnf("Unexpected request: %s %s %s", r.Method, r.URL.Path, r.URL.RawQuery)
+			options.Logger().Warnf("Unexpected request: %s %s %s", r.Method, r.URL.Path, r.URL.RawQuery)
 			w.WriteHeader(http.StatusInternalServerError)
 			log.StatusCode = http.StatusInternalServerError
 		}

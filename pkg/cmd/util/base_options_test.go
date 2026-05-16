@@ -6,7 +6,7 @@ import (
 	"io"
 	"testing"
 
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/pflag"
 	"github.com/stretchr/testify/require"
 
@@ -19,7 +19,7 @@ func TestDefaultBaseOptions_returnsExpectedDefaults(t *testing.T) {
 	opts := util.DefaultBaseOptions()
 
 	req.NotNil(opts, "DefaultBaseOptions should not return nil")
-	req.Equal(log.InfoLevel, opts.Verbosity, "expected default verbosity to be InfoLevel")
+	req.Equal(logrus.InfoLevel, opts.Verbosity, "expected default verbosity to be InfoLevel")
 	req.False(opts.JSONLogs, "expected JSONLogs to be false by default")
 }
 
@@ -40,8 +40,8 @@ func TestBaseOptions_AddFlags_registersAndParsesFlags(t *testing.T) {
 	if err := flags.Parse([]string{"--verbosity", "debug", "--json"}); err != nil {
 		t.Fatalf("unexpected parse error: %v", err)
 	}
-	if opts.Verbosity != log.DebugLevel {
-		t.Fatalf("expected verbosity %q, got %q", log.DebugLevel, opts.Verbosity)
+	if opts.Verbosity != logrus.DebugLevel {
+		t.Fatalf("expected verbosity %q, got %q", logrus.DebugLevel, opts.Verbosity)
 	}
 	if !opts.JSONLogs {
 		t.Fatal("expected JSONLogs to be true after parsing --json")
@@ -62,23 +62,23 @@ func TestBaseOptions_AddFlags_returnsErrorOnInvalidVerbosity(t *testing.T) {
 	}
 }
 
-//nolint:paralleltest // we modify global logger state in each test case
 func TestBaseOptions_SetUpLogs_configuresLogger(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		opts   *util.BaseOptions
-		assert func(req *require.Assertions, std *log.Logger)
+		assert func(req *require.Assertions, std *logrus.Logger)
 		name   string
 	}{
 		{
 			name: "sets output and level without changing formatter when json disabled",
 			opts: &util.BaseOptions{
-				Verbosity: log.WarnLevel,
+				Verbosity: logrus.WarnLevel,
 				JSONLogs:  false,
 			},
-			assert: func(req *require.Assertions, std *log.Logger) {
-				req.Equal(log.WarnLevel, std.Level, "Expected logger level to be set to WarnLevel")
+			assert: func(req *require.Assertions, std *logrus.Logger) {
+				req.Equal(logrus.WarnLevel, std.Level, "Expected logger level to be set to WarnLevel")
 				req.IsType(
-					&log.TextFormatter{},
+					&logrus.TextFormatter{},
 					std.Formatter,
 					"Expected formatter to be TextFormatter when JSONLogs is false",
 				)
@@ -87,13 +87,13 @@ func TestBaseOptions_SetUpLogs_configuresLogger(t *testing.T) {
 		{
 			name: "sets json formatter when json enabled",
 			opts: &util.BaseOptions{
-				Verbosity: log.ErrorLevel,
+				Verbosity: logrus.ErrorLevel,
 				JSONLogs:  true,
 			},
-			assert: func(req *require.Assertions, std *log.Logger) {
-				req.Equal(log.ErrorLevel, std.Level, "Expected logger level to be set to ErrorLevel")
+			assert: func(req *require.Assertions, std *logrus.Logger) {
+				req.Equal(logrus.ErrorLevel, std.Level, "Expected logger level to be set to ErrorLevel")
 				req.IsType(
-					&log.JSONFormatter{},
+					&logrus.JSONFormatter{},
 					std.Formatter,
 					"Expected formatter to be JSONFormatter when JSONLogs is true",
 				)
@@ -101,21 +101,14 @@ func TestBaseOptions_SetUpLogs_configuresLogger(t *testing.T) {
 		},
 	}
 
-	for _, tt := range tests { //nolint:paralleltest // we modify global logger state in each test case
+	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			std := log.StandardLogger()
-			originalOut := std.Out
-			originalFormatter := std.Formatter
-			originalLevel := std.Level
-			t.Cleanup(func() {
-				std.SetOutput(originalOut)
-				std.SetFormatter(originalFormatter)
-				std.SetLevel(originalLevel)
-			})
+			t.Parallel()
+			std := logrus.New()
 			req := require.New(t)
 
 			var out bytes.Buffer
-			tt.opts.SetUpLogs(&out)
+			tt.opts.SetUpLogs(&out, std)
 
 			req.Equal(&out, std.Out, "expected standard logger output to be set to provided writer")
 			tt.assert(req, std)

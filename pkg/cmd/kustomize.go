@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/runtime"
 
 	"github.com/kaweezle/iknite/pkg/cmd/options"
+	"github.com/kaweezle/iknite/pkg/cmd/util"
 	"github.com/kaweezle/iknite/pkg/config"
 	"github.com/kaweezle/iknite/pkg/constants"
 	"github.com/kaweezle/iknite/pkg/host"
@@ -98,7 +99,13 @@ applies the Embedded configuration that installs the following components:
 
 `,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			err := performKustomize(cmd.Context(), fs, kustomizeOptions, waitOptions)
+			err := performKustomize(
+				cmd.Context(),
+				fs,
+				kustomizeOptions,
+				waitOptions,
+				util.GetLoggerFromContext(cmd.Context()),
+			)
 			if err != nil {
 				return fmt.Errorf("failed to apply kustomize configuration: %w", err)
 			}
@@ -126,6 +133,7 @@ func performKustomize(
 	fs host.FileSystem,
 	kustomizeOptions *utils.KustomizeOptions,
 	waitOptions *utils.WaitOptions,
+	logger logrus.FieldLogger,
 ) error {
 	// We need to get it from root as we will apply configuration
 	kubeClient, err := k8s.NewClientFromFile(fs, constants.KubernetesRootConfig)
@@ -154,9 +162,12 @@ func performKustomize(
 	}
 
 	if waitOptions.HasLoop() {
-		logrus.Infof("Waiting for workloads with options: %s", waitOptions.String())
+		logger.Infof("Waiting for workloads with options: %s", waitOptions.String())
 		runtime.ErrorHandlers = runtime.ErrorHandlers[:0] //nolint:reassign // disabling printing of errors to stderr
-		if err := waitOptions.Poll(ctx, k8s.WorkloadsReadyConditionWithContextFunc(kubeClient, nil)); err != nil {
+		if err := waitOptions.Poll(
+			ctx,
+			k8s.WorkloadsReadyConditionWithContextFunc(kubeClient, logger, nil),
+		); err != nil {
 			return fmt.Errorf("failed to wait for workloads: %w", err)
 		}
 	}

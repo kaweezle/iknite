@@ -7,7 +7,7 @@ import (
 	"os"
 
 	"github.com/google/uuid"
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 
 	"github.com/kaweezle/iknite/pkg/host"
 )
@@ -27,9 +27,9 @@ const (
 // On other linuxes, netfilter is provided as a module.
 func EnsureNetFilter(fsExe host.FileExecutor) error {
 	if err := host.ExecuteIfNotExist(fsExe, brNetfilterDir, func() error {
-		log.Debug("Enabling netfilter...")
+		logrus.Debug("Enabling netfilter...")
 		if out, err := fsExe.Run(true, modProbeCmd, netfilter_module); err == nil {
-			log.Trace(string(out))
+			logrus.Trace(string(out))
 		} else {
 			return fmt.Errorf("error while enabling netfilter: %s: %w", string(out), err)
 		}
@@ -43,7 +43,7 @@ func EnsureNetFilter(fsExe host.FileExecutor) error {
 func EnsureMachineID(fs host.FileSystem) error {
 	if err := host.ExecuteIfNotExist(fs, machineIDFile, func() error {
 		id := uuid.New()
-		log.WithFields(log.Fields{
+		logrus.WithFields(logrus.Fields{
 			"uuid":     id,
 			"filename": machineIDFile,
 		}).Info("Generating machine ID...")

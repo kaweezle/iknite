@@ -9,7 +9,6 @@ import (
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
@@ -28,7 +27,6 @@ func simpleConfigurer(
 	executor.AddCheck(&check.Check{
 		Name: "simple",
 		CheckFn: func(_ context.Context, _ check.CheckData) (bool, string, error) {
-			logrus.Info("Running simple check")
 			return true, "simple check passed", nil
 		},
 	})
@@ -51,6 +49,7 @@ func TestStatusCommand(t *testing.T) {
 		tea.WithInput(input),
 		tea.WithoutRenderer(),
 	)
-	err = command.ExecuteContext(t.Context())
+	_, ctx, _ := cmd.CreateTestCmdInterface(t, command)
+	err = command.ExecuteContext(ctx)
 	req.NoError(err)
 }

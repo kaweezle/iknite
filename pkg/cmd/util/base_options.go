@@ -4,7 +4,7 @@ package util
 import (
 	"io"
 
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/pflag"
 )
 
@@ -16,13 +16,13 @@ const (
 )
 
 type BaseOptions struct {
-	Verbosity log.Level
+	Verbosity logrus.Level
 	JSONLogs  bool
 }
 
 func DefaultBaseOptions() *BaseOptions {
 	return &BaseOptions{
-		Verbosity: log.InfoLevel,
+		Verbosity: logrus.InfoLevel,
 		JSONLogs:  false,
 	}
 }
@@ -34,10 +34,10 @@ func (opts *BaseOptions) AddFlags(flags *pflag.FlagSet) {
 }
 
 // setUpLogs configures logrus output and level.
-func (opts *BaseOptions) SetUpLogs(out io.Writer) {
-	log.SetOutput(out)
+func (opts *BaseOptions) SetUpLogs(out io.Writer, l *logrus.Logger) {
+	l.SetOutput(out)
 	if opts.JSONLogs {
-		log.SetFormatter(&log.JSONFormatter{})
+		l.SetFormatter(&logrus.JSONFormatter{})
 	}
-	log.SetLevel(opts.Verbosity)
+	l.SetLevel(opts.Verbosity)
 }

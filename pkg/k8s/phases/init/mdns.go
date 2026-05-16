@@ -6,10 +6,12 @@ import (
 	"net"
 
 	"github.com/pion/mdns/v2"
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 	"golang.org/x/net/ipv4"
 	"golang.org/x/net/ipv6"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
+
+	"github.com/kaweezle/iknite/pkg/utils"
 )
 
 // cSpell: enable
@@ -25,6 +27,7 @@ func NewMDnsPublishPhase() workflow.Phase {
 type mdnsData interface {
 	IkniteClusterProvider
 	ShutdownHookRegistrar
+	utils.LoggerProvider
 }
 
 // runPrepare executes the node initialization process.
@@ -34,9 +37,10 @@ func runMDnsPublish(c workflow.RunData) error {
 		return fmt.Errorf("prepare phase invoked with an invalid data struct. ")
 	}
 	ikniteConfig := data.IkniteCluster().Spec
+	logger := data.Logger()
 
 	if !ikniteConfig.EnableMDNS {
-		log.WithField("phase", "mdns-publish").Info("MDNS is disabled, skipping mdns publish phase.")
+		logger.WithField("phase", "mdns-publish").Info("MDNS is disabled, skipping mdns publish phase.")
 		return nil
 	}
 
@@ -60,7 +64,7 @@ func runMDnsPublish(c workflow.RunData) error {
 		return fmt.Errorf("cannot listen on default address: %w", err)
 	}
 
-	log.WithField("phase", "mdns-publish").WithFields(log.Fields{
+	logger.WithField("phase", "mdns-publish").WithFields(logrus.Fields{
 		"addr4":      addr4,
 		"addr6":      addr6,
 		"interface4": l4.LocalAddr(),
@@ -68,7 +72,7 @@ func runMDnsPublish(c workflow.RunData) error {
 	}).Debug("Start mdns responder...")
 
 	var conn *mdns.Conn
-	log.WithField("phase", "mdns-publish").Info("Starting the mdns responder...")
+	logger.WithField("phase", "mdns-publish").Info("Starting the mdns responder...")
 	conn, err = mdns.Server(ipv4.NewPacketConn(l4), ipv6.NewPacketConn(l6), &mdns.Config{
 		LocalNames: []string{ikniteConfig.DomainName},
 	})

@@ -25,6 +25,7 @@ import (
 	"os"
 	_ "unsafe"
 
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	flag "github.com/spf13/pflag"
 	metaV1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -46,6 +47,7 @@ import (
 
 	ikniteApi "github.com/kaweezle/iknite/pkg/apis/iknite"
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
+	"github.com/kaweezle/iknite/pkg/cmd/util"
 	"github.com/kaweezle/iknite/pkg/config"
 	"github.com/kaweezle/iknite/pkg/host"
 	"github.com/kaweezle/iknite/pkg/k8s"
@@ -91,6 +93,7 @@ type resetData struct {
 	cleanupTmpDir         bool
 	ikniteCluster         *v1alpha1.IkniteCluster
 	alpineHost            host.Host
+	logger                logrus.FieldLogger
 }
 
 var _ iknitePhases.IkniteResetData = (*resetData)(nil)
@@ -116,6 +119,8 @@ func newResetOptions() *resetOptions {
 }
 
 // newResetData returns a new resetData struct to be used for the execution of the kubeadm reset workflow.
+//
+//nolint:gocyclo // Context and log management exceeded the limit. See if it can be simplified in the future.
 func newResetData(
 	cmd *cobra.Command, opts *resetOptions, in io.Reader, out io.Writer, allowExperimental bool,
 ) (*resetData, error) {
@@ -227,6 +232,11 @@ func newResetData(
 		certificatesDir = initCfg.CertificatesDir
 	}
 
+	ctx := cmd.Context()
+	if ctx == nil {
+		return nil, errors.New("command context is nil")
+	}
+
 	return &resetData{
 		certificatesDir:       certificatesDir,
 		client:                client,
@@ -247,6 +257,7 @@ func newResetData(
 			opts.externalCfg.CleanupTmpDir).(bool),
 		ikniteCluster: ikniteCluster,
 		alpineHost:    alpineHost,
+		logger:        util.GetLoggerFromContext(ctx),
 	}, nil
 }
 
@@ -373,4 +384,8 @@ func (r *resetData) IkniteCluster() *v1alpha1.IkniteCluster {
 
 func (r *resetData) Host() host.Host {
 	return r.alpineHost
+}
+
+func (r *resetData) Logger() logrus.FieldLogger {
+	return r.logger
 }

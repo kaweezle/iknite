@@ -117,13 +117,14 @@ func TestReadEnvFile(t *testing.T) {
 	})
 
 	opts := &BootstrapOptions{BootstrapDir: dir}
-	ok, err := opts.ReadEnvFile(fs)
+	logger, _ := testutil.TestLogger(t)
+	ok, err := opts.ReadEnvFile(fs, logger)
 	req.NoError(err)
 	req.True(ok)
 	req.Equal("enabled", os.Getenv("TEST_KUBEWAIT_ENV"))
 
 	missingOpts := &BootstrapOptions{BootstrapDir: filepath.Join(dir, "missing")}
-	ok, err = missingOpts.ReadEnvFile(fs)
+	ok, err = missingOpts.ReadEnvFile(fs, logger)
 	req.NoError(err)
 	req.True(ok)
 }
@@ -164,10 +165,11 @@ func TestRunBootstrapAndRunKubewaitSkipPaths(t *testing.T) {
 	req.NoError(err)
 
 	opts := &BootstrapOptions{BootstrapDir: dir, BootstrapScript: "iknite-bootstrap.sh"}
-	err = runBootstrap(t.Context(), h, opts)
+	logger, _ := testutil.TestLogger(t)
+	err = runBootstrap(t.Context(), h, opts, logger)
 	req.NoError(err)
 
-	err = RunKubewait(t.Context(), h, &Options{SkipWaitingForResources: true, SkipBootstrap: true}, nil)
+	err = RunKubewait(t.Context(), h, &Options{SkipWaitingForResources: true, SkipBootstrap: true}, nil, logger)
 	req.NoError(err)
 }
 

@@ -10,7 +10,7 @@ import (
 	"time"
 
 	argoV1 "github.com/argoproj/argo-cd/v3/pkg/apis/application/v1alpha1"
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -33,7 +33,7 @@ import (
 func NewClientFromKubeconfig(fs host.FileSystem, kubeconfigPath string) (*Client, error) {
 	restConfig, err := InClusterConfig(fs)
 	if err == nil {
-		log.Info("Using in-cluster configuration")
+		logrus.Info("Using in-cluster configuration")
 		return NewClientFromRestConfig(restConfig), nil
 	}
 	if kubeconfigPath != "" {
@@ -84,7 +84,7 @@ func workloadStatesToSlice(infos []*resource.Info) ([]*v1alpha1.WorkloadState, e
 // ValidateResourceTypes checks if the provided resource types are valid by attempting to find their corresponding
 // GroupVersionKind in the REST mapper. It returns a slice of valid resource types and an error if the
 // validation process encounters an issue.
-func ValidateResourceTypes(restMapper meta.RESTMapper, types []string) ([]string, error) {
+func ValidateResourceTypes(restMapper meta.RESTMapper, types []string, logger logrus.FieldLogger) ([]string, error) {
 	validTypes := make([]string, 0, len(types))
 	noMatchError := &meta.NoResourceMatchError{}
 	for _, t := range types {
@@ -94,7 +94,7 @@ func ValidateResourceTypes(restMapper meta.RESTMapper, types []string) ([]string
 		gvr := schema.GroupVersionResource{Group: "", Version: "", Resource: t}
 		_, err := restMapper.KindFor(gvr)
 		for attempt := 2; err != nil && !errors.Is(err, noMatchError) && attempt <= maxAttempts; attempt++ {
-			log.WithError(err).WithFields(log.Fields{
+			logger.WithError(err).WithFields(logrus.Fields{
 				"resourceType": t,
 				"attempt":      attempt,
 			}).Warn("Failed to get resource infos, retrying")
@@ -104,14 +104,14 @@ func ValidateResourceTypes(restMapper meta.RESTMapper, types []string) ([]string
 
 		if err != nil {
 			if errors.Is(err, noMatchError) {
-				log.WithError(err).
+				logger.WithError(err).
 					WithField("resourceType", t).
 					Warn("Resource type not found in REST mapper, skipping...")
 				continue
 			}
 			return nil, fmt.Errorf("while validating resource type %s: %w", t, err)
 		}
-		log.WithField("resourceType", t).Info("Resource type is available in REST mapper")
+		logger.WithField("resourceType", t).Info("Resource type is available in REST mapper")
 		validTypes = append(validTypes, t)
 	}
 	return validTypes, nil
@@ -167,7 +167,7 @@ func ObjectMetadataSetForNamespace(
 
 	infos, err := ResourceInfosForNamespace(client, namespace, resourceTypes)
 	for attempt := 2; err != nil && attempt <= maxAttempts; attempt++ {
-		log.WithError(err).WithFields(log.Fields{
+		logrus.WithError(err).WithFields(logrus.Fields{
 			"resourceTypes": resourceTypes,
 			"attempt":       attempt,
 			"namespace":     namespace,

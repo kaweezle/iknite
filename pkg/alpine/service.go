@@ -26,7 +26,7 @@ import (
 	"strings"
 	"syscall"
 
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 
 	"github.com/kaweezle/iknite/pkg/constants"
 	"github.com/kaweezle/iknite/pkg/host"
@@ -44,9 +44,9 @@ const (
 var startedServicesDir = path.Join(openRCDirectory, "started")
 
 func EnsureOpenRC(h host.Executor, level string) error {
-	log.WithField("level", level).Info("Ensuring OpenRC...")
+	logrus.WithField("level", level).Info("Ensuring OpenRC...")
 	if out, err := h.Run(true, "/sbin/openrc", "default"); err == nil {
-		log.Trace(string(out))
+		logrus.Trace(string(out))
 		return nil
 	} else {
 		return fmt.Errorf("error while starting openrc: %w", err)
@@ -130,7 +130,7 @@ func DisableService(h host.FileSystem, serviceName string) error {
 func StartService(h host.FileExecutor, serviceName string) error {
 	return ExecuteIfServiceNotStarted(h, serviceName, func() error {
 		if out, err := h.Run(false, "/sbin/rc-service", serviceName, "start"); err == nil {
-			log.Trace(string(out))
+			logrus.Trace(string(out))
 			return nil
 		} else {
 			return fmt.Errorf("error while starting service %s: %w", serviceName, err)
@@ -142,7 +142,7 @@ func StartService(h host.FileExecutor, serviceName string) error {
 func StopService(h host.FileExecutor, serviceName string) error {
 	return ExecuteIfServiceStarted(h, serviceName, func() error {
 		if out, err := h.Run(false, "/sbin/rc-service", serviceName, "stop"); err == nil {
-			log.Trace(string(out))
+			logrus.Trace(string(out))
 			return nil
 		} else {
 			return fmt.Errorf("error while stopping service %s: %w", serviceName, err)
@@ -176,7 +176,7 @@ func ServicePidFilePath(serviceName string) string {
 
 func CheckPidFile(h host.FileExecutor, service string) (int, host.Process, error) {
 	pidFilePath := ServicePidFilePath(service)
-	logger := log.WithField("pidfile", pidFilePath)
+	logger := logrus.WithField("pidfile", pidFilePath)
 	pidBytes, err := h.ReadFile(pidFilePath)
 	if err != nil && errors.Is(err, os.ErrNotExist) {
 		pidFilePath = fmt.Sprintf("/var/run/supervise-%s.pid", service)
@@ -215,7 +215,7 @@ func RemovePidFile(h host.FileSystem, service string) {
 	pidFilePath := ServicePidFilePath(service)
 	err := h.Remove(pidFilePath)
 	if err != nil {
-		log.WithFields(log.Fields{
+		logrus.WithFields(logrus.Fields{
 			"err":     err,
 			"pidFile": pidFilePath,
 		}).Warn("Failed to remove PID file")

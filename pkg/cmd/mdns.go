@@ -31,6 +31,7 @@ import (
 	"golang.org/x/net/ipv6"
 
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
+	"github.com/kaweezle/iknite/pkg/cmd/util"
 	"github.com/kaweezle/iknite/pkg/config"
 )
 
@@ -114,7 +115,8 @@ func performMdns(ctx context.Context, ikniteConfig *v1alpha1.IkniteClusterSpec) 
 		return err
 	}
 
-	logrus.WithFields(logrus.Fields{
+	logger := util.GetLoggerFromContext(ctx)
+	logger.WithFields(logrus.Fields{
 		"domainName": ikniteConfig.DomainName,
 		"addr4":      addr4,
 		"addr6":      addr6,
@@ -122,7 +124,7 @@ func performMdns(ctx context.Context, ikniteConfig *v1alpha1.IkniteClusterSpec) 
 
 	defer conn.Close() //nolint:errcheck // should not fail.
 	<-ctx.Done()
-	logrus.Info("Shutting down mdns responder...")
+	logger.Info("Shutting down mdns responder...")
 	return nil
 }
 

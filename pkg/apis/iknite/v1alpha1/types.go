@@ -8,7 +8,7 @@ import (
 	"net"
 	"os"
 
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 	metaV1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	ikniteApi "github.com/kaweezle/iknite/pkg/apis/iknite"
@@ -106,7 +106,7 @@ func (ikniteCluster *IkniteCluster) Persist(fs host.FileSystem) {
 		// Write JSON to file
 		err = fs.MkdirAll(constants.StatusDirectory, 0o755)
 		if err != nil {
-			log.WithError(err).Warn("Failed to create status directory")
+			logrus.WithError(err).Warn("Failed to create status directory")
 			return
 		}
 		err = fs.WriteFile(
@@ -115,10 +115,10 @@ func (ikniteCluster *IkniteCluster) Persist(fs host.FileSystem) {
 			0o644,
 		)
 		if err != nil {
-			log.WithError(err).Warn("Failed to write status.json")
+			logrus.WithError(err).Warn("Failed to write status.json")
 		}
 	} else {
-		log.WithError(err).Warn("Failed to marshal status.json")
+		logrus.WithError(err).Warn("Failed to marshal status.json")
 	}
 }
 

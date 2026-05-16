@@ -21,7 +21,6 @@ package reset
 import (
 	"errors"
 
-	"github.com/sirupsen/logrus"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
@@ -52,8 +51,10 @@ func runCleanupService(c workflow.RunData) error {
 		return errors.New("cleanup-node phase invoked with an invalid data struct")
 	}
 
+	logger := r.Logger().WithField("phase", "reset")
+
 	// Try to stop the kubelet service
-	logrus.WithField("phase", "reset").Info("Getting the init system...")
+	logger.Info("Getting the init system...")
 	osInitSystem, err := initSystem.GetInitSystem()
 	if err != nil {
 		klog.Warningln(
@@ -63,13 +64,13 @@ func runCleanupService(c workflow.RunData) error {
 		return nil //nolint:nilerr // TODO: return error?
 	}
 	if !r.DryRun() {
-		logrus.WithField("phase", "reset").Info("Stopping the iknite service...")
+		logger.Info("Stopping the iknite service...")
 		if err := osInitSystem.ServiceStop("iknite"); err != nil {
 			klog.Warningf("[reset] The iknite service could not be stopped by kubeadm: [%v]\n", err)
 			klog.Warningln("[reset] Please ensure iknite is stopped manually")
 		}
 	} else {
-		logrus.WithField("phase", "reset").Info("Would stop the iknite service")
+		logger.Info("Would stop the iknite service")
 	}
 
 	return nil

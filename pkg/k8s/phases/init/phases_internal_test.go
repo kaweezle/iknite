@@ -139,10 +139,11 @@ func TestCopyFile(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			req := require.New(t)
+			logger := newTestLogger(t)
 
 			fs := host.NewOsFS()
 			src, dst := tt.prepare(t)
-			err := copyFile(fs, src, dst)
+			err := copyFile(fs, src, dst, logger)
 			if tt.wantErr {
 				req.Error(err)
 				return
@@ -164,7 +165,8 @@ func TestWaitForKubelet_ProcessStop(t *testing.T) {
 	process.On("Wait").Return(nil).Once()
 	process.On("State").Return(&os.ProcessState{})
 
-	err := WaitForKubelet(context.Background(), process)
+	logger := newTestLogger(t)
+	err := WaitForKubelet(context.Background(), process, logger)
 	req.NoError(err)
 }
 
@@ -184,7 +186,8 @@ func TestWaitForKubelet_CtxDone(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel() // Cancel the context immediately
 
-	err := WaitForKubelet(ctx, process)
+	logger := newTestLogger(t)
+	err := WaitForKubelet(ctx, process, logger)
 	req.NoError(err)
 }
 
@@ -201,8 +204,9 @@ func TestWaitForKubelet_CtxDoneWithWaitError(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel() // Cancel the context immediately
+	logger := newTestLogger(t)
 
-	err := WaitForKubelet(ctx, process)
+	err := WaitForKubelet(ctx, process, logger)
 	req.Error(err)
 	req.Contains(err.Error(), "failed to wait for kubelet")
 }
@@ -220,8 +224,9 @@ func TestWaitForKubelet_CtxDoneWithSignalError(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel() // Cancel the context immediately
+	logger := newTestLogger(t)
 
-	err := WaitForKubelet(ctx, process)
+	err := WaitForKubelet(ctx, process, logger)
 	req.Error(err)
 	req.Contains(err.Error(), "failed to wait for kubelet")
 }
@@ -239,8 +244,9 @@ func TestWaitForKubelet_CtxDoneWithSignalAndWaitError(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel() // Cancel the context immediately
+	logger := newTestLogger(t)
 
-	err := WaitForKubelet(ctx, process)
+	err := WaitForKubelet(ctx, process, logger)
 	req.Error(err)
 	req.Contains(err.Error(), "failed to wait for kubelet")
 }

@@ -11,12 +11,13 @@ import (
 	"sync"
 	"time"
 
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 	kubeadmApi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 
 	"github.com/kaweezle/iknite/pkg/host"
+	"github.com/kaweezle/iknite/pkg/utils"
 )
 
 const (
@@ -39,6 +40,7 @@ type proxyAPIData interface {
 	ShutdownHookRegistrar
 	Cfg() *kubeadmApi.InitConfiguration
 	ContextProvider
+	utils.LoggerProvider
 }
 
 func runProxyAPI(c workflow.RunData) error {
@@ -51,6 +53,7 @@ func runProxyAPI(c workflow.RunData) error {
 	cfg := data.Cfg()
 	alpineHost := data.Host()
 	ctx := data.Context()
+	logger := data.Logger()
 
 	clusterIP := ikniteConfig.Ip
 	if clusterIP == nil {
@@ -62,7 +65,7 @@ func runProxyAPI(c workflow.RunData) error {
 		return fmt.Errorf("failed to get outbound IP: %w", err)
 	}
 	if outboundIP == nil || outboundIP.Equal(clusterIP) {
-		log.WithField("outboundIP", outboundIP).WithField("clusterIP", clusterIP).Info("No API proxy needed")
+		logger.WithField("outboundIP", outboundIP).WithField("clusterIP", clusterIP).Info("No API proxy needed")
 		return nil
 	}
 
@@ -70,24 +73,24 @@ func runProxyAPI(c workflow.RunData) error {
 	listeners := make([]net.Listener, 0, len(ports))
 	errGroup := data.ErrGroup()
 	for _, port := range ports {
-		listener, listenErr := startProxyAPIListener(ctx, alpineHost, errGroup, outboundIP, clusterIP, port)
+		listener, listenErr := startProxyAPIListener(ctx, alpineHost, errGroup, outboundIP, clusterIP, port, logger)
 		if listenErr != nil {
-			if closeErr := closeProxyAPIListeners(listeners); closeErr != nil {
-				log.WithError(closeErr).Warn("Failed to clean up proxy listeners")
+			if closeErr := closeProxyAPIListeners(listeners, logger); closeErr != nil {
+				logger.WithError(closeErr).Warn("Failed to clean up proxy listeners")
 			}
 			return fmt.Errorf("failed to start proxy on port %d: %w", port, listenErr)
 		}
 		listeners = append(listeners, listener)
 	}
 
-	log.WithFields(log.Fields{
+	logger.WithFields(logrus.Fields{
 		"clusterIP":  clusterIP.String(),
 		"outboundIP": outboundIP.String(),
 		"ports":      ports,
 	}).Info("API proxy started")
 
 	data.RegisterShutdownHook(proxyAPIPhaseName, func() error {
-		return closeProxyAPIListeners(listeners)
+		return closeProxyAPIListeners(listeners, logger)
 	})
 
 	return nil
@@ -115,6 +118,7 @@ func startProxyAPIListener(
 	errGroup *errgroup.Group,
 	outboundIP, clusterIP net.IP,
 	port int,
+	logger logrus.FieldLogger,
 ) (net.Listener, error) {
 	listenAddr := net.JoinHostPort(outboundIP.String(), strconv.Itoa(port))
 	targetAddr := net.JoinHostPort(clusterIP.String(), strconv.Itoa(port))
@@ -125,7 +129,7 @@ func startProxyAPIListener(
 	}
 
 	errGroup.Go(func() error {
-		return serveProxyAPIListener(ctx, networkHost, listener, targetAddr)
+		return serveProxyAPIListener(ctx, networkHost, listener, targetAddr, logger)
 	})
 
 	return listener, nil
@@ -136,6 +140,7 @@ func serveProxyAPIListener(
 	networkHost host.NetworkHost,
 	listener net.Listener,
 	targetAddr string,
+	logger logrus.FieldLogger,
 ) error {
 	for {
 		conn, err := listener.Accept()
@@ -146,62 +151,69 @@ func serveProxyAPIListener(
 			return fmt.Errorf("accept on %s: %w", listener.Addr().String(), err)
 		}
 
-		go proxyAPIConnection(ctx, networkHost, conn, targetAddr)
+		go proxyAPIConnection(ctx, networkHost, conn, targetAddr, logger)
 	}
 }
 
-func proxyAPIConnection(ctx context.Context, networkHost host.NetworkHost, clientConn net.Conn, targetAddr string) {
+func proxyAPIConnection(
+	ctx context.Context,
+	networkHost host.NetworkHost,
+	clientConn net.Conn,
+	targetAddr string,
+	logger logrus.FieldLogger,
+) {
 	defer func() {
-		closeProxyAPIConn(clientConn, "client")
+		closeProxyAPIConn(clientConn, "client", logger)
 	}()
 
 	targetConn, err := networkHost.DialTimeout(ctx, "tcp", targetAddr, proxyAPIDialTimeout)
 	if err != nil {
-		log.WithError(err).WithField("target", targetAddr).Warn("Proxy dial failed")
+		logger.WithError(err).WithField("target", targetAddr).Warn("Proxy dial failed")
 		return
 	}
 	defer func() {
-		closeProxyAPIConn(targetConn, "target")
+		closeProxyAPIConn(targetConn, "target", logger)
 	}()
 
-	proxyAPICopy(clientConn, targetConn)
+	proxyAPICopy(clientConn, targetConn, logger)
 }
 
-func proxyAPICopy(left, right net.Conn) {
+func proxyAPICopy(left, right net.Conn, logger logrus.FieldLogger) {
 	var wg sync.WaitGroup
 	wg.Add(2)
 	go func() {
 		defer wg.Done()
-		copyProxyStream(left, right)
+		copyProxyStream(left, right, logger)
 	}()
 	go func() {
 		defer wg.Done()
-		copyProxyStream(right, left)
+		copyProxyStream(right, left, logger)
 	}()
 	wg.Wait()
 }
 
-func copyProxyStream(dst, src net.Conn) {
+func copyProxyStream(dst, src net.Conn, logger logrus.FieldLogger) {
 	if _, err := io.Copy(dst, src); err != nil && !errors.Is(err, net.ErrClosed) {
-		log.WithError(err).Debug("Proxy stream stopped")
+		logger.WithError(err).Debug("Proxy stream stopped")
 	}
 	if closeWriter, ok := dst.(interface{ CloseWrite() error }); ok {
 		if err := closeWriter.CloseWrite(); err != nil && !errors.Is(err, net.ErrClosed) {
-			log.WithError(err).Debug("Failed to close proxy write side")
+			logger.WithError(err).Debug("Failed to close proxy write side")
 		}
 	}
 }
 
-func closeProxyAPIConn(conn net.Conn, side string) {
+func closeProxyAPIConn(conn net.Conn, side string, logger logrus.FieldLogger) {
 	if err := conn.Close(); err != nil && !errors.Is(err, net.ErrClosed) {
-		log.WithError(err).WithField("side", side).Debug("Failed to close proxy connection")
+		logger.WithError(err).WithField("side", side).Debug("Failed to close proxy connection")
 	}
 }
 
-func closeProxyAPIListeners(listeners []net.Listener) error {
+func closeProxyAPIListeners(listeners []net.Listener, logger logrus.FieldLogger) error {
 	var errs []error
 	for _, listener := range listeners {
 		if err := listener.Close(); err != nil && !errors.Is(err, net.ErrClosed) {
+			logger.WithError(err).WithField("listener", listener.Addr()).Debug("Failed to close proxy listener")
 			errs = append(errs, err)
 		}
 	}

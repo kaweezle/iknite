@@ -1,4 +1,4 @@
-// cSpell: words clientcmdapi clientcmd apimachinery wrapcheck genericclioptions errgroup
+// cSpell: words clientcmdapi clientcmd apimachinery wrapcheck genericclioptions errgroup sirupsen
 package cmd
 
 import (
@@ -10,6 +10,8 @@ import (
 	"strconv"
 	_ "unsafe"
 
+	"github.com/sirupsen/logrus"
+	"github.com/spf13/viper"
 	"golang.org/x/sync/errgroup"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
@@ -57,8 +59,10 @@ type initData struct {
 	alpineHost                  host.Host
 	clientGetter                genericclioptions.RESTClientGetter
 	errGroup                    errgroup.Group
-	hookManager                 utils.HookManager
+	hookManager                 *utils.HookManager
 	clusterUpdateBus            utils.Bus[*v1alpha1.IkniteCluster]
+	logger                      logrus.FieldLogger
+	viper                       *viper.Viper
 }
 
 // compile-time assert that the local data object satisfies the phases data interface.
@@ -368,4 +372,12 @@ func (d *initData) RunShutdownHooks() error {
 // RegisterIkniteClusterListener implements [init.IkniteInitData].
 func (d *initData) RegisterIkniteClusterListener() (<-chan *v1alpha1.IkniteCluster, func()) {
 	return d.clusterUpdateBus.Subscribe(1)
+}
+
+func (d *initData) Logger() logrus.FieldLogger {
+	return d.logger
+}
+
+func (d *initData) Viper() *viper.Viper {
+	return d.viper
 }

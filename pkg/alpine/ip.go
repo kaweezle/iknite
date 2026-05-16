@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"net"
 
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 	"github.com/txn2/txeh"
 
 	"github.com/kaweezle/iknite/pkg/host"
@@ -22,7 +22,7 @@ func AddIpAddress(exec host.Executor, iface string, address net.IP) error {
 	ones, _ := address.DefaultMask().Size()
 	ipWithMask := fmt.Sprintf("%v/%d", address, ones)
 
-	log.WithFields(log.Fields{
+	logrus.WithFields(logrus.Fields{
 		"ip":    ipWithMask,
 		"iface": iface,
 	}).Info("Adding IP address")

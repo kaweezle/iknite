@@ -6,7 +6,7 @@ import (
 	"os"
 	"syscall"
 
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	flag "github.com/spf13/pflag"
 	kubeadmOptions "k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
@@ -15,6 +15,7 @@ import (
 	"github.com/kaweezle/iknite/pkg/apis/iknite"
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
 	"github.com/kaweezle/iknite/pkg/cmd/options"
+	"github.com/kaweezle/iknite/pkg/cmd/util"
 	"github.com/kaweezle/iknite/pkg/config"
 	"github.com/kaweezle/iknite/pkg/constants"
 	"github.com/kaweezle/iknite/pkg/host"
@@ -94,13 +95,14 @@ removes the network interfaces and the IP address assigned to the cluster.
 
 This command must be run as root.
 `,
-		RunE: func(_ *cobra.Command, _ []string) error {
+		RunE: func(cmd *cobra.Command, _ []string) error {
 			if err := cleanOptions.validate(); err != nil {
-				log.WithError(err).Error("Invalid options")
+				logrus.WithError(err).Error("Invalid options")
 				return fmt.Errorf("invalid options: %w", err)
 			}
 
-			return performClean(alpineHost, ikniteConfig, cleanOptions)
+			logger := util.GetLoggerFromCommand(cmd)
+			return performClean(alpineHost, ikniteConfig, cleanOptions, logger)
 		},
 	}
 
@@ -149,9 +151,14 @@ func initializeClean(flags *flag.FlagSet, cleanOptions *cleanOptions) {
 }
 
 //nolint:gocyclo,gocognit // TODO: Should use a runner pattern to reduce complexity
-func performClean(alpineHost host.Host, ikniteConfig *v1alpha1.IkniteClusterSpec, cleanOptions *cleanOptions) error {
+func performClean(
+	alpineHost host.Host,
+	ikniteConfig *v1alpha1.IkniteClusterSpec,
+	cleanOptions *cleanOptions,
+	l logrus.FieldLogger,
+) error {
 	dryRun := cleanOptions.dryRun
-	logger := log.WithField("isDryRun", dryRun)
+	logger := l.WithField("isDryRun", dryRun)
 
 	if !cleanOptions.hasActualWorkToDo() {
 		logger.Info("No cleanup actions specified, skipping cleanup")
@@ -189,7 +196,7 @@ func performClean(alpineHost host.Host, ikniteConfig *v1alpha1.IkniteClusterSpec
 	if cleanOptions.stopContainers {
 		logger.Info("Stopping all containers...")
 		if err = k8s.StopAllContainers(alpineHost, dryRun); err != nil {
-			log.WithError(err).Warn("Error stopping all containers")
+			logrus.WithError(err).Warn("Error stopping all containers")
 		}
 	}
 
@@ -238,7 +245,7 @@ func performClean(alpineHost host.Host, ikniteConfig *v1alpha1.IkniteClusterSpec
 	if cleanOptions.cleanIpAddress {
 		err = k8s.ResetIPAddress(alpineHost, ikniteConfig, dryRun)
 		if err != nil {
-			log.WithError(err).Warn("Error resetting IP address")
+			logrus.WithError(err).Warn("Error resetting IP address")
 		}
 	}
 

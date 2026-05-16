@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/util/errors"
 
 	"github.com/kaweezle/iknite/pkg/alpine"
@@ -51,7 +51,7 @@ type KubeletRuntime interface {
 
 func StartKubelet(ctx context.Context, h host.FileExecutor) (host.Process, error) {
 	// Read the environment variables from /var/lib/kubelet/kubeadm-flags.env
-	log.WithField("kubeletEnvFile", KubeletEnvFile).Info("Reading kubelet environment file")
+	logrus.WithField("kubeletEnvFile", KubeletEnvFile).Info("Reading kubelet environment file")
 
 	// Check if a process with the value contained in kubeletPidFile exists
 	// ignore the error if for some reason the pid file is not found
@@ -60,7 +60,7 @@ func StartKubelet(ctx context.Context, h host.FileExecutor) (host.Process, error
 		return nil, fmt.Errorf("failed to check kubelet pid file: %w", err)
 	}
 	if kubeletPid > 0 {
-		log.WithField("pid", kubeletPid).
+		logrus.WithField("pid", kubeletPid).
 			Warnf("Kubelet is already running with pid: %d. Swallowing...", kubeletPid)
 		return p, nil
 	}
@@ -116,7 +116,7 @@ func StartKubelet(ctx context.Context, h host.FileExecutor) (host.Process, error
 	cmd.Stderr = logFile
 	pidFilePath := alpine.ServicePidFilePath(KubeletName)
 
-	log.WithFields(log.Fields{
+	logrus.WithFields(logrus.Fields{
 		"args":    cmd.Args,
 		"argsLen": len(cmd.Args),
 		"env":     cmd.Env,
@@ -134,7 +134,7 @@ func StartKubelet(ctx context.Context, h host.FileExecutor) (host.Process, error
 	err = h.WriteFile(
 		pidFilePath, fmt.Appendf(nil, "%d", p.Pid()), 0o644)
 	if err != nil {
-		log.WithFields(log.Fields{
+		logrus.WithFields(logrus.Fields{
 			"pid":     p.Pid(),
 			errKey:    err,
 			"pidFile": pidFilePath,
@@ -174,28 +174,28 @@ func StartAndConfigureKubelet(
 	for alive := true; alive; {
 		select {
 		case <-ctx.Done():
-			log.Info("Context canceled (SIGTERM ?), stopping kubelet...")
+			logrus.Info("Context canceled (SIGTERM ?), stopping kubelet...")
 			err = host.TerminateProcess(process, &alive)
 		case <-cmdDone:
 			// Child process has stopped
-			log.Infof("Kubelet stopped with state: %s", process.State().String())
+			logrus.Infof("Kubelet stopped with state: %s", process.State().String())
 			alive = false
 		case isKubeletHealthy := <-kubeletHealthz:
 			if isKubeletHealthy != nil {
-				log.WithError(isKubeletHealthy).Error("Kubelet is not healthy")
+				logrus.WithError(isKubeletHealthy).Error("Kubelet is not healthy")
 				err = host.TerminateProcess(process, &alive)
 			} else {
-				log.Info("Kubelet is healthy. Waiting for API server to be healthy...")
+				logrus.Info("Kubelet is healthy. Waiting for API server to be healthy...")
 				go func() {
 					apiServerHealthz <- runtime.CheckClusterRunning(ctx, 30, 2, 10*time.Second)
 				}()
 			}
 		case isApiServerHealthy := <-apiServerHealthz:
 			if isApiServerHealthy != nil {
-				log.WithError(isApiServerHealthy).Error("API server is not healthy")
+				logrus.WithError(isApiServerHealthy).Error("API server is not healthy")
 				err = host.TerminateProcess(process, &alive)
 			} else {
-				log.Info("API server is healthy")
+				logrus.Info("API server is healthy")
 				go func() {
 					configErr <- runtime.Kustomize(
 						ctx,
@@ -205,14 +205,14 @@ func StartAndConfigureKubelet(
 			}
 		case configError := <-configErr:
 			if configError != nil {
-				log.WithError(configError).Error("Failed to configure the cluster")
+				logrus.WithError(configError).Error("Failed to configure the cluster")
 				err = configError
 				terminateError := host.TerminateProcess(process, &alive)
 				if terminateError != nil {
 					err = errors.NewAggregate([]error{configError, terminateError})
 				}
 			} else {
-				log.Info("Cluster configured successfully")
+				logrus.Info("Cluster configured successfully")
 			}
 		}
 	}
@@ -236,7 +236,7 @@ func CheckServerRunning(
 	var err error
 	for ; retries > 0; retries-- {
 		if !first {
-			log.WithFields(log.Fields{
+			logrus.WithFields(logrus.Fields{
 				errKey:      err,
 				"wait_time": waitTime,
 			}).Debug("Waiting...")
@@ -245,7 +245,7 @@ func CheckServerRunning(
 		first = false
 		var req *http.Request
 		var resp *http.Response
-		log.WithField("retries", retries).Debug("Checking kubelet health...")
+		logrus.WithField("retries", retries).Debug("Checking kubelet health...")
 
 		req, err = http.NewRequestWithContext(
 			ctx,
@@ -255,18 +255,18 @@ func CheckServerRunning(
 		)
 		if err != nil {
 			err = fmt.Errorf("failed to create HTTP request: %w", err)
-			log.WithError(err).Debug("while making HTTP request")
+			logrus.WithError(err).Debug("while making HTTP request")
 			continue
 		}
 		resp, err = client.Do(req)
 		if err != nil { // nocov - unlikely to fail
 			err = fmt.Errorf("failed to make HTTP request: %w", err)
-			log.WithError(err).Debug("while making HTTP request")
+			logrus.WithError(err).Debug("while making HTTP request")
 			continue
 		}
 		if resp.StatusCode != http.StatusOK {
 			err = fmt.Errorf("unexpected status code: %d", resp.StatusCode)
-			log.WithError(err).Debug("Bad response")
+			logrus.WithError(err).Debug("Bad response")
 			continue
 		}
 
@@ -274,23 +274,23 @@ func CheckServerRunning(
 		var body []byte
 		body, err = io.ReadAll(resp.Body)
 		if err != nil { // nocov - unlikely to fail
-			log.WithError(err).Debug("while reading response body")
+			logrus.WithError(err).Debug("while reading response body")
 			continue
 		}
 		contentStr := string(body)
 		if contentStr != expectedResponse {
 			err = fmt.Errorf("unexpected response body: %s", contentStr)
-			log.WithError(err).Debug("Bad response")
+			logrus.WithError(err).Debug("Bad response")
 		} else {
 			okTries += 1
-			log.WithField("okTries", okTries).Trace("Ok response from server")
+			logrus.WithField("okTries", okTries).Trace("Ok response from server")
 			if okTries == okResponses {
 				break
 			}
 		}
 	}
 	if retries == 0 && okTries < okResponses {
-		log.Trace("No more retries left.")
+		logrus.Trace("No more retries left.")
 	}
 	return err
 }

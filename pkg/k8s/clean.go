@@ -8,7 +8,7 @@ import (
 	"os"
 	"path/filepath"
 
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 	"github.com/txn2/txeh"
 	kubeadmConstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 
@@ -20,19 +20,40 @@ import (
 
 // cSpell: enable
 
+type Cleaner struct {
+	logrus.FieldLogger
+	host.Host
+	ikniteConfig *v1alpha1.IkniteClusterSpec
+	isDryRun     bool
+}
+
+func NewCleaner(
+	h host.Host,
+	logger logrus.FieldLogger,
+	ikniteConfig *v1alpha1.IkniteClusterSpec,
+	isDryRun bool,
+) *Cleaner {
+	return &Cleaner{
+		FieldLogger:  logger,
+		Host:         h,
+		ikniteConfig: ikniteConfig,
+		isDryRun:     isDryRun,
+	}
+}
+
 func ResetIPAddress(alpineHost host.Host, ikniteConfig *v1alpha1.IkniteClusterSpec, isDryRun bool) error {
 	if !ikniteConfig.CreateIp {
 		return nil
 	}
 
-	log.WithField("isDryRun", isDryRun).Info("Resetting IP address...")
+	logrus.WithField("isDryRun", isDryRun).Info("Resetting IP address...")
 	hosts, err := txeh.NewHosts(alpineHost.GetHostsConfig())
 	if err != nil {
 		return fmt.Errorf("failed to create hosts file handler: %w", err)
 	}
 	ip, err := alpine.IpMappingForHost(hosts, ikniteConfig.DomainName)
 	if err != nil {
-		log.WithField("hostname", ikniteConfig.DomainName).
+		logrus.WithField("hostname", ikniteConfig.DomainName).
 			Warn("failed to get IP mapping for host:", err)
 		return nil
 	}
@@ -45,7 +66,7 @@ func ResetIPAddress(alpineHost host.Host, ikniteConfig *v1alpha1.IkniteClusterSp
 	}
 
 	p := alpineHost.ExecPipe(nil, "ip -br -4 a sh").Match(ipWithMask).Column(1).FilterLine(func(s string) string {
-		log.WithField("interface", s).WithField("ip", ipWithMask).Debug("Deleting IP address...")
+		logrus.WithField("interface", s).WithField("ip", ipWithMask).Debug("Deleting IP address...")
 		return s
 	})
 	p = alpineHost.ExecForEach(p, fmt.Sprintf("%sip addr del %s dev {{.}}", prefix, ipWithMask))
@@ -63,7 +84,7 @@ func ResetIPAddress(alpineHost host.Host, ikniteConfig *v1alpha1.IkniteClusterSp
 }
 
 func ResetIPTables(exec host.Executor, isDryRun bool) error {
-	log.WithField("isDryRun", isDryRun).Info("Cleaning up iptables rules...")
+	logrus.WithField("isDryRun", isDryRun).Info("Cleaning up iptables rules...")
 	if !isDryRun {
 		p := exec.ExecPipe(nil, "iptables-save").
 			Reject("KUBE-").
@@ -74,7 +95,7 @@ func ResetIPTables(exec host.Executor, isDryRun bool) error {
 			return fmt.Errorf("failed to clean up iptables rules: %w", err)
 		}
 	}
-	log.WithField("isDryRun", isDryRun).Info("Cleaning up ip6tables rules...")
+	logrus.WithField("isDryRun", isDryRun).Info("Cleaning up ip6tables rules...")
 	if !isDryRun {
 		p := exec.ExecPipe(nil, "ip6tables-save").
 			Reject("KUBE-").
@@ -94,11 +115,11 @@ const kubeletDataRemoveCommand = `sh -c 'rm -rf /var/lib/kubelet/{cpu_manager_st
 
 func RemoveKubeletFiles(exec host.Executor, isDryRun bool) error {
 	if isDryRun {
-		log.Info(
+		logrus.Info(
 			"Would remove cpu_manager_state, memory_manager_state, pod/* files in /var/lib/kubelet...",
 		)
 	} else {
-		log.Info(
+		logrus.Info(
 			"Removing cpu_manager_state, memory_manager_state, pod/* files in /var/lib/kubelet...",
 		)
 		out, err := exec.ExecPipe(nil, kubeletDataRemoveCommand).String()
@@ -111,11 +132,11 @@ func RemoveKubeletFiles(exec host.Executor, isDryRun bool) error {
 
 func StopAllContainers(exec host.Executor, isDryRun bool) error {
 	if isDryRun {
-		log.Info(
+		logrus.Info(
 			"Would stop all containers with command /bin/sh -c 'crictl rmp -f $(crictl pods -q)'...",
 		)
 	} else {
-		log.Info(
+		logrus.Info(
 			"Stopping all containers with command /bin/sh -c 'crictl rmp -f $(crictl pods -q)'...",
 		)
 		_, err := exec.ExecPipe(nil, "/bin/sh -c 'crictl rmp -f $(crictl pods -q)'").String()
@@ -131,7 +152,7 @@ func UnmountPaths(alpineHost host.Host, failOnError, isDryRun bool) error {
 	for _, path := range pathsToUnmount {
 		err = processMounts(alpineHost, path, false, "Unmounting", isDryRun)
 		if err != nil {
-			log.WithError(err).Warn("Error unmounting path")
+			logrus.WithError(err).Warn("Error unmounting path")
 			if failOnError {
 				return err
 			}
@@ -141,7 +162,7 @@ func UnmountPaths(alpineHost host.Host, failOnError, isDryRun bool) error {
 	for _, path := range pathsToUnmountAndRemove {
 		err = processMounts(alpineHost, path, true, "Unmounting and removing", isDryRun)
 		if err != nil {
-			log.WithError(err).Warn("Error unmounting and removing path")
+			logrus.WithError(err).Warn("Error unmounting and removing path")
 			if failOnError {
 				return err
 			}
@@ -158,7 +179,7 @@ func CleanAll(
 ) error {
 	var err error
 	if err = StopAllContainers(alpineHost, isDryRun); err != nil {
-		log.WithError(err).Warn("Error stopping all containers")
+		logrus.WithError(err).Warn("Error stopping all containers")
 		if failOnError {
 			return err
 		}
@@ -166,7 +187,7 @@ func CleanAll(
 
 	err = UnmountPaths(alpineHost, failOnError, isDryRun)
 	if err != nil {
-		log.WithError(err).Warn("Error unmounting paths")
+		logrus.WithError(err).Warn("Error unmounting paths")
 		if failOnError {
 			return err
 		}
@@ -174,7 +195,7 @@ func CleanAll(
 
 	err = RemoveKubeletFiles(alpineHost, isDryRun)
 	if err != nil {
-		log.WithError(err).Warn("Error removing kubelet files")
+		logrus.WithError(err).Warn("Error removing kubelet files")
 		if failOnError {
 			return err
 		}
@@ -182,7 +203,7 @@ func CleanAll(
 
 	err = DeleteCniNamespaces(alpineHost, isDryRun)
 	if err != nil {
-		log.WithError(err).Warn("Error deleting CNI namespaces")
+		logrus.WithError(err).Warn("Error deleting CNI namespaces")
 		if failOnError {
 			return err
 		}
@@ -190,17 +211,17 @@ func CleanAll(
 
 	err = DeleteNetworkInterfaces(alpineHost, isDryRun)
 	if err != nil {
-		log.WithError(err).Warn("Error deleting network interfaces")
+		logrus.WithError(err).Warn("Error deleting network interfaces")
 		if failOnError {
 			return err
 		}
 	}
 
 	if resetIpTables {
-		log.Info("Cleaning up iptables rules...")
+		logrus.Info("Cleaning up iptables rules...")
 		err = ResetIPTables(alpineHost, isDryRun)
 		if err != nil {
-			log.WithError(err).Warn("Error cleaning up iptables rules")
+			logrus.WithError(err).Warn("Error cleaning up iptables rules")
 			if failOnError {
 				return err
 			}
@@ -210,7 +231,7 @@ func CleanAll(
 	if resetIpAddress {
 		err = ResetIPAddress(alpineHost, ikniteConfig, isDryRun)
 		if err != nil {
-			log.WithError(err).Warn("Error resetting IP address")
+			logrus.WithError(err).Warn("Error resetting IP address")
 			if failOnError {
 				return err
 			}
@@ -220,13 +241,13 @@ func CleanAll(
 }
 
 func processMounts(alpineHost host.Host, path string, remove bool, message string, isDryRun bool) error {
-	fields := log.Fields{
+	fields := logrus.Fields{
 		"path":     path,
 		"remove":   remove,
 		"isDryRun": isDryRun,
 	}
-	log.WithFields(fields).Info(message)
-	logger := log.WithField("isDryRun", isDryRun)
+	logrus.WithFields(fields).Info(message)
+	logger := logrus.WithField("isDryRun", isDryRun)
 	var err error
 	path, err = alpineHost.EvalSymlinks(path)
 	if err != nil {
@@ -262,12 +283,12 @@ func processMounts(alpineHost host.Host, path string, remove bool, message strin
 }
 
 func DeleteCniNamespaces(exec host.Executor, isDryRun bool) error {
-	log.WithField("isDryRun", isDryRun).Info("Deleting CNI namespaces...")
+	logrus.WithField("isDryRun", isDryRun).Info("Deleting CNI namespaces...")
 	command := "ip netns delete {{.}}"
 	if isDryRun {
 		command = "echo " + command
 	}
-	logger := log.WithField("isDryRun", isDryRun)
+	logger := logrus.WithField("isDryRun", isDryRun)
 	p := exec.ExecPipe(nil, "ip netns show").Column(1).FilterLine(func(s string) string {
 		logger.WithField("namespace", s).Debug("Deleting namespace...")
 		return s
@@ -285,7 +306,7 @@ func DeleteNetworkInterfaces(exec host.Executor, isDryRun bool) error {
 	if isDryRun {
 		prefix = "echo "
 	}
-	logger := log.WithField("isDryRun", isDryRun)
+	logger := logrus.WithField("isDryRun", isDryRun)
 	logger.Info("Deleting pods network interfaces...")
 	//nolint:lll // long string (jq pipeline)
 	p := exec.ExecPipe(nil, "ip -j link show").
@@ -300,7 +321,7 @@ func DeleteNetworkInterfaces(exec host.Executor, isDryRun bool) error {
 	_ = p.Wait() //nolint:errcheck // we check p.Error() instead
 	err := p.Error()
 	if err != nil {
-		log.WithError(err).Error("Error deleting pods network interfaces")
+		logrus.WithError(err).Error("Error deleting pods network interfaces")
 		return fmt.Errorf("failed to delete network interfaces: %w", err)
 	} else {
 		logger.Infof("Deleted pods network interfaces")
@@ -331,9 +352,9 @@ func DeleteAPIBackendData(fs host.FileSystem, isDryRun bool, apiBackendName, api
 		}
 	}
 	if isDryRun {
-		log.WithField("path", apiBackendDatabaseDirectory).Info("Dry run: would delete API backend data...")
+		logrus.WithField("path", apiBackendDatabaseDirectory).Info("Dry run: would delete API backend data...")
 	} else {
-		log.WithField("path", apiBackendDatabaseDirectory).Info("Deleting API backend data...")
+		logrus.WithField("path", apiBackendDatabaseDirectory).Info("Deleting API backend data...")
 		err = host.CleanDir(fs, apiBackendDatabaseDirectory)
 		if err != nil {
 			return fmt.Errorf("failed to delete API backend data: %w", err)

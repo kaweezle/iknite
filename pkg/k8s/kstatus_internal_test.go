@@ -71,7 +71,8 @@ func TestRESTClientGetterKStatusErrorPaths(t *testing.T) {
 	mapper, err := getter.ToRESTMapper()
 	req.NoError(err)
 	req.NotNil(mapper)
-	types, err := ValidateResourceTypes(mapper, []string{"deployments"})
+	logger, _ := testutil.TestLogger(t)
+	types, err := ValidateResourceTypes(mapper, []string{"deployments"}, logger)
 	req.NoError(err)
 	req.Contains(types, "deployments")
 

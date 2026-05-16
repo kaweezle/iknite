@@ -12,6 +12,8 @@ import (
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
 	"github.com/kaweezle/iknite/pkg/host"
 	"github.com/kaweezle/iknite/pkg/utils"
+	"github.com/sirupsen/logrus"
+	"github.com/spf13/viper"
 	mock "github.com/stretchr/testify/mock"
 	"golang.org/x/sync/errgroup"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -698,6 +700,61 @@ func (_c *MockIkniteInitData_KubeConfigDir_Call) RunAndReturn(run func() string)
 	return _c
 }
 
+// KubeConfigOriginal provides a mock function for the type MockIkniteInitData
+func (_mock *MockIkniteInitData) KubeConfigOriginal() (*api.Config, error) {
+	ret := _mock.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for KubeConfigOriginal")
+	}
+
+	var r0 *api.Config
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func() (*api.Config, error)); ok {
+		return returnFunc()
+	}
+	if returnFunc, ok := ret.Get(0).(func() *api.Config); ok {
+		r0 = returnFunc()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*api.Config)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func() error); ok {
+		r1 = returnFunc()
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockIkniteInitData_KubeConfigOriginal_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'KubeConfigOriginal'
+type MockIkniteInitData_KubeConfigOriginal_Call struct {
+	*mock.Call
+}
+
+// KubeConfigOriginal is a helper method to define mock.On call
+func (_e *MockIkniteInitData_Expecter) KubeConfigOriginal() *MockIkniteInitData_KubeConfigOriginal_Call {
+	return &MockIkniteInitData_KubeConfigOriginal_Call{Call: _e.mock.On("KubeConfigOriginal")}
+}
+
+func (_c *MockIkniteInitData_KubeConfigOriginal_Call) Run(run func()) *MockIkniteInitData_KubeConfigOriginal_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *MockIkniteInitData_KubeConfigOriginal_Call) Return(config *api.Config, err error) *MockIkniteInitData_KubeConfigOriginal_Call {
+	_c.Call.Return(config, err)
+	return _c
+}
+
+func (_c *MockIkniteInitData_KubeConfigOriginal_Call) RunAndReturn(run func() (*api.Config, error)) *MockIkniteInitData_KubeConfigOriginal_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // KubeConfigPath provides a mock function for the type MockIkniteInitData
 func (_mock *MockIkniteInitData) KubeConfigPath() string {
 	ret := _mock.Called()
@@ -874,6 +931,52 @@ func (_c *MockIkniteInitData_KustomizeOptions_Call) Return(kustomizeOptions *uti
 }
 
 func (_c *MockIkniteInitData_KustomizeOptions_Call) RunAndReturn(run func() *utils.KustomizeOptions) *MockIkniteInitData_KustomizeOptions_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// Logger provides a mock function for the type MockIkniteInitData
+func (_mock *MockIkniteInitData) Logger() logrus.FieldLogger {
+	ret := _mock.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for Logger")
+	}
+
+	var r0 logrus.FieldLogger
+	if returnFunc, ok := ret.Get(0).(func() logrus.FieldLogger); ok {
+		r0 = returnFunc()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(logrus.FieldLogger)
+		}
+	}
+	return r0
+}
+
+// MockIkniteInitData_Logger_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Logger'
+type MockIkniteInitData_Logger_Call struct {
+	*mock.Call
+}
+
+// Logger is a helper method to define mock.On call
+func (_e *MockIkniteInitData_Expecter) Logger() *MockIkniteInitData_Logger_Call {
+	return &MockIkniteInitData_Logger_Call{Call: _e.mock.On("Logger")}
+}
+
+func (_c *MockIkniteInitData_Logger_Call) Run(run func()) *MockIkniteInitData_Logger_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *MockIkniteInitData_Logger_Call) Return(fieldLogger logrus.FieldLogger) *MockIkniteInitData_Logger_Call {
+	_c.Call.Return(fieldLogger)
+	return _c
+}
+
+func (_c *MockIkniteInitData_Logger_Call) RunAndReturn(run func() logrus.FieldLogger) *MockIkniteInitData_Logger_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -1530,57 +1633,48 @@ func (_c *MockIkniteInitData_UploadCerts_Call) RunAndReturn(run func() bool) *Mo
 	return _c
 }
 
-// WaitControlPlaneClient provides a mock function for the type MockIkniteInitData
-func (_mock *MockIkniteInitData) WaitControlPlaneClient() (kubernetes.Interface, error) {
+// Viper provides a mock function for the type MockIkniteInitData
+func (_mock *MockIkniteInitData) Viper() *viper.Viper {
 	ret := _mock.Called()
 
 	if len(ret) == 0 {
-		panic("no return value specified for WaitControlPlaneClient")
+		panic("no return value specified for Viper")
 	}
 
-	var r0 kubernetes.Interface
-	var r1 error
-	if returnFunc, ok := ret.Get(0).(func() (kubernetes.Interface, error)); ok {
-		return returnFunc()
-	}
-	if returnFunc, ok := ret.Get(0).(func() kubernetes.Interface); ok {
+	var r0 *viper.Viper
+	if returnFunc, ok := ret.Get(0).(func() *viper.Viper); ok {
 		r0 = returnFunc()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(kubernetes.Interface)
+			r0 = ret.Get(0).(*viper.Viper)
 		}
 	}
-	if returnFunc, ok := ret.Get(1).(func() error); ok {
-		r1 = returnFunc()
-	} else {
-		r1 = ret.Error(1)
-	}
-	return r0, r1
+	return r0
 }
 
-// MockIkniteInitData_WaitControlPlaneClient_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'WaitControlPlaneClient'
-type MockIkniteInitData_WaitControlPlaneClient_Call struct {
+// MockIkniteInitData_Viper_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Viper'
+type MockIkniteInitData_Viper_Call struct {
 	*mock.Call
 }
 
-// WaitControlPlaneClient is a helper method to define mock.On call
-func (_e *MockIkniteInitData_Expecter) WaitControlPlaneClient() *MockIkniteInitData_WaitControlPlaneClient_Call {
-	return &MockIkniteInitData_WaitControlPlaneClient_Call{Call: _e.mock.On("WaitControlPlaneClient")}
+// Viper is a helper method to define mock.On call
+func (_e *MockIkniteInitData_Expecter) Viper() *MockIkniteInitData_Viper_Call {
+	return &MockIkniteInitData_Viper_Call{Call: _e.mock.On("Viper")}
 }
 
-func (_c *MockIkniteInitData_WaitControlPlaneClient_Call) Run(run func()) *MockIkniteInitData_WaitControlPlaneClient_Call {
+func (_c *MockIkniteInitData_Viper_Call) Run(run func()) *MockIkniteInitData_Viper_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		run()
 	})
 	return _c
 }
 
-func (_c *MockIkniteInitData_WaitControlPlaneClient_Call) Return(interfaceParam kubernetes.Interface, err error) *MockIkniteInitData_WaitControlPlaneClient_Call {
-	_c.Call.Return(interfaceParam, err)
+func (_c *MockIkniteInitData_Viper_Call) Return(viper1 *viper.Viper) *MockIkniteInitData_Viper_Call {
+	_c.Call.Return(viper1)
 	return _c
 }
 
-func (_c *MockIkniteInitData_WaitControlPlaneClient_Call) RunAndReturn(run func() (kubernetes.Interface, error)) *MockIkniteInitData_WaitControlPlaneClient_Call {
+func (_c *MockIkniteInitData_Viper_Call) RunAndReturn(run func() *viper.Viper) *MockIkniteInitData_Viper_Call {
 	_c.Call.Return(run)
 	return _c
 }

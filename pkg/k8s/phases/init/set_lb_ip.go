@@ -5,7 +5,7 @@ import (
 	"context"
 	"fmt"
 
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -16,6 +16,7 @@ import (
 
 	"github.com/kaweezle/iknite/pkg/host"
 	"github.com/kaweezle/iknite/pkg/k8s"
+	"github.com/kaweezle/iknite/pkg/utils"
 )
 
 const (
@@ -38,6 +39,7 @@ type setLBIPData interface {
 	ContextProvider
 	RESTClientGetterProvider
 	ErrGroupProvider
+	utils.LoggerProvider
 }
 
 func runSetLBIP(c workflow.RunData) error {
@@ -47,6 +49,7 @@ func runSetLBIP(c workflow.RunData) error {
 	}
 
 	alpineHost := data.Host()
+	logger := data.Logger()
 
 	ips := make([]string, 0)
 
@@ -75,7 +78,7 @@ func runSetLBIP(c workflow.RunData) error {
 
 	ctx := data.Context()
 	data.ErrGroup().Go(func() error {
-		return watchSetLBIPServices(ctx, core, ips...)
+		return watchSetLBIPServices(ctx, core, logger, ips...)
 	})
 
 	return nil
@@ -84,6 +87,7 @@ func runSetLBIP(c workflow.RunData) error {
 func watchSetLBIPServices(
 	ctx context.Context,
 	core v1.CoreV1Interface,
+	l logrus.FieldLogger,
 	outboundIPs ...string,
 ) error {
 	listOptions := metav1.ListOptions{
@@ -104,17 +108,17 @@ func watchSetLBIPServices(
 			return fmt.Errorf("unknown watch error")
 		}
 		if event.Type != watch.Added && event.Type != watch.Modified {
-			log.WithField("eventType", event.Type).Debug("Ignoring non-added/modified service event")
+			l.WithField("eventType", event.Type).Debug("Ignoring non-added/modified service event")
 			continue
 		}
 
 		service, ok := event.Object.(*corev1.Service)
 		if !ok { // nocov -- Should never happen, and hard to test, so skipping coverage
-			log.WithField("eventObject", event.Object).Warn("Received unexpected object type in service watch")
+			l.WithField("eventObject", event.Object).Warn("Received unexpected object type in service watch")
 			continue
 		}
 
-		logger := log.WithFields(log.Fields{
+		logger := l.WithFields(logrus.Fields{
 			"service":   service.Name,
 			"namespace": service.Namespace,
 			"eventType": event.Type,
@@ -125,8 +129,8 @@ func watchSetLBIPServices(
 		if shouldPatchServiceLBIP(service, outboundIPs) {
 			logger.WithField("outboundIPs", outboundIPs).Info("Patching LoadBalancer service with outbound IP")
 
-			if err := patchServiceLBIP(ctx, core, service, outboundIPs); err != nil {
-				log.WithError(err).WithField("service", service.Name).
+			if err := patchServiceLBIP(ctx, core, service, logger, outboundIPs); err != nil {
+				logger.WithError(err).WithField("service", service.Name).
 					Error("Failed to patch LoadBalancer service")
 			}
 		} else {
@@ -174,6 +178,7 @@ func patchServiceLBIP(
 	ctx context.Context,
 	core v1.CoreV1Interface,
 	service *corev1.Service,
+	l *logrus.Entry,
 	outboundIPs []string,
 ) error {
 	serviceCopy := service.DeepCopy()
@@ -201,13 +206,13 @@ func patchServiceLBIP(
 		UpdateStatus(ctx, serviceCopy, metav1.UpdateOptions{FieldManager: "iknite"})
 	if err != nil {
 		if apierrors.IsNotFound(err) {
-			log.WithField("service", service.Name).
+			l.WithField("service", service.Name).
 				Warn("Service not found when patching LB IP, it may have been deleted")
 			return nil
 		}
 		return fmt.Errorf("failed to update service status: %w", err)
 	}
-	log.WithFields(log.Fields{
+	l.WithFields(logrus.Fields{
 		"service":     service.Name,
 		"namespace":   service.Namespace,
 		"outboundIPs": outboundIPs,

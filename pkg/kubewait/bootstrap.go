@@ -32,7 +32,7 @@ import (
 	"strings"
 	"time"
 
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/pflag"
 	"k8s.io/apimachinery/pkg/util/wait"
 
@@ -75,7 +75,7 @@ func AddBootstrapFlags(flags *pflag.FlagSet, opts *BootstrapOptions) {
 		"Path to an env file to load before running the bootstrap script (default: .env inside --bootstrap-dir)")
 }
 
-func (opts *BootstrapOptions) ReadEnvFile(fs host.FileSystem) (bool, error) {
+func (opts *BootstrapOptions) ReadEnvFile(fs host.FileSystem, logger logrus.FieldLogger) (bool, error) {
 	// Determine the env file path.
 	envFile := opts.EnvFile
 	if envFile == "" {
@@ -83,7 +83,7 @@ func (opts *BootstrapOptions) ReadEnvFile(fs host.FileSystem) (bool, error) {
 	}
 
 	if info, err := fs.Stat(envFile); err == nil && !info.IsDir() {
-		log.Infof("Loading environment from %s", envFile)
+		logger.Infof("Loading environment from %s", envFile)
 		variables, err := host.ReadEnvFiles(fs, envFile)
 		if err != nil {
 			return false, fmt.Errorf("failed to load env file %s: %w", envFile, err)
@@ -101,17 +101,17 @@ func (opts *BootstrapOptions) ReadEnvFile(fs host.FileSystem) (bool, error) {
 
 // runBootstrap clones the bootstrap repository (if URL and ref are provided), loads the env
 // file (if present), and executes the bootstrap script.
-func runBootstrap(ctx context.Context, fse host.FileExecutor, opts *BootstrapOptions) error {
+func runBootstrap(ctx context.Context, fse host.FileExecutor, opts *BootstrapOptions, logger logrus.FieldLogger) error {
 	// Clone the repository when a ref is also supplied; if no ref is given the clone is skipped.
 
 	baseDir := opts.BootstrapDir
 	if opts.RepoURL != "" && opts.RepoRef != "" {
-		if err := cloneBootstrapRepo(ctx, fse, opts); err != nil {
+		if err := cloneBootstrapRepo(ctx, fse, opts, logger); err != nil {
 			return fmt.Errorf("error during bootstrap: %w", err)
 		}
 		baseDir = filepath.Join(opts.BootstrapDir, bootstrapRepoDirname)
 	} else {
-		log.Info("Bootstrap repo URL or ref not provided, skipping clone")
+		logger.Info("Bootstrap repo URL or ref not provided, skipping clone")
 	}
 
 	// Locate and execute the bootstrap script.
@@ -120,7 +120,7 @@ func runBootstrap(ctx context.Context, fse host.FileExecutor, opts *BootstrapOpt
 		scriptPath = filepath.Join(baseDir, opts.BootstrapScript)
 	}
 	if _, err := fse.Stat(scriptPath); err != nil {
-		log.Infof(
+		logger.Infof(
 			"Bootstrap script %s not found in %s with error %v, skipping",
 			opts.BootstrapScript,
 			baseDir,
@@ -136,14 +136,14 @@ func runBootstrap(ctx context.Context, fse host.FileExecutor, opts *BootstrapOpt
 		return fmt.Errorf("failed to stat bootstrap script %s: %w", scriptPath, err)
 	}
 	if info.Mode()&0o111 == 0 {
-		log.Infof("Bootstrap script %s is not executable, attempting to make it executable", scriptPath)
+		logger.Infof("Bootstrap script %s is not executable, attempting to make it executable", scriptPath)
 
 		if chmodErr := fse.Chmod(scriptPath, 0o755); chmodErr != nil {
 			return fmt.Errorf("failed to make bootstrap script %s executable: %w", scriptPath, chmodErr)
 		}
 	}
 
-	log.Infof("Running bootstrap script: %s", scriptPath)
+	logger.Infof("Running bootstrap script: %s", scriptPath)
 	commandOptions := &host.CommandOptions{
 		Cmd:    scriptPath,
 		Args:   []string{},
@@ -162,11 +162,16 @@ func runBootstrap(ctx context.Context, fse host.FileExecutor, opts *BootstrapOpt
 }
 
 // cloneBootstrapRepo performs a shallow git clone of the bootstrap repository.
-func cloneBootstrapRepo(ctx context.Context, fse host.FileExecutor, opts *BootstrapOptions) error {
+func cloneBootstrapRepo(
+	ctx context.Context,
+	fse host.FileExecutor,
+	opts *BootstrapOptions,
+	logger logrus.FieldLogger,
+) error {
 	repoPath := filepath.Join(opts.BootstrapDir, bootstrapRepoDirname)
-	log.Infof("Cloning bootstrap repository %s (ref: %s) to %s", opts.RepoURL, opts.RepoRef, repoPath)
+	logger.Infof("Cloning bootstrap repository %s (ref: %s) to %s", opts.RepoURL, opts.RepoRef, repoPath)
 
-	if err := ensureSSHKnownHost(ctx, fse, opts.RepoURL); err != nil {
+	if err := ensureSSHKnownHost(ctx, fse, opts.RepoURL, logger); err != nil {
 		return err
 	}
 
@@ -196,25 +201,25 @@ func cloneBootstrapRepo(ctx context.Context, fse host.FileExecutor, opts *Bootst
 	return nil
 }
 
-func ensureSSHKnownHost(ctx context.Context, fse host.FileExecutor, repoURL string) error {
+func ensureSSHKnownHost(ctx context.Context, fse host.FileExecutor, repoURL string, logger logrus.FieldLogger) error {
 	sshServer := extractDomain(repoURL)
 	if sshServer == "" {
-		log.Warnf(
+		logger.Warnf(
 			"Failed to extract SSH server from repo URL %s, SSH host key will not be added to known_hosts",
 			repoURL,
 		)
 		return nil
 	}
 
-	log.Infof("Waiting for SSH server %s to be resolvable...", sshServer)
+	logger.Infof("Waiting for SSH server %s to be resolvable...", sshServer)
 	if err := wait.PollUntilContextCancel(ctx, 2*time.Second, true, func(ctx context.Context) (bool, error) {
 		addrs, err := net.DefaultResolver.LookupHost(ctx, sshServer)
 		if err != nil {
-			log.WithError(err).Debugf("SSH server %s not yet resolvable, retrying...", sshServer)
+			logger.WithError(err).Debugf("SSH server %s not yet resolvable, retrying...", sshServer)
 			return false, nil
 		}
 		if len(addrs) == 0 {
-			log.Debugf("SSH server %s resolved without addresses, retrying...", sshServer)
+			logger.Debugf("SSH server %s resolved without addresses, retrying...", sshServer)
 			return false, nil
 		}
 		return true, nil
@@ -222,7 +227,7 @@ func ensureSSHKnownHost(ctx context.Context, fse host.FileExecutor, repoURL stri
 		return fmt.Errorf("SSH server %s did not become resolvable: %w", sshServer, err)
 	}
 
-	log.Infof("Adding SSH server %s to known_hosts", sshServer)
+	logger.Infof("Adding SSH server %s to known_hosts", sshServer)
 
 	sshKeyscanCmd := exec.CommandContext(ctx, "ssh-keyscan", "-t", "rsa", sshServer)
 	keyscanOutput, err := sshKeyscanCmd.Output()

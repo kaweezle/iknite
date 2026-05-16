@@ -1,8 +1,10 @@
+// cSpell: words sirupsen
 package checkers
 
 import (
 	"time"
 
+	"github.com/sirupsen/logrus"
 	kubeadmConstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
@@ -14,6 +16,7 @@ import (
 //nolint:interfacebloat // Interface is used to pass data between check and printer functions
 type CheckWorkloadData interface {
 	host.HostProvider
+	utils.LoggerProvider
 	IkniteClusterSpec() *v1alpha1.IkniteClusterSpec
 	IsOk() bool
 	WorkloadCount() int
@@ -35,6 +38,7 @@ type CheckWorkloadData interface {
 }
 
 type checkWorkloadData struct {
+	utils.LogEnabled
 	ikniteConfig      *v1alpha1.IkniteClusterSpec
 	startTime         time.Time
 	waitOptions       *utils.WaitOptions
@@ -132,10 +136,12 @@ func CreateCheckWorkloadData(
 	ikniteConfig *v1alpha1.IkniteClusterSpec,
 	waitOptions *utils.WaitOptions,
 	alpineHost host.Host,
+	logger logrus.FieldLogger,
 ) check.CheckData {
 	return &checkWorkloadData{
 		ikniteConfig: ikniteConfig,
 		waitOptions:  waitOptions,
 		alpineHost:   alpineHost,
+		LogEnabled:   utils.LogEnabled{LogEntry: logger},
 	}
 }

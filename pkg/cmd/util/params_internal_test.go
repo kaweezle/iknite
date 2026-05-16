@@ -1,6 +1,6 @@
 package util
 
-// cSpell: words pflag
+// cSpell: words pflag sirupsen testutil
 
 import (
 	"errors"
@@ -9,6 +9,8 @@ import (
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/require"
+
+	"github.com/kaweezle/iknite/pkg/testutil"
 )
 
 type failingValue struct {
@@ -107,8 +109,9 @@ func TestBindFlagValue_ReturnsReplaceErrorForSliceValue(t *testing.T) {
 	v.Set("my_slice", []string{"a", "b"})
 
 	flag := &pflag.Flag{Name: "my-slice", Value: &failingSliceValue{replaceErr: errors.New("replace failed")}}
+	logger, _ := testutil.TestLogger(t)
 
-	err := BindFlagValue(flag, v, "my_slice")
+	err := BindFlagValue(flag, v, "my_slice", logger)
 	req.ErrorContains(err, "while replacing viper array value for my-slice from viper key my_slice")
 	req.ErrorContains(err, "replace failed")
 }
@@ -120,8 +123,9 @@ func TestBindFlagValue_ReturnsConversionErrorForInvalidSliceInput(t *testing.T) 
 	v.Set("my_slice", 42)
 
 	flag := &pflag.Flag{Name: "my-slice", Value: &failingSliceValue{}}
+	logger, _ := testutil.TestLogger(t)
 
-	err := BindFlagValue(flag, v, "my_slice")
+	err := BindFlagValue(flag, v, "my_slice", logger)
 	req.ErrorContains(err, "while getting viper array value for my_slice")
 	req.ErrorContains(err, "expected slice value, got int")
 }
@@ -133,8 +137,9 @@ func TestBindFlagValue_ReturnsSetErrorForScalarValue(t *testing.T) {
 	v.Set("my_flag", "from-viper")
 
 	flag := &pflag.Flag{Name: "my-flag", Value: &failingValue{setErr: errors.New("set failed")}}
+	logger, _ := testutil.TestLogger(t)
 
-	err := BindFlagValue(flag, v, "my_flag")
+	err := BindFlagValue(flag, v, "my_flag", logger.WithContext(t.Context()))
 	req.ErrorContains(err, "while setting viper value for my-flag from viper key my_flag")
 	req.ErrorContains(err, "set failed")
 }

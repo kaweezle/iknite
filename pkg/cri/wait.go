@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"time"
 
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 
 	"github.com/kaweezle/iknite/pkg/constants"
 	"github.com/kaweezle/iknite/pkg/host"
@@ -50,7 +50,7 @@ func WaitForContainerService(fs host.FileSystem, exec host.Executor) (bool, erro
 	serviceIsReady := false
 	for ; retries > 0; retries-- {
 		if !first {
-			log.Debug("Waiting 2 seconds...")
+			logrus.Debug("Waiting 2 seconds...")
 			time.Sleep(2 * time.Second)
 		}
 		first = false
@@ -64,7 +64,7 @@ func WaitForContainerService(fs host.FileSystem, exec host.Executor) (bool, erro
 			)
 		}
 		if !exist {
-			log.Debugf(
+			logrus.Debugf(
 				"Container service sock %s does not exist yet",
 				constants.ContainerServiceSock,
 			)
@@ -73,10 +73,10 @@ func WaitForContainerService(fs host.FileSystem, exec host.Executor) (bool, erro
 		out, err := exec.Run(false, "/usr/bin/crictl", "--runtime-endpoint",
 			"unix://"+constants.ContainerServiceSock, "info")
 		if err != nil {
-			log.WithError(err).Warn("Error while checking container service sock")
+			logrus.WithError(err).Warn("Error while checking container service sock")
 			continue
 		}
-		log.Trace(string(out))
+		logrus.Trace(string(out))
 		response := &CRIStatusResponse{}
 		err = json.Unmarshal(out, &response)
 		if err == nil {
@@ -93,7 +93,7 @@ func WaitForContainerService(fs host.FileSystem, exec host.Executor) (bool, erro
 				break
 			}
 		} else {
-			log.WithError(err).Warn("Error while parsing crictl status")
+			logrus.WithError(err).Warn("Error while parsing crictl status")
 		}
 	}
 	return serviceIsReady, nil

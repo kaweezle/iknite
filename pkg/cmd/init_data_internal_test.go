@@ -1,5 +1,5 @@
 // cSpell: words apimachinery bootstraptoken bootstraptokenv1 certutil clientcmdapi
-// cSpell: words clientsetfake genericclioptions paralleltest pkiutil Equalf
+// cSpell: words clientsetfake genericclioptions paralleltest pkiutil Equalf testutil
 package cmd
 
 import (
@@ -37,10 +37,12 @@ import (
 	mockHost "github.com/kaweezle/iknite/mocks/pkg/host"
 	ikniteApi "github.com/kaweezle/iknite/pkg/apis/iknite"
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
+	"github.com/kaweezle/iknite/pkg/cmd/util"
 	"github.com/kaweezle/iknite/pkg/constants"
 	"github.com/kaweezle/iknite/pkg/host"
 	"github.com/kaweezle/iknite/pkg/pki"
 	ikniteServer "github.com/kaweezle/iknite/pkg/server"
+	"github.com/kaweezle/iknite/pkg/testutil"
 	"github.com/kaweezle/iknite/pkg/utils"
 )
 
@@ -74,6 +76,8 @@ func createTestStatusServer(t *testing.T) *ikniteServer.IkniteServer {
 	require.NoError(t, err)
 	require.NoError(t, pki.WriteCertAndKey(fs, testPKIDir, "ca", caCert, caKey))
 
+	logger, _ := testutil.TestLogger(t)
+
 	spec := &v1alpha1.IkniteClusterSpec{
 		DomainName:       "iknite.local",
 		Ip:               net.ParseIP("192.168.1.1"),
@@ -81,10 +85,10 @@ func createTestStatusServer(t *testing.T) *ikniteServer.IkniteServer {
 	}
 	require.NoError(
 		t,
-		ikniteServer.EnsureServerCertAndKey(fs, testPKIDir, []string{spec.DomainName}, []net.IP{spec.Ip}),
+		ikniteServer.EnsureServerCertAndKey(fs, testPKIDir, []string{spec.DomainName}, []net.IP{spec.Ip}, logger),
 	)
 
-	srv, err := ikniteServer.NewIkniteServer(fs, testPKIDir, spec)
+	srv, err := ikniteServer.NewIkniteServer(fs, testPKIDir, spec, logger)
 	require.NoError(t, err)
 
 	return srv
@@ -333,6 +337,8 @@ func TestInitDataClientBranches(t *testing.T) {
 	initRunner := workflow.NewRunner()
 	var output bytes.Buffer
 	cmd := newCmdInit(&output, opts, initRunner, host.NewDefaultHost())
+	cmdIf := util.NewCmdInterface()
+	cmd.SetContext(util.WithCmdInterface(t.Context(), cmdIf))
 	req.NoError(cmd.Flags().Set(options.DryRun, "true"))
 	t.Setenv("KUBEADM_INIT_DRYRUN_DIR", filepath.Join(t.TempDir(), "dry-run"))
 
@@ -362,6 +368,7 @@ func TestInitDataClientBranches(t *testing.T) {
 func TestInitDataStatusServerAndMDNS(t *testing.T) {
 	req := require.New(t)
 
+	logger, _ := testutil.TestLogger(t)
 	alpineHost := mockHost.NewMockHost(t)
 	alpineHost.EXPECT().MkdirAll(constants.StatusDirectory, os.FileMode(0o755)).Return(nil).Twice()
 	alpineHost.EXPECT().WriteFile(constants.StatusFile, mock.Anything, os.FileMode(0o644)).Return(nil).Twice()
@@ -370,6 +377,8 @@ func TestInitDataStatusServerAndMDNS(t *testing.T) {
 		cfg:           &kubeadmApi.InitConfiguration{},
 		ikniteCluster: &v1alpha1.IkniteCluster{},
 		alpineHost:    alpineHost,
+		logger:        logger,
+		hookManager:   utils.NewHookManager(logger),
 	}
 
 	statusServer := createTestStatusServer(t)

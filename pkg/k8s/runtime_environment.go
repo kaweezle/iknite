@@ -23,10 +23,11 @@ import (
 	"strings"
 
 	"github.com/lithammer/dedent"
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 
 	"github.com/kaweezle/iknite/pkg/alpine"
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
+	"github.com/kaweezle/iknite/pkg/cmd/util"
 	"github.com/kaweezle/iknite/pkg/constants"
 	"github.com/kaweezle/iknite/pkg/host"
 )
@@ -58,10 +59,10 @@ func EnsureConfigFileHasConfigurationLine(fs host.FileSystem, confFilePath, line
 		return fmt.Errorf("while checking %s for %s: %w", confFilePath, line, err)
 	}
 	if present > 0 {
-		log.Infof("Configuration line '%s' is already present in %s", line, confFilePath)
+		logrus.Infof("Configuration line '%s' is already present in %s", line, confFilePath)
 		return nil
 	}
-	log.Infof("Adding configuration line '%s' to %s", line, confFilePath)
+	logrus.Infof("Adding configuration line '%s' to %s", line, confFilePath)
 	var lines []string
 	if lines, err = fs.Pipe(confFilePath).Slice(); err == nil {
 		lines = append(lines, line)
@@ -102,7 +103,7 @@ func MakeIkniteServiceNeedNetworking(fs host.FileSystem, confFilePath string) er
 
 // EnsureNetworkInterfacesConfiguration ensures that the /etc/network/interfaces file exists.
 func EnsureNetworkInterfacesConfiguration(fs host.FileSystem) error {
-	log.Infof("Ensuring network interfaces configuration in %s...", constants.NetworkInterfacesConfFile)
+	logrus.Infof("Ensuring network interfaces configuration in %s...", constants.NetworkInterfacesConfFile)
 	if err := host.ExecuteIfNotExist(fs, constants.NetworkInterfacesConfFile, func() error {
 		return fs.WriteFile(
 			constants.NetworkInterfacesConfFile,
@@ -127,7 +128,7 @@ func EnsureNetworkInterfacesConfiguration(fs host.FileSystem) error {
 func ensureIpConfiguration(ikniteConfig *v1alpha1.IkniteClusterSpec, alpineHost host.Host) error {
 	_, err := alpineHost.GetOutboundIP()
 	if err != nil {
-		log.WithError(err).Warn("Could not get current IP")
+		logrus.WithError(err).Warn("Could not get current IP")
 		if err = MakeIkniteServiceNeedNetworking(alpineHost, constants.RcConfFile); err != nil {
 			return fmt.Errorf("while making iknite service need networking: %w", err)
 		}
@@ -165,11 +166,11 @@ func EnableCGroupSubtreeControl(fs host.FileSystem) error {
 		return fmt.Errorf("while reading cgroup.subtree_control: %w", err)
 	}
 	if strings.Contains(string(content), "cpuset") {
-		log.Info("CGroup subtree control is already enabled")
+		logrus.Info("CGroup subtree control is already enabled")
 		return nil
 	}
 
-	log.Infof("Enabling cgroup subtree control...")
+	logrus.Infof("Enabling cgroup subtree control...")
 	// Create a group to move all current processes to, as enabling subtree control requires that no processes are in
 	// the root cgroup.
 	err = fs.MkdirAll("/sys/fs/cgroup/iknite_init", 0o755)
@@ -186,7 +187,7 @@ func EnableCGroupSubtreeControl(fs host.FileSystem) error {
 			); procErr != nil {
 				// Not sure if we should return an error here or just log it and continue, as some processes might have
 				// ended between the time we read the process numbers and now. For now, let's log it and continue.
-				log.WithError(procErr).
+				logrus.WithError(procErr).
 					WithField("processNumber", processNumber).
 					Warn("While moving process to iknite_init cgroup")
 			}
@@ -212,7 +213,7 @@ func EnableCGroupSubtreeControl(fs host.FileSystem) error {
 	if err != nil {
 		return fmt.Errorf("while enabling cgroup subtree control: %w", err)
 	}
-	log.Info("CGroup subtree control enabled")
+	logrus.Info("CGroup subtree control enabled")
 	return nil
 }
 
@@ -226,7 +227,8 @@ func PrepareKubernetesEnvironment(
 	alpineHost host.Host,
 	ikniteConfig *v1alpha1.IkniteClusterSpec,
 ) error {
-	log.WithFields(log.Fields{
+	logger := util.GetLoggerFromContext(ctx)
+	logger.WithFields(logrus.Fields{
 		"ip":                 ikniteConfig.Ip.String(),
 		"kubernetes_version": ikniteConfig.KubernetesVersion,
 		"domain_name":        ikniteConfig.DomainName,
@@ -238,14 +240,14 @@ func PrepareKubernetesEnvironment(
 	}).Info("Cluster configuration")
 
 	// Allow forwarding (kubeadm requirement)
-	log.Info("Ensuring basic settings...")
+	logger.Info("Ensuring basic settings...")
 	err := alpineHost.WriteFile(
 		"/proc/sys/net/ipv4/ip_forward",
 		[]byte("1\n"),
 		os.FileMode(int(0o644)),
 	)
 	if err != nil {
-		log.WithError(err).Info("Could not write to /proc/sys/net/ipv4/ip_forward")
+		logger.WithError(err).Info("Could not write to /proc/sys/net/ipv4/ip_forward")
 	}
 
 	if err = alpine.EnsureNetFilter(alpineHost); err != nil {
@@ -259,7 +261,7 @@ func PrepareKubernetesEnvironment(
 		os.FileMode(int(0o644)),
 	)
 	if err != nil {
-		log.WithError(err).Info("While enabling bridge-nf-call-iptables")
+		logrus.WithError(err).Info("While enabling bridge-nf-call-iptables")
 	}
 
 	// Setting loose mode on reverse path forwarding because of VIP addresses
@@ -269,7 +271,7 @@ func PrepareKubernetesEnvironment(
 		os.FileMode(int(0o644)),
 	)
 	if err != nil {
-		log.WithError(err).Info("While enabling loose mode on reverse path forwarding (rp_filter=2)")
+		logger.WithError(err).Info("While enabling loose mode on reverse path forwarding (rp_filter=2)")
 	}
 
 	if err = EnableCGroupSubtreeControl(alpineHost); err != nil {
@@ -286,7 +288,7 @@ func PrepareKubernetesEnvironment(
 
 	// Check that the domain name is bound
 	if ikniteConfig.DomainName != "" {
-		log.WithFields(log.Fields{
+		logger.WithFields(logrus.Fields{
 			"ip":         ikniteConfig.Ip,
 			"domainName": ikniteConfig.DomainName,
 		}).Info("Check domain name to IP mapping...")
@@ -296,7 +298,7 @@ func PrepareKubernetesEnvironment(
 			ikniteConfig.Ip,
 			ikniteConfig.DomainName,
 		); !contains {
-			log.WithFields(log.Fields{
+			logger.WithFields(logrus.Fields{
 				"ip":         ikniteConfig.Ip,
 				"domainName": ikniteConfig.DomainName,
 			}).Info("Mapping not found, creating...")
@@ -318,17 +320,17 @@ func PrepareKubernetesEnvironment(
 		}
 	}
 
-	log.Info("Preventing Kubelet from being started by OpenRC...")
+	logger.Info("Preventing Kubelet from being started by OpenRC...")
 	if err := PreventServiceFromStarting(alpineHost, constants.RcConfFile, KubeletName); err != nil {
 		return fmt.Errorf("while preventing kubelet service from starting: %w", err)
 	}
 
-	log.Info("Ensuring Iknite is launched by OpenRC...")
+	logger.Info("Ensuring Iknite is launched by OpenRC...")
 	if err := alpine.EnableService(alpineHost, constants.IkniteService); err != nil {
 		return fmt.Errorf("while enabling iknite service: %w", err)
 	}
 
-	log.Infof("Ensuring %s existence...", constants.CrictlYaml)
+	logger.Infof("Ensuring %s existence...", constants.CrictlYaml)
 	if err := host.ExecuteIfNotExist(alpineHost, constants.CrictlYaml, func() error {
 		return alpineHost.WriteFile(
 			constants.CrictlYaml,

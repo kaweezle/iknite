@@ -25,6 +25,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/pflag"
 
 	"github.com/kaweezle/iknite/pkg/cmd/util"
@@ -67,15 +68,21 @@ func (opts *Options) AddFlags(flags *pflag.FlagSet) {
 }
 
 // RunKubewait is the main logic for the kubewait command.
-func RunKubewait(ctx context.Context, fse host.FileExecutor, opts *Options, namespaces []string) error {
+func RunKubewait(
+	ctx context.Context,
+	fse host.FileExecutor,
+	opts *Options,
+	namespaces []string,
+	logger logrus.FieldLogger,
+) error {
 	if !opts.SkipWaitingForResources {
-		if err := waitForResources(ctx, fse, opts.ResourcesOptions, namespaces); err != nil {
+		if err := waitForResources(ctx, fse, opts.ResourcesOptions, namespaces, logger); err != nil {
 			return fmt.Errorf("error while waiting for resources: %w", err)
 		}
 	}
 
 	if !opts.SkipBootstrap {
-		if err := runBootstrap(ctx, fse, opts.BootstrapOptions); err != nil {
+		if err := runBootstrap(ctx, fse, opts.BootstrapOptions, logger); err != nil {
 			return fmt.Errorf("error during bootstrap: %w", err)
 		}
 	}

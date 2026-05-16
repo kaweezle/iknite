@@ -22,7 +22,7 @@ import (
 	"net/url"
 	"path"
 
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 	"sigs.k8s.io/kustomize/api/resmap"
 	"sigs.k8s.io/kustomize/kyaml/filesys"
 
@@ -34,7 +34,7 @@ import (
 var content embed.FS
 
 func createTempKustomizeDirectory(content *embed.FS, fs filesys.FileSystem, outDir, inDir string) error {
-	log.WithFields(log.Fields{
+	logrus.WithFields(logrus.Fields{
 		"outDir": outDir,
 		"inDir":  inDir,
 	}).Trace("Start creating directory")
@@ -51,13 +51,13 @@ func createTempKustomizeDirectory(content *embed.FS, fs filesys.FileSystem, outD
 		inPath := fmt.Sprintf("%s/%s", inDir, entry.Name())
 		outPath := fmt.Sprintf("%s/%s", outDir, entry.Name())
 
-		log.WithField("path", inPath).Trace("Reading file")
+		logrus.WithField("path", inPath).Trace("Reading file")
 		payload, err := content.ReadFile(inPath)
 		if err != nil {
 			return fmt.Errorf("while reading embedded file %s: %w", entry.Name(), err)
 		}
 
-		log.WithField("outPath", outPath).Trace("Writing content")
+		logrus.WithField("outPath", outPath).Trace("Writing content")
 		err = fs.WriteFile(outPath, payload)
 		if err != nil {
 			return fmt.Errorf("while writing %s to temp dir %s: %w", entry.Name(), outDir, err)
@@ -91,7 +91,7 @@ func GetBaseKustomizationResources(fs host.FileSystem, dirname string, forceEmbe
 	}
 	kustomizeFs := host.NewKustomizeFSWrapper(fs)
 	if !ok || forceEmbedded {
-		log.WithFields(log.Fields{
+		logrus.WithFields(logrus.Fields{
 			"directory":      dirname,
 			"force_embedded": forceEmbedded,
 			"exists":         ok,
@@ -103,7 +103,7 @@ func GetBaseKustomizationResources(fs host.FileSystem, dirname string, forceEmbe
 			return nil, fmt.Errorf("while creating temporary kustomization directory: %w", err)
 		}
 	} else {
-		log.WithField("directory", dirname).Debug("Base kustomization found, applying it...")
+		logrus.WithField("directory", dirname).Debug("Base kustomization found, applying it...")
 	}
 	return kustomize.BuildOnFileSystem(kustomizeFs, dirname) //nolint:wrapcheck // No need to wrap here.
 }
