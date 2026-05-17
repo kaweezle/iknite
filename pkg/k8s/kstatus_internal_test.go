@@ -21,7 +21,7 @@ func TestNewRESTClientGetterFromKubeconfig(t *testing.T) {
 	req := require.New(t)
 	fs := host.NewMemMapFS()
 
-	_, err := NewClientFromKubeconfig(fs, "/tmp/nonexistent-kubeconfig")
+	_, err := NewClientFromKubeconfig(fs, "/tmp/nonexistent-kubeconfig", testutil.TestLogger(t))
 	req.Error(err)
 }
 

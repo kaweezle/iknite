@@ -1,6 +1,6 @@
 package checkers
 
-// cSpell: words apiclient lipgloss clientcmd charmbracelet staticpod wrapcheck
+// cSpell: words apiclient lipgloss clientcmd charmbracelet staticpod wrapcheck sirupsen
 import (
 	"context"
 	"errors"
@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/charmbracelet/lipgloss"
+	"github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/cli-runtime/pkg/resource"
 	clientset "k8s.io/client-go/kubernetes"
@@ -86,6 +87,7 @@ func CheckService(
 	fileExec host.FileExecutor,
 	serviceName string,
 	serviceType ServiceType,
+	logger logrus.FieldLogger,
 ) (bool, string, error) {
 	pid := 0
 	if serviceType == ServiceTypeOpenRC {
@@ -103,7 +105,7 @@ func CheckService(
 	}
 	if serviceType == ServiceTypePidFile {
 		var err error
-		pid, _, err = alpine.CheckPidFile(fileExec, serviceName)
+		pid, _, err = alpine.CheckPidFile(fileExec, serviceName, logger)
 		if err != nil {
 			return false, "", fmt.Errorf("failed to check PID file for service %s: %w", serviceName, err)
 		}
@@ -112,6 +114,11 @@ func CheckService(
 		}
 	}
 	return true, fmt.Sprintf("Service %s is running with pid %d", serviceName, pid), nil
+}
+
+type serviceCheckData interface {
+	host.HostProvider
+	utils.LoggerProvider
 }
 
 // ServiceCheck checks if a service is running.
@@ -124,11 +131,11 @@ func ServiceCheck(name, serviceName string, serviceType ServiceType, parents ...
 		DependsOn:   parents,
 		Description: fmt.Sprintf("Check if %s service is running", serviceName),
 		CheckFn: func(_ context.Context, checkData check.CheckData) (bool, string, error) {
-			data, ok := checkData.(host.HostProvider)
+			data, ok := checkData.(serviceCheckData)
 			if !ok {
 				return false, "", fmt.Errorf("invalid check data type")
 			}
-			return CheckService(data.Host(), serviceName, serviceType)
+			return CheckService(data.Host(), serviceName, serviceType, data.Logger())
 		},
 	}
 }

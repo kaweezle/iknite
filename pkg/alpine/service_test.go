@@ -1,6 +1,6 @@
 package alpine_test
 
-// cSpell: words runlevel runlevels softlevel
+// cSpell: words runlevel runlevels softlevel testutil
 
 import (
 	"errors"
@@ -12,6 +12,7 @@ import (
 	"github.com/kaweezle/iknite/pkg/alpine"
 	"github.com/kaweezle/iknite/pkg/constants"
 	"github.com/kaweezle/iknite/pkg/host"
+	"github.com/kaweezle/iknite/pkg/testutil"
 )
 
 const (
@@ -32,7 +33,7 @@ func TestEnsureOpenRC_Success(t *testing.T) {
 	mockExec := mockHost.NewMockExecutor(t)
 	mockExec.On("Run", true, "/sbin/openrc", []string{"default"}).Return([]byte("ok"), nil).Once()
 
-	err := alpine.EnsureOpenRC(mockExec, "default")
+	err := alpine.EnsureOpenRC(mockExec, "default", testutil.TestLogger(t))
 	req.NoError(err)
 }
 
@@ -44,7 +45,7 @@ func TestEnsureOpenRC_Error(t *testing.T) {
 	mockExec.On("Run", true, "/sbin/openrc", []string{"default"}).
 		Return(nil, errors.New("openrc failed")).Once()
 
-	err := alpine.EnsureOpenRC(mockExec, "default")
+	err := alpine.EnsureOpenRC(mockExec, "default", testutil.TestLogger(t))
 	req.Error(err)
 	req.Contains(err.Error(), "error while starting openrc")
 }
@@ -59,7 +60,7 @@ func TestStartOpenRC_SoftLevelExists(t *testing.T) {
 	// SoftLevelPath already exists → no Run call expected
 	mockFE.On("Exists", constants.SoftLevelPath).Return(true, nil).Once()
 
-	err := alpine.StartOpenRC(mockFE)
+	err := alpine.StartOpenRC(mockFE, testutil.TestLogger(t))
 	req.NoError(err)
 }
 
@@ -71,7 +72,7 @@ func TestStartOpenRC_SoftLevelAbsent_Success(t *testing.T) {
 	mockFE.On("Exists", constants.SoftLevelPath).Return(false, nil).Once()
 	mockFE.On("Run", true, "/sbin/openrc", []string{"default"}).Return([]byte("ok"), nil).Once()
 
-	err := alpine.StartOpenRC(mockFE)
+	err := alpine.StartOpenRC(mockFE, testutil.TestLogger(t))
 	req.NoError(err)
 }
 
@@ -84,7 +85,7 @@ func TestStartOpenRC_SoftLevelAbsent_EnsureOpenRCError(t *testing.T) {
 	mockFE.On("Run", true, "/sbin/openrc", []string{"default"}).
 		Return(nil, errors.New("openrc failed")).Once()
 
-	err := alpine.StartOpenRC(mockFE)
+	err := alpine.StartOpenRC(mockFE, testutil.TestLogger(t))
 	req.Error(err)
 	req.Contains(err.Error(), "failed to start OpenRC")
 }
@@ -97,7 +98,7 @@ func TestStartOpenRC_ExistsError(t *testing.T) {
 	mockFE.On("Exists", constants.SoftLevelPath).
 		Return(false, errors.New("stat error")).Once()
 
-	err := alpine.StartOpenRC(mockFE)
+	err := alpine.StartOpenRC(mockFE, testutil.TestLogger(t))
 	req.Error(err)
 }
 
@@ -329,7 +330,7 @@ func TestStartService_NotStarted_Success(t *testing.T) {
 	mockFE.On("Run", false, "/sbin/rc-service", []string{testSvc, "start"}).
 		Return([]byte("started"), nil).Once()
 
-	err := alpine.StartService(mockFE, testSvc)
+	err := alpine.StartService(mockFE, testSvc, testutil.TestLogger(t))
 	req.NoError(err)
 }
 
@@ -341,7 +342,7 @@ func TestStartService_AlreadyStarted(t *testing.T) {
 	mockFE.On("Exists", startedSvcLink).Return(true, nil).Once()
 	// Run should NOT be called
 
-	err := alpine.StartService(mockFE, testSvc)
+	err := alpine.StartService(mockFE, testSvc, testutil.TestLogger(t))
 	req.NoError(err)
 }
 
@@ -354,7 +355,7 @@ func TestStartService_RunError(t *testing.T) {
 	mockFE.On("Run", false, "/sbin/rc-service", []string{testSvc, "start"}).
 		Return(nil, errors.New("start failed")).Once()
 
-	err := alpine.StartService(mockFE, testSvc)
+	err := alpine.StartService(mockFE, testSvc, testutil.TestLogger(t))
 	req.Error(err)
 	req.Contains(err.Error(), "error while starting service")
 }
@@ -370,7 +371,7 @@ func TestStopService_Started_Success(t *testing.T) {
 	mockFE.On("Run", false, "/sbin/rc-service", []string{testSvc, "stop"}).
 		Return([]byte("stopped"), nil).Once()
 
-	err := alpine.StopService(mockFE, testSvc)
+	err := alpine.StopService(mockFE, testSvc, testutil.TestLogger(t))
 	req.NoError(err)
 }
 
@@ -382,7 +383,7 @@ func TestStopService_NotStarted(t *testing.T) {
 	mockFE.On("Exists", startedSvcLink).Return(false, nil).Once()
 	// Run should NOT be called
 
-	err := alpine.StopService(mockFE, testSvc)
+	err := alpine.StopService(mockFE, testSvc, testutil.TestLogger(t))
 	req.NoError(err)
 }
 
@@ -395,7 +396,7 @@ func TestStopService_RunError(t *testing.T) {
 	mockFE.On("Run", false, "/sbin/rc-service", []string{testSvc, "stop"}).
 		Return(nil, errors.New("stop failed")).Once()
 
-	err := alpine.StopService(mockFE, testSvc)
+	err := alpine.StopService(mockFE, testSvc, testutil.TestLogger(t))
 	req.Error(err)
 	req.Contains(err.Error(), "error while stopping service")
 }

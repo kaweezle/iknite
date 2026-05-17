@@ -56,7 +56,7 @@ prints the Embedded configuration that installs the following components:
 
 `,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			err := performPrintKustomize(fs, kustomizeOptions, cmd.OutOrStdout())
+			err := performPrintKustomize(fs, kustomizeOptions, cmd.OutOrStdout(), util.LoggerFromCommand(cmd))
 			if err != nil {
 				return fmt.Errorf("failed to print kustomize configuration: %w", err)
 			}
@@ -104,7 +104,7 @@ applies the Embedded configuration that installs the following components:
 				fs,
 				kustomizeOptions,
 				waitOptions,
-				util.GetLoggerFromContext(cmd.Context()),
+				util.LoggerFromCommand(cmd),
 			)
 			if err != nil {
 				return fmt.Errorf("failed to apply kustomize configuration: %w", err)
@@ -178,11 +178,13 @@ func performPrintKustomize(
 	fs host.FileSystem,
 	kustomizeOptions *utils.KustomizeOptions,
 	out io.Writer,
+	logger logrus.FieldLogger,
 ) error {
 	resources, err := provision.GetBaseKustomizationResources(
 		fs,
 		kustomizeOptions.Kustomization,
 		kustomizeOptions.ForceEmbedded,
+		logger,
 	)
 	if err != nil {
 		return fmt.Errorf("while getting kustomization resources: %w", err)

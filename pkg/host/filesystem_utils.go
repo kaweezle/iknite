@@ -93,13 +93,13 @@ func CleanDir(fs FileSystem, dir string) error {
 	return nil
 }
 
-func ReadEnvFiles(fs FileSystem, paths ...string) (map[string]string, error) {
+func ReadEnvFiles(fs FileSystem, logger logrus.FieldLogger, paths ...string) (map[string]string, error) {
 	envData := make(map[string]string)
 	for _, path := range paths {
 		data, err := fs.ReadFile(path)
 		if err != nil {
 			if errors.Is(err, os.ErrNotExist) {
-				logrus.WithField("path", path).Debug("Environment file not found, skipping")
+				logger.WithField("path", path).Debug("Environment file not found, skipping")
 				continue
 			}
 			return nil, fmt.Errorf("failed to read environment file %s: %w", path, err)

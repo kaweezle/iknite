@@ -25,6 +25,7 @@ import (
 
 	"github.com/bitfield/script"
 	"github.com/mitchellh/mapstructure"
+	"github.com/sirupsen/logrus"
 	flag "github.com/spf13/pflag"
 	"github.com/spf13/viper"
 	appsV1 "k8s.io/api/apps/v1"
@@ -304,9 +305,14 @@ var workloadKinds = []resid.Gvk{
 	{Group: batchV1.GroupName, Kind: "CronJob"},
 }
 
-func getKustomizationImages(fs host.FileSystem, kustomization string, forceEmbedded bool) ([]string, error) {
+func getKustomizationImages(
+	fs host.FileSystem,
+	kustomization string,
+	forceEmbedded bool,
+	logger logrus.FieldLogger,
+) ([]string, error) {
 	var containerImages []string
-	resources, err := provision.GetBaseKustomizationResources(fs, kustomization, forceEmbedded)
+	resources, err := provision.GetBaseKustomizationResources(fs, kustomization, forceEmbedded, logger)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get resources from base kustomizations: %w", err)
 	}
@@ -339,7 +345,12 @@ func getKustomizationImages(fs host.FileSystem, kustomization string, forceEmbed
 }
 
 // GetIkniteImages returns the list of container images used by iknite.
-func GetIkniteImages(fs host.FileSystem, ikniteConfig *v1alpha1.IkniteClusterSpec, embedded bool) ([]string, error) {
+func GetIkniteImages(
+	fs host.FileSystem,
+	ikniteConfig *v1alpha1.IkniteClusterSpec,
+	embedded bool,
+	logger logrus.FieldLogger,
+) ([]string, error) {
 	// Load default kubeadm configuration to get the list of control plane images
 	externalInitCfg := &kubeadmApiV1.InitConfiguration{}
 	kubeadmScheme.Scheme.Default(externalInitCfg)
@@ -376,7 +387,7 @@ func GetIkniteImages(fs host.FileSystem, ikniteConfig *v1alpha1.IkniteClusterSpe
 	}
 
 	// Now let's perform the default kustomization to add images.
-	kustomizationImages, err := getKustomizationImages(fs, ikniteConfig.Kustomization, embedded)
+	kustomizationImages, err := getKustomizationImages(fs, ikniteConfig.Kustomization, embedded, logger)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get images from kustomization: %w", err)
 	}

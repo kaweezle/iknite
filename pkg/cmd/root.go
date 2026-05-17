@@ -62,7 +62,7 @@ kubernetes.`,
 		Version: IkniteVersion,
 		PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
 			opts.SetUpLogs(cmd.OutOrStderr(), cmdIf.Logger().WithField("cmd", cmd.Name()).Logger)
-			cmd.SetContext(util.WithCmdInterface(cmd.Context(), cmdIf))
+			util.SetCmdInterface(cmd, cmdIf)
 			initConfig(cmd.Root(), cmdIf)
 			if err := config.DecodeIkniteConfig(ikniteConfig); err != nil {
 				return fmt.Errorf("while decoding iknite config: %w", err)

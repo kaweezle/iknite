@@ -33,8 +33,13 @@ import (
 //go:embed base
 var content embed.FS
 
-func createTempKustomizeDirectory(content *embed.FS, fs filesys.FileSystem, outDir, inDir string) error {
-	logrus.WithFields(logrus.Fields{
+func createTempKustomizeDirectory(
+	content *embed.FS,
+	fs filesys.FileSystem,
+	outDir, inDir string,
+	logger logrus.FieldLogger,
+) error {
+	logger.WithFields(logrus.Fields{
 		"outDir": outDir,
 		"inDir":  inDir,
 	}).Trace("Start creating directory")
@@ -51,13 +56,13 @@ func createTempKustomizeDirectory(content *embed.FS, fs filesys.FileSystem, outD
 		inPath := fmt.Sprintf("%s/%s", inDir, entry.Name())
 		outPath := fmt.Sprintf("%s/%s", outDir, entry.Name())
 
-		logrus.WithField("path", inPath).Trace("Reading file")
+		logger.WithField("path", inPath).Trace("Reading file")
 		payload, err := content.ReadFile(inPath)
 		if err != nil {
 			return fmt.Errorf("while reading embedded file %s: %w", entry.Name(), err)
 		}
 
-		logrus.WithField("outPath", outPath).Trace("Writing content")
+		logger.WithField("outPath", outPath).Trace("Writing content")
 		err = fs.WriteFile(outPath, payload)
 		if err != nil {
 			return fmt.Errorf("while writing %s to temp dir %s: %w", entry.Name(), outDir, err)
@@ -84,26 +89,31 @@ func isBaseKustomizationAvailable(fs host.FileSystem, dirname string) (bool, err
 
 // GetBaseKustomizationResources applies the kustomizations located in the specified
 // directory if available, otherwise returns the embedded kustomizations.
-func GetBaseKustomizationResources(fs host.FileSystem, dirname string, forceEmbedded bool) (resmap.ResMap, error) {
+func GetBaseKustomizationResources(
+	fs host.FileSystem,
+	dirname string,
+	forceEmbedded bool,
+	logger logrus.FieldLogger,
+) (resmap.ResMap, error) {
 	ok, err := isBaseKustomizationAvailable(fs, dirname)
 	if err != nil {
 		return nil, fmt.Errorf("while checking for base kustomization: %w", err)
 	}
 	kustomizeFs := host.NewKustomizeFSWrapper(fs)
 	if !ok || forceEmbedded {
-		logrus.WithFields(logrus.Fields{
+		logger.WithFields(logrus.Fields{
 			"directory":      dirname,
 			"force_embedded": forceEmbedded,
 			"exists":         ok,
 		}).Debug("Using embedded kustomization.")
 		kustomizeFs = filesys.MakeFsInMemory()
 		dirname = "base"
-		err = createTempKustomizeDirectory(&content, kustomizeFs, dirname, dirname)
+		err = createTempKustomizeDirectory(&content, kustomizeFs, dirname, dirname, logger)
 		if err != nil {
 			return nil, fmt.Errorf("while creating temporary kustomization directory: %w", err)
 		}
 	} else {
-		logrus.WithField("directory", dirname).Debug("Base kustomization found, applying it...")
+		logger.WithField("directory", dirname).Debug("Base kustomization found, applying it...")
 	}
 	return kustomize.BuildOnFileSystem(kustomizeFs, dirname) //nolint:wrapcheck // No need to wrap here.
 }

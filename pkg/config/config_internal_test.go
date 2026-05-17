@@ -1,4 +1,4 @@
-// cSpell: words kyaml paralleltest
+// cSpell: words kyaml paralleltest testutil
 //
 //nolint:paralleltest // kustomization has race conditions
 package config
@@ -18,6 +18,7 @@ import (
 
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
 	"github.com/kaweezle/iknite/pkg/host"
+	"github.com/kaweezle/iknite/pkg/testutil"
 )
 
 func TestIkniteClusterFlagsAndDecode(t *testing.T) {
@@ -200,7 +201,8 @@ func TestGetKustomizationImages(t *testing.T) {
 
 	fs := host.NewMemMapFS()
 	kustomization := "/etc/iknite.d"
-	ids, err := getKustomizationImages(fs, kustomization, false)
+	logger := testutil.TestLogger(t)
+	ids, err := getKustomizationImages(fs, kustomization, false, logger)
 	req.NoError(err)
 	req.Len(ids, 9)
 	req.Contains(ids, "public.ecr.aws/docker/library/busybox:1.37.0")
@@ -212,7 +214,7 @@ func TestGetKustomizationImages(t *testing.T) {
 			[]byte("invalid: yaml: :"),
 			os.FileMode(0o644),
 		))
-	_, err = getKustomizationImages(fs, kustomization, false)
+	_, err = getKustomizationImages(fs, kustomization, false, logger)
 	req.Error(err)
 	req.Contains(err.Error(), "failed to get resources from base kustomizations")
 
@@ -225,7 +227,7 @@ func TestGetKustomizationImages(t *testing.T) {
 		[]byte(kustomizationYAML),
 		os.FileMode(0o644),
 	))
-	_, err = getKustomizationImages(fs, kustomization, false)
+	_, err = getKustomizationImages(fs, kustomization, false, logger)
 	req.Error(err)
 	req.Contains(err.Error(), "failed to get images from resource")
 
@@ -233,7 +235,7 @@ func TestGetKustomizationImages(t *testing.T) {
 		[]byte(badGatewayDeploymentYAML),
 		os.FileMode(0o644),
 	))
-	_, err = getKustomizationImages(fs, kustomization, false)
+	_, err = getKustomizationImages(fs, kustomization, false, logger)
 	req.Error(err)
 	req.Contains(err.Error(), "failed to get kgateway gateway image")
 }
@@ -246,7 +248,8 @@ func TestGetIkniteImages(t *testing.T) {
 		Kustomization: kustomization,
 	}
 	v1alpha1.SetDefaults_IkniteClusterSpec(clusterConfig)
-	ids, err := GetIkniteImages(fs, clusterConfig, false)
+	logger := testutil.TestLogger(t)
+	ids, err := GetIkniteImages(fs, clusterConfig, false, logger)
 	req.NoError(err)
 	req.Len(ids, 14)
 	req.Contains(ids, "public.ecr.aws/docker/library/busybox:1.37.0")
@@ -257,7 +260,7 @@ func TestGetIkniteImages(t *testing.T) {
 			[]byte("invalid: yaml: :"),
 			os.FileMode(0o644),
 		))
-	_, err = GetIkniteImages(fs, clusterConfig, false)
+	_, err = GetIkniteImages(fs, clusterConfig, false, logger)
 	req.Error(err)
 	req.Contains(err.Error(), "failed to get images from kustomization")
 }

@@ -257,7 +257,7 @@ func newResetData(
 			opts.externalCfg.CleanupTmpDir).(bool),
 		ikniteCluster: ikniteCluster,
 		alpineHost:    alpineHost,
-		logger:        util.GetLoggerFromContext(ctx),
+		logger:        util.LoggerFromContext(ctx),
 	}, nil
 }
 

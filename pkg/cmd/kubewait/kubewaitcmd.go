@@ -95,7 +95,7 @@ Examples:
 			// Re-setup logs after configuration is loaded to apply any log-related settings from the config file or
 			// env file
 			opts.SetUpLogs(cmd.OutOrStderr(), logger)
-			cmd.SetContext(cmdUtil.WithCmdInterface(cmd.Context(), cmdIf))
+			cmdUtil.SetCmdInterface(cmd, cmdIf)
 			return nil
 		},
 	}

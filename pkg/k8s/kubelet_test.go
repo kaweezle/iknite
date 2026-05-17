@@ -28,8 +28,9 @@ import (
 func TestCheckServerRunning(t *testing.T) {
 	t.Parallel()
 	req := require.New(t)
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 	defer cancel()
+	ctx = testutil.WithTestLogger(t, ctx)
 
 	// Start a simple HTTP server in the background
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -46,8 +47,9 @@ func TestCheckServerRunning(t *testing.T) {
 func TestCheckServerRunning_BadResponse(t *testing.T) {
 	t.Parallel()
 	req := require.New(t)
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 	defer cancel()
+	ctx = testutil.WithTestLogger(t, ctx)
 
 	// Start a simple HTTP server in the background
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -65,8 +67,9 @@ func TestCheckServerRunning_BadResponse(t *testing.T) {
 func TestCheckServerRunning_NotFound(t *testing.T) {
 	t.Parallel()
 	req := require.New(t)
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 	defer cancel()
+	ctx = testutil.WithTestLogger(t, ctx)
 
 	// Start a simple HTTP server in the background
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -83,8 +86,9 @@ func TestCheckServerRunning_NotFound(t *testing.T) {
 func TestCheckServerRunning_BadURL(t *testing.T) {
 	t.Parallel()
 	req := require.New(t)
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 	defer cancel()
+	ctx = testutil.WithTestLogger(t, ctx)
 
 	// Start a simple HTTP server in the background
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -102,8 +106,9 @@ func TestCheckServerRunning_BadURL(t *testing.T) {
 func TestCheckServerRunning_BadServer(t *testing.T) {
 	t.Parallel()
 	req := require.New(t)
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 	defer cancel()
+	ctx = testutil.WithTestLogger(t, ctx)
 
 	// Check if the server is running
 	err := k8s.CheckServerRunning(ctx, "http://127.0.0.2/foo", "ok", 1, 1, 1*time.Second)
@@ -268,8 +273,9 @@ func TestStarKubelet(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			req := require.New(t)
-			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 			defer cancel()
+			ctx = testutil.WithTestLogger(t, ctx)
 
 			fileExec := mockHost.NewMockFileExecutor(t)
 			tt.prepareMock(t, fileExec)
@@ -289,7 +295,7 @@ func TestStarKubelet(t *testing.T) {
 
 func exitedProcessState(t *testing.T) *os.ProcessState {
 	t.Helper()
-	cmd := exec.CommandContext(context.Background(), "true")
+	cmd := exec.CommandContext(t.Context(), "true")
 	req := require.New(t)
 	req.NoError(cmd.Run())
 	return cmd.ProcessState
@@ -300,7 +306,7 @@ func TestStartAndConfigureKubelet_NilRuntime(t *testing.T) {
 	req := require.New(t)
 
 	err := k8s.StartAndConfigureKubelet(
-		context.Background(),
+		testutil.WithTestLogger(t, t.Context()),
 		nil,
 		&utils.KustomizeOptions{},
 	)
@@ -317,7 +323,7 @@ func TestStartAndConfigureKubelet_StartKubeletError(t *testing.T) {
 	runtime.EXPECT().StartKubelet(mock.Anything).Return(nil, errors.New("start kubelet error")).Once()
 
 	err := k8s.StartAndConfigureKubelet(
-		context.Background(),
+		testutil.WithTestLogger(t, t.Context()),
 		runtime,
 		&utils.KustomizeOptions{},
 	)
@@ -346,7 +352,7 @@ func TestStartAndConfigureKubelet_KubeletHealthError(t *testing.T) {
 	runtime.EXPECT().RemovePidFile().Once()
 
 	err := k8s.StartAndConfigureKubelet(
-		context.Background(),
+		testutil.WithTestLogger(t, t.Context()),
 		runtime,
 		&utils.KustomizeOptions{},
 	)
@@ -377,7 +383,7 @@ func TestStartAndConfigureKubelet_APIServerHealthError(t *testing.T) {
 	runtime.EXPECT().RemovePidFile().Once()
 
 	err := k8s.StartAndConfigureKubelet(
-		context.Background(),
+		testutil.WithTestLogger(t, t.Context()),
 		runtime,
 		&utils.KustomizeOptions{},
 	)
@@ -411,7 +417,7 @@ func TestStartAndConfigureKubelet_KustomizeError(t *testing.T) {
 	runtime.EXPECT().RemovePidFile().Once()
 
 	err := k8s.StartAndConfigureKubelet(
-		context.Background(),
+		testutil.WithTestLogger(t, t.Context()),
 		runtime,
 		kustomizeOptions,
 	)
@@ -446,7 +452,7 @@ func TestStartAndConfigureKubelet_Success(t *testing.T) {
 	runtime.EXPECT().RemovePidFile().Once()
 
 	err := k8s.StartAndConfigureKubelet(
-		context.Background(),
+		testutil.WithTestLogger(t, t.Context()),
 		runtime,
 		kustomizeOptions,
 	)
@@ -458,8 +464,9 @@ func TestStartAndConfigureKubelet_ContextCanceled(t *testing.T) {
 	t.Parallel()
 	req := require.New(t)
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
+	ctx = testutil.WithTestLogger(t, ctx)
 
 	runtime := mockk8s.NewMockKubeletRuntime(t)
 	process := mockHost.NewMockProcess(t)

@@ -1,3 +1,4 @@
+// cSpell: words sirupsen
 package k8s
 
 import (
@@ -5,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/sirupsen/logrus"
 	"k8s.io/cli-runtime/pkg/resource"
 
 	"github.com/kaweezle/iknite/pkg/alpine"
@@ -18,13 +20,18 @@ import (
 type defaultKubeletRuntime struct {
 	fileExec   host.FileExecutor
 	kubeClient resource.RESTClientGetter
+	logger     logrus.FieldLogger
 }
 
 var _ KubeletRuntime = (*defaultKubeletRuntime)(nil)
 
 // NewKubeletRuntime returns a KubeletRuntime backed by the real k8s functions.
-func NewKubeletRuntime(fileExec host.FileExecutor, kubeClient resource.RESTClientGetter) KubeletRuntime { // nocov
-	return &defaultKubeletRuntime{fileExec: fileExec, kubeClient: kubeClient}
+func NewKubeletRuntime(
+	fileExec host.FileExecutor,
+	kubeClient resource.RESTClientGetter,
+	logger logrus.FieldLogger,
+) KubeletRuntime { // nocov
+	return &defaultKubeletRuntime{fileExec: fileExec, kubeClient: kubeClient, logger: logger}
 }
 
 func (r *defaultKubeletRuntime) StartKubelet(ctx context.Context) (host.Process, error) { // nocov
@@ -59,5 +66,5 @@ func (r *defaultKubeletRuntime) Kustomize(
 }
 
 func (r *defaultKubeletRuntime) RemovePidFile() { // nocov
-	alpine.RemovePidFile(r.fileExec, KubeletName)
+	alpine.RemovePidFile(r.fileExec, KubeletName, r.logger)
 }

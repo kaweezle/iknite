@@ -68,7 +68,7 @@ development tasks that are not part of the main iknite binary.`,
 			}
 			// Re-setup logs after configuration is loaded to apply any log-related settings from the config file
 			opts.SetUpLogs(cmd.OutOrStderr(), logger)
-			cmd.SetContext(util.WithCmdInterface(cmd.Context(), cmdIf))
+			util.SetCmdInterface(cmd, cmdIf)
 			return nil
 		},
 	}

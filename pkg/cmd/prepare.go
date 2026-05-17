@@ -54,5 +54,5 @@ func NewPrepareCommand(ikniteConfig *v1alpha1.IkniteClusterSpec) *cobra.Command 
 func performPrepare(ctx context.Context, ikniteConfig *v1alpha1.IkniteClusterSpec) {
 	alpineHost := host.NewDefaultHost()
 	cobra.CheckErr(k8s.PrepareKubernetesEnvironment(ctx, alpineHost, ikniteConfig))
-	util.GetLoggerFromContext(ctx).Info("VM is prepared for Kubernetes")
+	util.LoggerFromContext(ctx).Info("VM is prepared for Kubernetes")
 }

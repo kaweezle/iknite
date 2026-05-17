@@ -5,16 +5,13 @@ package cmd
 
 import (
 	"bytes"
-	"context"
 	"fmt"
-	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"testing"
 
-	logTest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -29,22 +26,6 @@ import (
 
 const testCRISocket = "unix:///var/run/containerd/containerd.sock"
 
-func CreateTestCmdInterface(t *testing.T, cmd *cobra.Command) (util.CmdInterface, context.Context, *logTest.Hook) {
-	t.Helper()
-	cmdIf := util.NewCmdInterface()
-	e := cmdIf.Logger().WithField("test", t.Name())
-	e.Logger.Out = io.Discard
-	hook := logTest.NewLocal(e.Logger)
-	t.Cleanup(func() {
-		hook.Reset()
-	})
-	ctx := util.WithCmdInterface(t.Context(), cmdIf)
-	if cmd != nil {
-		cmd.SetContext(ctx)
-	}
-	return cmdIf, ctx, hook
-}
-
 // makeResetCmd creates a cobra.Command with all reset flags, along with customized resetOptions.
 // SkipCRIDetect=true and a known CRISocket are set so tests run without a real container runtime.
 func makeResetCmd(t *testing.T, opts *resetOptions) *cobra.Command {
@@ -52,7 +33,7 @@ func makeResetCmd(t *testing.T, opts *resetOptions) *cobra.Command {
 	cmd := &cobra.Command{Use: "reset"}
 	AddResetFlags(cmd.Flags(), opts)
 	config.AddIkniteClusterFlags(cmd.Flags(), opts.ikniteCfg)
-	CreateTestCmdInterface(t, cmd)
+	cmd.SetContext(util.WithCmdInterface(t.Context(), util.NewCmdInterface()))
 	return cmd
 }
 
@@ -224,7 +205,7 @@ func TestNewCmdReset(t *testing.T) {
 
 	runner := workflow.NewRunner()
 	cmd := newCmdReset(&in, &out, nil, runner)
-	CreateTestCmdInterface(t, cmd)
+	cmd.SetContext(util.WithCmdInterface(t.Context(), util.NewCmdInterface()))
 
 	req.NotNil(cmd)
 	req.Equal("reset", cmd.Name())

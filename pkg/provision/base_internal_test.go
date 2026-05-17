@@ -1,4 +1,4 @@
-// cSpell: words paralleltest kyaml filesys
+// cSpell: words paralleltest kyaml filesys testutil
 package provision
 
 import (
@@ -9,6 +9,7 @@ import (
 	"sigs.k8s.io/kustomize/kyaml/filesys"
 
 	"github.com/kaweezle/iknite/pkg/host"
+	"github.com/kaweezle/iknite/pkg/testutil"
 )
 
 func TestIsBaseKustomizationAvailable(t *testing.T) {
@@ -69,7 +70,8 @@ func TestCreateTempKustomizeDirectory(t *testing.T) {
 	err := fs.Mkdir("base")
 	req.NoError(err)
 
-	err = createTempKustomizeDirectory(&content, fs, "base", "base")
+	logger := testutil.TestLogger(t)
+	err = createTempKustomizeDirectory(&content, fs, "base", "base", logger)
 	req.NoError(err)
 	req.True(fs.Exists("base/kustomization.yaml"))
 }
@@ -121,8 +123,8 @@ func TestGetBaseKustomizationResources(t *testing.T) {
 			req := require.New(t)
 
 			fs := host.NewMemMapFS()
-
-			resources, err := GetBaseKustomizationResources(fs, tt.prepare(req, fs), tt.forceEmbedded)
+			logger := testutil.TestLogger(t)
+			resources, err := GetBaseKustomizationResources(fs, tt.prepare(req, fs), tt.forceEmbedded, logger)
 			req.NoError(err)
 			req.NotNil(resources)
 			req.Positive(resources.Size())

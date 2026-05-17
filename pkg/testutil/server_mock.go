@@ -133,25 +133,6 @@ func WriteRestConfigToFile(t *testing.T, config *rest.Config, fs host.FileSystem
 	require.NoError(t, err, "Failed to write kubeconfig file")
 }
 
-func PatchHandler(w http.ResponseWriter, r *http.Request) {
-	logrus.Infof("Received request: %s %s %s", r.Method, r.URL.Path, r.URL.RawQuery)
-	switch r.Method {
-	case http.MethodPatch:
-		body, err := io.ReadAll(r.Body)
-		if err != nil {
-			logrus.Errorf("Failed to read request body: %v", err)
-		} else {
-			logrus.Infof("Request body: %s", string(body))
-		}
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write(body) //nolint:errcheck // test server, ignore error
-	default:
-		logrus.Warnf("Unexpected request: %s %s %s", r.Method, r.URL.Path, r.URL.RawQuery)
-		w.WriteHeader(http.StatusInternalServerError)
-	}
-}
-
 const notFoundResponse = `{
     "kind": "Status",
     "apiVersion": "v1",
@@ -192,10 +173,24 @@ func (l *RequestLog) String() string {
 	return r.String()
 }
 
-type HandlerOverrideFunc func(path string, w http.ResponseWriter, r *http.Request, log *RequestLog, fs embed.FS) bool
+type HandlerOverrideFunc func(
+	path string,
+	w http.ResponseWriter,
+	r *http.Request,
+	log *RequestLog,
+	fs embed.FS,
+	logger logrus.FieldLogger,
+) bool
 
-func FailOverrideHandler(path string, w http.ResponseWriter, _ *http.Request, log *RequestLog, _ embed.FS) bool {
-	logrus.Infof("Simulating failure for path: %s", path)
+func FailOverrideHandler(
+	path string,
+	w http.ResponseWriter,
+	_ *http.Request,
+	log *RequestLog,
+	_ embed.FS,
+	logger logrus.FieldLogger,
+) bool {
+	logger.Infof("Simulating failure for path: %s", path)
 	log.StatusCode = http.StatusInternalServerError
 	w.WriteHeader(http.StatusInternalServerError)
 	return true
@@ -232,7 +227,7 @@ func ContentPatchHandler(subdir string, options *TestServerOptions) http.Handler
 		}()
 		path := strings.TrimSuffix(r.URL.Path, "/")
 		if override, exists := options.Overrides[path]; exists {
-			if override(path, w, r, log, content) {
+			if override(path, w, r, log, content, options.Logger()) {
 				options.Logger().Infof("Override handled the request for path: %s", path)
 				return
 			}

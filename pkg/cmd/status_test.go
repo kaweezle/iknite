@@ -14,6 +14,7 @@ import (
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
 	"github.com/kaweezle/iknite/pkg/check"
 	"github.com/kaweezle/iknite/pkg/cmd"
+	"github.com/kaweezle/iknite/pkg/cmd/util"
 	"github.com/kaweezle/iknite/pkg/host"
 	"github.com/kaweezle/iknite/pkg/testutil"
 	"github.com/kaweezle/iknite/pkg/utils"
@@ -49,7 +50,7 @@ func TestStatusCommand(t *testing.T) {
 		tea.WithInput(input),
 		tea.WithoutRenderer(),
 	)
-	_, ctx, _ := cmd.CreateTestCmdInterface(t, command)
+	ctx := util.WithCmdInterface(t.Context(), util.NewCmdInterface())
 	err = command.ExecuteContext(ctx)
 	req.NoError(err)
 }

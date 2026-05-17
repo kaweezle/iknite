@@ -1,4 +1,4 @@
-// cSpell: words fakefi testdir noresolve testutil
+// cSpell: words fakefi testdir noresolve testutil sirupsen
 package checkers
 
 import (
@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
@@ -312,14 +313,15 @@ func TestAdditionalCheckerPaths(t *testing.T) {
 
 	// TODO: Use mocks and make a full test of CheckService.
 	h := host.NewDefaultHost()
+	logger := testutil.TestLogger(t)
 
-	ok, msg, err := CheckService(h, "ignored", ServiceTypeOpenRC)
+	ok, msg, err := CheckService(h, "ignored", ServiceTypeOpenRC, logger)
 	req.Error(err)
 	req.Empty(msg)
 	req.False(ok)
 	req.ErrorContains(err, "service ignored is not running")
 
-	ok, msg, err = CheckService(h, "ignored", ServiceTypePidFile)
+	ok, msg, err = CheckService(h, "ignored", ServiceTypePidFile, logger)
 	req.Error(err)
 	req.Empty(msg)
 	req.False(ok)
@@ -328,7 +330,7 @@ func TestAdditionalCheckerPaths(t *testing.T) {
 	// CheckService: IsServiceStarted returns an error (Exists fails).
 	mockErrHost := mockHost.NewMockHost(t)
 	mockErrHost.On("Exists", mock.Anything).Return(false, errors.New("disk error"))
-	ok, _, err = CheckService(mockErrHost, "svc", ServiceTypeOpenRC)
+	ok, _, err = CheckService(mockErrHost, "svc", ServiceTypeOpenRC, logger)
 	req.Error(err)
 	req.False(ok)
 	req.ErrorContains(err, "failed to check if service svc is started")
@@ -336,7 +338,7 @@ func TestAdditionalCheckerPaths(t *testing.T) {
 	// CheckService: IsServiceStarted returns true (success path for OpenRC).
 	mockOkHost := mockHost.NewMockHost(t)
 	mockOkHost.On("Exists", mock.Anything).Return(true, nil)
-	ok, msg, err = CheckService(mockOkHost, "svc", ServiceTypeOpenRC)
+	ok, msg, err = CheckService(mockOkHost, "svc", ServiceTypeOpenRC, logger)
 	req.NoError(err)
 	req.True(ok)
 	req.Contains(msg, "svc")
@@ -344,7 +346,7 @@ func TestAdditionalCheckerPaths(t *testing.T) {
 	// CheckService: CheckPidFile returns a non-ErrNotExist error.
 	mockPidErrHost := mockHost.NewMockHost(t)
 	mockPidErrHost.On("ReadFile", "/run/svc.pid").Return([]byte(nil), errors.New("permission denied"))
-	ok, _, err = CheckService(mockPidErrHost, "svc", ServiceTypePidFile)
+	ok, _, err = CheckService(mockPidErrHost, "svc", ServiceTypePidFile, logger)
 	req.Error(err)
 	req.False(ok)
 
@@ -400,11 +402,12 @@ func TestAdditionalCheckerPaths(t *testing.T) {
 	req.ErrorContains(err, "invalid check data type")
 
 	// ServiceCheck CheckFn with valid data (service not running).
-	mockSvcProvider := mockHost.NewMockHostProvider(t)
+	mockSvcCheckData := mockCheckers.NewMockServiceCheckData(t)
 	mockSvcHost := mockHost.NewMockHost(t)
-	mockSvcProvider.On("Host").Return(mockSvcHost)
-	mockSvcHost.On("Exists", mock.Anything).Return(false, nil)
-	ok, _, err = serviceCheck.CheckFn(context.Background(), mockSvcProvider)
+	mockSvcCheckData.EXPECT().Host().Return(mockSvcHost)
+	mockSvcCheckData.EXPECT().Logger().Return(testutil.TestLogger(t))
+	mockSvcHost.EXPECT().Exists(mock.Anything).Return(false, nil)
+	ok, _, err = serviceCheck.CheckFn(context.Background(), mockSvcCheckData)
 	req.Error(err)
 	req.False(ok)
 }
@@ -835,6 +838,7 @@ func TestCheckIkniteServerWithConfig(t *testing.T) {
 		_ *http.Request,
 		log *testutil.RequestLog,
 		_ embed.FS,
+		_ logrus.FieldLogger,
 	) bool {
 		log.StatusCode = http.StatusOK
 		w.WriteHeader(http.StatusOK)

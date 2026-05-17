@@ -1,4 +1,4 @@
-// cSpell: words charmbracelet bubbletea
+// cSpell: words charmbracelet bubbletea testutil
 package check_test
 
 import (
@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/kaweezle/iknite/pkg/check"
+	"github.com/kaweezle/iknite/pkg/testutil"
 )
 
 func TestCheckModelInitAndView(t *testing.T) {
@@ -17,7 +18,7 @@ func TestCheckModelInitAndView(t *testing.T) {
 	req := require.New(t)
 
 	executor := check.NewCheckExecutor()
-	model := check.NewCheckModel(context.Background(), executor, nil)
+	model := check.NewCheckModel(t.Context(), executor, nil, testutil.TestLogger(t))
 
 	cmd := model.Init()
 	req.NotNil(cmd)
@@ -38,7 +39,8 @@ func TestCheckModelView(t *testing.T) {
 	})
 	executor.PrepareRun()
 
-	model := check.NewCheckModel(t.Context(), executor, nil)
+	logger := testutil.TestLogger(t)
+	model := check.NewCheckModel(t.Context(), executor, nil, logger)
 	view := model.View()
 	req.Contains(view, "desc-a")
 }
@@ -57,7 +59,8 @@ func TestCheckModelUpdateKeyCancelsContext(t *testing.T) {
 	})
 	executor.PrepareRun()
 
-	model := check.NewCheckModel(context.Background(), executor, nil)
+	logger := testutil.TestLogger(t)
+	model := check.NewCheckModel(context.Background(), executor, nil, logger)
 
 	_, cmd := model.Update(tea.KeyMsg{})
 	req.NotNil(cmd)
@@ -93,7 +96,8 @@ func TestCheckModelUpdateDefaultBranches(t *testing.T) {
 		req.NotNil(res)
 		req.Len(res, 1)
 
-		model := check.NewCheckModel(t.Context(), executor, nil)
+		logger := testutil.TestLogger(t)
+		model := check.NewCheckModel(t.Context(), executor, nil, logger)
 
 		_, cmd := model.Update(struct{}{})
 		req.NotNil(cmd)
@@ -115,7 +119,8 @@ func TestCheckModelUpdateDefaultBranches(t *testing.T) {
 			},
 		})
 		executor.PrepareRun()
-		model := check.NewCheckModel(t.Context(), executor, nil)
+		logger := testutil.TestLogger(t)
+		model := check.NewCheckModel(t.Context(), executor, nil, logger)
 
 		_, cmd := model.Update(spinner.TickMsg{})
 		req.NotNil(cmd)

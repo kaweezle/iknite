@@ -226,7 +226,7 @@ func newCmdInit(
 					)
 				}
 			}
-			alpine.RemovePidFile(alpineHost, k8s.KubeletName)
+			alpine.RemovePidFile(alpineHost, k8s.KubeletName, data.Logger())
 
 			return nil
 		},
@@ -535,7 +535,7 @@ func newInitData(
 	if ctx == nil {
 		return nil, errors.New("command context is nil")
 	}
-	logger := util.GetLoggerFromContext(ctx)
+	logger := util.LoggerFromContext(ctx)
 
 	return &initData{
 		cfg:                     cfg,
@@ -561,7 +561,7 @@ func newInitData(
 		alpineHost:  alpineHost,
 		hookManager: utils.NewHookManager(logger),
 		logger:      logger,
-		viper:       util.GetViperFromContext(ctx),
+		viper:       util.ViperFromContext(ctx),
 	}, nil
 }
 

@@ -337,8 +337,7 @@ func TestInitDataClientBranches(t *testing.T) {
 	initRunner := workflow.NewRunner()
 	var output bytes.Buffer
 	cmd := newCmdInit(&output, opts, initRunner, host.NewDefaultHost())
-	cmdIf := util.NewCmdInterface()
-	cmd.SetContext(util.WithCmdInterface(t.Context(), cmdIf))
+	cmd.SetContext(util.WithCmdInterface(t.Context(), util.NewCmdInterface()))
 	req.NoError(cmd.Flags().Set(options.DryRun, "true"))
 	t.Setenv("KUBEADM_INIT_DRYRUN_DIR", filepath.Join(t.TempDir(), "dry-run"))
 

@@ -44,13 +44,13 @@ type CRIStatusResponse struct {
 	Status CRIStatus `json:"status"`
 }
 
-func WaitForContainerService(fs host.FileSystem, exec host.Executor) (bool, error) {
+func WaitForContainerService(fs host.FileSystem, exec host.Executor, logger logrus.FieldLogger) (bool, error) {
 	retries := 3
 	first := true
 	serviceIsReady := false
 	for ; retries > 0; retries-- {
 		if !first {
-			logrus.Debug("Waiting 2 seconds...")
+			logger.Debug("Waiting 2 seconds...")
 			time.Sleep(2 * time.Second)
 		}
 		first = false
@@ -64,7 +64,7 @@ func WaitForContainerService(fs host.FileSystem, exec host.Executor) (bool, erro
 			)
 		}
 		if !exist {
-			logrus.Debugf(
+			logger.Debugf(
 				"Container service sock %s does not exist yet",
 				constants.ContainerServiceSock,
 			)
@@ -76,7 +76,7 @@ func WaitForContainerService(fs host.FileSystem, exec host.Executor) (bool, erro
 			logrus.WithError(err).Warn("Error while checking container service sock")
 			continue
 		}
-		logrus.Trace(string(out))
+		logger.Debug(string(out))
 		response := &CRIStatusResponse{}
 		err = json.Unmarshal(out, &response)
 		if err == nil {
@@ -93,7 +93,7 @@ func WaitForContainerService(fs host.FileSystem, exec host.Executor) (bool, erro
 				break
 			}
 		} else {
-			logrus.WithError(err).Warn("Error while parsing crictl status")
+			logger.WithError(err).Warn("Error while parsing crictl status")
 		}
 	}
 	return serviceIsReady, nil

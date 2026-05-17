@@ -51,6 +51,7 @@ func serviceToFillHandler(
 	_ *http.Request,
 	log *testutil.RequestLog,
 	_ embed.FS,
+	_ logrus.FieldLogger,
 ) bool {
 	w.Header().Set("Content-Type", "application/json")
 	log.StatusCode = http.StatusOK

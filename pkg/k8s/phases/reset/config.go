@@ -65,6 +65,7 @@ func runCleanupConfig(c workflow.RunData) error {
 		return errors.New("cleanup-config phase invoked with an invalid data struct")
 	}
 
+	logger := r.Logger()
 	if !r.DryRun() {
 		// In case KubeletRunDirectory holds a symbolic link, evaluate it.
 		// This would also throw an error if the directory does not exist.
@@ -76,7 +77,7 @@ func runCleanupConfig(c workflow.RunData) error {
 			dirsToClean = append(dirsToClean, kubeletRunDirectory)
 		}
 	} else {
-		logrus.Infof("[reset] Would clean directory %q\n", kubeadmConstants.KubeletRunDirectory)
+		logger.Infof("[reset] Would clean directory %q\n", kubeadmConstants.KubeletRunDirectory)
 	}
 
 	certsDir := r.CertificatesDir()
@@ -94,7 +95,7 @@ func runCleanupConfig(c workflow.RunData) error {
 		tempDir := path.Join(kubeadmConstants.KubernetesDir, kubeadmConstants.TempDir)
 		dirsToClean = append(dirsToClean, tempDir)
 	}
-	resetConfigDir(r.Host(), kubeadmConstants.KubernetesDir, dirsToClean, r.DryRun())
+	resetConfigDir(r.Host(), kubeadmConstants.KubernetesDir, dirsToClean, r.DryRun(), logger)
 
 	if r.Cfg() != nil && features.Enabled(r.Cfg().FeatureGates, features.RootlessControlPlane) {
 		if !r.DryRun() {
@@ -110,26 +111,32 @@ func runCleanupConfig(c workflow.RunData) error {
 	return nil
 }
 
-func CleanConfig(fs host.FileSystem, isDryRun bool) {
+func CleanConfig(fs host.FileSystem, isDryRun bool, logger logrus.FieldLogger) {
 	dirsToClean := []string{
 		filepath.Join(kubeadmConstants.KubernetesDir, kubeadmConstants.ManifestsSubDirName),
 		kubeadmConstants.KubeletRunDirectory,
 		kubeadmApiV1.DefaultCertificatesDir,
 	}
 
-	resetConfigDir(fs, kubeadmConstants.KubernetesDir, dirsToClean, isDryRun)
+	resetConfigDir(fs, kubeadmConstants.KubernetesDir, dirsToClean, isDryRun, logger)
 }
 
-func resetConfigDir(fs host.FileSystem, configPathDir string, dirsToClean []string, isDryRun bool) {
+func resetConfigDir(
+	fs host.FileSystem,
+	configPathDir string,
+	dirsToClean []string,
+	isDryRun bool,
+	logger logrus.FieldLogger,
+) {
 	if !isDryRun {
-		logrus.Infof("[reset] Deleting contents of directories: %v\n", dirsToClean)
+		logger.Infof("[reset] Deleting contents of directories: %v\n", dirsToClean)
 		for _, dir := range dirsToClean {
 			if err := CleanDir(fs, dir); err != nil {
 				klog.Warningf("[reset] Failed to delete contents of %q directory: %v", dir, err)
 			}
 		}
 	} else {
-		logrus.Infof("[reset] Would delete contents of directories: %v\n", dirsToClean)
+		logger.Infof("[reset] Would delete contents of directories: %v\n", dirsToClean)
 	}
 
 	filesToClean := []string{
@@ -142,14 +149,14 @@ func resetConfigDir(fs host.FileSystem, configPathDir string, dirsToClean []stri
 	}
 
 	if !isDryRun {
-		logrus.Infof("[reset] Deleting files: %v\n", filesToClean)
+		logger.Infof("[reset] Deleting files: %v\n", filesToClean)
 		for _, path := range filesToClean {
 			if err := fs.RemoveAll(path); err != nil {
 				klog.Warningf("[reset] Failed to remove file: %q [%v]\n", path, err)
 			}
 		}
 	} else {
-		logrus.Infof("[reset] Would delete files: %v\n", filesToClean)
+		logger.Infof("[reset] Would delete files: %v\n", filesToClean)
 	}
 }
 

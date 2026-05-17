@@ -96,7 +96,7 @@ removes the network interfaces and the IP address assigned to the cluster.
 This command must be run as root.
 `,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			logger := util.GetLoggerFromCommand(cmd)
+			logger := util.LoggerFromCommand(cmd)
 			if err := cleanOptions.validate(); err != nil {
 				logger.WithError(err).Error("Invalid options")
 				return fmt.Errorf("invalid options: %w", err)
@@ -185,7 +185,7 @@ func performClean(
 		cleaner.WithField("serviceName", constants.IkniteService).Info("Stopping iknite service...")
 		if !dryRun {
 			// TODO: if reset kubelet, remove his node from etcd cluster
-			err = alpine.StopService(alpineHost, constants.IkniteService)
+			err = alpine.StopService(alpineHost, constants.IkniteService, cleaner)
 			if err != nil {
 				return fmt.Errorf("failed to stop iknite service: %w", err)
 			}
@@ -204,7 +204,7 @@ func performClean(
 		cleaner.WithField("serviceName", constants.ContainerServiceName).
 			Info("Stopping container service...")
 		if !dryRun {
-			err = alpine.StopService(alpineHost, constants.ContainerServiceName)
+			err = alpine.StopService(alpineHost, constants.ContainerServiceName, cleaner)
 			if err != nil {
 				return fmt.Errorf("failed to stop container service: %w", err)
 			}
@@ -263,7 +263,7 @@ func performClean(
 
 	if cleanOptions.cleanClusterConfig {
 		cleaner.Info("Resetting cluster configuration...")
-		reset.CleanConfig(alpineHost, dryRun)
+		reset.CleanConfig(alpineHost, dryRun, cleaner)
 		cleaner.WithField("path", constants.KubernetesRootConfig).
 			Info("Removing kubernetes root config...")
 		if !dryRun {
@@ -274,7 +274,7 @@ func performClean(
 		}
 	}
 
-	_, kubeletProcess, err := alpine.CheckPidFile(alpineHost, "kubelet")
+	_, kubeletProcess, err := alpine.CheckPidFile(alpineHost, "kubelet", cleaner)
 	switch {
 	case err != nil:
 		cleaner.WithError(err).Warn("Error checking kubelet process")

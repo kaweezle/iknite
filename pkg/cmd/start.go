@@ -81,7 +81,7 @@ func IsIkniteReady(ctx context.Context, fs host.FileSystem) (bool, error) {
 	if errors.Is(err, os.ErrNotExist) {
 		return false, nil
 	}
-	logger := util.GetLoggerFromContext(ctx)
+	logger := util.LoggerFromContext(ctx)
 	logger.WithFields(logrus.Fields{
 		"state":   cluster.Status.State.String(),
 		"phase":   cluster.Status.CurrentPhase,
@@ -114,7 +114,7 @@ func performStart(
 	if err != nil {
 		return fmt.Errorf("failed to prepare kubernetes environment: %w", err)
 	}
-	logger := util.GetLoggerFromContext(ctx)
+	logger := util.LoggerFromContext(ctx)
 
 	// If Kubernetes is already installed, check that the configuration has not
 	// Changed.
@@ -133,7 +133,7 @@ func performStart(
 	}
 
 	// Start OpenRC. This will perform `iknite init`.
-	err = alpine.EnsureOpenRC(alpineHost, "default")
+	err = alpine.EnsureOpenRC(alpineHost, "default", logger)
 	if err != nil {
 		return fmt.Errorf("failed to start OpenRC: %w", err)
 	}

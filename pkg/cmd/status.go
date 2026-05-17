@@ -84,7 +84,7 @@ func NewStatusCmd(
 - Statefulsets
 `,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			logger := util.GetLoggerFromContext(cmd.Context())
+			logger := util.LoggerFromCommand(cmd)
 			return performStatus(
 				cmd.Context(),
 				alpineHost,
@@ -121,7 +121,7 @@ func performStatus(
 
 	checkData := checkers.CreateCheckWorkloadData(ikniteConfig, waitOptions, alpineHost, logger)
 	teaOptions = append(teaOptions, tea.WithOutput(os.Stderr))
-	p := tea.NewProgram(check.NewCheckModel(ctx, executor, checkData), teaOptions...)
+	p := tea.NewProgram(check.NewCheckModel(ctx, executor, checkData, logger), teaOptions...)
 	tmp := os.Stdout
 	defer func() {
 		os.Stdout = tmp

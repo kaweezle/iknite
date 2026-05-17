@@ -115,7 +115,7 @@ func performMdns(ctx context.Context, ikniteConfig *v1alpha1.IkniteClusterSpec) 
 		return err
 	}
 
-	logger := util.GetLoggerFromContext(ctx)
+	logger := util.LoggerFromContext(ctx)
 	logger.WithFields(logrus.Fields{
 		"domainName": ikniteConfig.DomainName,
 		"addr4":      addr4,

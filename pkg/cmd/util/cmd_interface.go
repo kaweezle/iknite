@@ -10,6 +10,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
+	"github.com/kaweezle/iknite/pkg/constants"
 	"github.com/kaweezle/iknite/pkg/utils"
 )
 
@@ -84,8 +85,6 @@ func NewCmdInterface() CmdInterface {
 
 var defaultEntry = logrus.NewEntry(logrus.StandardLogger())
 
-type cmdInterfaceKey struct{}
-
 func WithCmdInterface(ctx context.Context, cmdInterface CmdInterface) context.Context {
 	if holder, ok := cmdInterface.(loggerHolder); ok {
 		logger := cmdInterface.Logger()
@@ -93,16 +92,34 @@ func WithCmdInterface(ctx context.Context, cmdInterface CmdInterface) context.Co
 			holder.SetLogger(logEntry.WithContext(ctx))
 		}
 	}
-	return context.WithValue(ctx, cmdInterfaceKey{}, cmdInterface)
+	newCtx := context.WithValue(ctx, constants.LoggerContextKey{}, cmdInterface.Logger())
+	return context.WithValue(newCtx, constants.ViperContextKey{}, cmdInterface.Viper())
 }
 
-func CmdInterfaceFromContext(ctx context.Context) (CmdInterface, bool) {
-	value := ctx.Value(cmdInterfaceKey{})
-	if value == nil {
-		return nil, false
+func SetCmdInterface(cmd *cobra.Command, cmdInterface CmdInterface) {
+	ctx := cmd.Context()
+	if ctx == nil {
+		cmdInterface.Logger().Warn("Command context is nil, creating a new context for the command")
+		return
 	}
-	cmdInterface, ok := value.(CmdInterface)
-	return cmdInterface, ok
+	cmd.SetContext(WithCmdInterface(ctx, cmdInterface))
+}
+
+func WithLogger(ctx context.Context, logger logrus.FieldLogger) context.Context {
+	return context.WithValue(ctx, constants.LoggerContextKey{}, logger)
+}
+
+func WithViper(ctx context.Context, v *viper.Viper) context.Context {
+	return context.WithValue(ctx, constants.ViperContextKey{}, v)
+}
+
+func CmdInterfaceFromContext(ctx context.Context) CmdInterface {
+	l := LoggerFromContext(ctx)
+	v := ViperFromContext(ctx)
+	return &cmdStruct{
+		LogEnabled: utils.LogEnabled{LogEntry: l},
+		v:          v,
+	}
 }
 
 func CmdInterfaceFromCommand(cmd *cobra.Command) (CmdInterface, bool) {
@@ -110,37 +127,42 @@ func CmdInterfaceFromCommand(cmd *cobra.Command) (CmdInterface, bool) {
 	if ctx == nil {
 		return nil, false
 	}
-	return CmdInterfaceFromContext(ctx)
+	return CmdInterfaceFromContext(ctx), true
 }
 
-func GetLoggerFromContext(ctx context.Context) logrus.FieldLogger {
-	cmdInterface, ok := CmdInterfaceFromContext(ctx)
-	if !ok {
-		return defaultEntry.WithContext(ctx) // Return a new logger if no CmdInterface is found in the context
+func LoggerFromContext(ctx context.Context) logrus.FieldLogger {
+	value := ctx.Value(constants.LoggerContextKey{})
+	if value != nil {
+		if logger, ok := value.(logrus.FieldLogger); ok {
+			return logger
+		}
 	}
-	return cmdInterface.Logger()
+	return defaultEntry.WithContext(ctx) // Return a new logger if no CmdInterface is found in the context
 }
 
-func GetLoggerFromCommand(cmd *cobra.Command) logrus.FieldLogger {
+func LoggerFromCommand(cmd *cobra.Command) logrus.FieldLogger {
 	ctx := cmd.Context()
 	if ctx == nil {
 		return defaultEntry
 	}
-	return GetLoggerFromContext(ctx)
+	return LoggerFromContext(ctx)
 }
 
-func GetViperFromContext(ctx context.Context) *viper.Viper {
-	cmdInterface, ok := CmdInterfaceFromContext(ctx)
-	if !ok {
-		return viper.New() // Return a new Viper instance if no CmdInterface is found in the context
+func ViperFromContext(ctx context.Context) *viper.Viper {
+	value := ctx.Value(constants.ViperContextKey{})
+	if value != nil {
+		if v, ok := value.(*viper.Viper); ok {
+			return v
+		}
 	}
-	return cmdInterface.Viper()
+	// Return a new Viper instance if no CmdInterface is found in the context
+	return viper.New()
 }
 
-func GetViperFromCommand(cmd *cobra.Command) *viper.Viper {
+func ViperFromCommand(cmd *cobra.Command) *viper.Viper {
 	ctx := cmd.Context()
 	if ctx == nil {
 		return viper.New() // Return a new Viper instance if the command context is nil
 	}
-	return GetViperFromContext(ctx)
+	return ViperFromContext(ctx)
 }

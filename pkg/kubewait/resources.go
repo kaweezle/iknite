@@ -125,7 +125,7 @@ func waitForResources(
 		defer cancel()
 	}
 
-	client, err := k8s.NewClientFromKubeconfig(fs, opts.Kubeconfig)
+	client, err := k8s.NewClientFromKubeconfig(fs, opts.Kubeconfig, logger)
 	if err != nil {
 		return fmt.Errorf("failed to create Kubernetes client: %w", err)
 	}
@@ -260,6 +260,7 @@ func newResourceWaiter(
 	client genericclioptions.RESTClientGetter,
 	namespace string,
 	opts *ResourcesOptions,
+	logger logrus.FieldLogger,
 ) (*resourceWaiter, error) {
 	factory := kubeUtil.NewFactory(client)
 	poller, err := polling.NewStatusPollerFromFactory(factory, polling.Options{
@@ -269,13 +270,11 @@ func newResourceWaiter(
 		return nil, fmt.Errorf("failed to create status poller: %w", err)
 	}
 
-	logger := logrus.WithField("namespace", namespace)
-
 	return &resourceWaiter{
 		client:         client,
 		namespace:      namespace,
 		poller:         poller,
-		logger:         logger,
+		logger:         logger.WithField("namespace", namespace),
 		pollCancel:     nil,
 		settleTimer:    nil,
 		endChannel:     make(chan error, 1),
@@ -574,7 +573,7 @@ func waitNamespaceResources(
 		logger2.Info("Namespace older than grace period, skipping wait")
 	}
 
-	waiter, err := newResourceWaiter(client, namespace, opts)
+	waiter, err := newResourceWaiter(client, namespace, opts, l)
 	if err != nil { // nocov - Unlikely to fail as the client works at this point.
 		return fmt.Errorf("failed to create resource waiter: %w", err)
 	}

@@ -40,6 +40,7 @@ import (
 	"sigs.k8s.io/kustomize/kyaml/resid"
 
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
+	"github.com/kaweezle/iknite/pkg/cmd/util"
 	"github.com/kaweezle/iknite/pkg/host"
 	"github.com/kaweezle/iknite/pkg/testutil"
 )
@@ -413,7 +414,7 @@ func WorkloadsReadyConditionWithContextFunc(
 ) wait.ConditionWithContextFunc {
 	iteration := 0
 	okIterations := 0
-	return func(_ context.Context) (bool, error) {
+	return func(ctx context.Context) (bool, error) {
 		states, err := AllWorkloadStates(client, logger)
 		if err != nil {
 			return false, err
@@ -429,7 +430,7 @@ func WorkloadsReadyConditionWithContextFunc(
 				ready = append(ready, state)
 			}
 		}
-		logrus.WithFields(logrus.Fields{
+		util.LoggerFromContext(ctx).WithFields(logrus.Fields{
 			"total":        len(states),
 			"ready":        len(ready),
 			"unready":      len(unready),
@@ -449,7 +450,7 @@ func WorkloadsReadyConditionWithContextFunc(
 	}
 }
 
-func InClusterConfig(fs host.FileSystem) (*rest.Config, error) {
+func InClusterConfig(fs host.FileSystem, logger logrus.FieldLogger) (*rest.Config, error) {
 	const (
 		tokenFile  = "/var/run/secrets/kubernetes.io/serviceaccount/token" //nolint:gosec // From client-go
 		rootCAFile = "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
@@ -468,11 +469,11 @@ func InClusterConfig(fs host.FileSystem) (*rest.Config, error) {
 
 	pemBlock, err := fs.ReadFile(rootCAFile)
 	if err != nil {
-		logrus.Errorf("Expected to load root CA config from %s, but got err: %v", rootCAFile, err)
+		logger.Errorf("Expected to load root CA config from %s, but got err: %v", rootCAFile, err)
 	} else {
 		_, err := cert.NewPoolFromBytes(pemBlock)
 		if err != nil {
-			logrus.Errorf("Expected to parse root CA config from %s, but got err: %v", rootCAFile, err)
+			logger.Errorf("Expected to parse root CA config from %s, but got err: %v", rootCAFile, err)
 		} else {
 			// Only set the CA data if it can be parsed successfully,
 			// otherwise the client will fail to connect to the API server.

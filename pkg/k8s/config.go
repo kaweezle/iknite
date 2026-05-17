@@ -157,7 +157,7 @@ func CheckClusterRunning(
 	okTries := 0
 	query := client.Get().AbsPath("/readyz")
 	first := true
-	logger := util.GetLoggerFromContext(ctx)
+	logger := util.LoggerFromContext(ctx)
 	for ; retries > 0; retries-- {
 		if !first {
 			logger.WithFields(logrus.Fields{
@@ -265,8 +265,9 @@ func Kustomize(
 	fs host.FileSystem,
 	options *utils.KustomizeOptions,
 ) error {
+	logger := util.LoggerFromContext(ctx)
 	if options.Kustomization == "" && !options.ForceEmbedded {
-		logrus.Warn("Empty kustomization.")
+		logger.Warn("Empty kustomization.")
 		return nil
 	}
 
@@ -280,19 +281,19 @@ func Kustomize(
 		return err
 	}
 	if cm.Data["configured"] == configuredValueTrue && !options.ForceConfig {
-		logrus.Info("configuration has already occurred. Use -C to force.")
+		logger.Info("configuration has already occurred. Use -C to force.")
 		return nil
 	}
 
-	logrus.WithFields(logrus.Fields{
+	logger.WithFields(logrus.Fields{
 		kustKey: options.Kustomization,
 	}).Info("Performing configuration")
 
-	resources, err := provision.GetBaseKustomizationResources(fs, options.Kustomization, options.ForceEmbedded)
+	resources, err := provision.GetBaseKustomizationResources(fs, options.Kustomization, options.ForceEmbedded, logger)
 	if err != nil {
 		return fmt.Errorf("while getting kustomization resources: %w", err)
 	}
-	logrus.WithField("resourceCount", resources.Size()).Info("Applying base kustomization resources")
+	logger.WithField("resourceCount", resources.Size()).Info("Applying base kustomization resources")
 
 	ids, err := ApplyResMapWithServerSideApply(kubeClient, resources)
 	if err != nil {
@@ -305,7 +306,7 @@ func Kustomize(
 		return fmt.Errorf("while writing configuration: %w", err)
 	}
 
-	logrus.WithFields(logrus.Fields{
+	logger.WithFields(logrus.Fields{
 		kustKey:     options.Kustomization,
 		"resources": ids,
 	}).Info("Configuration applied")

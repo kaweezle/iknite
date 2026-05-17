@@ -47,3 +47,8 @@ const (
 	StatusUpdateIntervalSeconds     = 5
 	StatusUpdateLongIntervalSeconds = 60
 )
+
+// TODO: this should be in a private package.
+type LoggerContextKey struct{}
+
+type ViperContextKey struct{}

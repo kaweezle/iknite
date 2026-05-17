@@ -84,7 +84,7 @@ func (opts *BootstrapOptions) ReadEnvFile(fs host.FileSystem, logger logrus.Fiel
 
 	if info, err := fs.Stat(envFile); err == nil && !info.IsDir() {
 		logger.Infof("Loading environment from %s", envFile)
-		variables, err := host.ReadEnvFiles(fs, envFile)
+		variables, err := host.ReadEnvFiles(fs, logger, envFile)
 		if err != nil {
 			return false, fmt.Errorf("failed to load env file %s: %w", envFile, err)
 		}

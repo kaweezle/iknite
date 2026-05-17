@@ -415,13 +415,14 @@ func Test_resolveNamespaces(t *testing.T) {
 func TestNewResourceWaiter(t *testing.T) {
 	t.Parallel()
 	req := require.New(t)
+	l := testutil.TestLogger(t)
 
 	serverOpts := &testutil.TestServerOptions{}
 	okGetter := testutil.CreateDefaultTestClientGetter(t, serverOpts)
 
 	opts := NewResourcesOptions()
 
-	waiter, err := newResourceWaiter(okGetter, "default", opts)
+	waiter, err := newResourceWaiter(okGetter, "default", opts, l)
 	req.NoError(err)
 	req.NotNil(waiter)
 	req.NotNil(waiter.client)
@@ -431,7 +432,7 @@ func TestNewResourceWaiter(t *testing.T) {
 	getter := mockCliOptions.NewMockRESTClientGetter(t)
 	getter.EXPECT().ToRESTMapper().Return(testutil.NewRESTMapper(), nil).Maybe()
 	getter.EXPECT().ToRESTConfig().Return(nil, errors.New("bad config")).Once()
-	waiter, err = newResourceWaiter(getter, "default", opts)
+	waiter, err = newResourceWaiter(getter, "default", opts, l)
 	req.Error(err)
 	req.Nil(waiter)
 }
@@ -479,11 +480,11 @@ func TestWaitNameSpaceResources(t *testing.T) {
 				counter := 0
 				sOpts.Overrides = map[string]testutil.HandlerOverrideFunc{
 					defaultNamespacePath: func(path string, w http.ResponseWriter, r *http.Request,
-						_ *testutil.RequestLog, _ embed.FS,
+						_ *testutil.RequestLog, _ embed.FS, logger logrus.FieldLogger,
 					) bool {
 						counter++
 						if counter < 3 {
-							logrus.Infof("Simulating delayed namespace creation for path: %s", path)
+							logger.Infof("Simulating delayed namespace creation for path: %s", path)
 							http.NotFound(w, r)
 							return true
 						}
@@ -556,13 +557,13 @@ func TestWaitNameSpaceResources(t *testing.T) {
 				counter := 0
 				sOpts.Overrides = map[string]testutil.HandlerOverrideFunc{
 					deploymentsPath: func(path string, _ http.ResponseWriter,
-						_ *http.Request, _ *testutil.RequestLog, _ embed.FS,
+						_ *http.Request, _ *testutil.RequestLog, _ embed.FS, logger logrus.FieldLogger,
 					) bool {
 						counter++
 						if counter == 1 {
 							return false // Let the first request pass to start the waiter
 						}
-						logrus.Infof("Simulating context cancellation for path: %s", path)
+						logger.Infof("Simulating context cancellation for path: %s", path)
 						cancel() // Cancel the context to simulate timeout
 						return false
 					},
@@ -583,7 +584,7 @@ func TestWaitNameSpaceResources(t *testing.T) {
 				var content []byte
 				sOpts.Overrides = map[string]testutil.HandlerOverrideFunc{
 					defaultNamespacePath: func(_ string, w http.ResponseWriter, _ *http.Request,
-						log *testutil.RequestLog, fs embed.FS,
+						log *testutil.RequestLog, fs embed.FS, logger logrus.FieldLogger,
 					) bool {
 						counter++
 						if counter == 1 {
@@ -591,23 +592,23 @@ func TestWaitNameSpaceResources(t *testing.T) {
 							var err error
 							content, err = fs.ReadFile("testdata/with_resources" + defaultNamespacePath + ".json")
 							if err != nil {
-								logrus.Errorf("Failed to read namespace fixture: %v", err)
+								logger.Errorf("Failed to read namespace fixture: %v", err)
 								http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 								log.StatusCode = http.StatusInternalServerError
 								return true
 							}
 							namespace := &corev1.Namespace{}
 							if err = json.Unmarshal(content, namespace); err != nil {
-								logrus.Errorf("Failed to unmarshal namespace fixture: %v", err)
+								logger.Errorf("Failed to unmarshal namespace fixture: %v", err)
 								http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 								log.StatusCode = http.StatusInternalServerError
 								return true
 							}
 							namespace.CreationTimestamp = metav1.NewTime(timeOfFirstRequest)
 							if content, err = json.Marshal(namespace); err != nil {
-								logrus.Errorf("Failed to marshal namespace fixture: %v", err)
+								logger.Errorf("Failed to marshal namespace fixture: %v", err)
 							}
-							logrus.Infof(
+							logger.Infof(
 								"Simulating namespace creation at: %s",
 								timeOfFirstRequest.Format(time.RFC3339),
 							)
@@ -640,13 +641,13 @@ func TestWaitNameSpaceResources(t *testing.T) {
 				counter := 0
 				sOpts.Overrides = map[string]testutil.HandlerOverrideFunc{
 					deploymentsPath: func(path string, w http.ResponseWriter, _ *http.Request,
-						log *testutil.RequestLog, _ embed.FS,
+						log *testutil.RequestLog, _ embed.FS, logger logrus.FieldLogger,
 					) bool {
 						counter++
 						if counter == 1 {
 							return false // Let the first request pass to start the waiter
 						}
-						logrus.Infof("Simulating failure to get resources for path: %s", path)
+						logger.Infof("Simulating failure to get resources for path: %s", path)
 						http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 						log.StatusCode = http.StatusInternalServerError
 						return true

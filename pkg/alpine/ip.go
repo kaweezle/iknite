@@ -18,11 +18,11 @@ import (
 //
 // It uses the default mask of the IP address class as the mask, and the default
 // broadcast address as the broadcast address.
-func AddIpAddress(exec host.Executor, iface string, address net.IP) error {
+func AddIpAddress(exec host.Executor, iface string, address net.IP, logger logrus.FieldLogger) error {
 	ones, _ := address.DefaultMask().Size()
 	ipWithMask := fmt.Sprintf("%v/%d", address, ones)
 
-	logrus.WithFields(logrus.Fields{
+	logger.WithFields(logrus.Fields{
 		"ip":    ipWithMask,
 		"iface": iface,
 	}).Info("Adding IP address")

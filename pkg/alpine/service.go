@@ -43,10 +43,10 @@ const (
 
 var startedServicesDir = path.Join(openRCDirectory, "started")
 
-func EnsureOpenRC(h host.Executor, level string) error {
-	logrus.WithField("level", level).Info("Ensuring OpenRC...")
+func EnsureOpenRC(h host.Executor, level string, logger logrus.FieldLogger) error {
+	logger.WithField("level", level).Info("Ensuring OpenRC...")
 	if out, err := h.Run(true, "/sbin/openrc", "default"); err == nil {
-		logrus.Trace(string(out))
+		logger.Debug(string(out))
 		return nil
 	} else {
 		return fmt.Errorf("error while starting openrc: %w", err)
@@ -56,9 +56,9 @@ func EnsureOpenRC(h host.Executor, level string) error {
 // StartOpenRC starts the openrc services in the default runlevel.
 // If one of the services is already started, it is not restarted. It one is
 // not started, it is started.
-func StartOpenRC(h host.FileExecutor) error {
+func StartOpenRC(h host.FileExecutor, logger logrus.FieldLogger) error {
 	if err := host.ExecuteIfNotExist(h, constants.SoftLevelPath, func() error {
-		return EnsureOpenRC(h, "default")
+		return EnsureOpenRC(h, "default", logger)
 	}); err != nil {
 		return fmt.Errorf("failed to start OpenRC: %w", err)
 	}
@@ -127,10 +127,10 @@ func DisableService(h host.FileSystem, serviceName string) error {
 }
 
 // StartService start the serviceName service if it is not already started.
-func StartService(h host.FileExecutor, serviceName string) error {
+func StartService(h host.FileExecutor, serviceName string, logger logrus.FieldLogger) error {
 	return ExecuteIfServiceNotStarted(h, serviceName, func() error {
 		if out, err := h.Run(false, "/sbin/rc-service", serviceName, "start"); err == nil {
-			logrus.Trace(string(out))
+			logger.Debug(string(out))
 			return nil
 		} else {
 			return fmt.Errorf("error while starting service %s: %w", serviceName, err)
@@ -139,10 +139,10 @@ func StartService(h host.FileExecutor, serviceName string) error {
 }
 
 // StopService stops the serviceName service if it is  started.
-func StopService(h host.FileExecutor, serviceName string) error {
+func StopService(h host.FileExecutor, serviceName string, logger logrus.FieldLogger) error {
 	return ExecuteIfServiceStarted(h, serviceName, func() error {
 		if out, err := h.Run(false, "/sbin/rc-service", serviceName, "stop"); err == nil {
-			logrus.Trace(string(out))
+			logger.Debug(string(out))
 			return nil
 		} else {
 			return fmt.Errorf("error while stopping service %s: %w", serviceName, err)
@@ -174,9 +174,9 @@ func ServicePidFilePath(serviceName string) string {
 	return fmt.Sprintf("/run/%s.pid", serviceName)
 }
 
-func CheckPidFile(h host.FileExecutor, service string) (int, host.Process, error) {
+func CheckPidFile(h host.FileExecutor, service string, logger logrus.FieldLogger) (int, host.Process, error) {
 	pidFilePath := ServicePidFilePath(service)
-	logger := logrus.WithField("pidfile", pidFilePath)
+	logger = logger.WithField("pidfile", pidFilePath)
 	pidBytes, err := h.ReadFile(pidFilePath)
 	if err != nil && errors.Is(err, os.ErrNotExist) {
 		pidFilePath = fmt.Sprintf("/var/run/supervise-%s.pid", service)
@@ -211,11 +211,11 @@ func CheckPidFile(h host.FileExecutor, service string) (int, host.Process, error
 	return 0, nil, nil
 }
 
-func RemovePidFile(h host.FileSystem, service string) {
+func RemovePidFile(h host.FileSystem, service string, logger logrus.FieldLogger) {
 	pidFilePath := ServicePidFilePath(service)
 	err := h.Remove(pidFilePath)
 	if err != nil {
-		logrus.WithFields(logrus.Fields{
+		logger.WithFields(logrus.Fields{
 			"err":     err,
 			"pidFile": pidFilePath,
 		}).Warn("Failed to remove PID file")

@@ -13,7 +13,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -137,22 +136,23 @@ func TestNewDefaultClient(t *testing.T) {
 func TestResourceInfosFromResMap(t *testing.T) {
 	t.Parallel()
 	req := require.New(t)
+	logger := testutil.TestLogger(t)
 
 	restConfig := testutil.CreateTestAPIServer(t, func(w http.ResponseWriter, r *http.Request) {
-		logrus.Infof("Received request: %s %s %s", r.Method, r.URL.Path, r.URL.RawQuery)
+		logger.Infof("Received request: %s %s %s", r.Method, r.URL.Path, r.URL.RawQuery)
 		switch r.Method {
 		case http.MethodPatch:
 			body, err := io.ReadAll(r.Body)
 			if err != nil {
-				logrus.Errorf("Failed to read request body: %v", err)
+				logger.Errorf("Failed to read request body: %v", err)
 			} else {
-				logrus.Infof("Request body: %s", string(body))
+				logger.Infof("Request body: %s", string(body))
 			}
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write(body)
 		default:
-			logrus.Warnf("Unexpected request: %s %s %s", r.Method, r.URL.Path, r.URL.RawQuery)
+			logger.Warnf("Unexpected request: %s %s %s", r.Method, r.URL.Path, r.URL.RawQuery)
 			w.WriteHeader(http.StatusInternalServerError)
 		}
 	})
@@ -389,6 +389,7 @@ func TestApplyResMapWithServerSideApply_Branches(t *testing.T) {
 	req.Error(err)
 	req.Contains(err.Error(), "failed to apply resources")
 
+	logger := testutil.TestLogger(t)
 	removeServer := testutil.CreateClientGetterWithTestServer(
 		t,
 		testutil.NewRESTMapper(),
@@ -399,7 +400,7 @@ func TestApplyResMapWithServerSideApply_Branches(t *testing.T) {
 			}
 			body, readErr := io.ReadAll(r.Body)
 			if readErr != nil {
-				logrus.Errorf("Failed to read request body: %v", readErr)
+				logger.Errorf("Failed to read request body: %v", readErr)
 				w.WriteHeader(http.StatusInternalServerError)
 				return
 			}
@@ -590,7 +591,8 @@ func TestInClusterConfig_MissingServiceHost(t *testing.T) {
 	t.Setenv("KUBERNETES_SERVICE_PORT", "6443")
 
 	fs := host.NewMemMapFS()
-	config, err := k8s.InClusterConfig(fs)
+	logger := testutil.TestLogger(t)
+	config, err := k8s.InClusterConfig(fs, logger)
 	req.ErrorIs(err, rest.ErrNotInCluster)
 	req.Nil(config)
 }
@@ -601,7 +603,8 @@ func TestInClusterConfig_MissingServicePort(t *testing.T) {
 	t.Setenv("KUBERNETES_SERVICE_PORT", "")
 
 	fs := host.NewMemMapFS()
-	config, err := k8s.InClusterConfig(fs)
+	logger := testutil.TestLogger(t)
+	config, err := k8s.InClusterConfig(fs, logger)
 	req.ErrorIs(err, rest.ErrNotInCluster)
 	req.Nil(config)
 }
@@ -612,7 +615,8 @@ func TestInClusterConfig_NoBothServiceHost(t *testing.T) {
 	t.Setenv("KUBERNETES_SERVICE_PORT", "")
 
 	fs := host.NewMemMapFS()
-	config, err := k8s.InClusterConfig(fs)
+	logger := testutil.TestLogger(t)
+	config, err := k8s.InClusterConfig(fs, logger)
 	req.ErrorIs(err, rest.ErrNotInCluster)
 	req.Nil(config)
 }
@@ -621,9 +625,10 @@ func TestInClusterConfig_TokenFileNotFound(t *testing.T) {
 	req := require.New(t)
 	t.Setenv("KUBERNETES_SERVICE_HOST", "kubernetes.default.svc")
 	t.Setenv("KUBERNETES_SERVICE_PORT", "6443")
+	logger := testutil.TestLogger(t)
 
 	fs := host.NewMemMapFS()
-	config, err := k8s.InClusterConfig(fs)
+	config, err := k8s.InClusterConfig(fs, logger)
 	req.Error(err)
 	req.Nil(config)
 }
@@ -638,7 +643,8 @@ func TestInClusterConfig_ValidTokenWithNoCA(t *testing.T) {
 	req.NoError(fs.MkdirAll(serviceAccountDir, 0o755))
 	req.NoError(fs.WriteFile(tokenFile, []byte("valid-token"), 0o644))
 
-	config, err := k8s.InClusterConfig(fs)
+	logger := testutil.TestLogger(t)
+	config, err := k8s.InClusterConfig(fs, logger)
 	req.NoError(err)
 	req.NotNil(config)
 	req.Equal("https://kubernetes.default.svc:6443", config.Host)
@@ -659,7 +665,8 @@ func TestInClusterConfig_ValidTokenWithInvalidCA(t *testing.T) {
 	req.NoError(fs.WriteFile(tokenFile, []byte("valid-token"), 0o644))
 	req.NoError(fs.WriteFile(caFile, []byte("invalid-ca"), 0o644))
 
-	config, err := k8s.InClusterConfig(fs)
+	logger := testutil.TestLogger(t)
+	config, err := k8s.InClusterConfig(fs, logger)
 	req.NoError(err)
 	req.NotNil(config)
 	req.Equal("https://kubernetes.default.svc:6443", config.Host)
@@ -680,7 +687,8 @@ func TestInClusterConfig_ValidTokenWithValidCA(t *testing.T) {
 	req.NoError(fs.WriteFile(tokenFile, []byte("valid-token"), 0o644))
 	req.NoError(fs.WriteFile(caFile, []byte(validCA), 0o644))
 
-	config, err := k8s.InClusterConfig(fs)
+	logger := testutil.TestLogger(t)
+	config, err := k8s.InClusterConfig(fs, logger)
 	req.NoError(err)
 	req.NotNil(config)
 	req.Equal("https://kubernetes.default.svc:6443", config.Host)
