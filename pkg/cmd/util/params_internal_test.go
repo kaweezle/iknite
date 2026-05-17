@@ -139,7 +139,7 @@ func TestBindFlagValue_ReturnsSetErrorForScalarValue(t *testing.T) {
 	flag := &pflag.Flag{Name: "my-flag", Value: &failingValue{setErr: errors.New("set failed")}}
 	logger := testutil.TestLogger(t)
 
-	err := BindFlagValue(flag, v, "my_flag", logger.WithContext(t.Context()))
+	err := BindFlagValue(flag, v, "my_flag", logger)
 	req.ErrorContains(err, "while setting viper value for my-flag from viper key my_flag")
 	req.ErrorContains(err, "set failed")
 }

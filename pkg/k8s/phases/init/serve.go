@@ -42,7 +42,7 @@ func runServe(c workflow.RunData) error {
 		return fmt.Errorf("failed to start iknite status server: %w", err)
 	}
 
-	data.Logger().WithField("port", ikniteCluster.Spec.StatusServerPort).Info("Iknite status server started")
+	data.Logger().Info("Iknite status server started", "port", ikniteCluster.Spec.StatusServerPort)
 
 	ch, unregister := data.RegisterIkniteClusterListener()
 	go func() {

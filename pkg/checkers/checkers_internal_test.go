@@ -5,6 +5,7 @@ import (
 	"context"
 	"embed"
 	"errors"
+	"log/slog"
 	"net"
 	"net/http"
 	"os"
@@ -12,7 +13,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
@@ -838,7 +838,7 @@ func TestCheckIkniteServerWithConfig(t *testing.T) {
 		_ *http.Request,
 		log *testutil.RequestLog,
 		_ embed.FS,
-		_ logrus.FieldLogger,
+		_ *slog.Logger,
 	) bool {
 		log.StatusCode = http.StatusOK
 		w.WriteHeader(http.StatusOK)

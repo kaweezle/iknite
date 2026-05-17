@@ -61,7 +61,7 @@ kubernetes.`,
 		Example: `> iknite start`,
 		Version: IkniteVersion,
 		PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
-			opts.SetUpLogs(cmd.OutOrStderr(), cmdIf.Logger().WithField("cmd", cmd.Name()).Logger)
+			opts.SetUpLogs(cmd.OutOrStderr(), cmdIf)
 			util.SetCmdInterface(cmd, cmdIf)
 			initConfig(cmd.Root(), cmdIf)
 			if err := config.DecodeIkniteConfig(ikniteConfig); err != nil {

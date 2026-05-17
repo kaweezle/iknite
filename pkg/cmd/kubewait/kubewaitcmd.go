@@ -78,13 +78,12 @@ Examples:
 			return kubewait.RunKubewait(cmd.Context(), fse, opts, args, cmdIf.Logger())
 		},
 		PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
-			logger := cmdIf.Logger().WithField("cmd", cmd.Name()).Logger
-			opts.SetUpLogs(cmd.OutOrStderr(), logger)
+			opts.SetUpLogs(cmd.OutOrStderr(), cmdIf)
 			rootCmd := cmd.Root()
 			if err := cmdUtil.InitializeConfiguration(rootCmd, cmdIf); err != nil {
 				return fmt.Errorf("while initializing configuration: %w", err)
 			}
-			ok, err := opts.ReadEnvFile(fse, logger)
+			ok, err := opts.ReadEnvFile(fse, cmdIf.Logger())
 			if err != nil {
 				return fmt.Errorf("while reading env file: %w", err)
 			}
@@ -94,7 +93,7 @@ Examples:
 			}
 			// Re-setup logs after configuration is loaded to apply any log-related settings from the config file or
 			// env file
-			opts.SetUpLogs(cmd.OutOrStderr(), logger)
+			opts.SetUpLogs(cmd.OutOrStderr(), cmdIf)
 			cmdUtil.SetCmdInterface(cmd, cmdIf)
 			return nil
 		},

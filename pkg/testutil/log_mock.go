@@ -2,31 +2,45 @@ package testutil
 
 import (
 	"context"
+	"io"
+	"log/slog"
 	"testing"
 
+	sloglogrus "github.com/samber/slog-logrus/v2"
 	"github.com/sirupsen/logrus"
 	logTest "github.com/sirupsen/logrus/hooks/test"
 
 	"github.com/kaweezle/iknite/pkg/constants"
 )
 
-func TestLogger(t *testing.T) *logrus.Entry {
-	t.Helper()
-	logger := logrus.New()
-	// FIXME: This provokes race coditions
-	// logger.SetOutput(t.Output())
-	logger.SetLevel(logrus.DebugLevel)
-	return logger.WithContext(t.Context())
+func NewLogger(out io.Writer) *slog.Logger {
+	l := logrus.New()
+	l.SetOutput(out)
+	return slog.New(sloglogrus.Option{
+		Level:  slog.LevelDebug,
+		Logger: l,
+	}.NewLogrusHandler())
 }
 
-func TestLoggerWithHook(t *testing.T) (*logrus.Entry, *logTest.Hook) {
+func TestLogger(t *testing.T) *slog.Logger {
 	t.Helper()
-	logger := TestLogger(t)
-	hook := logTest.NewLocal(logger.Logger)
+	return slog.New(sloglogrus.Option{
+		Level:  slog.LevelDebug,
+		Logger: logrus.New(),
+	}.NewLogrusHandler())
+}
+
+func TestLoggerWithHook(t *testing.T) (*slog.Logger, *logTest.Hook) {
+	t.Helper()
+	logger := logrus.New()
+	hook := logTest.NewLocal(logger)
 	t.Cleanup(func() {
 		hook.Reset()
 	})
-	return logger, hook
+	return slog.New(sloglogrus.Option{
+		Level:  slog.LevelDebug,
+		Logger: logger,
+	}.NewLogrusHandler()), hook
 }
 
 func WithTestLogger(t *testing.T, ctx context.Context) context.Context {

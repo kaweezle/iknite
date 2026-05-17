@@ -21,11 +21,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"slices"
 
 	"github.com/bitfield/script"
 	"github.com/mitchellh/mapstructure"
-	"github.com/sirupsen/logrus"
 	flag "github.com/spf13/pflag"
 	"github.com/spf13/viper"
 	appsV1 "k8s.io/api/apps/v1"
@@ -309,7 +309,7 @@ func getKustomizationImages(
 	fs host.FileSystem,
 	kustomization string,
 	forceEmbedded bool,
-	logger logrus.FieldLogger,
+	logger *slog.Logger,
 ) ([]string, error) {
 	var containerImages []string
 	resources, err := provision.GetBaseKustomizationResources(fs, kustomization, forceEmbedded, logger)
@@ -349,7 +349,7 @@ func GetIkniteImages(
 	fs host.FileSystem,
 	ikniteConfig *v1alpha1.IkniteClusterSpec,
 	embedded bool,
-	logger logrus.FieldLogger,
+	logger *slog.Logger,
 ) ([]string, error) {
 	// Load default kubeadm configuration to get the list of control plane images
 	externalInitCfg := &kubeadmApiV1.InitConfiguration{}

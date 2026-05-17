@@ -5,10 +5,10 @@ package k8s
 import (
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 
-	"github.com/sirupsen/logrus"
 	"github.com/txn2/txeh"
 	kubeadmConstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 
@@ -16,12 +16,13 @@ import (
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
 	"github.com/kaweezle/iknite/pkg/host"
 	"github.com/kaweezle/iknite/pkg/k8s/util"
+	"github.com/kaweezle/iknite/pkg/utils"
 )
 
 // cSpell: enable
 
 type Cleaner struct {
-	logrus.FieldLogger
+	*slog.Logger
 	host.Host
 	ikniteConfig *v1alpha1.IkniteClusterSpec
 	isDryRun     bool
@@ -29,12 +30,12 @@ type Cleaner struct {
 
 func NewCleaner(
 	h host.Host,
-	logger logrus.FieldLogger,
+	logger *slog.Logger,
 	ikniteConfig *v1alpha1.IkniteClusterSpec,
 	isDryRun bool,
 ) *Cleaner {
 	return &Cleaner{
-		FieldLogger:  logger.WithField("isDryRun", isDryRun),
+		Logger:       logger.With("isDryRun", isDryRun),
 		Host:         h,
 		ikniteConfig: ikniteConfig,
 		isDryRun:     isDryRun,
@@ -53,8 +54,7 @@ func (c *Cleaner) ResetIPAddress() error {
 	}
 	ip, err := alpine.IpMappingForHost(hosts, c.ikniteConfig.DomainName)
 	if err != nil {
-		c.WithField("hostname", c.ikniteConfig.DomainName).
-			Warn("failed to get IP mapping for host:", err)
+		c.Warn("failed to get IP mapping for host:", utils.ErrorKey, err, "hostname", c.ikniteConfig.DomainName)
 		return nil
 	}
 	ones, _ := ip.DefaultMask().Size()
@@ -66,7 +66,7 @@ func (c *Cleaner) ResetIPAddress() error {
 	}
 
 	p := c.ExecPipe(nil, "ip -br -4 a sh").Match(ipWithMask).Column(1).FilterLine(func(s string) string {
-		c.WithField("interface", s).WithField("ip", ipWithMask).Debug("Deleting IP address...")
+		c.Debug("Deleting IP address...", "interface", s, "ip", ipWithMask)
 		return s
 	})
 	p = c.ExecForEach(p, fmt.Sprintf("%sip addr del %s dev {{.}}", prefix, ipWithMask))
@@ -150,9 +150,9 @@ func (c *Cleaner) StopAllContainers() error {
 func (c *Cleaner) UnmountPaths(failOnError bool) error {
 	var err error
 	for _, path := range pathsToUnmount {
-		err = processMounts(c.Host, path, false, "Unmounting", c.isDryRun, c)
+		err = processMounts(c.Host, path, false, "Unmounting", c.isDryRun, c.Logger)
 		if err != nil {
-			c.WithError(err).Warn("Error unmounting path")
+			c.Warn("Error unmounting path", utils.ErrorKey, err, "path", path)
 			if failOnError {
 				return err
 			}
@@ -160,9 +160,9 @@ func (c *Cleaner) UnmountPaths(failOnError bool) error {
 	}
 
 	for _, path := range pathsToUnmountAndRemove {
-		err = processMounts(c.Host, path, true, "Unmounting and removing", c.isDryRun, c)
+		err = processMounts(c.Host, path, true, "Unmounting and removing", c.isDryRun, c.Logger)
 		if err != nil {
-			c.WithError(err).Warn("Error unmounting and removing path")
+			c.Warn("Error unmounting and removing path", utils.ErrorKey, err, "path", path)
 			if failOnError {
 				return err
 			}
@@ -177,7 +177,7 @@ func (c *Cleaner) CleanAll(
 ) error {
 	var err error
 	if err = c.StopAllContainers(); err != nil {
-		c.WithError(err).Warn("Error stopping all containers")
+		c.Warn("Error stopping all containers", utils.ErrorKey, err)
 		if failOnError {
 			return err
 		}
@@ -185,7 +185,7 @@ func (c *Cleaner) CleanAll(
 
 	err = c.UnmountPaths(failOnError)
 	if err != nil {
-		c.WithError(err).Warn("Error unmounting paths")
+		c.Warn("Error unmounting paths", utils.ErrorKey, err)
 		if failOnError {
 			return err
 		}
@@ -193,7 +193,7 @@ func (c *Cleaner) CleanAll(
 
 	err = c.RemoveKubeletFiles()
 	if err != nil {
-		c.WithError(err).Warn("Error removing kubelet files")
+		c.Warn("Error removing kubelet files", utils.ErrorKey, err)
 		if failOnError {
 			return err
 		}
@@ -201,7 +201,7 @@ func (c *Cleaner) CleanAll(
 
 	err = c.DeleteCniNamespaces()
 	if err != nil {
-		c.WithError(err).Warn("Error deleting CNI namespaces")
+		c.Warn("Error deleting CNI namespaces", utils.ErrorKey, err)
 		if failOnError {
 			return err
 		}
@@ -209,7 +209,7 @@ func (c *Cleaner) CleanAll(
 
 	err = c.DeleteNetworkInterfaces()
 	if err != nil {
-		c.WithError(err).Warn("Error deleting network interfaces")
+		c.Warn("Error deleting network interfaces", utils.ErrorKey, err)
 		if failOnError {
 			return err
 		}
@@ -219,7 +219,7 @@ func (c *Cleaner) CleanAll(
 		c.Info("Cleaning up iptables rules...")
 		err = c.ResetIPTables()
 		if err != nil {
-			c.WithError(err).Warn("Error cleaning up iptables rules")
+			c.Warn("Error cleaning up iptables rules", utils.ErrorKey, err)
 			if failOnError {
 				return err
 			}
@@ -229,7 +229,7 @@ func (c *Cleaner) CleanAll(
 	if resetIpAddress {
 		err = c.ResetIPAddress()
 		if err != nil {
-			c.WithError(err).Warn("Error resetting IP address")
+			c.Warn("Error resetting IP address", utils.ErrorKey, err)
 			if failOnError {
 				return err
 			}
@@ -244,13 +244,9 @@ func processMounts(
 	remove bool,
 	message string,
 	isDryRun bool,
-	logger logrus.FieldLogger,
+	logger *slog.Logger,
 ) error {
-	fields := logrus.Fields{
-		"path":   path,
-		"remove": remove,
-	}
-	logger.WithFields(fields).Info(message)
+	logger.Info(message, "path", path, "remove", remove)
 	var err error
 	path, err = c.EvalSymlinks(path)
 	if err != nil {
@@ -261,17 +257,17 @@ func processMounts(
 	}
 
 	p := c.Pipe("/proc/self/mounts").Column(2).Match(path).FilterLine(func(s string) string {
-		logger.WithField("mount", s).Debug(message)
+		logger.Debug(message, "mount", s)
 		if !isDryRun {
 			err = c.Unmount(s)
 			if err != nil {
-				logger.WithField("mount", s).WithError(err).Warn("Error unmounting path")
+				logger.Warn("Error unmounting path", utils.ErrorKey, err, "mount", s)
 				return s
 			}
 			if remove {
 				err = c.RemoveAll(s)
 				if err != nil {
-					logger.WithField("path", s).WithError(err).Warn("Error removing path")
+					logger.Warn("Error removing path", utils.ErrorKey, err, "path", s)
 					return s
 				}
 			}
@@ -292,7 +288,7 @@ func (c *Cleaner) DeleteCniNamespaces() error {
 		command = "echo " + command
 	}
 	p := c.ExecPipe(nil, "ip netns show").Column(1).FilterLine(func(s string) string {
-		c.WithField("namespace", s).Debug("Deleting namespace...")
+		c.Debug("Deleting namespace...", "namespace", s)
 		return s
 	})
 	p = c.ExecForEach(p, command)
@@ -315,17 +311,17 @@ func (c *Cleaner) DeleteNetworkInterfaces() error {
 		FilterLine(func(s string) string {
 			ifname := s[1 : len(s)-1]
 			command := fmt.Sprintf("%sip link delete %s", prefix, ifname)
-			c.WithField("interface", ifname).Debugf("Deleting interface with: %s...", command)
+			c.Debug("Deleting interface with", "interface", ifname, "command", command)
 			return command
 		})
 	p = c.ExecForEach(p, "{{ . }}")
 	_ = p.Wait() //nolint:errcheck // we check p.Error() instead
 	err := p.Error()
 	if err != nil {
-		c.WithError(err).Error("Error deleting pods network interfaces")
+		c.Error("Error deleting pods network interfaces", utils.ErrorKey, err)
 		return fmt.Errorf("failed to delete network interfaces: %w", err)
 	} else {
-		c.Infof("Deleted pods network interfaces")
+		c.Info("Deleted pods network interfaces")
 	}
 
 	return nil
@@ -353,9 +349,9 @@ func (c *Cleaner) DeleteAPIBackendData(apiBackendName, apiBackendDatabaseDirecto
 		}
 	}
 	if c.isDryRun {
-		c.WithField("path", apiBackendDatabaseDirectory).Info("Dry run: would delete API backend data...")
+		c.Info("Dry run: would delete API backend data...", "path", apiBackendDatabaseDirectory)
 	} else {
-		c.WithField("path", apiBackendDatabaseDirectory).Info("Deleting API backend data...")
+		c.Info("Deleting API backend data...", "path", apiBackendDatabaseDirectory)
 		err = host.CleanDir(c, apiBackendDatabaseDirectory)
 		if err != nil {
 			return fmt.Errorf("failed to delete API backend data: %w", err)

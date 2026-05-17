@@ -20,8 +20,8 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log/slog"
 
-	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"k8s.io/apimachinery/pkg/util/runtime"
@@ -133,7 +133,7 @@ func performKustomize(
 	fs host.FileSystem,
 	kustomizeOptions *utils.KustomizeOptions,
 	waitOptions *utils.WaitOptions,
-	logger logrus.FieldLogger,
+	logger *slog.Logger,
 ) error {
 	// We need to get it from root as we will apply configuration
 	kubeClient, err := k8s.NewClientFromFile(fs, constants.KubernetesRootConfig)
@@ -162,7 +162,7 @@ func performKustomize(
 	}
 
 	if waitOptions.HasLoop() {
-		logger.Infof("Waiting for workloads with options: %s", waitOptions.String())
+		logger.Info("Waiting for workloads", "options", waitOptions.String())
 		runtime.ErrorHandlers = runtime.ErrorHandlers[:0] //nolint:reassign // disabling printing of errors to stderr
 		if err := waitOptions.Poll(
 			ctx,
@@ -178,7 +178,7 @@ func performPrintKustomize(
 	fs host.FileSystem,
 	kustomizeOptions *utils.KustomizeOptions,
 	out io.Writer,
-	logger logrus.FieldLogger,
+	logger *slog.Logger,
 ) error {
 	resources, err := provision.GetBaseKustomizationResources(
 		fs,

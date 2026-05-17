@@ -4,10 +4,10 @@ package alpine
 // cSpell: disable
 import (
 	"fmt"
+	"log/slog"
 	"os"
 
 	"github.com/google/uuid"
-	"github.com/sirupsen/logrus"
 
 	"github.com/kaweezle/iknite/pkg/host"
 )
@@ -25,7 +25,7 @@ const (
 // The availability of the /proc/sys/net/bridge directory. On Windows 11, WSL2
 // includes br_netfilter in the kernel and modprobe is not available.
 // On other linuxes, netfilter is provided as a module.
-func EnsureNetFilter(fsExe host.FileExecutor, logger logrus.FieldLogger) error {
+func EnsureNetFilter(fsExe host.FileExecutor, logger *slog.Logger) error {
 	if err := host.ExecuteIfNotExist(fsExe, brNetfilterDir, func() error {
 		logger.Debug("Enabling netfilter...")
 		if out, err := fsExe.Run(true, modProbeCmd, netfilter_module); err == nil {
@@ -40,13 +40,10 @@ func EnsureNetFilter(fsExe host.FileExecutor, logger logrus.FieldLogger) error {
 	return nil
 }
 
-func EnsureMachineID(fs host.FileSystem, logger logrus.FieldLogger) error {
+func EnsureMachineID(fs host.FileSystem, logger *slog.Logger) error {
 	if err := host.ExecuteIfNotExist(fs, machineIDFile, func() error {
 		id := uuid.New()
-		logger.WithFields(logrus.Fields{
-			"uuid":     id,
-			"filename": machineIDFile,
-		}).Info("Generating machine ID...")
+		logger.Debug("Generating machine ID...", "uuid", id, "filename", machineIDFile)
 
 		if err := fs.WriteFile(
 			machineIDFile,

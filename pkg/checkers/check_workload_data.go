@@ -2,9 +2,9 @@
 package checkers
 
 import (
+	"log/slog"
 	"time"
 
-	"github.com/sirupsen/logrus"
 	kubeadmConstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
@@ -136,7 +136,7 @@ func CreateCheckWorkloadData(
 	ikniteConfig *v1alpha1.IkniteClusterSpec,
 	waitOptions *utils.WaitOptions,
 	alpineHost host.Host,
-	logger logrus.FieldLogger,
+	logger *slog.Logger,
 ) check.CheckData {
 	return &checkWorkloadData{
 		ikniteConfig: ikniteConfig,

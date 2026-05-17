@@ -113,7 +113,7 @@ func TestRunKubeletStart_Errors(t *testing.T) {
 		t.Parallel()
 		req := require.New(t)
 		m := mockData.NewMockKubeletStartData(t)
-		m.EXPECT().Logger().Return(newTestLogger(t)).Once()
+		m.EXPECT().Logger().Return(testutil.TestLogger(t)).Once()
 		dir := "/dev/null"
 		m.EXPECT().KubeletDir().Return(dir).Once()
 		cfg, err := createInitConfiguration()

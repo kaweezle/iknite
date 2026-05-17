@@ -18,14 +18,16 @@ package util
 
 import (
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
 
-	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
+
+	"github.com/kaweezle/iknite/pkg/utils"
 )
 
 const (
@@ -170,13 +172,13 @@ func toStringSlice(val any) ([]string, error) {
 }
 
 // BindFlagValue applies the viper config value to the flag when the flag is not set and viper has a value.
-func BindFlagValue(f *pflag.Flag, v *viper.Viper, viperName string, logger logrus.FieldLogger) error {
+func BindFlagValue(f *pflag.Flag, v *viper.Viper, viperName string, logger *slog.Logger) error {
 	// Apply the viper config value to the flag when the flag is not set and viper has a value
 	if f.Changed || !v.IsSet(viperName) {
-		logger.WithFields(logrus.Fields{
-			optionKey: f.Name,
-			viperKey:  viperName,
-		}).Trace("skipping applying viper config to flag because flag is already set or viper key is not set")
+		logger.With(
+			optionKey, f.Name,
+			viperKey, viperName,
+		).Debug("skipping applying viper config to flag because flag is already set or viper key is not set")
 		return nil
 	}
 	val := v.Get(viperName)
@@ -184,19 +186,23 @@ func BindFlagValue(f *pflag.Flag, v *viper.Viper, viperName string, logger logru
 	if vi, ok := f.Value.(pflag.SliceValue); ok {
 		stringValues, err := toStringSlice(val)
 		if err != nil {
-			logger.WithFields(logrus.Fields{
-				optionKey: f.Name,
-				viperKey:  viperName,
-				valueKey:  val,
-			}).WithError(err).Error("error converting options")
+			logger.Error(
+				"error converting options",
+				optionKey, f.Name,
+				viperKey, viperName,
+				valueKey, val,
+				utils.ErrorKey, err,
+			)
 			return fmt.Errorf("while getting viper array value for %s: %w", viperName, err)
 		}
 		if err := vi.Replace(stringValues); err != nil {
-			logger.WithFields(logrus.Fields{
-				optionKey: f.Name,
-				viperKey:  viperName,
-				valueKey:  val,
-			}).WithError(err).Error("error replacing options")
+			logger.Error(
+				"error replacing options",
+				optionKey, f.Name,
+				viperKey, viperName,
+				valueKey, val,
+				utils.ErrorKey, err,
+			)
 			return fmt.Errorf(
 				"while replacing viper array value for %s from viper key %s with value %v: %w",
 				f.Name,
@@ -207,11 +213,13 @@ func BindFlagValue(f *pflag.Flag, v *viper.Viper, viperName string, logger logru
 		}
 	} else {
 		if err := f.Value.Set(fmt.Sprintf("%v", val)); err != nil {
-			logger.WithFields(logrus.Fields{
-				optionKey: f.Name,
-				viperKey:  viperName,
-				valueKey:  val,
-			}).WithError(err).Error("error replacing options")
+			logger.Error(
+				"error replacing options",
+				optionKey, f.Name,
+				viperKey, viperName,
+				valueKey, val,
+				utils.ErrorKey, err,
+			)
 			return fmt.Errorf(
 				"while setting viper value for %s from viper key %s with value %v: %w",
 				f.Name,
@@ -224,9 +232,9 @@ func BindFlagValue(f *pflag.Flag, v *viper.Viper, viperName string, logger logru
 	return nil
 }
 
-type binderFunc func(f *pflag.Flag, v *viper.Viper, viperName string, logger logrus.FieldLogger) error
+type binderFunc func(f *pflag.Flag, v *viper.Viper, viperName string, logger *slog.Logger) error
 
-func BindFlag(f *pflag.Flag, v *viper.Viper, viperName string, _ logrus.FieldLogger) error {
+func BindFlag(f *pflag.Flag, v *viper.Viper, viperName string, _ *slog.Logger) error {
 	return v.BindPFlag(viperName, f) //nolint:wrapcheck // no added value from wrapping error
 }
 
@@ -236,7 +244,7 @@ func BindFlagSet(
 	v *viper.Viper,
 	prefix string,
 	binder binderFunc,
-	logger logrus.FieldLogger,
+	logger *slog.Logger,
 ) {
 	flagSet.VisitAll(func(f *pflag.Flag) {
 		if !FlagShouldSkipViperBind(f) {
@@ -244,10 +252,12 @@ func BindFlagSet(
 			// keys with underscores, e.g. --favorite-color to STING_FAVORITE_COLOR
 			viperName := GetFlagViperName(f, prefix)
 			if err := binder(f, v, viperName, logger); err != nil {
-				logger.WithFields(logrus.Fields{
-					optionKey: f.Name,
-					viperKey:  viperName,
-				}).WithError(err).Error("error binding flag to viper")
+				logger.Error(
+					"error binding flag to viper",
+					optionKey, f.Name,
+					viperKey, viperName,
+					utils.ErrorKey, err,
+				)
 			}
 		}
 	})
@@ -310,7 +320,7 @@ func InitializeConfiguration(rootCmd *cobra.Command, cmdIf CmdInterface) error {
 		if baseDir, err := GetBaseDirectory(); err == nil {
 			v.AddConfigPath(baseDir) // adding current directory as first search path
 		} else {
-			logger.WithError(err).Warn("could not determine base directory for config file search, skipping")
+			logger.Warn("could not determine base directory for config file search, skipping", utils.ErrorKey, err)
 		}
 	}
 
@@ -320,7 +330,7 @@ func InitializeConfiguration(rootCmd *cobra.Command, cmdIf CmdInterface) error {
 
 	// If a config file is found, read it in.
 	if err := v.ReadInConfig(); err != nil {
-		logger.WithError(err).Debug("could not read config file, skipping")
+		logger.Debug("could not read config file, skipping", utils.ErrorKey, err)
 	}
 	ApplyViperConfigToFlags(rootCmd, cmdIf)
 	return nil

@@ -28,7 +28,6 @@ import (
 	"time"
 	_ "unsafe"
 
-	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	flag "github.com/spf13/pflag"
 	metaV1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -188,8 +187,7 @@ func newCmdInit(
 				return errors.New("invalid data struct")
 			}
 
-			data.Logger().WithField("phase", "init").
-				Infof("Using Kubernetes version: %s", data.cfg.KubernetesVersion)
+			data.Logger().Info("Kubernetes version", "phase", "init", "version", data.cfg.KubernetesVersion)
 
 			return initRunner.Run(args)
 		},
@@ -205,7 +203,7 @@ func newCmdInit(
 			}
 			// Stop the status server if it was started
 			if shutdownErr := data.RunShutdownHooks(); shutdownErr != nil {
-				data.Logger().WithError(shutdownErr).Warn("Failed to stop iknite status server")
+				data.Logger().Warn("Failed to stop iknite status server", utils.ErrorKey, shutdownErr)
 			}
 			// Stop the kubelet process if it was started
 			kubeletProcess := data.KubeletProcess()
@@ -631,10 +629,7 @@ func WrapPhase(
 			phaseName := PhaseName(p, parentPhases)
 			data.UpdateIkniteCluster(state, phaseName, nil, nil)
 
-			data.Logger().WithFields(logrus.Fields{
-				"phase": phaseName,
-				"state": state.String(),
-			}).Infof("Running phase %s...", phaseName)
+			data.Logger().Info("Running phase...", "phase", phaseName, "state", state.String())
 
 			return oldRun(c)
 		}

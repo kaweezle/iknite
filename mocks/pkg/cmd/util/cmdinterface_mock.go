@@ -5,7 +5,8 @@
 package util
 
 import (
-	"github.com/sirupsen/logrus"
+	"log/slog"
+
 	"github.com/spf13/viper"
 	mock "github.com/stretchr/testify/mock"
 )
@@ -38,19 +39,19 @@ func (_m *MockCmdInterface) EXPECT() *MockCmdInterface_Expecter {
 }
 
 // Logger provides a mock function for the type MockCmdInterface
-func (_mock *MockCmdInterface) Logger() logrus.FieldLogger {
+func (_mock *MockCmdInterface) Logger() *slog.Logger {
 	ret := _mock.Called()
 
 	if len(ret) == 0 {
 		panic("no return value specified for Logger")
 	}
 
-	var r0 logrus.FieldLogger
-	if returnFunc, ok := ret.Get(0).(func() logrus.FieldLogger); ok {
+	var r0 *slog.Logger
+	if returnFunc, ok := ret.Get(0).(func() *slog.Logger); ok {
 		r0 = returnFunc()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(logrus.FieldLogger)
+			r0 = ret.Get(0).(*slog.Logger)
 		}
 	}
 	return r0
@@ -73,12 +74,12 @@ func (_c *MockCmdInterface_Logger_Call) Run(run func()) *MockCmdInterface_Logger
 	return _c
 }
 
-func (_c *MockCmdInterface_Logger_Call) Return(fieldLogger logrus.FieldLogger) *MockCmdInterface_Logger_Call {
-	_c.Call.Return(fieldLogger)
+func (_c *MockCmdInterface_Logger_Call) Return(logger *slog.Logger) *MockCmdInterface_Logger_Call {
+	_c.Call.Return(logger)
 	return _c
 }
 
-func (_c *MockCmdInterface_Logger_Call) RunAndReturn(run func() logrus.FieldLogger) *MockCmdInterface_Logger_Call {
+func (_c *MockCmdInterface_Logger_Call) RunAndReturn(run func() *slog.Logger) *MockCmdInterface_Logger_Call {
 	_c.Call.Return(run)
 	return _c
 }

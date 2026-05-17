@@ -22,10 +22,10 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	_ "unsafe"
 
-	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	flag "github.com/spf13/pflag"
 	metaV1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -93,7 +93,7 @@ type resetData struct {
 	cleanupTmpDir         bool
 	ikniteCluster         *v1alpha1.IkniteCluster
 	alpineHost            host.Host
-	logger                logrus.FieldLogger
+	logger                *slog.Logger
 }
 
 var _ iknitePhases.IkniteResetData = (*resetData)(nil)
@@ -386,6 +386,6 @@ func (r *resetData) Host() host.Host {
 	return r.alpineHost
 }
 
-func (r *resetData) Logger() logrus.FieldLogger {
+func (r *resetData) Logger() *slog.Logger {
 	return r.logger
 }

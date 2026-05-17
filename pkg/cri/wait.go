@@ -19,12 +19,12 @@ package cri
 import (
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"time"
-
-	"github.com/sirupsen/logrus"
 
 	"github.com/kaweezle/iknite/pkg/constants"
 	"github.com/kaweezle/iknite/pkg/host"
+	"github.com/kaweezle/iknite/pkg/utils"
 )
 
 // cSpell: enable
@@ -44,7 +44,7 @@ type CRIStatusResponse struct {
 	Status CRIStatus `json:"status"`
 }
 
-func WaitForContainerService(fs host.FileSystem, exec host.Executor, logger logrus.FieldLogger) (bool, error) {
+func WaitForContainerService(fs host.FileSystem, exec host.Executor, logger *slog.Logger) (bool, error) {
 	retries := 3
 	first := true
 	serviceIsReady := false
@@ -64,16 +64,13 @@ func WaitForContainerService(fs host.FileSystem, exec host.Executor, logger logr
 			)
 		}
 		if !exist {
-			logger.Debugf(
-				"Container service sock %s does not exist yet",
-				constants.ContainerServiceSock,
-			)
+			logger.Debug("Container service socket does not exist yet", "socket", constants.ContainerServiceSock)
 			continue
 		}
 		out, err := exec.Run(false, "/usr/bin/crictl", "--runtime-endpoint",
 			"unix://"+constants.ContainerServiceSock, "info")
 		if err != nil {
-			logrus.WithError(err).Warn("Error while checking container service sock")
+			logger.Warn("Error while checking container service sock", utils.ErrorKey, err)
 			continue
 		}
 		logger.Debug(string(out))
@@ -93,7 +90,7 @@ func WaitForContainerService(fs host.FileSystem, exec host.Executor, logger logr
 				break
 			}
 		} else {
-			logger.WithError(err).Warn("Error while parsing crictl status")
+			logger.Warn("Error while parsing crictl status", utils.ErrorKey, err)
 		}
 	}
 	return serviceIsReady, nil

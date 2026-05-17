@@ -22,11 +22,11 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"path"
 	"path/filepath"
 
-	"github.com/sirupsen/logrus"
 	"k8s.io/klog/v2"
 	kubeadmApiV1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
@@ -77,7 +77,7 @@ func runCleanupConfig(c workflow.RunData) error {
 			dirsToClean = append(dirsToClean, kubeletRunDirectory)
 		}
 	} else {
-		logger.Infof("[reset] Would clean directory %q\n", kubeadmConstants.KubeletRunDirectory)
+		logger.Info("[reset] Would clean directory", "directory", kubeadmConstants.KubeletRunDirectory)
 	}
 
 	certsDir := r.CertificatesDir()
@@ -111,7 +111,7 @@ func runCleanupConfig(c workflow.RunData) error {
 	return nil
 }
 
-func CleanConfig(fs host.FileSystem, isDryRun bool, logger logrus.FieldLogger) {
+func CleanConfig(fs host.FileSystem, isDryRun bool, logger *slog.Logger) {
 	dirsToClean := []string{
 		filepath.Join(kubeadmConstants.KubernetesDir, kubeadmConstants.ManifestsSubDirName),
 		kubeadmConstants.KubeletRunDirectory,
@@ -126,17 +126,17 @@ func resetConfigDir(
 	configPathDir string,
 	dirsToClean []string,
 	isDryRun bool,
-	logger logrus.FieldLogger,
+	logger *slog.Logger,
 ) {
 	if !isDryRun {
-		logger.Infof("[reset] Deleting contents of directories: %v\n", dirsToClean)
+		logger.Info("[reset] Deleting contents of directories", "directories", dirsToClean)
 		for _, dir := range dirsToClean {
 			if err := CleanDir(fs, dir); err != nil {
 				klog.Warningf("[reset] Failed to delete contents of %q directory: %v", dir, err)
 			}
 		}
 	} else {
-		logger.Infof("[reset] Would delete contents of directories: %v\n", dirsToClean)
+		logger.Info("[reset] Would delete contents of directories", "directories", dirsToClean)
 	}
 
 	filesToClean := []string{
@@ -149,14 +149,14 @@ func resetConfigDir(
 	}
 
 	if !isDryRun {
-		logger.Infof("[reset] Deleting files: %v\n", filesToClean)
+		logger.Info("[reset] Deleting files", "files", filesToClean)
 		for _, path := range filesToClean {
 			if err := fs.RemoveAll(path); err != nil {
 				klog.Warningf("[reset] Failed to remove file: %q [%v]\n", path, err)
 			}
 		}
 	} else {
-		logger.Infof("[reset] Would delete files: %v\n", filesToClean)
+		logger.Info("[reset] Would delete files", "files", filesToClean)
 	}
 }
 

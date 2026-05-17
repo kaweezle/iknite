@@ -9,13 +9,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net"
 	"os"
 	"sort"
 	"strings"
 	"time"
 
-	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -43,6 +43,7 @@ import (
 	"github.com/kaweezle/iknite/pkg/cmd/util"
 	"github.com/kaweezle/iknite/pkg/host"
 	"github.com/kaweezle/iknite/pkg/testutil"
+	"github.com/kaweezle/iknite/pkg/utils"
 )
 
 // cSpell: enable
@@ -347,7 +348,7 @@ func ApplyResMapWithServerSideApply(client resource.RESTClientGetter, resources 
 	return ids, nil
 }
 
-func AllWorkloadStates(client resource.RESTClientGetter, logger logrus.FieldLogger) ([]*v1alpha1.WorkloadState, error) {
+func AllWorkloadStates(client resource.RESTClientGetter, logger *slog.Logger) ([]*v1alpha1.WorkloadState, error) {
 	resourceTypes := []string{"deployments", "statefulsets", "daemonsets", "applications"}
 
 	mapper, err := client.ToRESTMapper()
@@ -409,7 +410,7 @@ type WorkloadStateCallbackFunc func(allReady bool, total int, ready []*v1alpha1.
 
 func WorkloadsReadyConditionWithContextFunc(
 	client resource.RESTClientGetter,
-	logger logrus.FieldLogger,
+	logger *slog.Logger,
 	callback WorkloadStateCallbackFunc,
 ) wait.ConditionWithContextFunc {
 	iteration := 0
@@ -430,13 +431,16 @@ func WorkloadsReadyConditionWithContextFunc(
 				ready = append(ready, state)
 			}
 		}
-		util.LoggerFromContext(ctx).WithFields(logrus.Fields{
-			"total":        len(states),
-			"ready":        len(ready),
-			"unready":      len(unready),
-			"okIterations": okIterations,
-		}).Infof("Workloads total: %d, ready: %d, unready:%d, okIterations: %d", len(states), len(ready), len(unready),
-			okIterations)
+		util.LoggerFromContext(ctx).
+			Info(
+				fmt.Sprintf(
+					"Workloads total: %d, ready: %d, unready:%d, okIterations: %d",
+					len(states), len(ready), len(unready), okIterations),
+				"total", len(states),
+				"ready", len(ready),
+				"unready", len(unready),
+				"okIterations", okIterations,
+			)
 		if allReady {
 			okIterations++
 		}
@@ -450,7 +454,7 @@ func WorkloadsReadyConditionWithContextFunc(
 	}
 }
 
-func InClusterConfig(fs host.FileSystem, logger logrus.FieldLogger) (*rest.Config, error) {
+func InClusterConfig(fs host.FileSystem, logger *slog.Logger) (*rest.Config, error) {
 	const (
 		tokenFile  = "/var/run/secrets/kubernetes.io/serviceaccount/token" //nolint:gosec // From client-go
 		rootCAFile = "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
@@ -469,11 +473,11 @@ func InClusterConfig(fs host.FileSystem, logger logrus.FieldLogger) (*rest.Confi
 
 	pemBlock, err := fs.ReadFile(rootCAFile)
 	if err != nil {
-		logger.Errorf("Expected to load root CA config from %s, but got err: %v", rootCAFile, err)
+		logger.Error("Error while trying to load root CA config", "file", rootCAFile, utils.ErrorKey, err)
 	} else {
 		_, err := cert.NewPoolFromBytes(pemBlock)
 		if err != nil {
-			logger.Errorf("Expected to parse root CA config from %s, but got err: %v", rootCAFile, err)
+			logger.Error("Error while trying to parse root CA config", "file", rootCAFile, utils.ErrorKey, err)
 		} else {
 			// Only set the CA data if it can be parsed successfully,
 			// otherwise the client will fail to connect to the API server.

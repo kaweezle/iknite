@@ -19,10 +19,10 @@ package cmd
 
 import (
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 
-	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
@@ -146,7 +146,7 @@ func performImages(
 	fs host.FileSystem,
 	ikniteConfig *v1alpha1.IkniteClusterSpec,
 	kustomizeOptions *utils.KustomizeOptions,
-	logger logrus.FieldLogger,
+	logger *slog.Logger,
 ) {
 	containerImages, err := config.GetIkniteImages(fs, ikniteConfig, kustomizeOptions.ForceEmbedded, logger)
 	cobra.CheckErr(err)

@@ -4,9 +4,8 @@ package utils
 import (
 	"errors"
 	"fmt"
+	"log/slog"
 	"sync"
-
-	"github.com/sirupsen/logrus"
 )
 
 type hook struct {
@@ -25,7 +24,7 @@ type HookManager struct {
 	mu    sync.Mutex
 }
 
-func NewHookManager(log logrus.FieldLogger) *HookManager {
+func NewHookManager(log *slog.Logger) *HookManager {
 	return &HookManager{
 		LogEnabled: LogEnabled{LogEntry: log},
 	}
@@ -50,7 +49,7 @@ func (m *HookManager) Run() error {
 			defer wg.Done()
 			if err := h.fn(); err != nil {
 				errs <- hookError{name: h.name, err: err}
-				m.Logger().WithField("hook", h.name).WithError(err).Error("Error while running hook")
+				m.Logger().Error("Error while running hook", "hook", h.name, ErrorKey, err)
 			}
 		}(h)
 	}

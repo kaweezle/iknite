@@ -4,8 +4,8 @@ package init
 import (
 	"context"
 	"fmt"
+	"log/slog"
 
-	"github.com/sirupsen/logrus"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 
 	"github.com/kaweezle/iknite/pkg/apis/iknite"
@@ -24,7 +24,7 @@ func NewDaemonizePhase() workflow.Phase {
 	}
 }
 
-func WaitForKubelet(ctx context.Context, process host.Process, logger logrus.FieldLogger) error {
+func WaitForKubelet(ctx context.Context, process host.Process, logger *slog.Logger) error {
 	cmdDone := make(chan error, 1)
 	go func() {
 		cmdDone <- process.Wait()
@@ -42,7 +42,7 @@ func WaitForKubelet(ctx context.Context, process host.Process, logger logrus.Fie
 
 		case err = <-cmdDone:
 			// Child process has stopped
-			logger.Infof("Kubelet stopped with state: %s", process.State().String())
+			logger.Info("Kubelet stopped", "state", process.State().String())
 			alive = false
 		}
 	}
@@ -82,18 +82,18 @@ func runDaemonize(c workflow.RunData) error {
 		// Prevent double stop
 		data.SetKubeletProcess(nil)
 	} else {
-		logger.WithError(err).Warn("Error while waiting for kubelet to stop")
+		logger.Warn("Error while waiting for kubelet to stop", utils.ErrorKey, err)
 	}
 
 	err = data.RunShutdownHooks()
 	if err != nil {
-		logger.WithError(err).Warn("Error running shutdown hooks")
+		logger.Warn("Error running shutdown hooks", utils.ErrorKey, err)
 	}
 	cleaner := k8s.NewCleaner(data.Host(), logger, &data.IkniteCluster().Spec, false)
 
 	err = cleaner.CleanAll(true, false, false)
 	if err != nil {
-		logger.WithError(err).Warn("Error during cleanup after kubelet stopped")
+		logger.Warn("Error during cleanup after kubelet stopped", utils.ErrorKey, err)
 	}
 	data.UpdateIkniteCluster(iknite.Stopped, "", nil, nil)
 	return nil

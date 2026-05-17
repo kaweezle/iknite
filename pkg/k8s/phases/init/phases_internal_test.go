@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// cSpell: words LBIP
+// cSpell: words LBIP testutil
 package init
 
 import (
@@ -32,6 +32,7 @@ import (
 
 	mockHost "github.com/kaweezle/iknite/mocks/pkg/host"
 	"github.com/kaweezle/iknite/pkg/host"
+	"github.com/kaweezle/iknite/pkg/testutil"
 )
 
 func TestPhaseConstructors(t *testing.T) {
@@ -139,7 +140,7 @@ func TestCopyFile(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			req := require.New(t)
-			logger := newTestLogger(t)
+			logger := testutil.TestLogger(t)
 
 			fs := host.NewOsFS()
 			src, dst := tt.prepare(t)
@@ -165,7 +166,7 @@ func TestWaitForKubelet_ProcessStop(t *testing.T) {
 	process.On("Wait").Return(nil).Once()
 	process.On("State").Return(&os.ProcessState{})
 
-	logger := newTestLogger(t)
+	logger := testutil.TestLogger(t)
 	err := WaitForKubelet(context.Background(), process, logger)
 	req.NoError(err)
 }
@@ -186,7 +187,7 @@ func TestWaitForKubelet_CtxDone(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel() // Cancel the context immediately
 
-	logger := newTestLogger(t)
+	logger := testutil.TestLogger(t)
 	err := WaitForKubelet(ctx, process, logger)
 	req.NoError(err)
 }
@@ -204,7 +205,7 @@ func TestWaitForKubelet_CtxDoneWithWaitError(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel() // Cancel the context immediately
-	logger := newTestLogger(t)
+	logger := testutil.TestLogger(t)
 
 	err := WaitForKubelet(ctx, process, logger)
 	req.Error(err)
@@ -224,7 +225,7 @@ func TestWaitForKubelet_CtxDoneWithSignalError(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel() // Cancel the context immediately
-	logger := newTestLogger(t)
+	logger := testutil.TestLogger(t)
 
 	err := WaitForKubelet(ctx, process, logger)
 	req.Error(err)
@@ -244,7 +245,7 @@ func TestWaitForKubelet_CtxDoneWithSignalAndWaitError(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel() // Cancel the context immediately
-	logger := newTestLogger(t)
+	logger := testutil.TestLogger(t)
 
 	err := WaitForKubelet(ctx, process, logger)
 	req.Error(err)

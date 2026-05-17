@@ -3,9 +3,9 @@ package init
 // cSpell: disable
 import (
 	"fmt"
+	"log/slog"
 	"path/filepath"
 
-	"github.com/sirupsen/logrus"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 
 	"github.com/kaweezle/iknite/pkg/constants"
@@ -77,7 +77,7 @@ func runCopyConfig(c workflow.RunData) error {
 // copyAdminConf loads the admin kubeconfig from /etc/kubernetes/admin.conf,
 // renames the cluster/context/user to clusterName, and writes the result to
 // /root/.kube/config.
-func copyAdminConf(fs host.FileSystem, clusterName string, logger logrus.FieldLogger) error {
+func copyAdminConf(fs host.FileSystem, clusterName string, logger *slog.Logger) error {
 	k8sConfig, err := k8s.LoadFromDefault(fs)
 	if err != nil {
 		return fmt.Errorf("failed to load admin kubeconfig: %w", err)
@@ -88,12 +88,12 @@ func copyAdminConf(fs host.FileSystem, clusterName string, logger logrus.FieldLo
 		return fmt.Errorf("failed to write kubeconfig to %s: %w", constants.KubernetesRootConfig, err)
 	}
 
-	logger.WithField("dest", constants.KubernetesRootConfig).Info("admin.conf copied")
+	logger.Info("admin.conf copied", "dest", constants.KubernetesRootConfig)
 	return nil
 }
 
 // copyFile copies the file at src to dst, creating parent directories as needed.
-func copyFile(fs host.FileSystem, src, dst string, logger logrus.FieldLogger) error {
+func copyFile(fs host.FileSystem, src, dst string, logger *slog.Logger) error {
 	data, err := fs.ReadFile(src)
 	if err != nil {
 		return fmt.Errorf("failed to read %s: %w", src, err)
@@ -107,6 +107,6 @@ func copyFile(fs host.FileSystem, src, dst string, logger logrus.FieldLogger) er
 		return fmt.Errorf("failed to write %s: %w", dst, err)
 	}
 
-	logger.WithFields(logrus.Fields{"src": src, "dest": dst}).Info("config file copied")
+	logger.Info("config file copied", "src", src, "dest", dst)
 	return nil
 }

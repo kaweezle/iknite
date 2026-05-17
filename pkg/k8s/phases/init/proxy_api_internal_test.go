@@ -5,12 +5,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net"
 	"strconv"
 	"testing"
 	"time"
 
-	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sync/errgroup"
@@ -30,7 +30,7 @@ type proxyAPIPhaseData struct {
 	cluster     *v1alpha1.IkniteCluster
 	cfg         *kubeadmApi.InitConfiguration
 	errGroup    *errgroup.Group
-	logger      logrus.FieldLogger
+	logger      *slog.Logger
 	hookManager utils.HookManager
 }
 
@@ -65,7 +65,7 @@ func (d *proxyAPIPhaseData) RunShutdownHooks() error {
 	return nil
 }
 
-func (d *proxyAPIPhaseData) Logger() logrus.FieldLogger {
+func (d *proxyAPIPhaseData) Logger() *slog.Logger {
 	return d.logger
 }
 
@@ -110,12 +110,6 @@ func (l *stubListener) Addr() net.Addr {
 	return l.addr
 }
 
-func newTestLogger(t *testing.T) *logrus.Entry {
-	t.Helper()
-	logger := testutil.TestLogger(t)
-	return logger
-}
-
 func TestProxyAPIPorts_DeduplicatesPositivePorts(t *testing.T) {
 	t.Parallel()
 	req := require.New(t)
@@ -142,7 +136,7 @@ func TestRunProxyAPI_SkipsWhenOutboundMatchesClusterIP(t *testing.T) {
 		host:     mockH,
 		cfg:      &kubeadmApi.InitConfiguration{LocalAPIEndpoint: kubeadmApi.APIEndpoint{BindPort: 6443}},
 		errGroup: &errgroup.Group{},
-		logger:   newTestLogger(t),
+		logger:   testutil.TestLogger(t),
 	}
 
 	req.NoError(runProxyAPI(data))
@@ -162,7 +156,7 @@ func TestRunProxyAPI_FailsWhenOutboundIPLookupFails(t *testing.T) {
 		host:     mockH,
 		cfg:      &kubeadmApi.InitConfiguration{LocalAPIEndpoint: kubeadmApi.APIEndpoint{BindPort: 6443}},
 		errGroup: &errgroup.Group{},
-		logger:   newTestLogger(t),
+		logger:   testutil.TestLogger(t),
 	}
 
 	err := runProxyAPI(data)
@@ -185,7 +179,7 @@ func TestRunProxyAPI_FailsWhenListenerCannotStart(t *testing.T) {
 		cfg:      &kubeadmApi.InitConfiguration{LocalAPIEndpoint: kubeadmApi.APIEndpoint{BindPort: 6443}},
 		errGroup: &errgroup.Group{},
 		ctx:      t.Context(),
-		logger:   newTestLogger(t),
+		logger:   testutil.TestLogger(t),
 	}
 
 	err := runProxyAPI(data)
@@ -199,7 +193,7 @@ func TestServeProxyAPIListener_ReturnsAcceptError(t *testing.T) {
 	listener := newStubListener(&net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: 12345})
 	listener.acceptErr = errors.New("accept failed")
 	nh := host.NewDefaultNetworkHost()
-	logger := newTestLogger(t)
+	logger := testutil.TestLogger(t)
 
 	err := serveProxyAPIListener(t.Context(), nh, listener, "127.0.0.2:12345", logger)
 	req.ErrorContains(err, "accept on 127.0.0.1:12345")
@@ -215,7 +209,7 @@ func TestCloseProxyAPIListeners_CollectsErrors(t *testing.T) {
 	failingListener := newStubListener(&net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: 2})
 	failingListener.closeErr = errors.New("close failed")
 
-	logger := newTestLogger(t)
+	logger := testutil.TestLogger(t)
 
 	err := closeProxyAPIListeners([]net.Listener{closedListener, failingListener}, logger)
 	req.ErrorContains(err, "close failed")
@@ -224,7 +218,7 @@ func TestCloseProxyAPIListeners_CollectsErrors(t *testing.T) {
 func TestProxyAPIConnection_DialFailureClosesClient(t *testing.T) {
 	t.Parallel()
 	req := require.New(t)
-	logger := newTestLogger(t)
+	logger := testutil.TestLogger(t)
 
 	mockH := mockHost.NewMockHost(t)
 	mockH.EXPECT().DialTimeout(mock.Anything, "tcp", "127.0.0.2:6443", proxyAPIDialTimeout).
@@ -290,7 +284,7 @@ func TestRunProxyAPI_ForwardsTrafficAndStops(t *testing.T) {
 		},
 		errGroup: &errgroup.Group{},
 		ctx:      t.Context(),
-		logger:   newTestLogger(t),
+		logger:   testutil.TestLogger(t),
 	}
 
 	req.NoError(runProxyAPI(data))

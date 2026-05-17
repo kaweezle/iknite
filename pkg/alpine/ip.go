@@ -4,9 +4,9 @@ package alpine
 // cSpell: disable
 import (
 	"fmt"
+	"log/slog"
 	"net"
 
-	"github.com/sirupsen/logrus"
 	"github.com/txn2/txeh"
 
 	"github.com/kaweezle/iknite/pkg/host"
@@ -18,14 +18,11 @@ import (
 //
 // It uses the default mask of the IP address class as the mask, and the default
 // broadcast address as the broadcast address.
-func AddIpAddress(exec host.Executor, iface string, address net.IP, logger logrus.FieldLogger) error {
+func AddIpAddress(exec host.Executor, iface string, address net.IP, logger *slog.Logger) error {
 	ones, _ := address.DefaultMask().Size()
 	ipWithMask := fmt.Sprintf("%v/%d", address, ones)
 
-	logger.WithFields(logrus.Fields{
-		"ip":    ipWithMask,
-		"iface": iface,
-	}).Info("Adding IP address")
+	logger.Debug("Adding IP address", "ip", ipWithMask, "iface", iface)
 
 	parameters := []string{
 		"addr",

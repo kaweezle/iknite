@@ -6,10 +6,10 @@ package init
 
 import (
 	"context"
+	"log/slog"
 
 	"github.com/kaweezle/iknite/pkg/apis/iknite"
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
-	"github.com/sirupsen/logrus"
 	mock "github.com/stretchr/testify/mock"
 	"golang.org/x/sync/errgroup"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
@@ -181,19 +181,19 @@ func (_c *MockMonitorData_IkniteCluster_Call) RunAndReturn(run func() *v1alpha1.
 }
 
 // Logger provides a mock function for the type MockMonitorData
-func (_mock *MockMonitorData) Logger() logrus.FieldLogger {
+func (_mock *MockMonitorData) Logger() *slog.Logger {
 	ret := _mock.Called()
 
 	if len(ret) == 0 {
 		panic("no return value specified for Logger")
 	}
 
-	var r0 logrus.FieldLogger
-	if returnFunc, ok := ret.Get(0).(func() logrus.FieldLogger); ok {
+	var r0 *slog.Logger
+	if returnFunc, ok := ret.Get(0).(func() *slog.Logger); ok {
 		r0 = returnFunc()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(logrus.FieldLogger)
+			r0 = ret.Get(0).(*slog.Logger)
 		}
 	}
 	return r0
@@ -216,12 +216,12 @@ func (_c *MockMonitorData_Logger_Call) Run(run func()) *MockMonitorData_Logger_C
 	return _c
 }
 
-func (_c *MockMonitorData_Logger_Call) Return(fieldLogger logrus.FieldLogger) *MockMonitorData_Logger_Call {
-	_c.Call.Return(fieldLogger)
+func (_c *MockMonitorData_Logger_Call) Return(logger *slog.Logger) *MockMonitorData_Logger_Call {
+	_c.Call.Return(logger)
 	return _c
 }
 
-func (_c *MockMonitorData_Logger_Call) RunAndReturn(run func() logrus.FieldLogger) *MockMonitorData_Logger_Call {
+func (_c *MockMonitorData_Logger_Call) RunAndReturn(run func() *slog.Logger) *MockMonitorData_Logger_Call {
 	_c.Call.Return(run)
 	return _c
 }

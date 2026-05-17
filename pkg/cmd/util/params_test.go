@@ -4,11 +4,10 @@ package util_test
 import (
 	"errors"
 	"fmt"
-	"io"
+	"log/slog"
 	"os"
 	"testing"
 
-	"github.com/sirupsen/logrus"
 	logTest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -17,15 +16,17 @@ import (
 
 	"github.com/kaweezle/iknite/pkg/cmd/util"
 	"github.com/kaweezle/iknite/pkg/testutil"
+	"github.com/kaweezle/iknite/pkg/utils"
 )
 
 //nolint:unparam // TODO: check on the hook the messages
 func createTestCmdInterface(t *testing.T) (util.CmdInterface, *logTest.Hook) {
 	t.Helper()
 	cmdIf := util.NewCmdInterface()
-	e := cmdIf.Logger().WithField("test", "test")
-	e.Logger.Out = io.Discard
-	hook := logTest.NewLocal(e.Logger)
+	loggerHolder, ok := cmdIf.(utils.LoggerHolder)
+	require.True(t, ok, "CmdInterface's Logger should implement LoggerHolder")
+	logger, hook := testutil.TestLoggerWithHook(t)
+	loggerHolder.SetLogger(logger)
 	t.Cleanup(func() {
 		hook.Reset()
 	})
@@ -422,7 +423,7 @@ func TestBindFlags_ContinuesWhenBinderReturnsError(t *testing.T) {
 	cmd.Flags().String("my-flag", "default", "test flag")
 
 	called := map[string]string{}
-	binder := func(f *pflag.Flag, _ *viper.Viper, viperName string, _ logrus.FieldLogger) error {
+	binder := func(f *pflag.Flag, _ *viper.Viper, viperName string, _ *slog.Logger) error {
 		called[f.Name] = viperName
 		return fmt.Errorf("bind %s: %w", f.Name, errors.New("boom"))
 	}

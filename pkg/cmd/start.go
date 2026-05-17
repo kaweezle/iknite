@@ -22,7 +22,6 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
 	"github.com/kaweezle/iknite/pkg/alpine"
@@ -82,19 +81,19 @@ func IsIkniteReady(ctx context.Context, fs host.FileSystem) (bool, error) {
 		return false, nil
 	}
 	logger := util.LoggerFromContext(ctx)
-	logger.WithFields(logrus.Fields{
-		"state":   cluster.Status.State.String(),
-		"phase":   cluster.Status.CurrentPhase,
-		"total":   cluster.Status.WorkloadsState.Count,
-		"ready":   cluster.Status.WorkloadsState.ReadyCount,
-		"unready": cluster.Status.WorkloadsState.UnreadyCount,
-	}).Infof(
+	logger.Info(fmt.Sprintf(
 		"status=%s, phase=%s, Workloads total=%d, ready=%d, unready=%d",
 		cluster.Status.State.String(),
 		cluster.Status.CurrentPhase,
 		cluster.Status.WorkloadsState.Count,
 		cluster.Status.WorkloadsState.ReadyCount,
 		cluster.Status.WorkloadsState.UnreadyCount,
+	),
+		"state", cluster.Status.State.String(),
+		"phase", cluster.Status.CurrentPhase,
+		"total", cluster.Status.WorkloadsState.Count,
+		"ready", cluster.Status.WorkloadsState.ReadyCount,
+		"unready", cluster.Status.WorkloadsState.UnreadyCount,
 	)
 
 	if cluster.Status.State > iknite.Initializing && cluster.Status.WorkloadsState.Count > 0 {

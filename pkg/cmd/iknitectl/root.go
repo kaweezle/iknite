@@ -60,14 +60,13 @@ func CreateRootCmd(opts *RootOptions) *cobra.Command {
 It provides utilities for managing secrets, building artifacts, and other
 development tasks that are not part of the main iknite binary.`,
 		PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
-			logger := cmdIf.Logger().WithField("cmd", cmd.Name()).Logger
-			opts.SetUpLogs(cmd.OutOrStderr(), logger)
+			opts.SetUpLogs(cmd.OutOrStderr(), cmdIf)
 			err := util.InitializeConfiguration(cmd.Root(), cmdIf)
 			if err != nil {
 				return fmt.Errorf("failed to initialize configuration: %w", err)
 			}
 			// Re-setup logs after configuration is loaded to apply any log-related settings from the config file
-			opts.SetUpLogs(cmd.OutOrStderr(), logger)
+			opts.SetUpLogs(cmd.OutOrStderr(), cmdIf)
 			util.SetCmdInterface(cmd, cmdIf)
 			return nil
 		},

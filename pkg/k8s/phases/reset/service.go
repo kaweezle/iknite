@@ -51,7 +51,7 @@ func runCleanupService(c workflow.RunData) error {
 		return errors.New("cleanup-node phase invoked with an invalid data struct")
 	}
 
-	logger := r.Logger().WithField("phase", "reset")
+	logger := r.Logger().With("phase", "reset")
 
 	// Try to stop the kubelet service
 	logger.Info("Getting the init system...")

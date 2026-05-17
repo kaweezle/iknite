@@ -24,7 +24,6 @@ import (
 	"net/netip"
 
 	"github.com/pion/mdns/v2"
-	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"golang.org/x/net/dns/dnsmessage"
 	"golang.org/x/net/ipv4"
@@ -116,11 +115,7 @@ func performMdns(ctx context.Context, ikniteConfig *v1alpha1.IkniteClusterSpec) 
 	}
 
 	logger := util.LoggerFromContext(ctx)
-	logger.WithFields(logrus.Fields{
-		"domainName": ikniteConfig.DomainName,
-		"addr4":      addr4,
-		"addr6":      addr6,
-	}).Debug("Start mdns responder...")
+	logger.Debug("Start mdns responder...", "domainName", ikniteConfig.DomainName, "addr4", addr4, "addr6", addr6)
 
 	defer conn.Close() //nolint:errcheck // should not fail.
 	<-ctx.Done()

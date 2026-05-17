@@ -5,9 +5,10 @@
 package init
 
 import (
+	"log/slog"
+
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
 	"github.com/kaweezle/iknite/pkg/host"
-	"github.com/sirupsen/logrus"
 	mock "github.com/stretchr/testify/mock"
 )
 
@@ -131,19 +132,19 @@ func (_c *MockServerData_IkniteCluster_Call) RunAndReturn(run func() *v1alpha1.I
 }
 
 // Logger provides a mock function for the type MockServerData
-func (_mock *MockServerData) Logger() logrus.FieldLogger {
+func (_mock *MockServerData) Logger() *slog.Logger {
 	ret := _mock.Called()
 
 	if len(ret) == 0 {
 		panic("no return value specified for Logger")
 	}
 
-	var r0 logrus.FieldLogger
-	if returnFunc, ok := ret.Get(0).(func() logrus.FieldLogger); ok {
+	var r0 *slog.Logger
+	if returnFunc, ok := ret.Get(0).(func() *slog.Logger); ok {
 		r0 = returnFunc()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(logrus.FieldLogger)
+			r0 = ret.Get(0).(*slog.Logger)
 		}
 	}
 	return r0
@@ -166,12 +167,12 @@ func (_c *MockServerData_Logger_Call) Run(run func()) *MockServerData_Logger_Cal
 	return _c
 }
 
-func (_c *MockServerData_Logger_Call) Return(fieldLogger logrus.FieldLogger) *MockServerData_Logger_Call {
-	_c.Call.Return(fieldLogger)
+func (_c *MockServerData_Logger_Call) Return(logger *slog.Logger) *MockServerData_Logger_Call {
+	_c.Call.Return(logger)
 	return _c
 }
 
-func (_c *MockServerData_Logger_Call) RunAndReturn(run func() logrus.FieldLogger) *MockServerData_Logger_Call {
+func (_c *MockServerData_Logger_Call) RunAndReturn(run func() *slog.Logger) *MockServerData_Logger_Call {
 	_c.Call.Return(run)
 	return _c
 }

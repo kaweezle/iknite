@@ -141,9 +141,10 @@ func TestHookManager_ErrorsLogged(t *testing.T) {
 	require.Equal(t, logrus.ErrorLevel, entry.Level)
 	require.Equal(t, "Error while running hook", entry.Message)
 	require.Equal(t, "failing", entry.Data["hook"])
-	errorEntry := entry.Data["error"]
+	errorEntry := entry.Data[ErrorKey]
 	require.NotNil(t, errorEntry)
-	err, ok := errorEntry.(error)
+	attrs, ok := errorEntry.(map[string]any)
 	require.True(t, ok)
-	require.Contains(t, err.Error(), "test fail")
+	require.Contains(t, attrs, ErrorKey)
+	require.Contains(t, attrs[ErrorKey], "test fail")
 }

@@ -24,7 +24,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sirupsen/logrus"
 	appsV1 "k8s.io/api/apps/v1"
 	coreV1 "k8s.io/api/core/v1"
 	k8Errors "k8s.io/apimachinery/pkg/api/errors"
@@ -160,10 +159,7 @@ func CheckClusterRunning(
 	logger := util.LoggerFromContext(ctx)
 	for ; retries > 0; retries-- {
 		if !first {
-			logger.WithFields(logrus.Fields{
-				errKey:      err,
-				"wait_time": interval,
-			}).Debug("Waiting...")
+			logger.Debug("Waiting...", utils.ErrorKey, err, "wait_time", interval)
 			select {
 			case <-ctx.Done():
 				return fmt.Errorf("context canceled: %w", ctx.Err())
@@ -175,17 +171,17 @@ func CheckClusterRunning(
 		var content []byte
 		content, err = query.DoRaw(ctx)
 		if err != nil {
-			logger.WithError(err).Debug("while querying cluster readiness")
+			logger.Debug("while querying cluster readiness", utils.ErrorKey, err)
 			continue
 		}
 
 		contentStr := string(content)
 		if strings.TrimSpace(contentStr) != "ok" {
 			err = fmt.Errorf("cluster health API returned: %s", contentStr)
-			logger.WithError(err).Debug("Bad response")
+			logger.Debug("Bad response", utils.ErrorKey, err)
 		} else {
 			okTries++
-			logger.WithField("okTries", okTries).Trace("Ok response from server")
+			logger.Debug("Ok response from server", "okTries", okTries)
 			if okTries == okResponses {
 				break
 			}
@@ -285,15 +281,13 @@ func Kustomize(
 		return nil
 	}
 
-	logger.WithFields(logrus.Fields{
-		kustKey: options.Kustomization,
-	}).Info("Performing configuration")
+	logger.Info("Performing configuration", kustKey, options.Kustomization)
 
 	resources, err := provision.GetBaseKustomizationResources(fs, options.Kustomization, options.ForceEmbedded, logger)
 	if err != nil {
 		return fmt.Errorf("while getting kustomization resources: %w", err)
 	}
-	logger.WithField("resourceCount", resources.Size()).Info("Applying base kustomization resources")
+	logger.Info("Applying base kustomization resources", "resourceCount", resources.Size())
 
 	ids, err := ApplyResMapWithServerSideApply(kubeClient, resources)
 	if err != nil {
@@ -306,10 +300,7 @@ func Kustomize(
 		return fmt.Errorf("while writing configuration: %w", err)
 	}
 
-	logger.WithFields(logrus.Fields{
-		kustKey:     options.Kustomization,
-		"resources": ids,
-	}).Info("Configuration applied")
+	logger.Info("Configuration applied", kustKey, options.Kustomization, "resources", ids)
 
 	return nil
 }

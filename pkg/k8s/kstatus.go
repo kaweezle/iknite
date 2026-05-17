@@ -6,11 +6,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"sort"
 	"time"
 
 	argoV1 "github.com/argoproj/argo-cd/v3/pkg/apis/application/v1alpha1"
-	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -25,12 +25,13 @@ import (
 
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
 	"github.com/kaweezle/iknite/pkg/host"
+	"github.com/kaweezle/iknite/pkg/utils"
 )
 
 // NewClientFromKubeconfig creates a RESTClientGetter using the default kubeconfig
 // loading rules. If kubeconfigPath is non-empty it is used directly; otherwise KUBECONFIG
 // env var and ~/.kube/config are tried in turn, with a final fall-back to in-cluster config.
-func NewClientFromKubeconfig(fs host.FileSystem, kubeconfigPath string, logger logrus.FieldLogger) (*Client, error) {
+func NewClientFromKubeconfig(fs host.FileSystem, kubeconfigPath string, logger *slog.Logger) (*Client, error) {
 	restConfig, err := InClusterConfig(fs, logger)
 	if err == nil {
 		logger.Info("Using in-cluster configuration")
@@ -84,7 +85,7 @@ func workloadStatesToSlice(infos []*resource.Info) ([]*v1alpha1.WorkloadState, e
 // ValidateResourceTypes checks if the provided resource types are valid by attempting to find their corresponding
 // GroupVersionKind in the REST mapper. It returns a slice of valid resource types and an error if the
 // validation process encounters an issue.
-func ValidateResourceTypes(restMapper meta.RESTMapper, types []string, logger logrus.FieldLogger) ([]string, error) {
+func ValidateResourceTypes(restMapper meta.RESTMapper, types []string, logger *slog.Logger) ([]string, error) {
 	validTypes := make([]string, 0, len(types))
 	noMatchError := &meta.NoResourceMatchError{}
 	for _, t := range types {
@@ -94,24 +95,33 @@ func ValidateResourceTypes(restMapper meta.RESTMapper, types []string, logger lo
 		gvr := schema.GroupVersionResource{Group: "", Version: "", Resource: t}
 		_, err := restMapper.KindFor(gvr)
 		for attempt := 2; err != nil && !errors.Is(err, noMatchError) && attempt <= maxAttempts; attempt++ {
-			logger.WithError(err).WithFields(logrus.Fields{
-				"resourceType": t,
-				"attempt":      attempt,
-			}).Warn("Failed to get resource infos, retrying")
+			logger.Warn(
+				"Failed to get resource infos, retrying",
+				utils.ErrorKey,
+				err,
+				"resourceType",
+				t,
+				"attempt",
+				attempt,
+			)
 			time.Sleep(retryDelay)
 			_, err = restMapper.KindFor(gvr)
 		}
 
 		if err != nil {
 			if errors.Is(err, noMatchError) {
-				logger.WithError(err).
-					WithField("resourceType", t).
-					Warn("Resource type not found in REST mapper, skipping...")
+				logger.Warn(
+					"Resource type not found in REST mapper, skipping...",
+					utils.ErrorKey,
+					err,
+					"resourceType",
+					t,
+				)
 				continue
 			}
 			return nil, fmt.Errorf("while validating resource type %s: %w", t, err)
 		}
-		logger.WithField("resourceType", t).Info("Resource type is available in REST mapper")
+		logger.Info("Resource type is available in REST mapper", "resourceType", t)
 		validTypes = append(validTypes, t)
 	}
 	return validTypes, nil
@@ -161,17 +171,20 @@ func infosToObjectMetadataSet(infos []*resource.Info) object.ObjMetadataSet {
 func ObjectMetadataSetForNamespace(
 	client resource.RESTClientGetter,
 	namespace string, resourceTypes []string,
+	logger *slog.Logger,
 ) (object.ObjMetadataSet, error) {
 	const maxAttempts = 3
 	const retryDelay = 2 * time.Second
 
 	infos, err := ResourceInfosForNamespace(client, namespace, resourceTypes)
 	for attempt := 2; err != nil && attempt <= maxAttempts; attempt++ {
-		logrus.WithError(err).WithFields(logrus.Fields{
-			"resourceTypes": resourceTypes,
-			"attempt":       attempt,
-			"namespace":     namespace,
-		}).Warn("Failed to get resource infos, retrying")
+		logger.Warn(
+			"Failed to get resource infos, retrying",
+			utils.ErrorKey, err,
+			"resourceTypes", resourceTypes,
+			"attempt", attempt,
+			"namespace", namespace,
+		)
 		time.Sleep(retryDelay)
 		infos, err = ResourceInfosForNamespace(client, namespace, resourceTypes)
 	}

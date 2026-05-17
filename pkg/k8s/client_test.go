@@ -32,6 +32,7 @@ import (
 	"github.com/kaweezle/iknite/pkg/host"
 	"github.com/kaweezle/iknite/pkg/k8s"
 	"github.com/kaweezle/iknite/pkg/testutil"
+	"github.com/kaweezle/iknite/pkg/utils"
 )
 
 type errorRESTMapper struct {
@@ -139,20 +140,20 @@ func TestResourceInfosFromResMap(t *testing.T) {
 	logger := testutil.TestLogger(t)
 
 	restConfig := testutil.CreateTestAPIServer(t, func(w http.ResponseWriter, r *http.Request) {
-		logger.Infof("Received request: %s %s %s", r.Method, r.URL.Path, r.URL.RawQuery)
+		logger.Info("Received request", "method", r.Method, "path", r.URL.Path, "query", r.URL.RawQuery)
 		switch r.Method {
 		case http.MethodPatch:
 			body, err := io.ReadAll(r.Body)
 			if err != nil {
-				logger.Errorf("Failed to read request body: %v", err)
+				logger.Error("Failed to read request body", utils.ErrorKey, err)
 			} else {
-				logger.Infof("Request body: %s", string(body))
+				logger.Info("Request body", "body", string(body))
 			}
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write(body)
 		default:
-			logger.Warnf("Unexpected request: %s %s %s", r.Method, r.URL.Path, r.URL.RawQuery)
+			logger.Warn("Unexpected request", "method", r.Method, "path", r.URL.Path, "query", r.URL.RawQuery)
 			w.WriteHeader(http.StatusInternalServerError)
 		}
 	})
@@ -400,7 +401,7 @@ func TestApplyResMapWithServerSideApply_Branches(t *testing.T) {
 			}
 			body, readErr := io.ReadAll(r.Body)
 			if readErr != nil {
-				logger.Errorf("Failed to read request body: %v", readErr)
+				logger.Error("Failed to read request body", utils.ErrorKey, readErr)
 				w.WriteHeader(http.StatusInternalServerError)
 				return
 			}

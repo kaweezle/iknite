@@ -4,9 +4,9 @@ package k8s
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"time"
 
-	"github.com/sirupsen/logrus"
 	"k8s.io/cli-runtime/pkg/resource"
 
 	"github.com/kaweezle/iknite/pkg/alpine"
@@ -20,7 +20,7 @@ import (
 type defaultKubeletRuntime struct {
 	fileExec   host.FileExecutor
 	kubeClient resource.RESTClientGetter
-	logger     logrus.FieldLogger
+	logger     *slog.Logger
 }
 
 var _ KubeletRuntime = (*defaultKubeletRuntime)(nil)
@@ -29,7 +29,7 @@ var _ KubeletRuntime = (*defaultKubeletRuntime)(nil)
 func NewKubeletRuntime(
 	fileExec host.FileExecutor,
 	kubeClient resource.RESTClientGetter,
-	logger logrus.FieldLogger,
+	logger *slog.Logger,
 ) KubeletRuntime { // nocov
 	return &defaultKubeletRuntime{fileExec: fileExec, kubeClient: kubeClient, logger: logger}
 }

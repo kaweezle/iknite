@@ -5,12 +5,12 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log/slog"
 	"net"
 	"path/filepath"
 	"strconv"
 	_ "unsafe"
 
-	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 	"golang.org/x/sync/errgroup"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -61,7 +61,7 @@ type initData struct {
 	errGroup                    errgroup.Group
 	hookManager                 *utils.HookManager
 	clusterUpdateBus            utils.Bus[*v1alpha1.IkniteCluster]
-	logger                      logrus.FieldLogger
+	logger                      *slog.Logger
 	viper                       *viper.Viper
 }
 
@@ -374,7 +374,7 @@ func (d *initData) RegisterIkniteClusterListener() (<-chan *v1alpha1.IkniteClust
 	return d.clusterUpdateBus.Subscribe(1)
 }
 
-func (d *initData) Logger() logrus.FieldLogger {
+func (d *initData) Logger() *slog.Logger {
 	return d.logger
 }
 

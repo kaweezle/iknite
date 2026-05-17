@@ -7,9 +7,9 @@ package init
 import (
 	"context"
 	"io"
+	"log/slog"
 
 	"github.com/kaweezle/iknite/pkg/host"
-	"github.com/sirupsen/logrus"
 	mock "github.com/stretchr/testify/mock"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 )
@@ -314,19 +314,19 @@ func (_c *MockKubeletStartData_KubeletProcess_Call) RunAndReturn(run func() host
 }
 
 // Logger provides a mock function for the type MockKubeletStartData
-func (_mock *MockKubeletStartData) Logger() logrus.FieldLogger {
+func (_mock *MockKubeletStartData) Logger() *slog.Logger {
 	ret := _mock.Called()
 
 	if len(ret) == 0 {
 		panic("no return value specified for Logger")
 	}
 
-	var r0 logrus.FieldLogger
-	if returnFunc, ok := ret.Get(0).(func() logrus.FieldLogger); ok {
+	var r0 *slog.Logger
+	if returnFunc, ok := ret.Get(0).(func() *slog.Logger); ok {
 		r0 = returnFunc()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(logrus.FieldLogger)
+			r0 = ret.Get(0).(*slog.Logger)
 		}
 	}
 	return r0
@@ -349,12 +349,12 @@ func (_c *MockKubeletStartData_Logger_Call) Run(run func()) *MockKubeletStartDat
 	return _c
 }
 
-func (_c *MockKubeletStartData_Logger_Call) Return(fieldLogger logrus.FieldLogger) *MockKubeletStartData_Logger_Call {
-	_c.Call.Return(fieldLogger)
+func (_c *MockKubeletStartData_Logger_Call) Return(logger *slog.Logger) *MockKubeletStartData_Logger_Call {
+	_c.Call.Return(logger)
 	return _c
 }
 
-func (_c *MockKubeletStartData_Logger_Call) RunAndReturn(run func() logrus.FieldLogger) *MockKubeletStartData_Logger_Call {
+func (_c *MockKubeletStartData_Logger_Call) RunAndReturn(run func() *slog.Logger) *MockKubeletStartData_Logger_Call {
 	_c.Call.Return(run)
 	return _c
 }

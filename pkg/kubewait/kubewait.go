@@ -24,8 +24,8 @@ package kubewait
 import (
 	"context"
 	"fmt"
+	"log/slog"
 
-	"github.com/sirupsen/logrus"
 	"github.com/spf13/pflag"
 
 	"github.com/kaweezle/iknite/pkg/cmd/util"
@@ -73,7 +73,7 @@ func RunKubewait(
 	fse host.FileExecutor,
 	opts *Options,
 	namespaces []string,
-	logger logrus.FieldLogger,
+	logger *slog.Logger,
 ) error {
 	if !opts.SkipWaitingForResources {
 		if err := waitForResources(ctx, fse, opts.ResourcesOptions, namespaces, logger); err != nil {

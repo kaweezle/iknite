@@ -19,10 +19,10 @@ package provision
 import (
 	"embed"
 	"fmt"
+	"log/slog"
 	"net/url"
 	"path"
 
-	"github.com/sirupsen/logrus"
 	"sigs.k8s.io/kustomize/api/resmap"
 	"sigs.k8s.io/kustomize/kyaml/filesys"
 
@@ -37,12 +37,9 @@ func createTempKustomizeDirectory(
 	content *embed.FS,
 	fs filesys.FileSystem,
 	outDir, inDir string,
-	logger logrus.FieldLogger,
+	logger *slog.Logger,
 ) error {
-	logger.WithFields(logrus.Fields{
-		"outDir": outDir,
-		"inDir":  inDir,
-	}).Trace("Start creating directory")
+	logger.Debug("Start creating directory", "outDir", outDir, "inDir", inDir)
 
 	files, err := content.ReadDir(inDir)
 	if err != nil {
@@ -56,13 +53,13 @@ func createTempKustomizeDirectory(
 		inPath := fmt.Sprintf("%s/%s", inDir, entry.Name())
 		outPath := fmt.Sprintf("%s/%s", outDir, entry.Name())
 
-		logger.WithField("path", inPath).Trace("Reading file")
+		logger.Debug("Reading file", "path", inPath)
 		payload, err := content.ReadFile(inPath)
 		if err != nil {
 			return fmt.Errorf("while reading embedded file %s: %w", entry.Name(), err)
 		}
 
-		logger.WithField("outPath", outPath).Trace("Writing content")
+		logger.Debug("Writing content", "outPath", outPath)
 		err = fs.WriteFile(outPath, payload)
 		if err != nil {
 			return fmt.Errorf("while writing %s to temp dir %s: %w", entry.Name(), outDir, err)
@@ -93,7 +90,7 @@ func GetBaseKustomizationResources(
 	fs host.FileSystem,
 	dirname string,
 	forceEmbedded bool,
-	logger logrus.FieldLogger,
+	logger *slog.Logger,
 ) (resmap.ResMap, error) {
 	ok, err := isBaseKustomizationAvailable(fs, dirname)
 	if err != nil {
@@ -101,11 +98,8 @@ func GetBaseKustomizationResources(
 	}
 	kustomizeFs := host.NewKustomizeFSWrapper(fs)
 	if !ok || forceEmbedded {
-		logger.WithFields(logrus.Fields{
-			"directory":      dirname,
-			"force_embedded": forceEmbedded,
-			"exists":         ok,
-		}).Debug("Using embedded kustomization.")
+		logger.Debug("Using embedded kustomization.", "directory", dirname, "force_embedded", forceEmbedded,
+			"exists", ok)
 		kustomizeFs = filesys.MakeFsInMemory()
 		dirname = "base"
 		err = createTempKustomizeDirectory(&content, kustomizeFs, dirname, dirname, logger)
@@ -113,7 +107,7 @@ func GetBaseKustomizationResources(
 			return nil, fmt.Errorf("while creating temporary kustomization directory: %w", err)
 		}
 	} else {
-		logger.WithField("directory", dirname).Debug("Base kustomization found, applying it...")
+		logger.Debug("Base kustomization found, applying it...", "directory", dirname)
 	}
 	return kustomize.BuildOnFileSystem(kustomizeFs, dirname) //nolint:wrapcheck // No need to wrap here.
 }

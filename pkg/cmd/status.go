@@ -21,10 +21,10 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"log/slog"
 	"os"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
@@ -84,15 +84,26 @@ func NewStatusCmd(
 - Statefulsets
 `,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			logger := util.LoggerFromCommand(cmd)
-			return performStatus(
+			cmdIf, ok := util.CmdInterfaceFromCommand(cmd)
+			if !ok {
+				return fmt.Errorf("cannot get command interface")
+			}
+			var output bytes.Buffer
+			util.DefaultBaseOptions().SetUpLogs(&output, cmdIf)
+
+			err := performStatus(
 				cmd.Context(),
 				alpineHost,
 				ikniteConfig,
 				waitOptions,
 				configurer,
-				logger,
+				cmdIf.Logger(),
 				teaOptions...)
+			if output.Len() > 0 {
+				fmt.Fprintln(os.Stderr, "Additional logs:")
+				fmt.Fprintln(os.Stderr, output.String())
+			}
+			return err
 		},
 	}
 
@@ -109,28 +120,15 @@ func performStatus(
 	ikniteConfig *v1alpha1.IkniteClusterSpec,
 	waitOptions *utils.WaitOptions,
 	configurer CheckExecutorConfigurer,
-	logger logrus.FieldLogger,
+	logger *slog.Logger,
 	teaOptions ...tea.ProgramOption,
 ) error {
 	executor := check.NewCheckExecutor()
 	configurer.Configure(executor, ikniteConfig, waitOptions)
 
-	// Inhibit logging
-	var output bytes.Buffer
-	logger.WithField("t", nil).Logger.Out = &output
-
 	checkData := checkers.CreateCheckWorkloadData(ikniteConfig, waitOptions, alpineHost, logger)
 	teaOptions = append(teaOptions, tea.WithOutput(os.Stderr))
 	p := tea.NewProgram(check.NewCheckModel(ctx, executor, checkData, logger), teaOptions...)
-	tmp := os.Stdout
-	defer func() {
-		os.Stdout = tmp
-		if output.Len() > 0 {
-			fmt.Fprintln(os.Stderr, "Additional logs:")
-			fmt.Fprintln(os.Stderr, output.String())
-		}
-	}()
-	os.Stdout = nil
 	_, err := p.Run()
 	if err != nil { // nocov -- hard to cover in all test scenarios.
 		return fmt.Errorf("error running checks: %w", err)

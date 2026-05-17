@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net"
 	"os"
 	"path/filepath"
@@ -13,7 +14,6 @@ import (
 	"time"
 
 	"github.com/charmbracelet/lipgloss"
-	"github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/cli-runtime/pkg/resource"
 	clientset "k8s.io/client-go/kubernetes"
@@ -87,7 +87,7 @@ func CheckService(
 	fileExec host.FileExecutor,
 	serviceName string,
 	serviceType ServiceType,
-	logger logrus.FieldLogger,
+	logger *slog.Logger,
 ) (bool, string, error) {
 	pid := 0
 	if serviceType == ServiceTypeOpenRC {

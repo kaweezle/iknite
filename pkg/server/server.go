@@ -24,6 +24,7 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net"
 	"net/http"
 	"path/filepath"
@@ -31,7 +32,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/sirupsen/logrus"
 	certutil "k8s.io/client-go/util/cert"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeConfigUtil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
@@ -63,7 +63,7 @@ type IkniteServer struct {
 func (s *IkniteServer) SetCluster(c *v1alpha1.IkniteCluster) {
 	data, err := json.MarshalIndent(c, "", "  ")
 	if err != nil {
-		s.Logger().WithError(err).Error("Failed to serialize cluster status for in-memory cache")
+		s.Logger().Error("Failed to serialize cluster status for in-memory cache", utils.ErrorKey, err)
 		return
 	}
 	s.mu.Lock()
@@ -87,7 +87,7 @@ func (s *IkniteServer) statusHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "application/json")
 	if _, err := w.Write(data); err != nil {
-		s.Logger().WithError(err).Error("Failed to write status response")
+		s.Logger().Error("Failed to write status response", utils.ErrorKey, err)
 	}
 }
 
@@ -101,7 +101,7 @@ func (s *IkniteServer) healthzHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "text/plain")
 	if _, err := w.Write([]byte("ok")); err != nil {
-		s.Logger().WithError(err).Error("Failed to write healthz response")
+		s.Logger().Error("Failed to write healthz response", utils.ErrorKey, err)
 	}
 }
 
@@ -136,10 +136,10 @@ func EnsureServerCertAndKey(
 	certDir string,
 	dnsNames []string,
 	ips []net.IP,
-	logger logrus.FieldLogger,
+	logger *slog.Logger,
 ) error {
 	if pki.CertOrKeyExist(fs, certDir, constants.IkniteServerCertName) {
-		logger.WithField("certDir", certDir).Debug("Server cert already exists, skipping creation")
+		logger.Debug("Server cert already exists, skipping creation", "certDir", certDir)
 		return nil
 	}
 
@@ -172,16 +172,17 @@ func EnsureServerCertAndKey(
 		return fmt.Errorf("failed to write server cert and key: %w", err)
 	}
 
-	logger.WithField("certDir", certDir).Info("Server cert and key created")
+	logger.Info("Server cert and key created", "certDir", certDir)
 	return nil
 }
 
 // EnsureClientCertAndKey ensures that the iknite client certificate and key
 // exist in certDir. If they don't exist, they are created signed by the
 // Kubernetes CA.
-func EnsureClientCertAndKey(fs host.FileSystem, certDir string, logger logrus.FieldLogger) error {
+func EnsureClientCertAndKey(fs host.FileSystem, certDir string, logger *slog.Logger) error {
+	logger = logger.With("certDir", certDir)
 	if pki.CertOrKeyExist(fs, certDir, constants.IkniteClientCertName) {
-		logger.WithField("certDir", certDir).Debug("Client cert already exists, skipping creation")
+		logger.Debug("Client cert already exists, skipping creation")
 		return nil
 	}
 
@@ -208,7 +209,7 @@ func EnsureClientCertAndKey(fs host.FileSystem, certDir string, logger logrus.Fi
 		return fmt.Errorf("failed to write client cert and key: %w", err)
 	}
 
-	logger.WithField("certDir", certDir).Info("Client cert and key created")
+	logger.Info("Client cert and key created")
 	return nil
 }
 
@@ -224,7 +225,7 @@ func EnsureIkniteConf(
 	fs host.FileSystem,
 	certDir, confPath string,
 	spec *v1alpha1.IkniteClusterSpec,
-	logger logrus.FieldLogger,
+	logger *slog.Logger,
 ) error {
 	// Determine the server address from the cluster spec
 	serverAddr := "localhost"
@@ -265,10 +266,7 @@ func EnsureIkniteConf(
 		return fmt.Errorf("failed to write iknite.conf to %s: %w", confPath, err)
 	}
 
-	logger.WithFields(logrus.Fields{
-		"path":   confPath,
-		"server": serverURL,
-	}).Info("iknite.conf written")
+	logger.Info("iknite.conf written", "path", confPath, "server", serverURL)
 	return nil
 }
 
@@ -280,7 +278,7 @@ func NewIkniteServer(
 	fs host.FileSystem,
 	certDir string,
 	spec *v1alpha1.IkniteClusterSpec,
-	logger logrus.FieldLogger,
+	logger *slog.Logger,
 ) (*IkniteServer, error) {
 	caCertPEM, err := fs.ReadFile(filepath.Join(certDir, "ca.crt"))
 	if err != nil {
@@ -332,7 +330,7 @@ func EnsureIkniteServerConfiguration(
 	fs host.FileSystem,
 	certDir string,
 	spec *v1alpha1.IkniteClusterSpec,
-	logger logrus.FieldLogger,
+	logger *slog.Logger,
 ) error {
 	// Build SAN extensions from the cluster spec.
 	var dnsNames []string
@@ -364,7 +362,7 @@ func StartIkniteServer(
 	fs host.FileSystem,
 	certDir string,
 	cluster *v1alpha1.IkniteCluster,
-	logger logrus.FieldLogger,
+	logger *slog.Logger,
 ) (*IkniteServer, error) {
 	spec := &cluster.Spec
 
@@ -385,15 +383,13 @@ func StartIkniteServer(
 
 	startErr := make(chan error, 1)
 	go func() {
-		logger.WithFields(logrus.Fields{
-			"addr": srv.httpServer.Addr,
-		}).Info("Starting iknite status server")
+		logger.Info("Starting iknite status server", "addr", srv.httpServer.Addr)
 		if listenErr := srv.httpServer.ListenAndServeTLS(
 			"",
 			"",
 		); listenErr != nil &&
 			listenErr != http.ErrServerClosed {
-			logger.WithError(listenErr).Error("Iknite status server error")
+			logger.Error("Iknite status server error", utils.ErrorKey, listenErr)
 			startErr <- listenErr
 		}
 	}()

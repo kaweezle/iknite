@@ -18,22 +18,23 @@ package util
 
 import (
 	"fmt"
+	"log/slog"
 
-	"github.com/sirupsen/logrus"
 	"github.com/spf13/pflag"
 )
 
-type LogLevelValue logrus.Level
+type LogLevelValue slog.Level
 
 // Ensure logLevelValue implements the pflag.Value interface.
 var _ pflag.Value = (*LogLevelValue)(nil)
 
-func NewLogLevelValue(p *logrus.Level) *LogLevelValue {
+func NewLogLevelValue(p *slog.Level) *LogLevelValue {
 	return (*LogLevelValue)(p)
 }
 
 func (c *LogLevelValue) Set(s string) error {
-	level, err := logrus.ParseLevel(s)
+	level := slog.Level(*c)
+	err := level.UnmarshalText([]byte(s))
 	if err != nil {
 		return fmt.Errorf("while parsing log level: %w", err)
 	}
@@ -45,4 +46,4 @@ func (s *LogLevelValue) Type() string {
 	return "logLevel"
 }
 
-func (s *LogLevelValue) String() string { return logrus.Level(*s).String() }
+func (s *LogLevelValue) String() string { return slog.Level(*s).String() }

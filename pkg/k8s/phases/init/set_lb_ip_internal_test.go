@@ -6,6 +6,7 @@ import (
 	"context"
 	"embed"
 	"errors"
+	"log/slog"
 	"net"
 	"net/http"
 	"testing"
@@ -51,7 +52,7 @@ func serviceToFillHandler(
 	_ *http.Request,
 	log *testutil.RequestLog,
 	_ embed.FS,
-	_ logrus.FieldLogger,
+	_ *slog.Logger,
 ) bool {
 	w.Header().Set("Content-Type", "application/json")
 	log.StatusCode = http.StatusOK
@@ -81,7 +82,7 @@ type setLBIPPhaseData struct {
 	cluster  *v1alpha1.IkniteCluster
 	getter   genericclioptions.RESTClientGetter
 	errGroup *errgroup.Group
-	logger   logrus.FieldLogger
+	logger   *slog.Logger
 }
 
 var _ setLBIPData = (*setLBIPPhaseData)(nil)
@@ -105,7 +106,7 @@ func (d *setLBIPPhaseData) RESTClientGetter() (genericclioptions.RESTClientGette
 	return d.getter, nil
 }
 
-func (d *setLBIPPhaseData) Logger() logrus.FieldLogger {
+func (d *setLBIPPhaseData) Logger() *slog.Logger {
 	return d.logger
 }
 
@@ -144,7 +145,7 @@ func TestRunSetLBIP_NominalCase(t *testing.T) {
 		host:     createMockHostWithOutboundIP(t, ""),
 		cluster:  &v1alpha1.IkniteCluster{Spec: v1alpha1.IkniteClusterSpec{Ip: net.ParseIP(testOutboundIP)}},
 		getter:   createGetter(t, sOpts),
-		logger:   newTestLogger(t),
+		logger:   testutil.TestLogger(t),
 	}
 
 	req.NoError(runSetLBIP(data))
@@ -167,7 +168,7 @@ func TestRunSetLBIP_UsesOutboundAndClusterIPWhenDifferent(t *testing.T) {
 		host:     createMockHostWithOutboundIP(t, testOutboundIP),
 		cluster:  &v1alpha1.IkniteCluster{Spec: v1alpha1.IkniteClusterSpec{Ip: net.ParseIP(testClusterIP)}},
 		getter:   createGetter(t, sOpts),
-		logger:   newTestLogger(t),
+		logger:   testutil.TestLogger(t),
 	}
 
 	req.NoError(runSetLBIP(data))
@@ -191,7 +192,7 @@ func TestRunSetLBIP_FailsOnRESTClientGetterError(t *testing.T) {
 		errGroup: &errgroup.Group{},
 		host:     createMockHostWithOutboundIP(t, ""),
 		cluster:  &v1alpha1.IkniteCluster{Spec: v1alpha1.IkniteClusterSpec{Ip: net.ParseIP(testOutboundIP)}},
-		logger:   newTestLogger(t),
+		logger:   testutil.TestLogger(t),
 	}
 
 	err := runSetLBIP(data)
@@ -271,7 +272,7 @@ func TestRunSetLBIP_StartsWatcher(t *testing.T) {
 		errGroup: eg,
 		host:     createMockHostWithOutboundIP(t, ""),
 		cluster:  &v1alpha1.IkniteCluster{Spec: v1alpha1.IkniteClusterSpec{Ip: net.ParseIP(testOutboundIP)}},
-		logger:   newTestLogger(t),
+		logger:   testutil.TestLogger(t),
 	}
 
 	// This will fail because the mock returns an error
@@ -379,7 +380,7 @@ func TestSetLBIPPatchGeneration(t *testing.T) {
 func TestWatchSetLBIPServices(t *testing.T) {
 	t.Parallel()
 	req := require.New(t)
-	logger := newTestLogger(t)
+	logger := testutil.TestLogger(t)
 	mockServiceInterface := mockV1.NewMockServiceInterface(t)
 	mockCoreV1Interface := mockV1.NewMockCoreV1Interface(t)
 	mockCoreV1Interface.EXPECT().Services(metav1.NamespaceAll).Return(mockServiceInterface).Once()
@@ -527,7 +528,7 @@ func TestWatchSetLBIPServices_WatchError(t *testing.T) {
 	mockServiceInterface.EXPECT().Watch(mock.Anything, mock.Anything).Return(nil, errors.New("mock watch error")).Once()
 
 	var eg errgroup.Group
-	logger := newTestLogger(t)
+	logger := testutil.TestLogger(t)
 	eg.Go(func() error {
 		return watchSetLBIPServices(t.Context(), mockCoreV1Interface, logger, testOutboundIP)
 	})
@@ -570,7 +571,7 @@ func TestWatchSetLBIPServices_ChangeOneIpAddress(t *testing.T) {
 	}
 
 	var eg errgroup.Group
-	logger := newTestLogger(t)
+	logger := testutil.TestLogger(t)
 	eg.Go(func() error {
 		return watchSetLBIPServices(t.Context(), mockCoreV1Interface, logger, testOutboundIP, testClusterIP)
 	})

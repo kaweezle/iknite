@@ -4,6 +4,7 @@ package util
 import (
 	"context"
 	"log/slog"
+	"os"
 
 	sloglogrus "github.com/samber/slog-logrus/v2"
 	"github.com/sirupsen/logrus"
@@ -13,10 +14,6 @@ import (
 	"github.com/kaweezle/iknite/pkg/constants"
 	"github.com/kaweezle/iknite/pkg/utils"
 )
-
-type loggerHolder interface {
-	SetLogger(*logrus.Entry)
-}
 
 type ViperProvider interface {
 	Viper() *viper.Viper
@@ -35,63 +32,31 @@ type cmdStruct struct {
 
 var _ CmdInterface = (*cmdStruct)(nil)
 
-var _ loggerHolder = (*cmdStruct)(nil)
+var _ utils.LoggerHolder = (*cmdStruct)(nil)
 
 func (c *cmdStruct) Viper() *viper.Viper {
 	return c.v
 }
 
-func (c *cmdStruct) SetLogger(logger *logrus.Entry) {
+func (c *cmdStruct) SetLogger(logger *slog.Logger) {
 	c.LogEntry = logger
 }
 
-type _logger struct {
-	*logrus.Logger
-}
-
-func (l _logger) Level() slog.Level {
-	switch l.GetLevel() {
-	case logrus.TraceLevel:
-		return slog.LevelDebug
-	case logrus.DebugLevel:
-		return slog.LevelDebug
-	case logrus.InfoLevel:
-		return slog.LevelInfo
-	case logrus.WarnLevel:
-		return slog.LevelWarn
-	case logrus.ErrorLevel:
-		return slog.LevelError
-	case logrus.FatalLevel:
-		return slog.LevelError
-	case logrus.PanicLevel:
-		return slog.LevelError
-	default:
-		return slog.LevelInfo
-	}
-}
-
 func NewCmdInterface() CmdInterface {
-	l := logrus.New()
-	e := logrus.NewEntry(l)
-	v := viper.NewWithOptions(viper.WithLogger(slog.New(sloglogrus.Option{
-		Level:  _logger{l},
-		Logger: l,
-	}.NewLogrusHandler())))
+	le := utils.NewLogger(os.Stdout)
+	v := viper.NewWithOptions(viper.WithLogger(le))
 	return &cmdStruct{
-		LogEnabled: utils.LogEnabled{LogEntry: e},
+		LogEnabled: utils.LogEnabled{LogEntry: le},
 		v:          v,
 	}
 }
 
-var defaultEntry = logrus.NewEntry(logrus.StandardLogger())
+var defaultLogger = slog.New(sloglogrus.Option{
+	Level:  slog.LevelDebug,
+	Logger: logrus.New(),
+}.NewLogrusHandler())
 
 func WithCmdInterface(ctx context.Context, cmdInterface CmdInterface) context.Context {
-	if holder, ok := cmdInterface.(loggerHolder); ok {
-		logger := cmdInterface.Logger()
-		if logEntry, ok := logger.(*logrus.Entry); ok {
-			holder.SetLogger(logEntry.WithContext(ctx))
-		}
-	}
 	newCtx := context.WithValue(ctx, constants.LoggerContextKey{}, cmdInterface.Logger())
 	return context.WithValue(newCtx, constants.ViperContextKey{}, cmdInterface.Viper())
 }
@@ -105,7 +70,7 @@ func SetCmdInterface(cmd *cobra.Command, cmdInterface CmdInterface) {
 	cmd.SetContext(WithCmdInterface(ctx, cmdInterface))
 }
 
-func WithLogger(ctx context.Context, logger logrus.FieldLogger) context.Context {
+func WithLogger(ctx context.Context, logger *slog.Logger) context.Context {
 	return context.WithValue(ctx, constants.LoggerContextKey{}, logger)
 }
 
@@ -130,20 +95,20 @@ func CmdInterfaceFromCommand(cmd *cobra.Command) (CmdInterface, bool) {
 	return CmdInterfaceFromContext(ctx), true
 }
 
-func LoggerFromContext(ctx context.Context) logrus.FieldLogger {
+func LoggerFromContext(ctx context.Context) *slog.Logger {
 	value := ctx.Value(constants.LoggerContextKey{})
 	if value != nil {
-		if logger, ok := value.(logrus.FieldLogger); ok {
+		if logger, ok := value.(*slog.Logger); ok {
 			return logger
 		}
 	}
-	return defaultEntry.WithContext(ctx) // Return a new logger if no CmdInterface is found in the context
+	return defaultLogger
 }
 
-func LoggerFromCommand(cmd *cobra.Command) logrus.FieldLogger {
+func LoggerFromCommand(cmd *cobra.Command) *slog.Logger {
 	ctx := cmd.Context()
 	if ctx == nil {
-		return defaultEntry
+		return defaultLogger
 	}
 	return LoggerFromContext(ctx)
 }

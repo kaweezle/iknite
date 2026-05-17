@@ -77,7 +77,7 @@ func runMonitorWorkloads(c workflow.RunData) error {
 				logger.Debug("Getting workloads information...")
 				_, err := updateWorkloads(ctx)
 				if err != nil {
-					logger.Errorf("While getting workloads information: %v", err)
+					logger.Error("while getting workloads information", utils.ErrorKey, err)
 					ticker.Stop()
 					return err
 				}
