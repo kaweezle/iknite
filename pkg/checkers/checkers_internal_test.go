@@ -195,7 +195,7 @@ func TestCheckWorkloadDataAccessors(t *testing.T) {
 	ikniteConfig := &v1alpha1.IkniteClusterSpec{
 		Ip: net.ParseIP("10.0.0.1"),
 	}
-	logger, _ := testutil.TestLogger(t)
+	logger := testutil.TestLogger(t)
 	raw := CreateCheckWorkloadData(ikniteConfig, waitOptions, alpineHost, logger)
 	data, ok := raw.(*checkWorkloadData)
 	req.True(ok)

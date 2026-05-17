@@ -61,7 +61,7 @@ func configureKubeletStartDataMock(
 ) {
 	t.Helper()
 
-	logger, _ := testutil.TestLogger(t)
+	logger := testutil.TestLogger(t)
 	m.EXPECT().Logger().Return(logger).Once()
 	cfg, err := createInitConfiguration()
 	require.NoError(t, err)

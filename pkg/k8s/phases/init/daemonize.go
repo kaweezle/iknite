@@ -89,8 +89,9 @@ func runDaemonize(c workflow.RunData) error {
 	if err != nil {
 		logger.WithError(err).Warn("Error running shutdown hooks")
 	}
+	cleaner := k8s.NewCleaner(data.Host(), logger, &data.IkniteCluster().Spec, false)
 
-	err = k8s.CleanAll(data.Host(), &data.IkniteCluster().Spec, true, false, false, false)
+	err = cleaner.CleanAll(true, false, false)
 	if err != nil {
 		logger.WithError(err).Warn("Error during cleanup after kubelet stopped")
 	}

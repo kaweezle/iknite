@@ -424,7 +424,7 @@ func TestApplyResMapWithServerSideApply_Branches(t *testing.T) {
 func TestAllWorkloadStates(t *testing.T) {
 	t.Parallel()
 	req := require.New(t)
-	logger, _ := testutil.TestLogger(t)
+	logger := testutil.TestLogger(t)
 
 	getter := genericclioptions.NewMockRESTClientGetter(t)
 	getter.EXPECT().ToRESTMapper().Return(nil, errors.New("mapper unavailable")).Once()
@@ -499,7 +499,7 @@ func TestWorkloadsReadyConditionWithContextFunc(t *testing.T) {
 
 	getter := genericclioptions.NewMockRESTClientGetter(t)
 	getter.EXPECT().ToRESTMapper().Return(nil, errors.New("mapper unavailable")).Once()
-	logger, _ := testutil.TestLogger(t)
+	logger := testutil.TestLogger(t)
 	condition := k8s.WorkloadsReadyConditionWithContextFunc(getter, logger, nil)
 	ready, err := condition(t.Context())
 	req.Error(err)

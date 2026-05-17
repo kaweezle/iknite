@@ -209,7 +209,7 @@ func TestBindFlagValue_AppliesViperValueToFlag(t *testing.T) {
 	flag := flags.Lookup("my-flag")
 	req.NotNil(flag)
 
-	logger, _ := testutil.TestLogger(t)
+	logger := testutil.TestLogger(t)
 
 	err := util.BindFlagValue(flag, v, "my_flag", logger)
 	req.NoError(err)
@@ -230,7 +230,7 @@ func TestBindFlagValue_SkipsWhenFlagChanged(t *testing.T) {
 	req.NotNil(flag)
 	req.True(flag.Changed)
 
-	logger, _ := testutil.TestLogger(t)
+	logger := testutil.TestLogger(t)
 
 	err = util.BindFlagValue(flag, v, "my_flag", logger)
 	req.NoError(err)
@@ -247,7 +247,7 @@ func TestBindFlagValue_SkipsWhenViperKeyNotSet(t *testing.T) {
 	flag := flags.Lookup("my-flag")
 	req.NotNil(flag)
 
-	logger, _ := testutil.TestLogger(t)
+	logger := testutil.TestLogger(t)
 
 	err := util.BindFlagValue(flag, v, "my_flag", logger)
 	req.NoError(err)
@@ -265,7 +265,7 @@ func TestBindFlagValue_SliceFlag(t *testing.T) {
 	flag := flags.Lookup("my-slice")
 	req.NotNil(flag)
 
-	logger, _ := testutil.TestLogger(t)
+	logger := testutil.TestLogger(t)
 
 	err := util.BindFlagValue(flag, v, "my_slice", logger)
 	req.NoError(err)
@@ -283,7 +283,7 @@ func TestBindFlagValue_SliceFlag_FromEnvironmentStyleString(t *testing.T) {
 	flag := flags.Lookup("my-slice")
 	req.NotNil(flag)
 
-	logger, _ := testutil.TestLogger(t)
+	logger := testutil.TestLogger(t)
 
 	err := util.BindFlagValue(flag, v, "my_slice", logger)
 	req.NoError(err)
@@ -301,7 +301,7 @@ func TestBindFlagValue_SliceFlag_FromGenericSlice(t *testing.T) {
 	flag := flags.Lookup("my-slice")
 	req.NotNil(flag)
 
-	logger, _ := testutil.TestLogger(t)
+	logger := testutil.TestLogger(t)
 
 	err := util.BindFlagValue(flag, v, "my_slice", logger)
 	req.NoError(err)

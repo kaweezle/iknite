@@ -62,7 +62,7 @@ func TestHookManager_Register_Run(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			logger, _ := testutil.TestLogger(t)
+			logger := testutil.TestLogger(t)
 			m := NewHookManager(logger)
 
 			for _, h := range tt.hooks {
@@ -91,7 +91,7 @@ func TestHookManager_Register_Run(t *testing.T) {
 
 func TestHookManager_ConcurrentRegister(t *testing.T) {
 	t.Parallel()
-	logger, _ := testutil.TestLogger(t)
+	logger := testutil.TestLogger(t)
 	m := NewHookManager(logger)
 	var wg sync.WaitGroup
 	numHooks := 20
@@ -111,7 +111,7 @@ func TestHookManager_ConcurrentRegister(t *testing.T) {
 
 func TestHookManager_ConcurrentRun_Parallel(t *testing.T) {
 	t.Parallel()
-	logger, _ := testutil.TestLogger(t)
+	logger := testutil.TestLogger(t)
 	m := NewHookManager(logger)
 	numHooks := 10
 	for i := 0; i < numHooks; i++ {
@@ -129,7 +129,7 @@ func TestHookManager_ConcurrentRun_Parallel(t *testing.T) {
 
 func TestHookManager_ErrorsLogged(t *testing.T) {
 	t.Parallel()
-	logger, hook := testutil.TestLogger(t)
+	logger, hook := testutil.TestLoggerWithHook(t)
 	m := NewHookManager(logger)
 	m.Register("failing", func() error { return errors.New("test fail") })
 

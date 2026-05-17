@@ -96,12 +96,12 @@ removes the network interfaces and the IP address assigned to the cluster.
 This command must be run as root.
 `,
 		RunE: func(cmd *cobra.Command, _ []string) error {
+			logger := util.GetLoggerFromCommand(cmd)
 			if err := cleanOptions.validate(); err != nil {
-				logrus.WithError(err).Error("Invalid options")
+				logger.WithError(err).Error("Invalid options")
 				return fmt.Errorf("invalid options: %w", err)
 			}
 
-			logger := util.GetLoggerFromCommand(cmd)
 			return performClean(alpineHost, ikniteConfig, cleanOptions, logger)
 		},
 	}
@@ -158,10 +158,10 @@ func performClean(
 	l logrus.FieldLogger,
 ) error {
 	dryRun := cleanOptions.dryRun
-	logger := l.WithField("isDryRun", dryRun)
+	cleaner := k8s.NewCleaner(alpineHost, l, ikniteConfig, dryRun)
 
 	if !cleanOptions.hasActualWorkToDo() {
-		logger.Info("No cleanup actions specified, skipping cleanup")
+		cleaner.Info("No cleanup actions specified, skipping cleanup")
 		return nil
 	}
 
@@ -169,10 +169,10 @@ func performClean(
 	ikniteCluster, err := v1alpha1.LoadIkniteCluster(alpineHost)
 	if err != nil {
 		if !os.IsNotExist(err) {
-			logger.WithError(err).Warn("Failed to load iknite cluster, assuming it does not exist")
+			cleaner.WithError(err).Warn("Failed to load iknite cluster, assuming it does not exist")
 		}
 	} else {
-		logger.Info("Loaded iknite cluster status. Replace cluster config with the one from the status file")
+		cleaner.Info("Loaded iknite cluster status. Replace cluster config with the one from the status file")
 		state = ikniteCluster.Status.State
 		*ikniteConfig = ikniteCluster.Spec
 	}
@@ -182,7 +182,7 @@ func performClean(
 	}
 
 	if state == iknite.Running {
-		logger.WithField("serviceName", constants.IkniteService).Info("Stopping iknite service...")
+		cleaner.WithField("serviceName", constants.IkniteService).Info("Stopping iknite service...")
 		if !dryRun {
 			// TODO: if reset kubelet, remove his node from etcd cluster
 			err = alpine.StopService(alpineHost, constants.IkniteService)
@@ -194,14 +194,14 @@ func performClean(
 
 	// we assume that starting from here, we are in a stopped state
 	if cleanOptions.stopContainers {
-		logger.Info("Stopping all containers...")
-		if err = k8s.StopAllContainers(alpineHost, dryRun); err != nil {
-			logrus.WithError(err).Warn("Error stopping all containers")
+		cleaner.Info("Stopping all containers...")
+		if err = cleaner.StopAllContainers(); err != nil {
+			cleaner.WithError(err).Warn("Error stopping all containers")
 		}
 	}
 
 	if cleanOptions.stopContainerd {
-		logger.WithField("serviceName", constants.ContainerServiceName).
+		cleaner.WithField("serviceName", constants.ContainerServiceName).
 			Info("Stopping container service...")
 		if !dryRun {
 			err = alpine.StopService(alpineHost, constants.ContainerServiceName)
@@ -212,59 +212,59 @@ func performClean(
 	}
 
 	if cleanOptions.unmountPaths {
-		logger.Info("Unmounting paths...")
-		err = k8s.UnmountPaths(alpineHost, true, dryRun)
+		cleaner.Info("Unmounting paths...")
+		err = cleaner.UnmountPaths(true)
 		if err != nil {
 			return fmt.Errorf("failed to unmount paths: %w", err)
 		}
-		logger.Info("Removing kubelet runtime files...")
-		err = k8s.RemoveKubeletFiles(alpineHost, dryRun)
+		cleaner.Info("Removing kubelet runtime files...")
+		err = cleaner.RemoveKubeletFiles()
 		if err != nil {
 			return fmt.Errorf("failed to remove kubelet runtime files: %w", err)
 		}
 	}
 
 	if cleanOptions.cleanCni {
-		err = k8s.DeleteCniNamespaces(alpineHost, dryRun)
+		err = cleaner.DeleteCniNamespaces()
 		if err != nil {
 			return fmt.Errorf("failed to delete CNI namespaces: %w", err)
 		}
-		err = k8s.DeleteNetworkInterfaces(alpineHost, dryRun)
+		err = cleaner.DeleteNetworkInterfaces()
 		if err != nil {
 			return fmt.Errorf("failed to delete network interfaces: %w", err)
 		}
 	}
 
 	if cleanOptions.cleanIptables {
-		err = k8s.ResetIPTables(alpineHost, dryRun)
+		err = cleaner.ResetIPTables()
 		if err != nil {
 			return fmt.Errorf("failed to reset iptables: %w", err)
 		}
 	}
 
 	if cleanOptions.cleanIpAddress {
-		err = k8s.ResetIPAddress(alpineHost, ikniteConfig, dryRun)
+		err = cleaner.ResetIPAddress()
 		if err != nil {
-			logrus.WithError(err).Warn("Error resetting IP address")
+			cleaner.WithError(err).Warn("Error resetting IP address")
 		}
 	}
 
 	if cleanOptions.cleanAPIBackend {
-		logger.Info("Cleaning up API backend data...")
+		cleaner.Info("Cleaning up API backend data...")
 		apiBackendName := "kine"
 		if ikniteConfig.UseEtcd {
 			apiBackendName = constants.EtcdBackendName
 		}
-		err = k8s.DeleteAPIBackendData(alpineHost, dryRun, apiBackendName, ikniteConfig.APIBackendDatabaseDirectory)
+		err = cleaner.DeleteAPIBackendData(apiBackendName, ikniteConfig.APIBackendDatabaseDirectory)
 		if err != nil {
 			return fmt.Errorf("failed to delete API backend data: %w", err)
 		}
 	}
 
 	if cleanOptions.cleanClusterConfig {
-		logger.Info("Resetting cluster configuration...")
+		cleaner.Info("Resetting cluster configuration...")
 		reset.CleanConfig(alpineHost, dryRun)
-		logger.WithField("path", constants.KubernetesRootConfig).
+		cleaner.WithField("path", constants.KubernetesRootConfig).
 			Info("Removing kubernetes root config...")
 		if !dryRun {
 			err = alpineHost.RemoveAll(constants.KubernetesRootConfig)
@@ -277,13 +277,13 @@ func performClean(
 	_, kubeletProcess, err := alpine.CheckPidFile(alpineHost, "kubelet")
 	switch {
 	case err != nil:
-		logger.WithError(err).Warn("Error checking kubelet process")
+		cleaner.WithError(err).Warn("Error checking kubelet process")
 	case kubeletProcess != nil:
-		logger.WithField("pid", kubeletProcess.Pid()).Info("Kubelet is still running, stopping it...")
+		cleaner.WithField("pid", kubeletProcess.Pid()).Info("Kubelet is still running, stopping it...")
 		if !dryRun {
 			err = kubeletProcess.Signal(syscall.SIGTERM)
 			if err == nil {
-				logger.WithField("pid", kubeletProcess.Pid()).Info("Waiting for kubelet to stop...")
+				cleaner.WithField("pid", kubeletProcess.Pid()).Info("Waiting for kubelet to stop...")
 				err = kubeletProcess.Wait()
 				if err != nil {
 					return fmt.Errorf("failed to wait for kubelet process to stop: %w", err)
@@ -291,9 +291,9 @@ func performClean(
 			}
 		}
 	default:
-		logger.Info("Kubelet is not running")
+		cleaner.Info("Kubelet is not running")
 	}
 
-	logger.Info("Cleanup completed")
+	cleaner.Info("Cleanup completed")
 	return nil
 }

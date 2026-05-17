@@ -109,7 +109,7 @@ func TestBindFlagValue_ReturnsReplaceErrorForSliceValue(t *testing.T) {
 	v.Set("my_slice", []string{"a", "b"})
 
 	flag := &pflag.Flag{Name: "my-slice", Value: &failingSliceValue{replaceErr: errors.New("replace failed")}}
-	logger, _ := testutil.TestLogger(t)
+	logger := testutil.TestLogger(t)
 
 	err := BindFlagValue(flag, v, "my_slice", logger)
 	req.ErrorContains(err, "while replacing viper array value for my-slice from viper key my_slice")
@@ -123,7 +123,7 @@ func TestBindFlagValue_ReturnsConversionErrorForInvalidSliceInput(t *testing.T) 
 	v.Set("my_slice", 42)
 
 	flag := &pflag.Flag{Name: "my-slice", Value: &failingSliceValue{}}
-	logger, _ := testutil.TestLogger(t)
+	logger := testutil.TestLogger(t)
 
 	err := BindFlagValue(flag, v, "my_slice", logger)
 	req.ErrorContains(err, "while getting viper array value for my_slice")
@@ -137,7 +137,7 @@ func TestBindFlagValue_ReturnsSetErrorForScalarValue(t *testing.T) {
 	v.Set("my_flag", "from-viper")
 
 	flag := &pflag.Flag{Name: "my-flag", Value: &failingValue{setErr: errors.New("set failed")}}
-	logger, _ := testutil.TestLogger(t)
+	logger := testutil.TestLogger(t)
 
 	err := BindFlagValue(flag, v, "my_flag", logger.WithContext(t.Context()))
 	req.ErrorContains(err, "while setting viper value for my-flag from viper key my_flag")

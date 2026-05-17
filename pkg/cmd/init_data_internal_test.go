@@ -76,7 +76,7 @@ func createTestStatusServer(t *testing.T) *ikniteServer.IkniteServer {
 	require.NoError(t, err)
 	require.NoError(t, pki.WriteCertAndKey(fs, testPKIDir, "ca", caCert, caKey))
 
-	logger, _ := testutil.TestLogger(t)
+	logger := testutil.TestLogger(t)
 
 	spec := &v1alpha1.IkniteClusterSpec{
 		DomainName:       "iknite.local",
@@ -368,7 +368,7 @@ func TestInitDataClientBranches(t *testing.T) {
 func TestInitDataStatusServerAndMDNS(t *testing.T) {
 	req := require.New(t)
 
-	logger, _ := testutil.TestLogger(t)
+	logger := testutil.TestLogger(t)
 	alpineHost := mockHost.NewMockHost(t)
 	alpineHost.EXPECT().MkdirAll(constants.StatusDirectory, os.FileMode(0o755)).Return(nil).Twice()
 	alpineHost.EXPECT().WriteFile(constants.StatusFile, mock.Anything, os.FileMode(0o644)).Return(nil).Twice()

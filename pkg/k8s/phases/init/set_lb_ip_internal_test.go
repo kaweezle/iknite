@@ -457,7 +457,7 @@ func TestWatchSetLBIPServices_ServiceDeletedBeforePatch(t *testing.T) {
 		},
 	}
 
-	logger, hook := testutil.TestLogger(t) // Create a test logger and hook to capture logs
+	logger, hook := testutil.TestLoggerWithHook(t) // Create a test logger and hook to capture logs
 
 	var eg errgroup.Group
 	eg.Go(func() error {
@@ -502,7 +502,7 @@ func TestWatchSetLBIPServices_PatchError(t *testing.T) {
 		},
 	}
 
-	logger, hook := testutil.TestLogger(t) // Create a test logger and hook to capture logs
+	logger, hook := testutil.TestLoggerWithHook(t) // Create a test logger and hook to capture logs
 	var eg errgroup.Group
 	eg.Go(func() error {
 		return watchSetLBIPServices(t.Context(), mockCoreV1Interface, logger, testOutboundIP)

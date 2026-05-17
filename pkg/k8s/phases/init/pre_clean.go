@@ -7,6 +7,7 @@ import (
 
 	"github.com/kaweezle/iknite/pkg/host"
 	"github.com/kaweezle/iknite/pkg/k8s"
+	"github.com/kaweezle/iknite/pkg/utils"
 )
 
 func NewPreCleanHostPhase() workflow.Phase {
@@ -20,6 +21,7 @@ func NewPreCleanHostPhase() workflow.Phase {
 type preCleanHostData interface {
 	IkniteClusterProvider
 	host.HostProvider
+	utils.LoggerProvider
 }
 
 // runPreCleanHost executes the node initialization process.
@@ -30,7 +32,8 @@ func runPreCleanHost(c workflow.RunData) error {
 	}
 	ikniteConfig := &data.IkniteCluster().Spec
 
-	if err := k8s.CleanAll(data.Host(), ikniteConfig, false, false, true, false); err != nil {
+	cleaner := k8s.NewCleaner(data.Host(), data.Logger(), ikniteConfig, false)
+	if err := cleaner.CleanAll(false, false, true); err != nil {
 		return fmt.Errorf("failed to pre-clean host: %w", err)
 	}
 	return nil

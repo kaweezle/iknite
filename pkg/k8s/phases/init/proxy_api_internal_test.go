@@ -112,7 +112,7 @@ func (l *stubListener) Addr() net.Addr {
 
 func newTestLogger(t *testing.T) *logrus.Entry {
 	t.Helper()
-	logger, _ := testutil.TestLogger(t)
+	logger := testutil.TestLogger(t)
 	return logger
 }
 

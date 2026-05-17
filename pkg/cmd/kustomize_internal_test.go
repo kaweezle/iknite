@@ -206,7 +206,7 @@ func Test_performKustomize(t *testing.T) {
 			if tt.prepare != nil {
 				req.NoError(tt.prepare(t, fs, kustomizationOptions, waitOptions, srvOptions))
 			}
-			logger, _ := testutil.TestLogger(t)
+			logger := testutil.TestLogger(t)
 			gotErr := performKustomize(context.Background(), fs, kustomizationOptions, waitOptions, logger)
 			if tt.wantErr != "" {
 				req.Error(gotErr)

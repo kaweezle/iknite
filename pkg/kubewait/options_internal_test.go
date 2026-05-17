@@ -117,7 +117,7 @@ func TestReadEnvFile(t *testing.T) {
 	})
 
 	opts := &BootstrapOptions{BootstrapDir: dir}
-	logger, _ := testutil.TestLogger(t)
+	logger := testutil.TestLogger(t)
 	ok, err := opts.ReadEnvFile(fs, logger)
 	req.NoError(err)
 	req.True(ok)
@@ -165,7 +165,7 @@ func TestRunBootstrapAndRunKubewaitSkipPaths(t *testing.T) {
 	req.NoError(err)
 
 	opts := &BootstrapOptions{BootstrapDir: dir, BootstrapScript: "iknite-bootstrap.sh"}
-	logger, _ := testutil.TestLogger(t)
+	logger := testutil.TestLogger(t)
 	err = runBootstrap(t.Context(), h, opts, logger)
 	req.NoError(err)
 

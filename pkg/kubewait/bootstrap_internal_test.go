@@ -84,7 +84,7 @@ func TestRunBootstrapVariants(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			req := require.New(t)
-			logger, _ := testutil.TestLogger(t)
+			logger := testutil.TestLogger(t)
 
 			fs := host.NewMemMapFS()
 			mockExecutor := mockHost.NewMockExecutor(t)
@@ -109,7 +109,7 @@ func TestEnsureSSHKnownHostBranches(t *testing.T) {
 
 	h, err := testutil.NewDummyHost(host.NewMemMapFS(), &testutil.DummyHostOptions{})
 	req.NoError(err)
-	logger, _ := testutil.TestLogger(t)
+	logger := testutil.TestLogger(t)
 	err = ensureSSHKnownHost(t.Context(), h, "https://example.com/repo.git", logger)
 	req.NoError(err)
 

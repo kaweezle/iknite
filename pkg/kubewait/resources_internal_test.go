@@ -80,7 +80,7 @@ func TestClientDependentHelpersReturnErrors(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			req := require.New(t)
-			logger, _ := testutil.TestLogger(t)
+			logger := testutil.TestLogger(t)
 			err := tt.run(logger)
 			req.Error(err)
 		})
@@ -174,7 +174,7 @@ func TestRunKubewaitErrorWrapping(t *testing.T) {
 		h, err := testutil.NewDummyHost(fs, &testutil.DummyHostOptions{})
 		req.NoError(err)
 
-		logger, _ := testutil.TestLogger(t)
+		logger := testutil.TestLogger(t)
 		err = RunKubewait(context.Background(), h, opts, []string{"default"}, logger)
 		req.Error(err)
 		req.Contains(err.Error(), "error while waiting for resources")
@@ -201,7 +201,7 @@ func TestRunKubewaitErrorWrapping(t *testing.T) {
 		opts.BootstrapScript = filepath.Base(script)
 
 		// We need that as we cannot execute RAM based scripts (should mock execution in that case)
-		logger, _ := testutil.TestLogger(t)
+		logger := testutil.TestLogger(t)
 		err := RunKubewait(context.Background(), h, opts, []string{"default"}, logger)
 		req.Error(err)
 		req.Contains(err.Error(), "error during bootstrap")
@@ -263,7 +263,7 @@ func Test_listNamespaces(t *testing.T) {
 				defer cancel()
 			}
 
-			logger, _ := testutil.TestLogger(t)
+			logger := testutil.TestLogger(t)
 			got, gotErr := listNamespaces(ctx, k8sInterface, tt.interval, logger)
 			if gotErr != nil {
 				if tt.wantErr == "" {
@@ -395,7 +395,7 @@ func Test_resolveNamespaces(t *testing.T) {
 			opts.StatusUpdateInterval = tt.interval
 			opts.AllNamespaces = tt.allNamespaces
 
-			logger, _ := testutil.TestLogger(t)
+			logger := testutil.TestLogger(t)
 			got, gotErr := resolveNamespaces(ctx, getter, fs, opts, tt.namespaces, logger)
 			if gotErr != nil {
 				if tt.wantErr == "" {
@@ -681,7 +681,7 @@ func TestWaitNameSpaceResources(t *testing.T) {
 			defer cancel()
 			getter := tt.createGetter(t, serverOpts, rOpts, cancel)
 
-			logger, _ := testutil.TestLogger(t)
+			logger := testutil.TestLogger(t)
 			gotErr := waitNamespaceResources(ctx, getter, tt.namespace, rOpts, logger)
 			if tt.wantErr != "" {
 				req.Error(gotErr)
@@ -787,7 +787,7 @@ func Test_waitForResources(t *testing.T) {
 				NamespaceSettlePeriod:   1 * time.Second,
 			}
 
-			logger, _ := testutil.TestLogger(t)
+			logger := testutil.TestLogger(t)
 			gotErr := waitForResources(t.Context(), fs, rOpts, tt.namespaces, logger)
 			if tt.wantErr != "" {
 				req.Error(gotErr)
