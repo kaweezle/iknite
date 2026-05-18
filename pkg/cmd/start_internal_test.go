@@ -4,6 +4,7 @@ package cmd
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"net"
 	"os"
 	"strings"
@@ -140,7 +141,7 @@ func persistClusterState(
 ) {
 	cluster := v1alpha1.NewDefaultIkniteCluster()
 	cluster.Update(state, "phase-a", ready, unready)
-	cluster.Persist(fs)
+	cluster.Persist(fs, slog.Default())
 }
 
 func setupPrepareSuccessMocks(m *mockHost.MockHost) {

@@ -8,8 +8,6 @@ import (
 	"log/slog"
 	"testing"
 
-	sloglogrus "github.com/samber/slog-logrus/v2"
-	"github.com/sirupsen/logrus"
 	"github.com/spf13/pflag"
 	"github.com/stretchr/testify/require"
 
@@ -44,7 +42,7 @@ func TestBaseOptions_AddFlags_registersAndParsesFlags(t *testing.T) {
 		t.Fatalf("unexpected parse error: %v", err)
 	}
 	if opts.Verbosity != slog.LevelDebug {
-		t.Fatalf("expected verbosity %q, got %q", logrus.DebugLevel, opts.Verbosity)
+		t.Fatalf("expected verbosity %q, got %q", slog.LevelDebug, opts.Verbosity)
 	}
 	if !opts.JSONLogs {
 		t.Fatal("expected JSONLogs to be true after parsing --json")
@@ -114,15 +112,10 @@ func TestBaseOptions_SetUpLogs_configuresLogger(t *testing.T) {
 			req := require.New(t)
 
 			var out bytes.Buffer
-			cmdIf := util.NewCmdInterface()
+			cmdIf := util.NewCmdInterface(nil)
 			tt.opts.SetUpLogs(&out, cmdIf)
 
 			logger := cmdIf.Logger()
-			_, ok := logger.Handler().(*sloglogrus.LogrusHandler)
-			if !ok {
-				t.Fatal("expected logger handler to be of type *sloglogrus.LogrusHandler")
-			}
-
 			tt.assert(req, logger, &out)
 		})
 	}

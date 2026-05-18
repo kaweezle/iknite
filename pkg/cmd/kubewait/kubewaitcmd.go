@@ -43,7 +43,7 @@ func CreateKubewaitCmd(out io.Writer, fse host.FileExecutor, opts *kubewait.Opti
 	if fse == nil {
 		fse = host.NewDefaultHost()
 	}
-	cmdIf := cmdUtil.NewCmdInterface()
+	cmdIf := cmdUtil.NewCmdInterface(&opts.BaseOptions)
 
 	cmd := &cobra.Command{
 		Use:   "kubewait [namespaces...]",

@@ -50,7 +50,7 @@ func TestStatusCommand(t *testing.T) {
 		tea.WithInput(input),
 		tea.WithoutRenderer(),
 	)
-	ctx := util.WithCmdInterface(t.Context(), util.NewCmdInterface())
+	ctx := util.WithCmdInterface(t.Context(), util.NewCmdInterface(nil))
 	err = command.ExecuteContext(ctx)
 	req.NoError(err)
 }

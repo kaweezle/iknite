@@ -4,11 +4,11 @@ package utils
 import (
 	"errors"
 	"fmt"
+	"log/slog"
 	"sync"
 	"testing"
 	"time"
 
-	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 
 	"github.com/kaweezle/iknite/pkg/testutil"
@@ -138,13 +138,14 @@ func TestHookManager_ErrorsLogged(t *testing.T) {
 
 	require.Len(t, hook.AllEntries(), 1)
 	entry := hook.LastEntry()
-	require.Equal(t, logrus.ErrorLevel, entry.Level)
+	require.Equal(t, slog.LevelError, entry.Level)
 	require.Equal(t, "Error while running hook", entry.Message)
-	require.Equal(t, "failing", entry.Data["hook"])
-	errorEntry := entry.Data[ErrorKey]
+	attrs := make(map[string]any)
+	entry.Attrs(func(a slog.Attr) bool { attrs[a.Key] = a.Value.Any(); return true })
+	require.Equal(t, "failing", attrs["hook"])
+	errorEntry := attrs[ErrorKey]
 	require.NotNil(t, errorEntry)
-	attrs, ok := errorEntry.(map[string]any)
+	err, ok := errorEntry.(error)
 	require.True(t, ok)
-	require.Contains(t, attrs, ErrorKey)
-	require.Contains(t, attrs[ErrorKey], "test fail")
+	require.Contains(t, err.Error(), "test fail")
 }

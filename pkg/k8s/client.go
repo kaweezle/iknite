@@ -40,7 +40,6 @@ import (
 	"sigs.k8s.io/kustomize/kyaml/resid"
 
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
-	"github.com/kaweezle/iknite/pkg/cmd/util"
 	"github.com/kaweezle/iknite/pkg/host"
 	"github.com/kaweezle/iknite/pkg/testutil"
 	"github.com/kaweezle/iknite/pkg/utils"
@@ -415,7 +414,7 @@ func WorkloadsReadyConditionWithContextFunc(
 ) wait.ConditionWithContextFunc {
 	iteration := 0
 	okIterations := 0
-	return func(ctx context.Context) (bool, error) {
+	return func(_ context.Context) (bool, error) {
 		states, err := AllWorkloadStates(client, logger)
 		if err != nil {
 			return false, err
@@ -431,7 +430,7 @@ func WorkloadsReadyConditionWithContextFunc(
 				ready = append(ready, state)
 			}
 		}
-		util.LoggerFromContext(ctx).
+		logger.
 			Info(
 				fmt.Sprintf(
 					"Workloads total: %d, ready: %d, unready:%d, okIterations: %d",

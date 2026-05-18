@@ -20,6 +20,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/kaweezle/iknite/pkg/cmd/util"
 	"github.com/kaweezle/iknite/pkg/host"
 	pkgSecrets "github.com/kaweezle/iknite/pkg/secrets"
 )
@@ -40,7 +41,8 @@ func CreateSecretsCmd(fs host.FileSystem, opts *pkgSecrets.Options) *cobra.Comma
 
 Paths are specified in dot notation under the data key.
 For example, github.api_token targets data.github.api_token.`,
-		PersistentPreRunE: func(_ *cobra.Command, _ []string) error {
+		PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
+			opts.Logger = util.LoggerFromCommand(cmd)
 			err := opts.SetDefaults()
 			if err != nil {
 				return fmt.Errorf("error setting default opts: %w", err)

@@ -11,7 +11,6 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sync/errgroup"
@@ -471,7 +470,7 @@ func TestWatchSetLBIPServices_ServiceDeletedBeforePatch(t *testing.T) {
 
 	err := eg.Wait()
 	req.NoError(err) // Should not return an error even though the update failed with NotFound
-	req.Equal(logrus.WarnLevel, hook.LastEntry().Level)
+	req.Equal(slog.LevelWarn, hook.LastEntry().Level)
 	req.Equal("Service not found when patching LB IP, it may have been deleted", hook.LastEntry().Message)
 }
 
@@ -515,7 +514,7 @@ func TestWatchSetLBIPServices_PatchError(t *testing.T) {
 
 	err := eg.Wait()
 	req.NoError(err) // Should not return an error even though the update failed
-	req.Equal(logrus.ErrorLevel, hook.LastEntry().Level)
+	req.Equal(slog.LevelError, hook.LastEntry().Level)
 	req.Equal("Failed to patch LoadBalancer service", hook.LastEntry().Message)
 }
 

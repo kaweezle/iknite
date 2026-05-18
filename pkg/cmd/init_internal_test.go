@@ -144,7 +144,7 @@ func TestNewInitData(t *testing.T) {
 			var output bytes.Buffer // dummy output for validation
 
 			cmd := newCmdInit(&output, opts, initRunner, host.NewDefaultHost())
-			cmd.SetContext(util.WithCmdInterface(t.Context(), util.NewCmdInterface()))
+			cmd.SetContext(util.WithCmdInterface(t.Context(), util.NewCmdInterface(nil)))
 			if tt.customizeOptions != nil {
 				cleanup, err := tt.customizeOptions(t, cmd, opts)
 				req.NoError(err)
@@ -211,7 +211,7 @@ func TestInitDataClientWithNonDefaultKubeconfig(t *testing.T) {
 		t.Fatalf("initRunner.InitData expected error when context is nil, got nil")
 	}
 
-	cmd.SetContext(util.WithCmdInterface(t.Context(), util.NewCmdInterface()))
+	cmd.SetContext(util.WithCmdInterface(t.Context(), util.NewCmdInterface(nil)))
 
 	d, err := initRunner.InitData([]string{})
 	if err != nil {

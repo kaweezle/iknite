@@ -5,8 +5,6 @@ import (
 	"io"
 	"log/slog"
 
-	sloglogrus "github.com/samber/slog-logrus/v2"
-	"github.com/sirupsen/logrus"
 	"github.com/spf13/pflag"
 
 	"github.com/kaweezle/iknite/pkg/utils"
@@ -33,20 +31,12 @@ func DefaultBaseOptions() *BaseOptions {
 
 func (opts *BaseOptions) AddFlags(flags *pflag.FlagSet) {
 	flags.VarP(
-		NewLogLevelValue(&opts.Verbosity), LogLevelFlag, "v", "Log level (debug, info, warn, error)")
+		NewLogLevelValue(&opts.Verbosity), LogLevelFlag, "v", "Log level (trace, debug, info, warn, error)")
 	flags.BoolVar(&opts.JSONLogs, JSONLogsFlag, opts.JSONLogs, "Emit log messages as JSON")
 }
 
 func (opts *BaseOptions) Logger(out io.Writer) *slog.Logger {
-	l := logrus.New()
-	l.SetOutput(out)
-	if opts.JSONLogs {
-		l.SetFormatter(&logrus.JSONFormatter{})
-	}
-	return slog.New(sloglogrus.Option{
-		Level:  opts.Verbosity,
-		Logger: l,
-	}.NewLogrusHandler())
+	return utils.NewLogger(out, opts.Verbosity, opts.JSONLogs)
 }
 
 // setUpLogs configures logrus output and level.

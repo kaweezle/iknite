@@ -50,7 +50,7 @@ func CreateRootCmd(opts *RootOptions) *cobra.Command {
 		opts = NewRootOptions()
 	}
 
-	cmdIf := util.NewCmdInterface()
+	cmdIf := util.NewCmdInterface(&opts.BaseOptions)
 
 	rootCmd := &cobra.Command{
 		Use:   "iknitectl",

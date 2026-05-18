@@ -17,6 +17,7 @@ limitations under the License.
 package util
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"os"
@@ -174,11 +175,10 @@ func toStringSlice(val any) ([]string, error) {
 // BindFlagValue applies the viper config value to the flag when the flag is not set and viper has a value.
 func BindFlagValue(f *pflag.Flag, v *viper.Viper, viperName string, logger *slog.Logger) error {
 	// Apply the viper config value to the flag when the flag is not set and viper has a value
+	logger = logger.With(optionKey, f.Name, viperKey, viperName)
 	if f.Changed || !v.IsSet(viperName) {
-		logger.With(
-			optionKey, f.Name,
-			viperKey, viperName,
-		).Debug("skipping applying viper config to flag because flag is already set or viper key is not set")
+		logger.Log(context.TODO(), utils.LevelTrace,
+			"skipping viper -> pflag", "flag_changed", f.Changed, "viper_set", v.IsSet(viperName))
 		return nil
 	}
 	val := v.Get(viperName)
@@ -198,8 +198,6 @@ func BindFlagValue(f *pflag.Flag, v *viper.Viper, viperName string, logger *slog
 		if err := vi.Replace(stringValues); err != nil {
 			logger.Error(
 				"error replacing options",
-				optionKey, f.Name,
-				viperKey, viperName,
 				valueKey, val,
 				utils.ErrorKey, err,
 			)
@@ -215,8 +213,6 @@ func BindFlagValue(f *pflag.Flag, v *viper.Viper, viperName string, logger *slog
 		if err := f.Value.Set(fmt.Sprintf("%v", val)); err != nil {
 			logger.Error(
 				"error replacing options",
-				optionKey, f.Name,
-				viperKey, viperName,
 				valueKey, val,
 				utils.ErrorKey, err,
 			)

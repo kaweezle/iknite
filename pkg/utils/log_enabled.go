@@ -5,14 +5,14 @@ import (
 	"io"
 	"log/slog"
 	"os"
-
-	sloglogrus "github.com/samber/slog-logrus/v2"
-	"github.com/sirupsen/logrus"
 )
 
 var DefaultLogLevel = slog.LevelDebug
 
-const ErrorKey = "error"
+const (
+	ErrorKey   = "error"
+	LevelTrace = slog.Level(-8)
+)
 
 type LoggerProvider interface {
 	Logger() *slog.Logger
@@ -30,18 +30,22 @@ var _ LoggerProvider = (*LogEnabled)(nil)
 
 var _ LoggerHolder = (*LogEnabled)(nil)
 
-func NewLogger(out io.Writer) *slog.Logger {
-	l := logrus.New()
-	l.SetOutput(out)
-	return slog.New(sloglogrus.Option{
-		Level:  DefaultLogLevel,
-		Logger: l,
-	}.NewLogrusHandler())
+func NewLogger(out io.Writer, level slog.Level, jsonLogs bool) *slog.Logger {
+	var handler slog.Handler
+	options := &slog.HandlerOptions{
+		Level: level,
+	}
+	if jsonLogs {
+		handler = slog.NewJSONHandler(out, options)
+	} else {
+		handler = slog.NewTextHandler(out, options)
+	}
+	return slog.New(handler)
 }
 
 func (le *LogEnabled) Logger() *slog.Logger {
 	if le.LogEntry == nil {
-		le.LogEntry = NewLogger(os.Stdout)
+		le.LogEntry = NewLogger(os.Stdout, DefaultLogLevel, false)
 	}
 	return le.LogEntry
 }

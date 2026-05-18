@@ -89,7 +89,8 @@ func NewStatusCmd(
 				return fmt.Errorf("cannot get command interface")
 			}
 			var output bytes.Buffer
-			util.DefaultBaseOptions().SetUpLogs(&output, cmdIf)
+			opts := &util.BaseOptions{Verbosity: slog.LevelWarn}
+			opts.SetUpLogs(&output, cmdIf)
 
 			err := performStatus(
 				cmd.Context(),

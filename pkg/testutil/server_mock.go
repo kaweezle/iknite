@@ -17,7 +17,6 @@ import (
 	"testing"
 
 	argoprojv1 "github.com/argoproj/argo-cd/v3/pkg/apis/application/v1alpha1"
-	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	appsV1 "k8s.io/api/apps/v1"
@@ -406,7 +405,7 @@ func GetTestMapperFromClientConfig(clientconfig clientcmd.ClientConfig) (meta.RE
 		r.EXPECT().KindFor(mock.Anything).Return(schema.GroupVersionKind{}, errors.New("bad type")).Maybe()
 		return r, nil
 	case "network":
-		logrus.Warn("using network REST mapper, which will make real API calls to the cluster.")
+		slog.Warn("using network REST mapper, which will make real API calls to the cluster.")
 	default:
 		return nil, fmt.Errorf("unsupported test REST mapper type: %s", mapperType)
 	}

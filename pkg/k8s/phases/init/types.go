@@ -10,7 +10,6 @@ import (
 
 	ikniteApi "github.com/kaweezle/iknite/pkg/apis/iknite"
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
-	"github.com/kaweezle/iknite/pkg/cmd/util"
 	"github.com/kaweezle/iknite/pkg/host"
 	"github.com/kaweezle/iknite/pkg/utils"
 )
@@ -82,5 +81,5 @@ type IkniteInitData interface {
 	ShutdownHookRegistrar
 	ShutdownHookRunner
 	utils.LoggerProvider
-	util.ViperProvider
+	utils.ViperProvider
 }

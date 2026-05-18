@@ -33,7 +33,7 @@ func makeResetCmd(t *testing.T, opts *resetOptions) *cobra.Command {
 	cmd := &cobra.Command{Use: "reset"}
 	AddResetFlags(cmd.Flags(), opts)
 	config.AddIkniteClusterFlags(cmd.Flags(), opts.ikniteCfg)
-	cmd.SetContext(util.WithCmdInterface(t.Context(), util.NewCmdInterface()))
+	cmd.SetContext(util.WithCmdInterface(t.Context(), util.NewCmdInterface(nil)))
 	return cmd
 }
 
@@ -205,7 +205,7 @@ func TestNewCmdReset(t *testing.T) {
 
 	runner := workflow.NewRunner()
 	cmd := newCmdReset(&in, &out, nil, runner)
-	cmd.SetContext(util.WithCmdInterface(t.Context(), util.NewCmdInterface()))
+	cmd.SetContext(util.WithCmdInterface(t.Context(), util.NewCmdInterface(nil)))
 
 	req.NotNil(cmd)
 	req.Equal("reset", cmd.Name())

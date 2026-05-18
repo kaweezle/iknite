@@ -19,6 +19,7 @@ package util
 import (
 	"fmt"
 	"log/slog"
+	"strings"
 
 	"github.com/spf13/pflag"
 )
@@ -34,9 +35,13 @@ func NewLogLevelValue(p *slog.Level) *LogLevelValue {
 
 func (c *LogLevelValue) Set(s string) error {
 	level := slog.Level(*c)
-	err := level.UnmarshalText([]byte(s))
-	if err != nil {
-		return fmt.Errorf("while parsing log level: %w", err)
+	if strings.EqualFold(s, "TRACE") {
+		level = slog.Level(-8) // Custom trace level below debug
+	} else {
+		err := level.UnmarshalText([]byte(s))
+		if err != nil {
+			return fmt.Errorf("while parsing log level: %w", err)
+		}
 	}
 	*c = LogLevelValue(level)
 	return nil

@@ -342,7 +342,7 @@ func (d *initData) Host() host.Host {
 func (d *initData) SetIkniteCluster(cluster *v1alpha1.IkniteCluster) {
 	clusterCopy := *cluster
 	d.ikniteCluster = &clusterCopy
-	d.ikniteCluster.Persist(d.Host())
+	d.ikniteCluster.Persist(d.Host(), d.Logger())
 	d.clusterUpdateBus.Publish(d.ikniteCluster)
 }
 
@@ -352,7 +352,7 @@ func (d *initData) UpdateIkniteCluster(
 	ready, unready []*v1alpha1.WorkloadState,
 ) {
 	d.ikniteCluster.Update(state, phase, ready, unready)
-	d.ikniteCluster.Persist(d.Host())
+	d.ikniteCluster.Persist(d.Host(), d.Logger())
 	clusterCopy := d.ikniteCluster.DeepCopy()
 	d.clusterUpdateBus.Publish(clusterCopy)
 }

@@ -8,7 +8,6 @@ import (
 	"os"
 	"testing"
 
-	logTest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
@@ -20,9 +19,9 @@ import (
 )
 
 //nolint:unparam // TODO: check on the hook the messages
-func createTestCmdInterface(t *testing.T) (util.CmdInterface, *logTest.Hook) {
+func createTestCmdInterface(t *testing.T) (util.CmdInterface, *testutil.Hook) {
 	t.Helper()
-	cmdIf := util.NewCmdInterface()
+	cmdIf := util.NewCmdInterface(nil)
 	loggerHolder, ok := cmdIf.(utils.LoggerHolder)
 	require.True(t, ok, "CmdInterface's Logger should implement LoggerHolder")
 	logger, hook := testutil.TestLoggerWithHook(t)

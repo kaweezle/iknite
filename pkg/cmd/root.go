@@ -49,7 +49,7 @@ func NewRootCmd(opts *util.BaseOptions) *cobra.Command {
 	cobra.EnableTraverseRunHooks = true
 
 	ikniteConfig := &v1alpha1.IkniteClusterSpec{}
-	cmdIf := util.NewCmdInterface()
+	cmdIf := util.NewCmdInterface(opts)
 
 	// rootCmd represents the base command when called without any subcommands
 	rootCmd := &cobra.Command{
