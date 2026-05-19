@@ -535,6 +535,16 @@ func newInitData(
 	}
 	logger := util.LoggerFromContext(ctx)
 
+	// ensure outbound IP is included in the API server cert SANs
+	var externalIP string
+	ip, err := alpineHost.GetOutboundIP()
+	if err != nil {
+		logger.Warn("Failed to get outbound IP address, API server certificate may not be valid", "error", err)
+	} else {
+		externalIP = ip.String()
+	}
+	cfg.APIServer.CertSANs = append(cfg.APIServer.CertSANs, externalIP)
+
 	return &initData{
 		cfg:                     cfg,
 		certificatesDir:         cfg.CertificatesDir,
