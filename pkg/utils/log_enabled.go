@@ -1,9 +1,12 @@
+// cSpell: words zerolog
 package utils
 
 import (
 	"io"
 	"log/slog"
 	"os"
+
+	"github.com/rs/zerolog"
 )
 
 var DefaultLogLevel = slog.LevelDebug
@@ -30,15 +33,16 @@ var _ LoggerProvider = (*LogEnabled)(nil)
 var _ LoggerHolder = (*LogEnabled)(nil)
 
 func NewLogger(out io.Writer, level slog.Level, jsonLogs bool) *slog.Logger {
-	var handler slog.Handler
-	options := &slog.HandlerOptions{
-		Level: level,
+	zLevel, err := zerolog.ParseLevel(level.String())
+	if err != nil {
+		zLevel = zerolog.DebugLevel
 	}
-	if jsonLogs {
-		handler = slog.NewJSONHandler(out, options)
-	} else {
-		handler = slog.NewTextHandler(out, options)
+	zl := zerolog.New(out).Level(zLevel)
+	if !jsonLogs {
+		output := zerolog.ConsoleWriter{Out: os.Stdout}
+		zl = zl.Output(output)
 	}
+	handler := zerolog.NewSlogHandler(zl)
 	return slog.New(handler)
 }
 
