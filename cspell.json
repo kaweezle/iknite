@@ -134,6 +134,7 @@
     "statefulsets",
     "stretchr",
     "testdata",
+    "testutil",
     "tflint",
     "tfstate",
     "tmpl",

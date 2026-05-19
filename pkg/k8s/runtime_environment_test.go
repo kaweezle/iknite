@@ -1,4 +1,4 @@
-// cSpell: words testutils cpuset netfilter modprobe paralleltest tparallel procs runlevels cyclop testutil
+// cSpell: words testutils cpuset netfilter modprobe paralleltest tparallel procs runlevels cyclop
 package k8s_test
 
 // cSpell: disable

@@ -1,4 +1,4 @@
-// cSpell: words ipcns utsns testutil
+// cSpell: words ipcns utsns
 //
 //nolint:errcheck,forcetypeassert // Ignoring error checks in tests for simplicity
 package cmd

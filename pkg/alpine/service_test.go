@@ -1,6 +1,6 @@
 package alpine_test
 
-// cSpell: words runlevel runlevels softlevel testutil
+// cSpell: words runlevel runlevels softlevel
 
 import (
 	"errors"

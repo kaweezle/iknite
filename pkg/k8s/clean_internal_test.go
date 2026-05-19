@@ -1,6 +1,6 @@
 package k8s
 
-// cSpell: words ipcns utsns testmount tmpfs mountpoint testutil
+// cSpell: words ipcns utsns testmount tmpfs mountpoint
 
 import (
 	"errors"

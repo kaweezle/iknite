@@ -1,4 +1,4 @@
-// cSpell: words paralleltest testutils testutil
+// cSpell: words paralleltest testutils
 //
 //nolint:paralleltest,lll // uses package globals and long mocked JSON payloads
 package cri_test

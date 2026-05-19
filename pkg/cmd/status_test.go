@@ -1,4 +1,4 @@
-// cSpell: words paralleltest configurer testutil charmbracelet bubbletea
+// cSpell: words paralleltest configurer charmbracelet bubbletea
 //
 //nolint:paralleltest // mutates viper
 package cmd_test

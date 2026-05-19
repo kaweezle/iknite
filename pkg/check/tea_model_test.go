@@ -1,4 +1,4 @@
-// cSpell: words charmbracelet bubbletea testutil
+// cSpell: words charmbracelet bubbletea
 package check_test
 
 import (

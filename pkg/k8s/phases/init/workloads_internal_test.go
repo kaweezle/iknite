@@ -1,4 +1,4 @@
-// cSpell: words testutil apimachinery errgroup
+// cSpell: words apimachinery errgroup
 package init
 
 import (

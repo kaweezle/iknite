@@ -1,4 +1,4 @@
-// cSpell: words getsops testutil
+// cSpell: words getsops
 /*
 Copyright © 2025 Antoine Martin <antoine@openance.com>
 

@@ -1,4 +1,4 @@
-// cSpell: words testutil corev1 apiextensionsv1 apiextensions apimachinery utilruntime admissionregistration
+// cSpell: words corev1 apiextensionsv1 apiextensions apimachinery utilruntime admissionregistration
 // cSpell: words apiregistration
 package testutil
 

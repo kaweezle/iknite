@@ -1,4 +1,4 @@
-// cSpell: words chmoded testutil
+// cSpell: words chmoded
 package kubewait
 
 import (

@@ -16,7 +16,7 @@ limitations under the License.
 //nolint:gosec,errcheck,forcetypeassert // Unit testing
 package server_test
 
-// cSpell: words pkiutil certutil clientcmd kubeadmapi noctx ikniteapi testutil
+// cSpell: words pkiutil certutil clientcmd kubeadmapi noctx ikniteapi
 
 import (
 	"context"

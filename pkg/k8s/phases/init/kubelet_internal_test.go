@@ -1,4 +1,4 @@
-// cSpell: words testutil kubeadmapi features
+// cSpell: words kubeadmapi features
 package init
 
 import (

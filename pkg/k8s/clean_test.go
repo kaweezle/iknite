@@ -1,6 +1,6 @@
 package k8s_test
 
-// cSpell: words txeh ifname wrapcheck testutil
+// cSpell: words txeh ifname wrapcheck
 
 import (
 	"bytes"

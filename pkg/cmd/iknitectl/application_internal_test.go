@@ -15,7 +15,7 @@ limitations under the License.
 */
 package iknitectl
 
-// cSpell: words dvcm appstage mockhost hostpkg crds testutil
+// cSpell: words dvcm appstage mockhost hostpkg crds
 
 import (
 	"bytes"

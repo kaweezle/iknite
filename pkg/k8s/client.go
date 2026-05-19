@@ -1,7 +1,7 @@
 package k8s
 
 // cSpell: words clientcmd clientconfig restconfig casttype metav1 polymorphichelpers restmapper genericclioptions
-// cSpell: words testutil serviceaccount corev
+// cSpell: words serviceaccount corev
 // cSpell: disable
 import (
 	"bytes"

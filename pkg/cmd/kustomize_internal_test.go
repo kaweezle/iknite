@@ -1,4 +1,4 @@
-// cSpell: words testutil clientcmd readyz clusterroles paralleltest
+// cSpell: words clientcmd readyz clusterroles paralleltest
 package cmd
 
 import (

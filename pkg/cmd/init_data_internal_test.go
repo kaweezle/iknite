@@ -1,5 +1,5 @@
 // cSpell: words apimachinery bootstraptoken bootstraptokenv1 certutil clientcmdapi
-// cSpell: words clientsetfake genericclioptions paralleltest pkiutil Equalf testutil
+// cSpell: words clientsetfake genericclioptions paralleltest pkiutil Equalf
 package cmd
 
 import (

@@ -1,4 +1,4 @@
-// cSpell: words cgroupfs testutil
+// cSpell: words cgroupfs
 package host_test
 
 import (

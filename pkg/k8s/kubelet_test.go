@@ -1,4 +1,4 @@
-// cSpell: words cgroupfs mockk8s testutil
+// cSpell: words cgroupfs mockk8s
 package k8s_test
 
 import (
