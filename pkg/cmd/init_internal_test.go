@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -295,6 +296,7 @@ func TestRunInitCmd_Failed(t *testing.T) {
 	).Return(nil).Once()
 	mockH.EXPECT().Exists("/proc/sys/net/bridge").
 		Return(false, errors.New("File error"))
+	mockH.EXPECT().GetOutboundIP().Return(net.ParseIP("51.75.199.148"), nil).Once()
 
 	var output bytes.Buffer
 	cmd := newCmdInit(&output, initOptions, initRunner, mockH)
@@ -359,6 +361,7 @@ func TestRunInitCmd_Success(t *testing.T) {
 		Maybe()
 	// Remove the kubelet pid file at the end of the workflow
 	mockH.EXPECT().Remove("/run/kubelet.pid").Return(nil).Once()
+	mockH.EXPECT().GetOutboundIP().Return(net.ParseIP("51.75.199.148"), nil).Once()
 
 	var output bytes.Buffer
 	cmd := newCmdInit(&output, initOptions, initRunner, mockH)
