@@ -1,4 +1,4 @@
-// cSpell: words viper logrus sloglogrus samber
+// cSpell: words viper  samber
 package util
 
 import (
@@ -39,7 +39,7 @@ func (opts *BaseOptions) Logger(out io.Writer) *slog.Logger {
 	return utils.NewLogger(out, opts.Verbosity, opts.JSONLogs)
 }
 
-// setUpLogs configures logrus output and level.
+// setUpLogs configures log output and level.
 func (opts *BaseOptions) SetUpLogs(out io.Writer, cmdIf CmdInterface) {
 	if setLogger, ok := cmdIf.(utils.LoggerHolder); ok {
 		setLogger.SetLogger(opts.Logger(out))

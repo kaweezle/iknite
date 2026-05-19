@@ -2,7 +2,7 @@
 <div id="top"></div>
 <!-- markdownlint-enable MD033 MD041-->
 
-<!-- cSpell:words logrus goreleaser kubectx kubens rootfs wsldl kwsl LOCALAPPDATA iface -->
+<!-- cSpell:words goreleaser kubectx kubens rootfs wsldl kwsl LOCALAPPDATA iface -->
 
 <!-- PROJECT SHIELDS -->
 
@@ -117,7 +117,7 @@ Some additional components are also installed:
 This project uses the following popular [go](https://go.dev/) tools:
 
 - [cobra](https://github.com/spf13/cobra)
-- [logrus](github.com/sirupsen/logrus)
+- [viper](https://github.com/spf13/viper)
 - [client-go](https://github.com/kubernetes/client-go)
 - [goreleaser](https://goreleaser.com/) for building and packaging
 - ... (take a look at `go.mod`)

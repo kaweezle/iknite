@@ -189,7 +189,6 @@ Major external dependencies (see `go.mod`):
 
 - **Kubernetes**: `k8s.io/client-go`, `k8s.io/api`, `k8s.io/apimachinery`
 - **CLI**: `github.com/spf13/cobra`, `github.com/spf13/viper`
-- **Logging**: `github.com/sirupsen/logrus`
 - **Testing**: `github.com/stretchr/testify`
 
 ## Testing
@@ -332,11 +331,10 @@ if err != nil {
 ### Logging
 
 ```go
-import log "github.com/sirupsen/logrus"
+import log "log/slog"
 
-log.WithFields(log.Fields{
-    "service": name,
-}).Info("Starting service")
+logger := util.LoggerFromContext(ctx)
+logger.Info("Starting service", "service", name)
 ```
 
 ### Configuration

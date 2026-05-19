@@ -15,7 +15,7 @@ limitations under the License.
 */
 package cmd
 
-// cSpell: words runlevels runlevel apiserver controllermanager healthcheck logrus configurer
+// cSpell: words runlevels runlevel apiserver controllermanager healthcheck configurer
 // cSpell: disable
 import (
 	"bytes"

@@ -1,4 +1,4 @@
-// cSpell: words sloglogrus samber
+// cSpell: words
 package util
 
 import (

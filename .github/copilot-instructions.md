@@ -296,11 +296,13 @@ This can be done also with iknite:
 - use `RunE` variants of Cobra commands for automatic error handling.
 - Avoid `cobra.CheckErr()` for command-level errors
 - Wrap errors with context: `fmt.Errorf("failed to start OpenRC: %w", err)`
-- Log with structured fields: `logrus.WithField("phase", phase).Info(...)`
+- Log with structured fields: `logger.Info("message", "key", value)`
 
 #### Logging
 
-- Use `logrus` (aliased sometimes as `log`)
+- Use `log/slog`
+- The logger is injected into the command context and can be accessed with
+  `util.LoggerFromContext(ctx)`
 - Verbosity set via `-v` flag: `debug`, `info`, `warn`, `error`
 - JSON output via `--json` flag (see
   [pkg/cmd/util/base_options.go](../pkg/cmd/util/base_options.go).

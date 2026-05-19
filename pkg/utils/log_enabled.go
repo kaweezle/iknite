@@ -1,4 +1,3 @@
-// cSpell: words samber sloglogrus
 package utils
 
 import (
