@@ -1,4 +1,4 @@
-// cSpell: words paralleltest wrapcheck
+// cSpell: words paralleltest wrapcheck testutil
 package secrets
 
 import (
@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/kaweezle/iknite/pkg/host"
+	"github.com/kaweezle/iknite/pkg/testutil"
 )
 
 const (
@@ -450,6 +451,7 @@ func TestInitSecrets_internal(t *testing.T) {
 				FileSystem: baseFS,
 				writeErrs:  map[string]error{secretsFile: errors.New("write failed")},
 			},
+			Logger:      testutil.TestLogger(t),
 			SecretsFile: secretsFile,
 			HomeDir:     homeDir,
 			KeyFile:     keyFile,
@@ -600,6 +602,7 @@ func newSecretsFixture(t *testing.T) (*Options, string) {
 
 	return &Options{
 		Fs:          fs,
+		Logger:      testutil.TestLogger(t),
 		SecretsFile: filepath.Join(tempDir, DefaultSecretsFile),
 		HomeDir:     tempDir,
 		KeyFile:     keyFile,

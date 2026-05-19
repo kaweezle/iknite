@@ -15,20 +15,22 @@ limitations under the License.
 */
 package cmd
 
-// cSpell: words runlevels runlevel apiserver controllermanager healthcheck logrus configurer
+// cSpell: words runlevels runlevel apiserver controllermanager healthcheck configurer
 // cSpell: disable
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"log/slog"
 	"os"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
 	"github.com/kaweezle/iknite/pkg/check"
 	"github.com/kaweezle/iknite/pkg/checkers"
+	"github.com/kaweezle/iknite/pkg/cmd/util"
 	"github.com/kaweezle/iknite/pkg/config"
 	"github.com/kaweezle/iknite/pkg/host"
 	"github.com/kaweezle/iknite/pkg/utils"
@@ -82,7 +84,27 @@ func NewStatusCmd(
 - Statefulsets
 `,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			return performStatus(cmd.Context(), alpineHost, ikniteConfig, waitOptions, configurer, teaOptions...)
+			cmdIf, ok := util.CmdInterfaceFromCommand(cmd)
+			if !ok {
+				return fmt.Errorf("cannot get command interface")
+			}
+			var output bytes.Buffer
+			opts := &util.BaseOptions{Verbosity: slog.LevelWarn}
+			opts.SetUpLogs(&output, cmdIf)
+
+			err := performStatus(
+				cmd.Context(),
+				alpineHost,
+				ikniteConfig,
+				waitOptions,
+				configurer,
+				cmdIf.Logger(),
+				teaOptions...)
+			if output.Len() > 0 {
+				fmt.Fprintln(os.Stderr, "Additional logs:")
+				fmt.Fprintln(os.Stderr, output.String())
+			}
+			return err
 		},
 	}
 
@@ -99,20 +121,15 @@ func performStatus(
 	ikniteConfig *v1alpha1.IkniteClusterSpec,
 	waitOptions *utils.WaitOptions,
 	configurer CheckExecutorConfigurer,
+	logger *slog.Logger,
 	teaOptions ...tea.ProgramOption,
 ) error {
 	executor := check.NewCheckExecutor()
 	configurer.Configure(executor, ikniteConfig, waitOptions)
 
-	// Run all checks
-	logrus.SetLevel(logrus.FatalLevel)
-
-	checkData := checkers.CreateCheckWorkloadData(ikniteConfig, waitOptions, alpineHost)
+	checkData := checkers.CreateCheckWorkloadData(ikniteConfig, waitOptions, alpineHost, logger)
 	teaOptions = append(teaOptions, tea.WithOutput(os.Stderr))
-	p := tea.NewProgram(check.NewCheckModel(ctx, executor, checkData), teaOptions...)
-	tmp := os.Stdout
-	defer func() { os.Stdout = tmp }()
-	os.Stdout = nil
+	p := tea.NewProgram(check.NewCheckModel(ctx, executor, checkData, logger), teaOptions...)
 	_, err := p.Run()
 	if err != nil { // nocov -- hard to cover in all test scenarios.
 		return fmt.Errorf("error running checks: %w", err)

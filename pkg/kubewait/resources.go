@@ -20,16 +20,16 @@ limitations under the License.
 // a bootstrap repository script.
 package kubewait
 
-// cSpell: words godotenv clientcmd apimachinery kstatus errorf sirupsen joho metav1 serviceaccount genericclioptions
+// cSpell: words godotenv clientcmd apimachinery kstatus errorf joho metav1 serviceaccount genericclioptions
 
 import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"sync"
 	"time"
 
-	log "github.com/sirupsen/logrus"
 	"github.com/spf13/pflag"
 	coreV1 "k8s.io/api/core/v1"
 	k8errors "k8s.io/apimachinery/pkg/api/errors"
@@ -48,6 +48,7 @@ import (
 
 	"github.com/kaweezle/iknite/pkg/host"
 	"github.com/kaweezle/iknite/pkg/k8s"
+	"github.com/kaweezle/iknite/pkg/utils"
 )
 
 const (
@@ -112,14 +113,20 @@ func AddResourcesFlags(flags *pflag.FlagSet, opts *ResourcesOptions) {
 }
 
 // waitForResources waits for all resources in the specified namespaces to become ready.
-func waitForResources(ctx context.Context, fs host.FileSystem, opts *ResourcesOptions, namespaces []string) error {
+func waitForResources(
+	ctx context.Context,
+	fs host.FileSystem,
+	opts *ResourcesOptions,
+	namespaces []string,
+	logger *slog.Logger,
+) error {
 	if opts.Timeout > 0 {
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(ctx, opts.Timeout)
 		defer cancel()
 	}
 
-	client, err := k8s.NewClientFromKubeconfig(fs, opts.Kubeconfig)
+	client, err := k8s.NewClientFromKubeconfig(fs, opts.Kubeconfig, logger)
 	if err != nil {
 		return fmt.Errorf("failed to create Kubernetes client: %w", err)
 	}
@@ -130,7 +137,7 @@ func waitForResources(ctx context.Context, fs host.FileSystem, opts *ResourcesOp
 	}
 
 	// Validate that the requested resource types are supported by the cluster before starting the wait loops.
-	validTypes, err := k8s.ValidateResourceTypes(mapper, opts.ResourceTypes)
+	validTypes, err := k8s.ValidateResourceTypes(mapper, opts.ResourceTypes, logger)
 	if err != nil {
 		return fmt.Errorf("resource type validation failed: %w", err)
 	}
@@ -139,19 +146,19 @@ func waitForResources(ctx context.Context, fs host.FileSystem, opts *ResourcesOp
 	}
 	opts.ResourceTypes = validTypes
 
-	namespaces, err = resolveNamespaces(ctx, client, fs, opts, namespaces)
+	namespaces, err = resolveNamespaces(ctx, client, fs, opts, namespaces, logger)
 	if err != nil {
 		return err
 	}
 
-	log.Infof("Watching %d namespace(s) concurrently: %v", len(namespaces), namespaces)
+	logger.Info("Watching namespaces concurrently", "count", len(namespaces), "namespaces", namespaces)
 
 	// Launch one goroutine per namespace; collect errors via a buffered channel.
 	errCh := make(chan error, len(namespaces))
 	var wg sync.WaitGroup
 	for _, ns := range namespaces {
 		wg.Go(func() {
-			if err := waitNamespaceResources(ctx, client, ns, opts); err != nil {
+			if err := waitNamespaceResources(ctx, client, ns, opts, logger); err != nil {
 				errCh <- err
 			}
 		})
@@ -167,7 +174,7 @@ func waitForResources(ctx context.Context, fs host.FileSystem, opts *ResourcesOp
 		return errors.Join(errs...)
 	}
 
-	log.Info("All resources in all namespaces are ready")
+	logger.Info("All resources in all namespaces are ready")
 	return nil
 }
 
@@ -177,19 +184,20 @@ func resolveNamespaces(
 	fs host.FileSystem,
 	opts *ResourcesOptions,
 	namespaces []string,
+	logger *slog.Logger,
 ) ([]string, error) {
 	if len(namespaces) != 0 {
 		return namespaces, nil
 	}
 
 	if info, err := fs.Stat(currentNamespaceFile); err == nil && !info.IsDir() && !opts.AllNamespaces {
-		log.Infof("Getting namespace from %s", currentNamespaceFile)
+		logger.Info("Getting namespace from file", "file", currentNamespaceFile)
 		namespaceBytes, readErr := fs.ReadFile(currentNamespaceFile)
 		if readErr != nil { // nocov
 			return nil, fmt.Errorf("failed to read namespace from file %s: %w", currentNamespaceFile, readErr)
 		}
 		namespace := string(namespaceBytes)
-		log.Infof("Watching current namespace: %s", namespace)
+		logger.Info("Watching current namespace", "namespace", namespace)
 		return []string{namespace}, nil
 	}
 
@@ -198,7 +206,7 @@ func resolveNamespaces(
 		return nil, fmt.Errorf("failed to create Kubernetes client: %w", err)
 	}
 
-	namespaces, err = listNamespaces(ctx, k8sInterface, opts.StatusUpdateInterval)
+	namespaces, err = listNamespaces(ctx, k8sInterface, opts.StatusUpdateInterval, logger)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list namespaces: %w", err)
 	}
@@ -211,14 +219,15 @@ func listNamespaces(
 	ctx context.Context,
 	k8sInterface kubernetes.Interface,
 	interval time.Duration,
+	logger *slog.Logger,
 ) ([]string, error) {
-	log.Info("No namespaces specified, listing all namespaces from the cluster...")
+	logger.Info("No namespaces specified, listing all namespaces from the cluster...")
 
 	var names []string
 	if err := wait.PollUntilContextCancel(ctx, interval, true, func(ctx context.Context) (bool, error) {
 		list, listErr := k8sInterface.CoreV1().Namespaces().List(ctx, metav1.ListOptions{})
 		if listErr != nil {
-			log.WithError(listErr).Debug("API not available yet, retrying...")
+			logger.Debug("API not available yet, retrying...", utils.ErrorKey, listErr)
 			return false, nil
 		}
 		names = make([]string, 0, len(list.Items))
@@ -235,7 +244,7 @@ func listNamespaces(
 }
 
 type resourceWaiter struct {
-	logger             log.FieldLogger
+	logger             *slog.Logger
 	client             genericclioptions.RESTClientGetter
 	poller             *polling.StatusPoller
 	pollCancel         context.CancelFunc
@@ -252,6 +261,7 @@ func newResourceWaiter(
 	client genericclioptions.RESTClientGetter,
 	namespace string,
 	opts *ResourcesOptions,
+	logger *slog.Logger,
 ) (*resourceWaiter, error) {
 	factory := kubeUtil.NewFactory(client)
 	poller, err := polling.NewStatusPollerFromFactory(factory, polling.Options{
@@ -261,13 +271,11 @@ func newResourceWaiter(
 		return nil, fmt.Errorf("failed to create status poller: %w", err)
 	}
 
-	logger := log.WithField("namespace", namespace)
-
 	return &resourceWaiter{
 		client:         client,
 		namespace:      namespace,
 		poller:         poller,
-		logger:         logger,
+		logger:         logger.With("namespace", namespace),
 		pollCancel:     nil,
 		settleTimer:    nil,
 		endChannel:     make(chan error, 1),
@@ -359,10 +367,10 @@ func (w *resourceWaiter) startPolling(ctx context.Context, dataSet object.ObjMet
 	w.pollCancel = cancel
 	w.mu.Unlock()
 
-	w.logger.WithFields(log.Fields{
-		"pollInterval":  w.opts.StatusUpdateInterval.Round(time.Second),
-		"resourceCount": len(dataSet),
-	}).Info("Waiting for resources to become ready")
+	w.logger.Info(
+		"Waiting for resources to become ready",
+		"pollInterval", w.opts.StatusUpdateInterval.Round(time.Second),
+		"resourceCount", len(dataSet))
 
 	coll := collector.NewResourceStatusCollector(dataSet)
 
@@ -379,7 +387,7 @@ func (w *resourceWaiter) startPolling(ctx context.Context, dataSet object.ObjMet
 	go func() {
 		for result := range done {
 			if result.Err != nil {
-				w.logger.Errorf("Error while polling resource statuses: %v", result.Err)
+				w.logger.Error("Error while polling resource statuses", utils.ErrorKey, result.Err)
 				w.reportDone(result.Err)
 				return
 			}
@@ -388,7 +396,7 @@ func (w *resourceWaiter) startPolling(ctx context.Context, dataSet object.ObjMet
 }
 
 func (w *resourceWaiter) refreshDataSet() (object.ObjMetadataSet, error) {
-	dataSet, err := k8s.ObjectMetadataSetForNamespace(w.client, w.namespace, w.opts.ResourceTypes)
+	dataSet, err := k8s.ObjectMetadataSetForNamespace(w.client, w.namespace, w.opts.ResourceTypes, w.logger)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get object metadata set for namespace %s: %w", w.namespace, err)
 	}
@@ -445,11 +453,12 @@ func (w *resourceWaiter) watchDataSetChanges(ctx context.Context) {
 				return
 			}
 
-			w.logger.WithFields(log.Fields{
-				"previousCount": len(currentDataSet),
-				"currentCount":  len(newDataSet),
-				"interval":      w.opts.ResourcesUpdateInterval.Round(time.Second),
-			}).Info("Resource dataset changed, restarting poller")
+			w.logger.Info(
+				"Resource dataset changed, restarting poller",
+				"previousCount", len(currentDataSet),
+				"currentCount", len(newDataSet),
+				"interval", w.opts.ResourcesUpdateInterval.Round(time.Second),
+			)
 
 			if err := w.restartPolling(ctx, newDataSet); err != nil {
 				w.reportDone(err)
@@ -461,14 +470,15 @@ func (w *resourceWaiter) watchDataSetChanges(ctx context.Context) {
 
 func (w *resourceWaiter) processEvent(rsc *collector.ResourceStatusCollector, event pollingEvent.Event) {
 	if event.Type == pollingEvent.ResourceUpdateEvent {
-		w.logger.WithFields(log.Fields{
-			"group":     event.Resource.Identifier.GroupKind.Group,
-			"kind":      event.Resource.Identifier.GroupKind.Kind,
-			"name":      event.Resource.Identifier.Name,
-			"namespace": event.Resource.Identifier.Namespace,
-			"status":    event.Resource.Status,
-			"message":   event.Resource.Message,
-		}).Infof("Resource update")
+		w.logger.Info(
+			"Resource update",
+			"group", event.Resource.Identifier.GroupKind.Group,
+			"kind", event.Resource.Identifier.GroupKind.Kind,
+			"name", event.Resource.Identifier.Name,
+			"namespace", event.Resource.Identifier.Namespace,
+			"status", event.Resource.Status,
+			"message", event.Resource.Message,
+		)
 	}
 	rss := make([]*pollingEvent.ResourceStatus, 0, len(rsc.ResourceStatuses))
 	for _, rs := range rsc.ResourceStatuses {
@@ -476,16 +486,17 @@ func (w *resourceWaiter) processEvent(rsc *collector.ResourceStatusCollector, ev
 	}
 	aggStatus := aggregator.AggregateStatus(rss, status.CurrentStatus)
 	if aggStatus == status.CurrentStatus && !w.hasSettleTimer() {
-		w.logger.WithField("timer", w.opts.SettlePeriod.Round(time.Second)).Info(
+		w.logger.Info(
 			"All resources are ready, starting settle timer",
+			"timer", w.opts.SettlePeriod.Round(time.Second),
 		)
 		if err := w.StartSettleTimer(); err != nil {
-			w.logger.Errorf("Failed to start settle timer: %v", err)
+			w.logger.Error("Failed to start settle timer", utils.ErrorKey, err)
 		}
 	} else if aggStatus != status.CurrentStatus && w.hasSettleTimer() {
-		w.logger.Infof("A resource is no longer ready, stopping settle timer")
+		w.logger.Info("A resource is no longer ready, stopping settle timer")
 		if err := w.StopSettleTimer(); err != nil {
-			w.logger.Errorf("Failed to stop settle timer: %v", err)
+			w.logger.Error("Failed to stop settle timer", utils.ErrorKey, err)
 		}
 	}
 }
@@ -516,10 +527,11 @@ func waitNamespaceResources(
 	client genericclioptions.RESTClientGetter,
 	namespace string,
 	opts *ResourcesOptions,
+	l *slog.Logger,
 ) error {
-	logger := log.WithField("namespace", namespace)
+	logger := l.With("namespace", namespace)
 	// 1. Wait for the namespace to exist.
-	logger.Infof("Waiting for namespace to exist...")
+	logger.Info("Waiting for namespace to exist...")
 	var ns *coreV1.Namespace
 	k8sInterface, err := k8s.ClientSet(client)
 	if err != nil {
@@ -534,7 +546,7 @@ func waitNamespaceResources(
 			ns, nsErr = k8sInterface.CoreV1().Namespaces().Get(ctx, namespace, metav1.GetOptions{})
 			if nsErr != nil {
 				if k8errors.IsNotFound(nsErr) {
-					logger.Debugf("Namespace not yet present, waiting...")
+					logger.Debug("Namespace not yet present, waiting...")
 					return false, nil
 				}
 				return false, fmt.Errorf("error checking namespace: %w", nsErr)
@@ -547,12 +559,10 @@ func waitNamespaceResources(
 
 	nsExistence := time.Since(ns.CreationTimestamp.Time)
 	timeToWait := max(0, opts.NamespaceSettlePeriod-nsExistence)
-	logger2 := logger.WithFields(
-		log.Fields{
-			"namespaceAge": nsExistence.Round(time.Second),
-			"settlePeriod": opts.NamespaceSettlePeriod.Round(time.Second),
-			"timeToWait":   timeToWait.Round(time.Second),
-		},
+	logger2 := logger.With(
+		"namespaceAge", nsExistence.Round(time.Second),
+		"settlePeriod", opts.NamespaceSettlePeriod.Round(time.Second),
+		"timeToWait", timeToWait.Round(time.Second),
 	)
 	if timeToWait > 0 {
 		logger2.Info("Namespace younger than grace period, waiting")
@@ -565,7 +575,7 @@ func waitNamespaceResources(
 		logger2.Info("Namespace older than grace period, skipping wait")
 	}
 
-	waiter, err := newResourceWaiter(client, namespace, opts)
+	waiter, err := newResourceWaiter(client, namespace, opts, l)
 	if err != nil { // nocov - Unlikely to fail as the client works at this point.
 		return fmt.Errorf("failed to create resource waiter: %w", err)
 	}

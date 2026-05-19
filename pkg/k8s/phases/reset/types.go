@@ -10,6 +10,7 @@ import (
 
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
 	"github.com/kaweezle/iknite/pkg/host"
+	"github.com/kaweezle/iknite/pkg/utils"
 )
 
 // cSpell: enable
@@ -29,4 +30,5 @@ type IkniteResetData interface {
 
 	IkniteCluster() *v1alpha1.IkniteCluster
 	Host() host.Host
+	utils.LoggerProvider
 }

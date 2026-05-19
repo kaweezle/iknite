@@ -1,4 +1,4 @@
-// cSpell: words paralleltest testutils
+// cSpell: words paralleltest testutils testutil
 //
 //nolint:paralleltest,lll // uses package globals and long mocked JSON payloads
 package cri_test
@@ -13,6 +13,7 @@ import (
 	"github.com/kaweezle/iknite/pkg/constants"
 	"github.com/kaweezle/iknite/pkg/cri"
 	"github.com/kaweezle/iknite/pkg/host"
+	"github.com/kaweezle/iknite/pkg/testutil"
 )
 
 func TestWaitForContainerService(t *testing.T) {
@@ -72,8 +73,9 @@ func TestWaitForContainerService(t *testing.T) {
 			if tt.expectSocket {
 				req.NoError(fs.WriteFile(constants.ContainerServiceSock, []byte(""), 0o600))
 			}
+			logger := testutil.TestLogger(t)
 
-			ready, err := cri.WaitForContainerService(fs, mockExec)
+			ready, err := cri.WaitForContainerService(fs, mockExec, logger)
 			if tt.wantErr {
 				req.Error(err)
 			} else {

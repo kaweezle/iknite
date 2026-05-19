@@ -13,16 +13,16 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-// cSpell: words filesys sirupsen kyaml wrapcheck
+// cSpell: words filesys kyaml wrapcheck
 package provision
 
 import (
 	"embed"
 	"fmt"
+	"log/slog"
 	"net/url"
 	"path"
 
-	log "github.com/sirupsen/logrus"
 	"sigs.k8s.io/kustomize/api/resmap"
 	"sigs.k8s.io/kustomize/kyaml/filesys"
 
@@ -33,11 +33,13 @@ import (
 //go:embed base
 var content embed.FS
 
-func createTempKustomizeDirectory(content *embed.FS, fs filesys.FileSystem, outDir, inDir string) error {
-	log.WithFields(log.Fields{
-		"outDir": outDir,
-		"inDir":  inDir,
-	}).Trace("Start creating directory")
+func createTempKustomizeDirectory(
+	content *embed.FS,
+	fs filesys.FileSystem,
+	outDir, inDir string,
+	logger *slog.Logger,
+) error {
+	logger.Debug("Start creating directory", "outDir", outDir, "inDir", inDir)
 
 	files, err := content.ReadDir(inDir)
 	if err != nil {
@@ -51,13 +53,13 @@ func createTempKustomizeDirectory(content *embed.FS, fs filesys.FileSystem, outD
 		inPath := fmt.Sprintf("%s/%s", inDir, entry.Name())
 		outPath := fmt.Sprintf("%s/%s", outDir, entry.Name())
 
-		log.WithField("path", inPath).Trace("Reading file")
+		logger.Debug("Reading file", "path", inPath)
 		payload, err := content.ReadFile(inPath)
 		if err != nil {
 			return fmt.Errorf("while reading embedded file %s: %w", entry.Name(), err)
 		}
 
-		log.WithField("outPath", outPath).Trace("Writing content")
+		logger.Debug("Writing content", "outPath", outPath)
 		err = fs.WriteFile(outPath, payload)
 		if err != nil {
 			return fmt.Errorf("while writing %s to temp dir %s: %w", entry.Name(), outDir, err)
@@ -84,26 +86,28 @@ func isBaseKustomizationAvailable(fs host.FileSystem, dirname string) (bool, err
 
 // GetBaseKustomizationResources applies the kustomizations located in the specified
 // directory if available, otherwise returns the embedded kustomizations.
-func GetBaseKustomizationResources(fs host.FileSystem, dirname string, forceEmbedded bool) (resmap.ResMap, error) {
+func GetBaseKustomizationResources(
+	fs host.FileSystem,
+	dirname string,
+	forceEmbedded bool,
+	logger *slog.Logger,
+) (resmap.ResMap, error) {
 	ok, err := isBaseKustomizationAvailable(fs, dirname)
 	if err != nil {
 		return nil, fmt.Errorf("while checking for base kustomization: %w", err)
 	}
 	kustomizeFs := host.NewKustomizeFSWrapper(fs)
 	if !ok || forceEmbedded {
-		log.WithFields(log.Fields{
-			"directory":      dirname,
-			"force_embedded": forceEmbedded,
-			"exists":         ok,
-		}).Debug("Using embedded kustomization.")
+		logger.Debug("Using embedded kustomization.", "directory", dirname, "force_embedded", forceEmbedded,
+			"exists", ok)
 		kustomizeFs = filesys.MakeFsInMemory()
 		dirname = "base"
-		err = createTempKustomizeDirectory(&content, kustomizeFs, dirname, dirname)
+		err = createTempKustomizeDirectory(&content, kustomizeFs, dirname, dirname, logger)
 		if err != nil {
 			return nil, fmt.Errorf("while creating temporary kustomization directory: %w", err)
 		}
 	} else {
-		log.WithField("directory", dirname).Debug("Base kustomization found, applying it...")
+		logger.Debug("Base kustomization found, applying it...", "directory", dirname)
 	}
 	return kustomize.BuildOnFileSystem(kustomizeFs, dirname) //nolint:wrapcheck // No need to wrap here.
 }

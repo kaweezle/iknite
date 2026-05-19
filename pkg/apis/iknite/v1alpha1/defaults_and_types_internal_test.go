@@ -1,4 +1,4 @@
-// cSpell: words paralleltest apimachinery metav1 ikniteapi
+// cSpell: words paralleltest apimachinery metav1 ikniteapi testutil
 package v1alpha1
 
 import (
@@ -12,6 +12,7 @@ import (
 	ikniteapi "github.com/kaweezle/iknite/pkg/apis/iknite"
 	"github.com/kaweezle/iknite/pkg/constants"
 	"github.com/kaweezle/iknite/pkg/host"
+	"github.com/kaweezle/iknite/pkg/testutil"
 )
 
 func TestSetDefaults_IkniteClusterSpec(t *testing.T) {
@@ -95,7 +96,8 @@ func TestIkniteCluster_Update(t *testing.T) {
 	ready := []*WorkloadState{{Namespace: "ns", Name: "a", Ok: true, Message: "ok"}}
 	unready := []*WorkloadState{{Namespace: "ns", Name: "b", Ok: false, Message: "waiting"}}
 	cluster.Update(ikniteapi.Stabilizing, "phase-a", ready, unready)
-	cluster.Persist(fs)
+	logger := testutil.TestLogger(t)
+	cluster.Persist(fs, logger)
 
 	req.Equal(ikniteapi.Stabilizing, cluster.Status.State)
 	req.Equal("phase-a", cluster.Status.CurrentPhase)

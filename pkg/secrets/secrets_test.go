@@ -1,4 +1,4 @@
-// cSpell: words getsops
+// cSpell: words getsops testutil
 /*
 Copyright © 2025 Antoine Martin <antoine@openance.com>
 
@@ -31,6 +31,7 @@ import (
 
 	"github.com/kaweezle/iknite/pkg/host"
 	"github.com/kaweezle/iknite/pkg/secrets"
+	"github.com/kaweezle/iknite/pkg/testutil"
 )
 
 const (
@@ -47,7 +48,7 @@ func TestGetSecret(t *testing.T) {
 		t.Fatalf("failed to write test secrets file: %v", err)
 	}
 
-	opts := &secrets.Options{Fs: testFs, SecretsFile: secretsPath}
+	opts := &secrets.Options{Fs: testFs, SecretsFile: secretsPath, Logger: testutil.TestLogger(t)}
 	value, err := secrets.GetSecret(opts, "github.api_token")
 	if err != nil {
 		t.Fatalf("GetSecret failed: %v", err)
@@ -67,7 +68,7 @@ func TestGetSecretMissingPath(t *testing.T) {
 		t.Fatalf("failed to write test secrets file: %v", err)
 	}
 
-	opts := &secrets.Options{Fs: testFs, SecretsFile: secretsPath}
+	opts := &secrets.Options{Fs: testFs, SecretsFile: secretsPath, Logger: testutil.TestLogger(t)}
 	_, err := secrets.GetSecret(opts, "github.missing")
 	if err == nil {
 		t.Fatal("expected error for missing path, got nil")
@@ -86,7 +87,7 @@ func TestSetSecret(t *testing.T) {
 		t.Fatalf("failed to write test secrets file: %v", err)
 	}
 
-	opts := &secrets.Options{Fs: testFs, SecretsFile: secretsPath}
+	opts := &secrets.Options{Fs: testFs, SecretsFile: secretsPath, Logger: testutil.TestLogger(t)}
 	if err := secrets.SetSecret(opts, "github.api_token", "new-token-value"); err != nil {
 		t.Fatalf("SetSecret failed: %v", err)
 	}
@@ -103,7 +104,7 @@ func TestRemoveSecret(t *testing.T) {
 		t.Fatalf("failed to write test secrets file: %v", err)
 	}
 
-	opts := &secrets.Options{Fs: testFs, SecretsFile: secretsPath}
+	opts := &secrets.Options{Fs: testFs, SecretsFile: secretsPath, Logger: testutil.TestLogger(t)}
 	if err := secrets.RemoveSecret(opts, "github.api_token"); err != nil {
 		t.Fatalf("RemoveSecret failed: %v", err)
 	}
@@ -120,7 +121,7 @@ func TestRemoveSecretMissingPath(t *testing.T) {
 		t.Fatalf("failed to write test secrets file: %v", err)
 	}
 
-	opts := &secrets.Options{Fs: testFs, SecretsFile: secretsPath}
+	opts := &secrets.Options{Fs: testFs, SecretsFile: secretsPath, Logger: testutil.TestLogger(t)}
 	err := secrets.RemoveSecret(opts, "github.missing")
 	if err == nil {
 		t.Fatal("expected error for missing path, got nil")

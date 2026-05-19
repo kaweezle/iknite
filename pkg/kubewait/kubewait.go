@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// cSpell: words kstatus sirupsen logrus
+// cSpell: words kstatus
 // Package kubewait implements the kubewait command.
 // It waits for Kubernetes resources in specified namespaces to become ready
 // using kstatus (one goroutine per namespace), then optionally clones and runs
@@ -24,6 +24,7 @@ package kubewait
 import (
 	"context"
 	"fmt"
+	"log/slog"
 
 	"github.com/spf13/pflag"
 
@@ -67,15 +68,21 @@ func (opts *Options) AddFlags(flags *pflag.FlagSet) {
 }
 
 // RunKubewait is the main logic for the kubewait command.
-func RunKubewait(ctx context.Context, fse host.FileExecutor, opts *Options, namespaces []string) error {
+func RunKubewait(
+	ctx context.Context,
+	fse host.FileExecutor,
+	opts *Options,
+	namespaces []string,
+	logger *slog.Logger,
+) error {
 	if !opts.SkipWaitingForResources {
-		if err := waitForResources(ctx, fse, opts.ResourcesOptions, namespaces); err != nil {
+		if err := waitForResources(ctx, fse, opts.ResourcesOptions, namespaces, logger); err != nil {
 			return fmt.Errorf("error while waiting for resources: %w", err)
 		}
 	}
 
 	if !opts.SkipBootstrap {
-		if err := runBootstrap(ctx, fse, opts.BootstrapOptions); err != nil {
+		if err := runBootstrap(ctx, fse, opts.BootstrapOptions, logger); err != nil {
 			return fmt.Errorf("error during bootstrap: %w", err)
 		}
 	}

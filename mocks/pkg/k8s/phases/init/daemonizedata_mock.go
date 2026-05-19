@@ -6,6 +6,7 @@ package init
 
 import (
 	"context"
+	"log/slog"
 
 	"github.com/kaweezle/iknite/pkg/apis/iknite"
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
@@ -220,6 +221,52 @@ func (_c *MockDaemonizeData_KubeletProcess_Call) Return(process host.Process) *M
 }
 
 func (_c *MockDaemonizeData_KubeletProcess_Call) RunAndReturn(run func() host.Process) *MockDaemonizeData_KubeletProcess_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// Logger provides a mock function for the type MockDaemonizeData
+func (_mock *MockDaemonizeData) Logger() *slog.Logger {
+	ret := _mock.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for Logger")
+	}
+
+	var r0 *slog.Logger
+	if returnFunc, ok := ret.Get(0).(func() *slog.Logger); ok {
+		r0 = returnFunc()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*slog.Logger)
+		}
+	}
+	return r0
+}
+
+// MockDaemonizeData_Logger_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Logger'
+type MockDaemonizeData_Logger_Call struct {
+	*mock.Call
+}
+
+// Logger is a helper method to define mock.On call
+func (_e *MockDaemonizeData_Expecter) Logger() *MockDaemonizeData_Logger_Call {
+	return &MockDaemonizeData_Logger_Call{Call: _e.mock.On("Logger")}
+}
+
+func (_c *MockDaemonizeData_Logger_Call) Run(run func()) *MockDaemonizeData_Logger_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *MockDaemonizeData_Logger_Call) Return(logger *slog.Logger) *MockDaemonizeData_Logger_Call {
+	_c.Call.Return(logger)
+	return _c
+}
+
+func (_c *MockDaemonizeData_Logger_Call) RunAndReturn(run func() *slog.Logger) *MockDaemonizeData_Logger_Call {
 	_c.Call.Return(run)
 	return _c
 }

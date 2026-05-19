@@ -1,4 +1,4 @@
-// cSpell: words kstatus sirupsen apimachinery testutil clientcmd genericclioptions corev metav unknownresource
+// cSpell: words kstatus apimachinery testutil clientcmd genericclioptions corev metav unknownresource
 //
 //nolint:gocognit // Complex test cases.
 package kubewait
@@ -9,13 +9,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
 
-	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -31,6 +31,7 @@ import (
 	"github.com/kaweezle/iknite/pkg/host"
 	"github.com/kaweezle/iknite/pkg/k8s"
 	"github.com/kaweezle/iknite/pkg/testutil"
+	"github.com/kaweezle/iknite/pkg/utils"
 )
 
 func TestClientDependentHelpersReturnErrors(t *testing.T) {
@@ -39,39 +40,39 @@ func TestClientDependentHelpersReturnErrors(t *testing.T) {
 	missingKubeconfig := filepath.Join(t.TempDir(), "missing.conf")
 
 	tests := []struct {
-		run  func() error
+		run  func(logger *slog.Logger) error
 		name string
 	}{
 		{
 			name: "list namespaces with invalid kubeconfig",
-			run: func() error {
+			run: func(logger *slog.Logger) error {
 				client := k8s.NewClientFromConfig(api.NewConfig())
 				clientset, err := k8s.ClientSet(client)
 				if err != nil {
 					return fmt.Errorf("failed to create clientset: %w", err)
 				}
-				_, err = listNamespaces(context.Background(), clientset, time.Millisecond)
+				_, err = listNamespaces(context.Background(), clientset, time.Millisecond, logger)
 				return err
 			},
 		},
 		{
 			name: "wait namespace resources with invalid kubeconfig",
-			run: func() error {
+			run: func(logger *slog.Logger) error {
 				client := k8s.NewClientFromConfig(api.NewConfig())
 				opts := NewResourcesOptions()
 				opts.StatusUpdateInterval = time.Millisecond
-				return waitNamespaceResources(context.Background(), client, "default", opts)
+				return waitNamespaceResources(context.Background(), client, "default", opts, logger)
 			},
 		},
 		{
 			name: "wait for resources with invalid kubeconfig",
-			run: func() error {
+			run: func(logger *slog.Logger) error {
 				opts := NewResourcesOptions()
 				opts.Kubeconfig = missingKubeconfig
 				opts.ResourceTypes = []string{"deployments"}
 				opts.StatusUpdateInterval = time.Millisecond
 				fs := host.NewMemMapFS()
-				return waitForResources(context.Background(), fs, opts, []string{"default"})
+				return waitForResources(context.Background(), fs, opts, []string{"default"}, logger)
 			},
 		},
 	}
@@ -80,7 +81,8 @@ func TestClientDependentHelpersReturnErrors(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			req := require.New(t)
-			err := tt.run()
+			logger := testutil.TestLogger(t)
+			err := tt.run(logger)
 			req.Error(err)
 		})
 	}
@@ -94,7 +96,7 @@ func TestResourceWaiterCancelAndTimerHelpers(t *testing.T) {
 	pollCanceled := false
 
 	w := &resourceWaiter{
-		logger:     logrus.New(),
+		logger:     testutil.TestLogger(t),
 		opts:       &ResourcesOptions{SettlePeriod: 10 * time.Millisecond},
 		endChannel: make(chan error, 1),
 	}
@@ -125,7 +127,7 @@ func TestResourceWaiterProcessEventStartsAndStopsSettleTimer(t *testing.T) {
 	req := require.New(t)
 
 	w := &resourceWaiter{
-		logger:     logrus.New(),
+		logger:     testutil.TestLogger(t),
 		opts:       &ResourcesOptions{SettlePeriod: time.Second},
 		endChannel: make(chan error, 1),
 	}
@@ -173,7 +175,8 @@ func TestRunKubewaitErrorWrapping(t *testing.T) {
 		h, err := testutil.NewDummyHost(fs, &testutil.DummyHostOptions{})
 		req.NoError(err)
 
-		err = RunKubewait(context.Background(), h, opts, []string{"default"})
+		logger := testutil.TestLogger(t)
+		err = RunKubewait(context.Background(), h, opts, []string{"default"}, logger)
 		req.Error(err)
 		req.Contains(err.Error(), "error while waiting for resources")
 	})
@@ -199,7 +202,8 @@ func TestRunKubewaitErrorWrapping(t *testing.T) {
 		opts.BootstrapScript = filepath.Base(script)
 
 		// We need that as we cannot execute RAM based scripts (should mock execution in that case)
-		err := RunKubewait(context.Background(), h, opts, []string{"default"})
+		logger := testutil.TestLogger(t)
+		err := RunKubewait(context.Background(), h, opts, []string{"default"}, logger)
 		req.Error(err)
 		req.Contains(err.Error(), "error during bootstrap")
 	})
@@ -260,7 +264,8 @@ func Test_listNamespaces(t *testing.T) {
 				defer cancel()
 			}
 
-			got, gotErr := listNamespaces(ctx, k8sInterface, tt.interval)
+			logger := testutil.TestLogger(t)
+			got, gotErr := listNamespaces(ctx, k8sInterface, tt.interval, logger)
 			if gotErr != nil {
 				if tt.wantErr == "" {
 					req.NoError(gotErr, "listNamespaces() returned unexpected error")
@@ -391,7 +396,8 @@ func Test_resolveNamespaces(t *testing.T) {
 			opts.StatusUpdateInterval = tt.interval
 			opts.AllNamespaces = tt.allNamespaces
 
-			got, gotErr := resolveNamespaces(ctx, getter, fs, opts, tt.namespaces)
+			logger := testutil.TestLogger(t)
+			got, gotErr := resolveNamespaces(ctx, getter, fs, opts, tt.namespaces, logger)
 			if gotErr != nil {
 				if tt.wantErr == "" {
 					req.NoError(gotErr, "resolveNamespaces() returned unexpected error")
@@ -410,13 +416,14 @@ func Test_resolveNamespaces(t *testing.T) {
 func TestNewResourceWaiter(t *testing.T) {
 	t.Parallel()
 	req := require.New(t)
+	l := testutil.TestLogger(t)
 
 	serverOpts := &testutil.TestServerOptions{}
 	okGetter := testutil.CreateDefaultTestClientGetter(t, serverOpts)
 
 	opts := NewResourcesOptions()
 
-	waiter, err := newResourceWaiter(okGetter, "default", opts)
+	waiter, err := newResourceWaiter(okGetter, "default", opts, l)
 	req.NoError(err)
 	req.NotNil(waiter)
 	req.NotNil(waiter.client)
@@ -426,7 +433,7 @@ func TestNewResourceWaiter(t *testing.T) {
 	getter := mockCliOptions.NewMockRESTClientGetter(t)
 	getter.EXPECT().ToRESTMapper().Return(testutil.NewRESTMapper(), nil).Maybe()
 	getter.EXPECT().ToRESTConfig().Return(nil, errors.New("bad config")).Once()
-	waiter, err = newResourceWaiter(getter, "default", opts)
+	waiter, err = newResourceWaiter(getter, "default", opts, l)
 	req.Error(err)
 	req.Nil(waiter)
 }
@@ -474,11 +481,11 @@ func TestWaitNameSpaceResources(t *testing.T) {
 				counter := 0
 				sOpts.Overrides = map[string]testutil.HandlerOverrideFunc{
 					defaultNamespacePath: func(path string, w http.ResponseWriter, r *http.Request,
-						_ *testutil.RequestLog, _ embed.FS,
+						_ *testutil.RequestLog, _ embed.FS, logger *slog.Logger,
 					) bool {
 						counter++
 						if counter < 3 {
-							logrus.Infof("Simulating delayed namespace creation for path: %s", path)
+							logger.Info("Simulating delayed namespace creation", "path", path)
 							http.NotFound(w, r)
 							return true
 						}
@@ -551,13 +558,13 @@ func TestWaitNameSpaceResources(t *testing.T) {
 				counter := 0
 				sOpts.Overrides = map[string]testutil.HandlerOverrideFunc{
 					deploymentsPath: func(path string, _ http.ResponseWriter,
-						_ *http.Request, _ *testutil.RequestLog, _ embed.FS,
+						_ *http.Request, _ *testutil.RequestLog, _ embed.FS, logger *slog.Logger,
 					) bool {
 						counter++
 						if counter == 1 {
 							return false // Let the first request pass to start the waiter
 						}
-						logrus.Infof("Simulating context cancellation for path: %s", path)
+						logger.Info("Simulating context cancellation", "path", path)
 						cancel() // Cancel the context to simulate timeout
 						return false
 					},
@@ -578,7 +585,7 @@ func TestWaitNameSpaceResources(t *testing.T) {
 				var content []byte
 				sOpts.Overrides = map[string]testutil.HandlerOverrideFunc{
 					defaultNamespacePath: func(_ string, w http.ResponseWriter, _ *http.Request,
-						log *testutil.RequestLog, fs embed.FS,
+						log *testutil.RequestLog, fs embed.FS, logger *slog.Logger,
 					) bool {
 						counter++
 						if counter == 1 {
@@ -586,25 +593,25 @@ func TestWaitNameSpaceResources(t *testing.T) {
 							var err error
 							content, err = fs.ReadFile("testdata/with_resources" + defaultNamespacePath + ".json")
 							if err != nil {
-								logrus.Errorf("Failed to read namespace fixture: %v", err)
+								logger.Error("Failed to read namespace fixture", utils.ErrorKey, err)
 								http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 								log.StatusCode = http.StatusInternalServerError
 								return true
 							}
 							namespace := &corev1.Namespace{}
 							if err = json.Unmarshal(content, namespace); err != nil {
-								logrus.Errorf("Failed to unmarshal namespace fixture: %v", err)
+								logger.Error("Failed to unmarshal namespace fixture", utils.ErrorKey, err)
 								http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 								log.StatusCode = http.StatusInternalServerError
 								return true
 							}
 							namespace.CreationTimestamp = metav1.NewTime(timeOfFirstRequest)
 							if content, err = json.Marshal(namespace); err != nil {
-								logrus.Errorf("Failed to marshal namespace fixture: %v", err)
+								logger.Error("Failed to marshal namespace fixture", utils.ErrorKey, err)
 							}
-							logrus.Infof(
-								"Simulating namespace creation at: %s",
-								timeOfFirstRequest.Format(time.RFC3339),
+							logger.Info(
+								"Simulating namespace creation",
+								"time", timeOfFirstRequest.Format(time.RFC3339),
 							)
 						}
 						w.Header().Set("Content-Type", "application/json")
@@ -635,13 +642,13 @@ func TestWaitNameSpaceResources(t *testing.T) {
 				counter := 0
 				sOpts.Overrides = map[string]testutil.HandlerOverrideFunc{
 					deploymentsPath: func(path string, w http.ResponseWriter, _ *http.Request,
-						log *testutil.RequestLog, _ embed.FS,
+						log *testutil.RequestLog, _ embed.FS, logger *slog.Logger,
 					) bool {
 						counter++
 						if counter == 1 {
 							return false // Let the first request pass to start the waiter
 						}
-						logrus.Infof("Simulating failure to get resources for path: %s", path)
+						logger.Info("Simulating failure to get resources", "path", path)
 						http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 						log.StatusCode = http.StatusInternalServerError
 						return true
@@ -676,7 +683,8 @@ func TestWaitNameSpaceResources(t *testing.T) {
 			defer cancel()
 			getter := tt.createGetter(t, serverOpts, rOpts, cancel)
 
-			gotErr := waitNamespaceResources(ctx, getter, tt.namespace, rOpts)
+			logger := testutil.TestLogger(t)
+			gotErr := waitNamespaceResources(ctx, getter, tt.namespace, rOpts, logger)
 			if tt.wantErr != "" {
 				req.Error(gotErr)
 				req.Contains(
@@ -781,7 +789,8 @@ func Test_waitForResources(t *testing.T) {
 				NamespaceSettlePeriod:   1 * time.Second,
 			}
 
-			gotErr := waitForResources(t.Context(), fs, rOpts, tt.namespaces)
+			logger := testutil.TestLogger(t)
+			gotErr := waitForResources(t.Context(), fs, rOpts, tt.namespaces, logger)
 			if tt.wantErr != "" {
 				req.Error(gotErr)
 				req.Contains(gotErr.Error(), tt.wantErr)

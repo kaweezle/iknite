@@ -22,7 +22,6 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/sirupsen/logrus"
 	kubeletConfig "k8s.io/kubelet/config/v1beta1"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
@@ -33,6 +32,7 @@ import (
 
 	"github.com/kaweezle/iknite/pkg/host"
 	"github.com/kaweezle/iknite/pkg/k8s"
+	"github.com/kaweezle/iknite/pkg/utils"
 )
 
 // cSpell: enable
@@ -70,6 +70,7 @@ type kubeletStartData interface {
 	KubeletDir() string
 	PatchesDir() string
 	OutputWriter() io.Writer
+	utils.LoggerProvider
 }
 
 // runKubeletStart executes kubelet start logic.
@@ -78,6 +79,7 @@ func runKubeletStart(c workflow.RunData) error {
 	if !ok {
 		return errors.New("kubelet-start phase invoked with an invalid data struct")
 	}
+	logger := data.Logger().With("phase", "kubelet-start")
 
 	// TODO: Do we need to try to stop the kubelet ?
 
@@ -108,8 +110,9 @@ func runKubeletStart(c workflow.RunData) error {
 			return fmt.Errorf("error writing instance kubelet configuration to disk: %w", err)
 		}
 	} else { // nocov - This is enabled by default in kubeadm since v1.35. almost dead code
-		logrus.WithField("phase", "kubelet-start").
-			Info("Skipping writing instance kubelet configuration file as the NodeLocalCRISocket feature gate is disabled")
+		logger.Info(
+			"Skipping writing instance kubelet configuration file as the NodeLocalCRISocket feature gate is disabled",
+		)
 	}
 
 	// Write the kubelet configuration file to disk.
@@ -123,7 +126,7 @@ func runKubeletStart(c workflow.RunData) error {
 	}
 	// Try to start the kubelet service in case it's inactive
 	if !data.DryRun() {
-		logrus.WithField("phase", "kubelet-start").Info("Starting the kubelet")
+		logger.Info("Starting the kubelet")
 		ctx := data.Context()
 		process, err := k8s.StartKubelet(ctx, data.Host())
 		if err != nil {

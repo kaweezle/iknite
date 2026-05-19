@@ -1,4 +1,4 @@
-// cspell: words stretchr testutils netfilter paralleltest
+// cspell: words stretchr testutils netfilter paralleltest testutil
 package alpine
 
 import (
@@ -9,6 +9,7 @@ import (
 
 	mockHost "github.com/kaweezle/iknite/mocks/pkg/host"
 	"github.com/kaweezle/iknite/pkg/host"
+	"github.com/kaweezle/iknite/pkg/testutil"
 )
 
 func TestEnsureNetFilter(t *testing.T) {
@@ -54,7 +55,8 @@ func TestEnsureNetFilter(t *testing.T) {
 
 			tt.prepare(t, mockFileExec)
 
-			err := EnsureNetFilter(mockFileExec)
+			logger := testutil.TestLogger(t)
+			err := EnsureNetFilter(mockFileExec, logger)
 			if tt.wantErr {
 				req.Error(err)
 				return
@@ -64,15 +66,16 @@ func TestEnsureNetFilter(t *testing.T) {
 	}
 }
 
-//nolint:paralleltest // tests modify global state
 func TestEnsureMachineID(t *testing.T) {
+	t.Parallel()
 	req := require.New(t)
 
 	fs := host.NewMemMapFS()
+	logger := testutil.TestLogger(t)
 
 	req.NoError(fs.MkdirAll("/etc", 0o755))
 
-	req.NoError(EnsureMachineID(fs))
+	req.NoError(EnsureMachineID(fs, logger))
 
 	exists, err := fs.Exists(machineIDFile)
 	req.NoError(err)
@@ -82,7 +85,7 @@ func TestEnsureMachineID(t *testing.T) {
 	req.NoError(err)
 	req.NotEmpty(before)
 
-	req.NoError(EnsureMachineID(fs))
+	req.NoError(EnsureMachineID(fs, logger))
 	after, err := fs.ReadFile(machineIDFile)
 	req.NoError(err)
 	req.Equal(string(before), string(after))

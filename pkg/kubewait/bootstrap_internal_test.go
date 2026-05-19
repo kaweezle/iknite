@@ -84,12 +84,13 @@ func TestRunBootstrapVariants(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			req := require.New(t)
+			logger := testutil.TestLogger(t)
 
 			fs := host.NewMemMapFS()
 			mockExecutor := mockHost.NewMockExecutor(t)
 			opts := tt.prepare(t, fs, mockExecutor)
 			h := &testutil.DelegateHost{Fs: fs, Exec: mockExecutor}
-			err := runBootstrap(t.Context(), h, opts)
+			err := runBootstrap(t.Context(), h, opts, logger)
 			if tt.wantErr {
 				req.Error(err)
 				return
@@ -108,12 +109,13 @@ func TestEnsureSSHKnownHostBranches(t *testing.T) {
 
 	h, err := testutil.NewDummyHost(host.NewMemMapFS(), &testutil.DummyHostOptions{})
 	req.NoError(err)
-	err = ensureSSHKnownHost(t.Context(), h, "https://example.com/repo.git")
+	logger := testutil.TestLogger(t)
+	err = ensureSSHKnownHost(t.Context(), h, "https://example.com/repo.git", logger)
 	req.NoError(err)
 
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
-	err = ensureSSHKnownHost(ctx, h, "git@github.com:owner/repo.git")
+	err = ensureSSHKnownHost(ctx, h, "git@github.com:owner/repo.git", logger)
 	req.Error(err)
 	req.Contains(err.Error(), "did not become resolvable")
 }

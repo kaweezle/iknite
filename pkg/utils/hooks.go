@@ -1,12 +1,11 @@
-// cSpell: words sirupsen
+// cSpell: words
 package utils
 
 import (
 	"errors"
 	"fmt"
+	"log/slog"
 	"sync"
-
-	log "github.com/sirupsen/logrus"
 )
 
 type hook struct {
@@ -20,8 +19,15 @@ type hookError struct {
 }
 
 type HookManager struct {
+	LogEnabled
 	hooks []hook
 	mu    sync.Mutex
+}
+
+func NewHookManager(log *slog.Logger) *HookManager {
+	return &HookManager{
+		LogEnabled: LogEnabled{LogEntry: log},
+	}
 }
 
 func (m *HookManager) Register(name string, fn func() error) {
@@ -43,7 +49,7 @@ func (m *HookManager) Run() error {
 			defer wg.Done()
 			if err := h.fn(); err != nil {
 				errs <- hookError{name: h.name, err: err}
-				log.WithField("hook", h.name).WithError(err).Error("Error while running hook")
+				m.Logger().Error("Error while running hook", "hook", h.name, ErrorKey, err)
 			}
 		}(h)
 	}

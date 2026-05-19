@@ -13,7 +13,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-// cSpell: words sirupsen
+// cSpell: words
 package cmd
 
 import (
@@ -24,13 +24,13 @@ import (
 	"net/netip"
 
 	"github.com/pion/mdns/v2"
-	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"golang.org/x/net/dns/dnsmessage"
 	"golang.org/x/net/ipv4"
 	"golang.org/x/net/ipv6"
 
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
+	"github.com/kaweezle/iknite/pkg/cmd/util"
 	"github.com/kaweezle/iknite/pkg/config"
 )
 
@@ -114,15 +114,12 @@ func performMdns(ctx context.Context, ikniteConfig *v1alpha1.IkniteClusterSpec) 
 		return err
 	}
 
-	logrus.WithFields(logrus.Fields{
-		"domainName": ikniteConfig.DomainName,
-		"addr4":      addr4,
-		"addr6":      addr6,
-	}).Debug("Start mdns responder...")
+	logger := util.LoggerFromContext(ctx)
+	logger.Debug("Start mdns responder...", "domainName", ikniteConfig.DomainName, "addr4", addr4, "addr6", addr6)
 
 	defer conn.Close() //nolint:errcheck // should not fail.
 	<-ctx.Done()
-	logrus.Info("Shutting down mdns responder...")
+	logger.Info("Shutting down mdns responder...")
 	return nil
 }
 

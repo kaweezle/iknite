@@ -1,6 +1,6 @@
 package alpine_test
 
-// cSpell: words RTNETLINK Nilf
+// cSpell: words RTNETLINK Nilf testutil
 // cSpell: disable
 import (
 	"net"
@@ -15,6 +15,7 @@ import (
 
 	mockHost "github.com/kaweezle/iknite/mocks/pkg/host"
 	"github.com/kaweezle/iknite/pkg/alpine"
+	"github.com/kaweezle/iknite/pkg/testutil"
 )
 
 // cSpell: enable
@@ -36,7 +37,8 @@ func TestAddIpAddress(t *testing.T) {
 		[]string{"addr", "add", "192.168.99.2/24", "broadcast", "+", "dev", "eth0"},
 	).Return([]byte("ok"), nil)
 
-	err := alpine.AddIpAddress(mockExec, "eth0", ipaddr)
+	logger := testutil.TestLogger(t)
+	err := alpine.AddIpAddress(mockExec, "eth0", ipaddr, logger)
 	req.NoError(err)
 	mockExec.AssertExpectations(t)
 
@@ -44,7 +46,7 @@ func TestAddIpAddress(t *testing.T) {
 	mockExec.On("Run", true, "/sbin/ip", []string{"addr", "add", "192.168.99.2/24", "broadcast", "+", "dev", "eth0"}).
 		Return([]byte("RTNETLINK answers: File exists"), new(exec.ExitError))
 
-	err = alpine.AddIpAddress(mockExec, "eth0", ipaddr)
+	err = alpine.AddIpAddress(mockExec, "eth0", ipaddr, logger)
 	req.EqualError(err, "RTNETLINK answers: File exists: <nil>")
 	mockExec.AssertExpectations(t)
 }

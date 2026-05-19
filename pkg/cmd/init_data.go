@@ -5,11 +5,13 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log/slog"
 	"net"
 	"path/filepath"
 	"strconv"
 	_ "unsafe"
 
+	"github.com/spf13/viper"
 	"golang.org/x/sync/errgroup"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
@@ -57,8 +59,10 @@ type initData struct {
 	alpineHost                  host.Host
 	clientGetter                genericclioptions.RESTClientGetter
 	errGroup                    errgroup.Group
-	hookManager                 utils.HookManager
+	hookManager                 *utils.HookManager
 	clusterUpdateBus            utils.Bus[*v1alpha1.IkniteCluster]
+	logger                      *slog.Logger
+	viper                       *viper.Viper
 }
 
 // compile-time assert that the local data object satisfies the phases data interface.
@@ -338,7 +342,7 @@ func (d *initData) Host() host.Host {
 func (d *initData) SetIkniteCluster(cluster *v1alpha1.IkniteCluster) {
 	clusterCopy := *cluster
 	d.ikniteCluster = &clusterCopy
-	d.ikniteCluster.Persist(d.Host())
+	d.ikniteCluster.Persist(d.Host(), d.Logger())
 	d.clusterUpdateBus.Publish(d.ikniteCluster)
 }
 
@@ -348,7 +352,7 @@ func (d *initData) UpdateIkniteCluster(
 	ready, unready []*v1alpha1.WorkloadState,
 ) {
 	d.ikniteCluster.Update(state, phase, ready, unready)
-	d.ikniteCluster.Persist(d.Host())
+	d.ikniteCluster.Persist(d.Host(), d.Logger())
 	clusterCopy := d.ikniteCluster.DeepCopy()
 	d.clusterUpdateBus.Publish(clusterCopy)
 }
@@ -368,4 +372,12 @@ func (d *initData) RunShutdownHooks() error {
 // RegisterIkniteClusterListener implements [init.IkniteInitData].
 func (d *initData) RegisterIkniteClusterListener() (<-chan *v1alpha1.IkniteCluster, func()) {
 	return d.clusterUpdateBus.Subscribe(1)
+}
+
+func (d *initData) Logger() *slog.Logger {
+	return d.logger
+}
+
+func (d *initData) Viper() *viper.Viper {
+	return d.viper
 }

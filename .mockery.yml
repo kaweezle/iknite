@@ -68,4 +68,9 @@ packages:
   github.com/kaweezle/iknite/pkg/checkers:
     config:
       dir: mocks/{{.InterfaceDirRelative}}
-    interfaces: { CheckWorkloadData}
+      structname: "Mock{{.InterfaceName | firstUpper }}"
+    interfaces: { CheckWorkloadData, serviceCheckData}
+  github.com/kaweezle/iknite/pkg/cmd/util:
+    config:
+      dir: mocks/{{.InterfaceDirRelative}}
+    interfaces: { CmdInterface }

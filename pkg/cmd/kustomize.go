@@ -13,20 +13,21 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-// cSpell: words filesys kyaml forbidigo apimachinery sirupsen
+// cSpell: words filesys kyaml forbidigo apimachinery
 package cmd
 
 import (
 	"context"
 	"fmt"
 	"io"
+	"log/slog"
 
-	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"k8s.io/apimachinery/pkg/util/runtime"
 
 	"github.com/kaweezle/iknite/pkg/cmd/options"
+	"github.com/kaweezle/iknite/pkg/cmd/util"
 	"github.com/kaweezle/iknite/pkg/config"
 	"github.com/kaweezle/iknite/pkg/constants"
 	"github.com/kaweezle/iknite/pkg/host"
@@ -55,7 +56,7 @@ prints the Embedded configuration that installs the following components:
 
 `,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			err := performPrintKustomize(fs, kustomizeOptions, cmd.OutOrStdout())
+			err := performPrintKustomize(fs, kustomizeOptions, cmd.OutOrStdout(), util.LoggerFromCommand(cmd))
 			if err != nil {
 				return fmt.Errorf("failed to print kustomize configuration: %w", err)
 			}
@@ -98,7 +99,13 @@ applies the Embedded configuration that installs the following components:
 
 `,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			err := performKustomize(cmd.Context(), fs, kustomizeOptions, waitOptions)
+			err := performKustomize(
+				cmd.Context(),
+				fs,
+				kustomizeOptions,
+				waitOptions,
+				util.LoggerFromCommand(cmd),
+			)
 			if err != nil {
 				return fmt.Errorf("failed to apply kustomize configuration: %w", err)
 			}
@@ -126,6 +133,7 @@ func performKustomize(
 	fs host.FileSystem,
 	kustomizeOptions *utils.KustomizeOptions,
 	waitOptions *utils.WaitOptions,
+	logger *slog.Logger,
 ) error {
 	// We need to get it from root as we will apply configuration
 	kubeClient, err := k8s.NewClientFromFile(fs, constants.KubernetesRootConfig)
@@ -154,9 +162,12 @@ func performKustomize(
 	}
 
 	if waitOptions.HasLoop() {
-		logrus.Infof("Waiting for workloads with options: %s", waitOptions.String())
+		logger.Info("Waiting for workloads", "options", waitOptions.String())
 		runtime.ErrorHandlers = runtime.ErrorHandlers[:0] //nolint:reassign // disabling printing of errors to stderr
-		if err := waitOptions.Poll(ctx, k8s.WorkloadsReadyConditionWithContextFunc(kubeClient, nil)); err != nil {
+		if err := waitOptions.Poll(
+			ctx,
+			k8s.WorkloadsReadyConditionWithContextFunc(kubeClient, logger, nil),
+		); err != nil {
 			return fmt.Errorf("failed to wait for workloads: %w", err)
 		}
 	}
@@ -167,11 +178,13 @@ func performPrintKustomize(
 	fs host.FileSystem,
 	kustomizeOptions *utils.KustomizeOptions,
 	out io.Writer,
+	logger *slog.Logger,
 ) error {
 	resources, err := provision.GetBaseKustomizationResources(
 		fs,
 		kustomizeOptions.Kustomization,
 		kustomizeOptions.ForceEmbedded,
+		logger,
 	)
 	if err != nil {
 		return fmt.Errorf("while getting kustomization resources: %w", err)

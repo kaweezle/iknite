@@ -4,12 +4,12 @@ package check
 // cSpell: disable
 import (
 	"context"
+	"log/slog"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	log "github.com/sirupsen/logrus"
 )
 
 // cSpell: enable
@@ -18,6 +18,7 @@ var _ tea.Model = (*CheckModel)(nil) // compile-time assertion that CheckModel i
 
 type CheckModel struct {
 	executor  *CheckExecutor
+	logger    *slog.Logger
 	checkData CheckData
 	ctx       context.Context //nolint:containedctx // passed around to sub-checks
 	cancel    context.CancelFunc
@@ -40,7 +41,7 @@ func (m *CheckModel) Update(
 ) (tea.Model, tea.Cmd) {
 	switch msg.(type) {
 	case tea.KeyMsg:
-		log.Infof("Canceling checks %v", m.cancel)
+		m.logger.Info("Canceling checks...", "cancel", m.cancel)
 		m.cancel()
 		return m, tea.Batch(
 			// tea.ExitAltScreen,
@@ -78,7 +79,12 @@ func (m *CheckModel) Context() context.Context {
 	return m.ctx
 }
 
-func NewCheckModel(ctx context.Context, executor *CheckExecutor, checkData CheckData) *CheckModel {
+func NewCheckModel(
+	ctx context.Context,
+	executor *CheckExecutor,
+	checkData CheckData,
+	logger *slog.Logger,
+) *CheckModel {
 	newCtx, cancel := context.WithCancel(ctx)
 	s := spinner.New()
 	s.Spinner = spinner.MiniDot
@@ -89,5 +95,6 @@ func NewCheckModel(ctx context.Context, executor *CheckExecutor, checkData Check
 		ctx:       newCtx,
 		cancel:    cancel,
 		spinner:   s,
+		logger:    logger,
 	}
 }

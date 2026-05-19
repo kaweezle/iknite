@@ -1,4 +1,4 @@
-// cSpell: words clientset corev metav apimachinery errgroup genericclioptions lbip testutil errchkjson sirupsen
+// cSpell: words clientset corev metav apimachinery errgroup genericclioptions lbip testutil errchkjson
 // cSpell: words paralleltest
 package init
 
@@ -6,12 +6,11 @@ import (
 	"context"
 	"embed"
 	"errors"
+	"log/slog"
 	"net"
 	"net/http"
 	"testing"
 
-	"github.com/sirupsen/logrus"
-	logTest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sync/errgroup"
@@ -52,6 +51,7 @@ func serviceToFillHandler(
 	_ *http.Request,
 	log *testutil.RequestLog,
 	_ embed.FS,
+	_ *slog.Logger,
 ) bool {
 	w.Header().Set("Content-Type", "application/json")
 	log.StatusCode = http.StatusOK
@@ -81,6 +81,7 @@ type setLBIPPhaseData struct {
 	cluster  *v1alpha1.IkniteCluster
 	getter   genericclioptions.RESTClientGetter
 	errGroup *errgroup.Group
+	logger   *slog.Logger
 }
 
 var _ setLBIPData = (*setLBIPPhaseData)(nil)
@@ -102,6 +103,10 @@ func (d *setLBIPPhaseData) RESTClientGetter() (genericclioptions.RESTClientGette
 		return nil, errors.New("no getter available")
 	}
 	return d.getter, nil
+}
+
+func (d *setLBIPPhaseData) Logger() *slog.Logger {
+	return d.logger
 }
 
 func (d *setLBIPPhaseData) ErrGroup() *errgroup.Group {
@@ -139,6 +144,7 @@ func TestRunSetLBIP_NominalCase(t *testing.T) {
 		host:     createMockHostWithOutboundIP(t, ""),
 		cluster:  &v1alpha1.IkniteCluster{Spec: v1alpha1.IkniteClusterSpec{Ip: net.ParseIP(testOutboundIP)}},
 		getter:   createGetter(t, sOpts),
+		logger:   testutil.TestLogger(t),
 	}
 
 	req.NoError(runSetLBIP(data))
@@ -161,6 +167,7 @@ func TestRunSetLBIP_UsesOutboundAndClusterIPWhenDifferent(t *testing.T) {
 		host:     createMockHostWithOutboundIP(t, testOutboundIP),
 		cluster:  &v1alpha1.IkniteCluster{Spec: v1alpha1.IkniteClusterSpec{Ip: net.ParseIP(testClusterIP)}},
 		getter:   createGetter(t, sOpts),
+		logger:   testutil.TestLogger(t),
 	}
 
 	req.NoError(runSetLBIP(data))
@@ -184,6 +191,7 @@ func TestRunSetLBIP_FailsOnRESTClientGetterError(t *testing.T) {
 		errGroup: &errgroup.Group{},
 		host:     createMockHostWithOutboundIP(t, ""),
 		cluster:  &v1alpha1.IkniteCluster{Spec: v1alpha1.IkniteClusterSpec{Ip: net.ParseIP(testOutboundIP)}},
+		logger:   testutil.TestLogger(t),
 	}
 
 	err := runSetLBIP(data)
@@ -263,6 +271,7 @@ func TestRunSetLBIP_StartsWatcher(t *testing.T) {
 		errGroup: eg,
 		host:     createMockHostWithOutboundIP(t, ""),
 		cluster:  &v1alpha1.IkniteCluster{Spec: v1alpha1.IkniteClusterSpec{Ip: net.ParseIP(testOutboundIP)}},
+		logger:   testutil.TestLogger(t),
 	}
 
 	// This will fail because the mock returns an error
@@ -370,6 +379,7 @@ func TestSetLBIPPatchGeneration(t *testing.T) {
 func TestWatchSetLBIPServices(t *testing.T) {
 	t.Parallel()
 	req := require.New(t)
+	logger := testutil.TestLogger(t)
 	mockServiceInterface := mockV1.NewMockServiceInterface(t)
 	mockCoreV1Interface := mockV1.NewMockCoreV1Interface(t)
 	mockCoreV1Interface.EXPECT().Services(metav1.NamespaceAll).Return(mockServiceInterface).Once()
@@ -402,7 +412,7 @@ func TestWatchSetLBIPServices(t *testing.T) {
 
 	var eg errgroup.Group
 	eg.Go(func() error {
-		return watchSetLBIPServices(t.Context(), mockCoreV1Interface, testOutboundIP)
+		return watchSetLBIPServices(t.Context(), mockCoreV1Interface, logger, testOutboundIP)
 	})
 
 	fakeWatcher.Add(service)
@@ -421,11 +431,8 @@ func TestWatchSetLBIPServices(t *testing.T) {
 
 // Same test as before, but with update error because the service has been deleted between the watch event and the patch
 // attempt. This tests that we handle NotFound errors gracefully.
-//
-//nolint:paralleltest // Messing with logs
 func TestWatchSetLBIPServices_ServiceDeletedBeforePatch(t *testing.T) {
-	hook := logTest.NewGlobal()
-	defer hook.Reset()
+	t.Parallel()
 	req := require.New(t)
 	mockServiceInterface := mockV1.NewMockServiceInterface(t)
 	mockCoreV1Interface := mockV1.NewMockCoreV1Interface(t)
@@ -451,9 +458,11 @@ func TestWatchSetLBIPServices_ServiceDeletedBeforePatch(t *testing.T) {
 		},
 	}
 
+	logger, hook := testutil.TestLoggerWithHook(t) // Create a test logger and hook to capture logs
+
 	var eg errgroup.Group
 	eg.Go(func() error {
-		return watchSetLBIPServices(t.Context(), mockCoreV1Interface, testOutboundIP)
+		return watchSetLBIPServices(t.Context(), mockCoreV1Interface, logger, testOutboundIP)
 	})
 
 	fakeWatcher.Add(service)
@@ -461,17 +470,14 @@ func TestWatchSetLBIPServices_ServiceDeletedBeforePatch(t *testing.T) {
 
 	err := eg.Wait()
 	req.NoError(err) // Should not return an error even though the update failed with NotFound
-	req.Equal(logrus.WarnLevel, hook.LastEntry().Level)
+	req.Equal(slog.LevelWarn, hook.LastEntry().Level)
 	req.Equal("Service not found when patching LB IP, it may have been deleted", hook.LastEntry().Message)
 }
 
 // Same test as before, but other kind of error when patching, to verify that we log an error but keep watching for
 // other events.
-//
-//nolint:paralleltest // Messing with logs
 func TestWatchSetLBIPServices_PatchError(t *testing.T) {
-	hook := logTest.NewGlobal()
-	defer hook.Reset()
+	t.Parallel()
 	req := require.New(t)
 	mockServiceInterface := mockV1.NewMockServiceInterface(t)
 	mockCoreV1Interface := mockV1.NewMockCoreV1Interface(t)
@@ -497,9 +503,10 @@ func TestWatchSetLBIPServices_PatchError(t *testing.T) {
 		},
 	}
 
+	logger, hook := testutil.TestLoggerWithHook(t) // Create a test logger and hook to capture logs
 	var eg errgroup.Group
 	eg.Go(func() error {
-		return watchSetLBIPServices(t.Context(), mockCoreV1Interface, testOutboundIP)
+		return watchSetLBIPServices(t.Context(), mockCoreV1Interface, logger, testOutboundIP)
 	})
 
 	fakeWatcher.Add(service)
@@ -507,7 +514,7 @@ func TestWatchSetLBIPServices_PatchError(t *testing.T) {
 
 	err := eg.Wait()
 	req.NoError(err) // Should not return an error even though the update failed
-	req.Equal(logrus.ErrorLevel, hook.LastEntry().Level)
+	req.Equal(slog.LevelError, hook.LastEntry().Level)
 	req.Equal("Failed to patch LoadBalancer service", hook.LastEntry().Message)
 }
 
@@ -520,8 +527,9 @@ func TestWatchSetLBIPServices_WatchError(t *testing.T) {
 	mockServiceInterface.EXPECT().Watch(mock.Anything, mock.Anything).Return(nil, errors.New("mock watch error")).Once()
 
 	var eg errgroup.Group
+	logger := testutil.TestLogger(t)
 	eg.Go(func() error {
-		return watchSetLBIPServices(t.Context(), mockCoreV1Interface, testOutboundIP)
+		return watchSetLBIPServices(t.Context(), mockCoreV1Interface, logger, testOutboundIP)
 	})
 
 	err := eg.Wait()
@@ -562,8 +570,9 @@ func TestWatchSetLBIPServices_ChangeOneIpAddress(t *testing.T) {
 	}
 
 	var eg errgroup.Group
+	logger := testutil.TestLogger(t)
 	eg.Go(func() error {
-		return watchSetLBIPServices(t.Context(), mockCoreV1Interface, testOutboundIP, testClusterIP)
+		return watchSetLBIPServices(t.Context(), mockCoreV1Interface, logger, testOutboundIP, testClusterIP)
 	})
 
 	fakeWatcher.Add(service)

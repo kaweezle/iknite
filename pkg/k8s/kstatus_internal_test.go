@@ -1,4 +1,4 @@
-// cSpell: words kstatus apimachinery sirupsen testutil
+// cSpell: words kstatus apimachinery testutil
 package k8s
 
 import (
@@ -21,7 +21,7 @@ func TestNewRESTClientGetterFromKubeconfig(t *testing.T) {
 	req := require.New(t)
 	fs := host.NewMemMapFS()
 
-	_, err := NewClientFromKubeconfig(fs, "/tmp/nonexistent-kubeconfig")
+	_, err := NewClientFromKubeconfig(fs, "/tmp/nonexistent-kubeconfig", testutil.TestLogger(t))
 	req.Error(err)
 }
 
@@ -71,7 +71,8 @@ func TestRESTClientGetterKStatusErrorPaths(t *testing.T) {
 	mapper, err := getter.ToRESTMapper()
 	req.NoError(err)
 	req.NotNil(mapper)
-	types, err := ValidateResourceTypes(mapper, []string{"deployments"})
+	logger := testutil.TestLogger(t)
+	types, err := ValidateResourceTypes(mapper, []string{"deployments"}, logger)
 	req.NoError(err)
 	req.Contains(types, "deployments")
 

@@ -1,4 +1,4 @@
-// cSpell: words testutils cpuset netfilter modprobe paralleltest tparallel procs runlevels cyclop
+// cSpell: words testutils cpuset netfilter modprobe paralleltest tparallel procs runlevels cyclop testutil
 package k8s_test
 
 // cSpell: disable
@@ -20,6 +20,7 @@ import (
 	"github.com/kaweezle/iknite/pkg/constants"
 	"github.com/kaweezle/iknite/pkg/host"
 	"github.com/kaweezle/iknite/pkg/k8s"
+	"github.com/kaweezle/iknite/pkg/testutil"
 )
 
 // cSpell: enable
@@ -60,7 +61,8 @@ func TestPreventKubeletServiceFromStarting(t *testing.T) {
 	err := fs.WriteFile(confFilePath, []byte(rcConfFileContent), 0o644)
 	req.NoError(err)
 
-	err = k8s.PreventServiceFromStarting(fs, confFilePath, "kubelet")
+	logger := testutil.TestLogger(t)
+	err = k8s.PreventServiceFromStarting(fs, confFilePath, "kubelet", logger)
 	req.NoError(err)
 
 	content, err := fs.ReadFile(confFilePath)
@@ -86,7 +88,8 @@ func TestPreventKubeletServiceFromStarting_WhenLineIsPresent(t *testing.T) {
 	err := fs.WriteFile(confFilePath, []byte(existingContent), 0o644)
 	req.NoError(err)
 
-	err = k8s.PreventServiceFromStarting(fs, confFilePath, "kubelet")
+	logger := testutil.TestLogger(t)
+	err = k8s.PreventServiceFromStarting(fs, confFilePath, "kubelet", logger)
 	req.NoError(err)
 
 	content, err := fs.ReadFile(confFilePath)
@@ -111,7 +114,8 @@ func TestMakeIkniteServiceNeedNetworking(t *testing.T) {
 	err := fs.WriteFile(confFilePath, []byte(rcConfFileContent), 0o644)
 	req.NoError(err)
 
-	err = k8s.MakeIkniteServiceNeedNetworking(fs, confFilePath)
+	logger := testutil.TestLogger(t)
+	err = k8s.MakeIkniteServiceNeedNetworking(fs, confFilePath, logger)
 	req.NoError(err)
 
 	content, err := fs.ReadFile(confFilePath)
@@ -137,7 +141,8 @@ func TestMakeIkniteServiceNeedNetworking_WhenLineIsPresent(t *testing.T) {
 	err := fs.WriteFile(confFilePath, []byte(existingContent), 0o644)
 	req.NoError(err)
 
-	err = k8s.MakeIkniteServiceNeedNetworking(fs, confFilePath)
+	logger := testutil.TestLogger(t)
+	err = k8s.MakeIkniteServiceNeedNetworking(fs, confFilePath, logger)
 	req.NoError(err)
 
 	content, err := fs.ReadFile(confFilePath)
@@ -250,7 +255,8 @@ func TestEnsureConfigFileHasConfigurationLine_Errors(t *testing.T) {
 			mfs := mockHost.NewMockFileSystem(t)
 			tt.prepare(mfs)
 
-			err := k8s.EnsureConfigFileHasConfigurationLine(mfs, confFilePath, "new-line")
+			logger := testutil.TestLogger(t)
+			err := k8s.EnsureConfigFileHasConfigurationLine(mfs, confFilePath, "new-line", logger)
 			req.ErrorContains(err, tt.wantErrContains)
 		})
 	}
@@ -303,7 +309,8 @@ func TestEnsureNetworkInterfacesConfiguration(t *testing.T) {
 			mfs := mockHost.NewMockFileSystem(t)
 			tt.prepare(mfs)
 
-			err := k8s.EnsureNetworkInterfacesConfiguration(mfs)
+			logger := testutil.TestLogger(t)
+			err := k8s.EnsureNetworkInterfacesConfiguration(mfs, logger)
 			if tt.wantErr {
 				req.Error(err)
 				return
@@ -409,7 +416,7 @@ func TestEnableCGroupSubtreeControl(t *testing.T) {
 			mfs := mockHost.NewMockFileSystem(t)
 			tt.prepare(mfs)
 
-			err := k8s.EnableCGroupSubtreeControl(mfs)
+			err := k8s.EnableCGroupSubtreeControl(mfs, testutil.TestLogger(t))
 			if tt.wantErr {
 				req.Error(err)
 				return

@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -16,7 +17,6 @@ import (
 	"testing"
 
 	argoprojv1 "github.com/argoproj/argo-cd/v3/pkg/apis/application/v1alpha1"
-	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	appsV1 "k8s.io/api/apps/v1"
@@ -39,6 +39,9 @@ import (
 	"github.com/kaweezle/iknite/mocks/k8s.io/cli-runtime/pkg/genericclioptions"
 	"github.com/kaweezle/iknite/pkg/host"
 )
+
+// Independent of actual packages.
+const errorKey = "error"
 
 //go:embed testdata
 var content embed.FS
@@ -133,25 +136,6 @@ func WriteRestConfigToFile(t *testing.T, config *rest.Config, fs host.FileSystem
 	require.NoError(t, err, "Failed to write kubeconfig file")
 }
 
-func PatchHandler(w http.ResponseWriter, r *http.Request) {
-	logrus.Infof("Received request: %s %s %s", r.Method, r.URL.Path, r.URL.RawQuery)
-	switch r.Method {
-	case http.MethodPatch:
-		body, err := io.ReadAll(r.Body)
-		if err != nil {
-			logrus.Errorf("Failed to read request body: %v", err)
-		} else {
-			logrus.Infof("Request body: %s", string(body))
-		}
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write(body) //nolint:errcheck // test server, ignore error
-	default:
-		logrus.Warnf("Unexpected request: %s %s %s", r.Method, r.URL.Path, r.URL.RawQuery)
-		w.WriteHeader(http.StatusInternalServerError)
-	}
-}
-
 const notFoundResponse = `{
     "kind": "Status",
     "apiVersion": "v1",
@@ -192,19 +176,41 @@ func (l *RequestLog) String() string {
 	return r.String()
 }
 
-type HandlerOverrideFunc func(path string, w http.ResponseWriter, r *http.Request, log *RequestLog, fs embed.FS) bool
+type HandlerOverrideFunc func(
+	path string,
+	w http.ResponseWriter,
+	r *http.Request,
+	log *RequestLog,
+	fs embed.FS,
+	logger *slog.Logger,
+) bool
 
-func FailOverrideHandler(path string, w http.ResponseWriter, _ *http.Request, log *RequestLog, _ embed.FS) bool {
-	logrus.Infof("Simulating failure for path: %s", path)
+func FailOverrideHandler(
+	path string,
+	w http.ResponseWriter,
+	_ *http.Request,
+	log *RequestLog,
+	_ embed.FS,
+	logger *slog.Logger,
+) bool {
+	logger.Info("Simulating failure", "path", path)
 	log.StatusCode = http.StatusInternalServerError
 	w.WriteHeader(http.StatusInternalServerError)
 	return true
 }
 
 type TestServerOptions struct {
+	Entry     *slog.Logger
 	Overrides map[string]HandlerOverrideFunc
 	Requests  []RequestLog
 	RequestMu sync.Mutex
+}
+
+func (o *TestServerOptions) Logger() *slog.Logger {
+	if o.Entry == nil {
+		o.Entry = NewLogger(os.Stderr)
+	}
+	return o.Entry
 }
 
 func ContentPatchHandler(subdir string, options *TestServerOptions) http.HandlerFunc {
@@ -214,16 +220,18 @@ func ContentPatchHandler(subdir string, options *TestServerOptions) http.Handler
 			Path:   r.URL.Path,
 			Query:  r.URL.RawQuery,
 		}
+		logger := options.Logger()
+		reqLogger := logger.With("method", r.Method, "path", r.URL.Path, "query", r.URL.RawQuery)
 		defer func() {
 			options.RequestMu.Lock()
 			defer options.RequestMu.Unlock()
 			options.Requests = append(options.Requests, *log)
-			logrus.Info(log.String())
+			logger.Info(log.String())
 		}()
 		path := strings.TrimSuffix(r.URL.Path, "/")
 		if override, exists := options.Overrides[path]; exists {
-			if override(path, w, r, log, content) {
-				logrus.Infof("Override handled the request for path: %s", path)
+			if override(path, w, r, log, content, logger) {
+				reqLogger.Info("Override handled the request")
 				return
 			}
 		}
@@ -233,13 +241,13 @@ func ContentPatchHandler(subdir string, options *TestServerOptions) http.Handler
 			content, err := content.ReadFile(filename)
 			if err != nil {
 				if os.IsNotExist(err) {
-					logrus.Errorf("File not found: %s", filename)
+					reqLogger.Error("File not found", "filename", filename)
 					log.StatusCode = http.StatusNotFound
 					w.WriteHeader(http.StatusNotFound)
 					w.Header().Set("Content-Type", "application/json")
 					_, _ = w.Write([]byte(notFoundResponse)) //nolint:errcheck // test server, ignore error
 				} else {
-					logrus.Errorf("Failed to read file %s: %v", filename, err)
+					reqLogger.Error("Failed to read file", "filename", filename, errorKey, err)
 					log.StatusCode = http.StatusInternalServerError
 					w.WriteHeader(http.StatusInternalServerError)
 				}
@@ -252,7 +260,7 @@ func ContentPatchHandler(subdir string, options *TestServerOptions) http.Handler
 		case http.MethodPatch:
 			body, err := io.ReadAll(r.Body)
 			if err != nil {
-				logrus.Errorf("Failed to read request body: %v", err)
+				reqLogger.Error("Failed to read request body", errorKey, err)
 			}
 			log.Body = string(body)
 			w.Header().Set("Content-Type", "application/json")
@@ -264,17 +272,16 @@ func ContentPatchHandler(subdir string, options *TestServerOptions) http.Handler
 			log.Body = string(body)
 			content_type := r.Header.Get("Content-Type")
 			if err != nil {
-				logrus.Errorf("Failed to read request body: %v", err)
+				reqLogger.Error("Failed to read request body", errorKey, err)
 			} else {
-				logrus.Infof("Request body: %s", string(body))
-				logrus.Infof("Content-Type: %s", content_type)
+				reqLogger.Info("content", "body", string(body), "content_type", content_type)
 			}
 			w.Header().Set("Content-Type", content_type)
 			w.WriteHeader(http.StatusOK)
 			log.StatusCode = http.StatusOK
 			_, _ = w.Write(body) //nolint:errcheck // test server, ignore error
 		default:
-			logrus.Warnf("Unexpected request: %s %s %s", r.Method, r.URL.Path, r.URL.RawQuery)
+			reqLogger.Warn("Unexpected request")
 			w.WriteHeader(http.StatusInternalServerError)
 			log.StatusCode = http.StatusInternalServerError
 		}
@@ -398,7 +405,7 @@ func GetTestMapperFromClientConfig(clientconfig clientcmd.ClientConfig) (meta.RE
 		r.EXPECT().KindFor(mock.Anything).Return(schema.GroupVersionKind{}, errors.New("bad type")).Maybe()
 		return r, nil
 	case "network":
-		logrus.Warn("using network REST mapper, which will make real API calls to the cluster.")
+		slog.Warn("using network REST mapper, which will make real API calls to the cluster.")
 	default:
 		return nil, fmt.Errorf("unsupported test REST mapper type: %s", mapperType)
 	}

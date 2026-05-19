@@ -1,4 +1,4 @@
-// cSpell: words iface ifaces sirupsen wrapcheck
+// cSpell: words iface ifaces wrapcheck
 package host
 
 import (
@@ -7,7 +7,6 @@ import (
 	"net"
 	"time"
 
-	"github.com/sirupsen/logrus"
 	"github.com/txn2/txeh"
 )
 
@@ -59,9 +58,6 @@ func (h *hostImpl) CheckIpExists(ip net.IP) (bool, error) {
 		var addrs []net.Addr
 		addrs, err = i.Addrs()
 		if err != nil { // nocov - Hard in CI
-			logrus.WithFields(logrus.Fields{
-				"interface": i,
-			}).Warn("Cannot get interface address")
 			continue
 		}
 		for _, a := range addrs {

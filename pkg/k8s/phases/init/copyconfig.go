@@ -3,15 +3,16 @@ package init
 // cSpell: disable
 import (
 	"fmt"
+	"log/slog"
 	"path/filepath"
 
-	log "github.com/sirupsen/logrus"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 
 	"github.com/kaweezle/iknite/pkg/constants"
 	"github.com/kaweezle/iknite/pkg/host"
 	"github.com/kaweezle/iknite/pkg/k8s"
 	"github.com/kaweezle/iknite/pkg/server"
+	"github.com/kaweezle/iknite/pkg/utils"
 )
 
 // cSpell: enable
@@ -28,10 +29,16 @@ func NewCopyConfigPhase() workflow.Phase {
 	}
 }
 
+type copyConfigData interface {
+	IkniteClusterProvider
+	host.HostProvider
+	utils.LoggerProvider
+}
+
 // runCopyConfig copies admin.conf (renamed to the cluster name) to
 // /root/.kube/config and copies iknite.conf to /root/.kube/iknite.conf.
 func runCopyConfig(c workflow.RunData) error {
-	data, ok := c.(IkniteInitData)
+	data, ok := c.(copyConfigData)
 	if !ok {
 		return fmt.Errorf("copy-config phase invoked with an invalid data struct")
 	}
@@ -39,7 +46,7 @@ func runCopyConfig(c workflow.RunData) error {
 	ikniteConfig := data.IkniteCluster().Spec
 
 	// Copy admin.conf to /root/.kube/config (renamed to the cluster name).
-	if err := copyAdminConf(data.Host(), ikniteConfig.ClusterName); err != nil {
+	if err := copyAdminConf(data.Host(), ikniteConfig.ClusterName, data.Logger()); err != nil {
 		return fmt.Errorf("failed to copy admin.conf to %s: %w", constants.KubernetesRootConfig, err)
 	}
 
@@ -49,12 +56,18 @@ func runCopyConfig(c workflow.RunData) error {
 		data.Host(),
 		constants.KubernetesPKIDir,
 		&ikniteConfig,
+		data.Logger(),
 	); err != nil {
 		return fmt.Errorf("failed to ensure iknite server configuration: %w", err)
 	}
 
 	// Copy iknite.conf to /root/.kube/iknite.conf.
-	if err := copyFile(data.Host(), constants.IkniteConfPath, constants.IkniteLocalConfPath); err != nil {
+	if err := copyFile(
+		data.Host(),
+		constants.IkniteConfPath,
+		constants.IkniteLocalConfPath,
+		data.Logger(),
+	); err != nil {
 		return fmt.Errorf("failed to copy iknite.conf to %s: %w", constants.IkniteLocalConfPath, err)
 	}
 
@@ -64,7 +77,7 @@ func runCopyConfig(c workflow.RunData) error {
 // copyAdminConf loads the admin kubeconfig from /etc/kubernetes/admin.conf,
 // renames the cluster/context/user to clusterName, and writes the result to
 // /root/.kube/config.
-func copyAdminConf(fs host.FileSystem, clusterName string) error {
+func copyAdminConf(fs host.FileSystem, clusterName string, logger *slog.Logger) error {
 	k8sConfig, err := k8s.LoadFromDefault(fs)
 	if err != nil {
 		return fmt.Errorf("failed to load admin kubeconfig: %w", err)
@@ -75,12 +88,12 @@ func copyAdminConf(fs host.FileSystem, clusterName string) error {
 		return fmt.Errorf("failed to write kubeconfig to %s: %w", constants.KubernetesRootConfig, err)
 	}
 
-	log.WithField("dest", constants.KubernetesRootConfig).Info("admin.conf copied")
+	logger.Info("admin.conf copied", "dest", constants.KubernetesRootConfig)
 	return nil
 }
 
 // copyFile copies the file at src to dst, creating parent directories as needed.
-func copyFile(fs host.FileSystem, src, dst string) error {
+func copyFile(fs host.FileSystem, src, dst string, logger *slog.Logger) error {
 	data, err := fs.ReadFile(src)
 	if err != nil {
 		return fmt.Errorf("failed to read %s: %w", src, err)
@@ -94,6 +107,6 @@ func copyFile(fs host.FileSystem, src, dst string) error {
 		return fmt.Errorf("failed to write %s: %w", dst, err)
 	}
 
-	log.WithFields(log.Fields{"src": src, "dest": dst}).Info("config file copied")
+	logger.Info("config file copied", "src", src, "dest", dst)
 	return nil
 }

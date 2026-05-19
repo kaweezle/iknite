@@ -1,3 +1,4 @@
+// cSpell: words testutil
 package secrets
 
 import (
@@ -7,6 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/kaweezle/iknite/pkg/host"
+	"github.com/kaweezle/iknite/pkg/testutil"
 )
 
 func TestBuildSecretsPath(t *testing.T) {
@@ -120,7 +122,11 @@ func TestEncryptAndLoadSecretsErrorPaths(t *testing.T) {
 	_, err := encryptSecretsPlaintext(DefaultSecretsFile, []byte(""), "invalid-recipient")
 	req.Error(err)
 
-	opts := &Options{Fs: host.NewMemMapFS(), SecretsFile: filepath.Join("tmp", "missing.yaml")}
+	opts := &Options{
+		Fs:          host.NewMemMapFS(),
+		SecretsFile: filepath.Join("tmp", "missing.yaml"),
+		Logger:      testutil.TestLogger(t),
+	}
 	_, err = loadAndDecryptSecrets(opts)
 	req.Error(err)
 	req.Contains(err.Error(), "secrets file not found")

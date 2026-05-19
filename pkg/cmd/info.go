@@ -19,6 +19,7 @@ package cmd
 
 import (
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 
@@ -26,6 +27,7 @@ import (
 
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
 	"github.com/kaweezle/iknite/pkg/cmd/options"
+	"github.com/kaweezle/iknite/pkg/cmd/util"
 	"github.com/kaweezle/iknite/pkg/config"
 	"github.com/kaweezle/iknite/pkg/host"
 	"github.com/kaweezle/iknite/pkg/utils"
@@ -92,8 +94,8 @@ func NewImagesCmd(ikniteConfig *v1alpha1.IkniteClusterSpec) *cobra.Command {
 		Use:   "images",
 		Short: "Lists the container images used by iknite",
 		Long:  `Lists the container images used by iknite.`,
-		Run: func(_ *cobra.Command, _ []string) {
-			performImages(host.NewOsFS(), ikniteConfig, kustomizeOptions)
+		Run: func(cmd *cobra.Command, _ []string) {
+			performImages(host.NewOsFS(), ikniteConfig, kustomizeOptions, util.LoggerFromCommand(cmd))
 		},
 	}
 	utils.AddKustomizeOptionsFlags(imagesCmd.Flags(), kustomizeOptions)
@@ -144,8 +146,9 @@ func performImages(
 	fs host.FileSystem,
 	ikniteConfig *v1alpha1.IkniteClusterSpec,
 	kustomizeOptions *utils.KustomizeOptions,
+	logger *slog.Logger,
 ) {
-	containerImages, err := config.GetIkniteImages(fs, ikniteConfig, kustomizeOptions.ForceEmbedded)
+	containerImages, err := config.GetIkniteImages(fs, ikniteConfig, kustomizeOptions.ForceEmbedded, logger)
 	cobra.CheckErr(err)
 
 	for _, image := range containerImages {

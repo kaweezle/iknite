@@ -22,12 +22,12 @@ import (
 	"fmt"
 	"os"
 
-	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
 	"github.com/kaweezle/iknite/pkg/alpine"
 	"github.com/kaweezle/iknite/pkg/apis/iknite"
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
+	"github.com/kaweezle/iknite/pkg/cmd/util"
 	"github.com/kaweezle/iknite/pkg/config"
 	"github.com/kaweezle/iknite/pkg/host"
 	"github.com/kaweezle/iknite/pkg/k8s"
@@ -72,7 +72,7 @@ func NewStartCmd(
 	return startCmd
 }
 
-func IsIkniteReady(_ context.Context, fs host.FileSystem) (bool, error) {
+func IsIkniteReady(ctx context.Context, fs host.FileSystem) (bool, error) {
 	cluster, err := v1alpha1.LoadIkniteCluster(fs)
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
 		return false, fmt.Errorf("failed to load iknite cluster state: %w", err)
@@ -80,19 +80,20 @@ func IsIkniteReady(_ context.Context, fs host.FileSystem) (bool, error) {
 	if errors.Is(err, os.ErrNotExist) {
 		return false, nil
 	}
-	log.WithFields(log.Fields{
-		"state":   cluster.Status.State.String(),
-		"phase":   cluster.Status.CurrentPhase,
-		"total":   cluster.Status.WorkloadsState.Count,
-		"ready":   cluster.Status.WorkloadsState.ReadyCount,
-		"unready": cluster.Status.WorkloadsState.UnreadyCount,
-	}).Infof(
+	logger := util.LoggerFromContext(ctx)
+	logger.Info(fmt.Sprintf(
 		"status=%s, phase=%s, Workloads total=%d, ready=%d, unready=%d",
 		cluster.Status.State.String(),
 		cluster.Status.CurrentPhase,
 		cluster.Status.WorkloadsState.Count,
 		cluster.Status.WorkloadsState.ReadyCount,
 		cluster.Status.WorkloadsState.UnreadyCount,
+	),
+		"state", cluster.Status.State.String(),
+		"phase", cluster.Status.CurrentPhase,
+		"total", cluster.Status.WorkloadsState.Count,
+		"ready", cluster.Status.WorkloadsState.ReadyCount,
+		"unready", cluster.Status.WorkloadsState.UnreadyCount,
 	)
 
 	if cluster.Status.State > iknite.Initializing && cluster.Status.WorkloadsState.Count > 0 {
@@ -112,6 +113,7 @@ func performStart(
 	if err != nil {
 		return fmt.Errorf("failed to prepare kubernetes environment: %w", err)
 	}
+	logger := util.LoggerFromContext(ctx)
 
 	// If Kubernetes is already installed, check that the configuration has not
 	// Changed.
@@ -121,16 +123,16 @@ func performStart(
 			return fmt.Errorf("kubeconfig server address does not match iknite config API endpoint." +
 				" Please reset the cluster with `iknite reset` and start again")
 		}
-		log.Info("Existing configuration found. Starting cluster...")
+		logger.Info("Existing configuration found. Starting cluster...")
 	} else {
 		if !errors.Is(err, os.ErrNotExist) {
 			return fmt.Errorf("failed to load existing cluster admin.conf: %w", err)
 		}
-		log.Info("No current configuration found. Initializing...")
+		logger.Info("No current configuration found. Initializing...")
 	}
 
 	// Start OpenRC. This will perform `iknite init`.
-	err = alpine.EnsureOpenRC(alpineHost, "default")
+	err = alpine.EnsureOpenRC(alpineHost, "default", logger)
 	if err != nil {
 		return fmt.Errorf("failed to start OpenRC: %w", err)
 	}
@@ -140,6 +142,6 @@ func performStart(
 	if err != nil {
 		return fmt.Errorf("cluster did not become ready in time: %w", err)
 	}
-	log.Info("Cluster is ready")
+	logger.Info("Cluster is ready")
 	return nil
 }

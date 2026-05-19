@@ -80,4 +80,6 @@ type IkniteInitData interface {
 	ErrGroupProvider
 	ShutdownHookRegistrar
 	ShutdownHookRunner
+	utils.LoggerProvider
+	utils.ViperProvider
 }

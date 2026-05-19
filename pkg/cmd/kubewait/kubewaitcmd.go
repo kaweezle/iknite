@@ -20,7 +20,7 @@ limitations under the License.
 // a bootstrap repository script.
 package kubewait
 
-// cSpell: words godotenv clientcmd apimachinery kstatus errorf sirupsen joho metav1 wrapcheck
+// cSpell: words godotenv clientcmd apimachinery kstatus errorf joho metav1 wrapcheck
 
 import (
 	"context"
@@ -29,7 +29,6 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 
 	cmdUtil "github.com/kaweezle/iknite/pkg/cmd/util"
 	"github.com/kaweezle/iknite/pkg/host"
@@ -44,7 +43,7 @@ func CreateKubewaitCmd(out io.Writer, fse host.FileExecutor, opts *kubewait.Opti
 	if fse == nil {
 		fse = host.NewDefaultHost()
 	}
-	v := viper.GetViper()
+	cmdIf := cmdUtil.NewCmdInterface(&opts.BaseOptions)
 
 	cmd := &cobra.Command{
 		Use:   "kubewait [namespaces...]",
@@ -76,25 +75,26 @@ Examples:
   # Use a specific kubeconfig
   kubewait --kubeconfig ~/.kube/config kube-system`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return kubewait.RunKubewait(cmd.Context(), fse, opts, args)
+			return kubewait.RunKubewait(cmd.Context(), fse, opts, args, cmdIf.Logger())
 		},
 		PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
-			opts.SetUpLogs(cmd.OutOrStderr())
+			opts.SetUpLogs(cmd.OutOrStderr(), cmdIf)
 			rootCmd := cmd.Root()
-			if err := cmdUtil.InitializeConfiguration(rootCmd, v); err != nil {
+			if err := cmdUtil.InitializeConfiguration(rootCmd, cmdIf); err != nil {
 				return fmt.Errorf("while initializing configuration: %w", err)
 			}
-			ok, err := opts.ReadEnvFile(fse)
+			ok, err := opts.ReadEnvFile(fse, cmdIf.Logger())
 			if err != nil {
 				return fmt.Errorf("while reading env file: %w", err)
 			}
 			if ok {
 				// Re-apply config to flags to override with env file values if needed
-				cmdUtil.ApplyViperConfigToFlags(rootCmd, v)
+				cmdUtil.ApplyViperConfigToFlags(rootCmd, cmdIf)
 			}
 			// Re-setup logs after configuration is loaded to apply any log-related settings from the config file or
 			// env file
-			opts.SetUpLogs(cmd.OutOrStderr())
+			opts.SetUpLogs(cmd.OutOrStderr(), cmdIf)
+			cmdUtil.SetCmdInterface(cmd, cmdIf)
 			return nil
 		},
 	}
@@ -103,7 +103,7 @@ Examples:
 	cmdUtil.AddConfigFlag(cmd)
 	flags := cmd.Flags()
 	opts.AddFlags(flags)
-	cmdUtil.BindFlagsToViper(cmd, v)
+	cmdUtil.BindFlagsToViper(cmd, cmdIf)
 
 	return cmd
 }

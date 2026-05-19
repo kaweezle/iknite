@@ -1,11 +1,13 @@
-// cSpell: words viper logrus sirupsen
+// cSpell: words viper  samber
 package util
 
 import (
 	"io"
+	"log/slog"
 
-	log "github.com/sirupsen/logrus"
 	"github.com/spf13/pflag"
+
+	"github.com/kaweezle/iknite/pkg/utils"
 )
 
 const (
@@ -16,28 +18,33 @@ const (
 )
 
 type BaseOptions struct {
-	Verbosity log.Level
+	Verbosity slog.Level
 	JSONLogs  bool
 }
 
 func DefaultBaseOptions() *BaseOptions {
 	return &BaseOptions{
-		Verbosity: log.InfoLevel,
+		Verbosity: slog.LevelInfo,
 		JSONLogs:  false,
 	}
 }
 
 func (opts *BaseOptions) AddFlags(flags *pflag.FlagSet) {
 	flags.VarP(
-		NewLogLevelValue(&opts.Verbosity), LogLevelFlag, "v", "Log level (debug, info, warn, error, fatal, panic)")
+		NewLogLevelValue(&opts.Verbosity), LogLevelFlag, "v", "Log level (trace, debug, info, warn, error)")
 	flags.BoolVar(&opts.JSONLogs, JSONLogsFlag, opts.JSONLogs, "Emit log messages as JSON")
 }
 
-// setUpLogs configures logrus output and level.
-func (opts *BaseOptions) SetUpLogs(out io.Writer) {
-	log.SetOutput(out)
-	if opts.JSONLogs {
-		log.SetFormatter(&log.JSONFormatter{})
+func (opts *BaseOptions) Logger(out io.Writer) *slog.Logger {
+	return utils.NewLogger(out, opts.Verbosity, opts.JSONLogs)
+}
+
+// setUpLogs configures log output and level.
+func (opts *BaseOptions) SetUpLogs(out io.Writer, cmdIf CmdInterface) {
+	if setLogger, ok := cmdIf.(utils.LoggerHolder); ok {
+		setLogger.SetLogger(opts.Logger(out))
+		return
+	} else {
+		cmdIf.Logger().Warn("cmdIf does not implement loggerHolder, using default logger")
 	}
-	log.SetLevel(opts.Verbosity)
 }

@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -26,6 +27,7 @@ import (
 
 	mockHost "github.com/kaweezle/iknite/mocks/pkg/host"
 	ikniteApi "github.com/kaweezle/iknite/pkg/apis/iknite"
+	"github.com/kaweezle/iknite/pkg/cmd/util"
 	"github.com/kaweezle/iknite/pkg/host"
 	k8sInit "github.com/kaweezle/iknite/pkg/k8s/phases/init"
 )
@@ -143,6 +145,7 @@ func TestNewInitData(t *testing.T) {
 			var output bytes.Buffer // dummy output for validation
 
 			cmd := newCmdInit(&output, opts, initRunner, host.NewDefaultHost())
+			cmd.SetContext(util.WithCmdInterface(t.Context(), util.NewCmdInterface(nil)))
 			if tt.customizeOptions != nil {
 				cleanup, err := tt.customizeOptions(t, cmd, opts)
 				req.NoError(err)
@@ -182,6 +185,7 @@ current-context: foo-context
 kind: Config
 `
 
+//nolint:gocyclo // This test is necessarily complex as it tests the integration of multiple components.
 func TestInitDataClientWithNonDefaultKubeconfig(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodHead {
@@ -201,7 +205,14 @@ func TestInitDataClientWithNonDefaultKubeconfig(t *testing.T) {
 	initOptions.kubeconfigPath = kubeconfigPath
 	initRunner := workflow.NewRunner()
 	var output bytes.Buffer // dummy output for validation
-	_ = newCmdInit(&output, initOptions, initRunner, host.NewDefaultHost())
+	cmd := newCmdInit(&output, initOptions, initRunner, host.NewDefaultHost())
+
+	_, err := initRunner.InitData([]string{})
+	if err == nil {
+		t.Fatalf("initRunner.InitData expected error when context is nil, got nil")
+	}
+
+	cmd.SetContext(util.WithCmdInterface(t.Context(), util.NewCmdInterface(nil)))
 
 	d, err := initRunner.InitData([]string{})
 	if err != nil {
@@ -285,6 +296,7 @@ func TestRunInitCmd_Failed(t *testing.T) {
 	).Return(nil).Once()
 	mockH.EXPECT().Exists("/proc/sys/net/bridge").
 		Return(false, errors.New("File error"))
+	mockH.EXPECT().GetOutboundIP().Return(net.ParseIP("51.75.199.148"), nil).Once()
 
 	var output bytes.Buffer
 	cmd := newCmdInit(&output, initOptions, initRunner, mockH)
@@ -349,6 +361,7 @@ func TestRunInitCmd_Success(t *testing.T) {
 		Maybe()
 	// Remove the kubelet pid file at the end of the workflow
 	mockH.EXPECT().Remove("/run/kubelet.pid").Return(nil).Once()
+	mockH.EXPECT().GetOutboundIP().Return(net.ParseIP("51.75.199.148"), nil).Once()
 
 	var output bytes.Buffer
 	cmd := newCmdInit(&output, initOptions, initRunner, mockH)

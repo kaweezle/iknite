@@ -1,4 +1,4 @@
-// cSpell: words cgroupfs
+// cSpell: words cgroupfs testutil
 package host_test
 
 import (
@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/kaweezle/iknite/pkg/host"
+	"github.com/kaweezle/iknite/pkg/testutil"
 )
 
 func TestExecuteOnExistenceVariants(t *testing.T) {
@@ -180,7 +181,8 @@ func TestReadEnvFiles(t *testing.T) {
 			paths, err := tt.prepare(req, fs)
 			req.NoError(err, "error while preparing paths")
 
-			got, gotErr := host.ReadEnvFiles(fs, paths...)
+			logger := testutil.TestLogger(t)
+			got, gotErr := host.ReadEnvFiles(fs, logger, paths...)
 			if gotErr != nil {
 				if tt.wantErr == "" {
 					req.Error(gotErr)

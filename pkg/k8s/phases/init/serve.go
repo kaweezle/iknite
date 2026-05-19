@@ -4,12 +4,12 @@ package init
 import (
 	"fmt"
 
-	log "github.com/sirupsen/logrus"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 
 	"github.com/kaweezle/iknite/pkg/constants"
 	"github.com/kaweezle/iknite/pkg/host"
 	"github.com/kaweezle/iknite/pkg/server"
+	"github.com/kaweezle/iknite/pkg/utils"
 )
 
 // cSpell: enable
@@ -27,6 +27,7 @@ type serverData interface {
 	host.HostProvider
 	IkniteClusterListenerRegistrar
 	ShutdownHookRegistrar
+	utils.LoggerProvider
 }
 
 func runServe(c workflow.RunData) error {
@@ -36,12 +37,12 @@ func runServe(c workflow.RunData) error {
 	}
 
 	ikniteCluster := data.IkniteCluster()
-	srv, err := server.StartIkniteServer(data.Host(), constants.KubernetesPKIDir, ikniteCluster)
+	srv, err := server.StartIkniteServer(data.Host(), constants.KubernetesPKIDir, ikniteCluster, data.Logger())
 	if err != nil {
 		return fmt.Errorf("failed to start iknite status server: %w", err)
 	}
 
-	log.WithField("port", ikniteCluster.Spec.StatusServerPort).Info("Iknite status server started")
+	data.Logger().Info("Iknite status server started", "port", ikniteCluster.Spec.StatusServerPort)
 
 	ch, unregister := data.RegisterIkniteClusterListener()
 	go func() {

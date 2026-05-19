@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net"
 	"os"
 	"path/filepath"
@@ -86,6 +87,7 @@ func CheckService(
 	fileExec host.FileExecutor,
 	serviceName string,
 	serviceType ServiceType,
+	logger *slog.Logger,
 ) (bool, string, error) {
 	pid := 0
 	if serviceType == ServiceTypeOpenRC {
@@ -103,7 +105,7 @@ func CheckService(
 	}
 	if serviceType == ServiceTypePidFile {
 		var err error
-		pid, _, err = alpine.CheckPidFile(fileExec, serviceName)
+		pid, _, err = alpine.CheckPidFile(fileExec, serviceName, logger)
 		if err != nil {
 			return false, "", fmt.Errorf("failed to check PID file for service %s: %w", serviceName, err)
 		}
@@ -112,6 +114,11 @@ func CheckService(
 		}
 	}
 	return true, fmt.Sprintf("Service %s is running with pid %d", serviceName, pid), nil
+}
+
+type serviceCheckData interface {
+	host.HostProvider
+	utils.LoggerProvider
 }
 
 // ServiceCheck checks if a service is running.
@@ -124,11 +131,11 @@ func ServiceCheck(name, serviceName string, serviceType ServiceType, parents ...
 		DependsOn:   parents,
 		Description: fmt.Sprintf("Check if %s service is running", serviceName),
 		CheckFn: func(_ context.Context, checkData check.CheckData) (bool, string, error) {
-			data, ok := checkData.(host.HostProvider)
+			data, ok := checkData.(serviceCheckData)
 			if !ok {
 				return false, "", fmt.Errorf("invalid check data type")
 			}
-			return CheckService(data.Host(), serviceName, serviceType)
+			return CheckService(data.Host(), serviceName, serviceType, data.Logger())
 		},
 	}
 }
@@ -431,7 +438,9 @@ func checkWorkloadsWithConfig(
 	kubeClient resource.RESTClientGetter,
 ) (bool, string, error) { // nocov -- requires a running Kubernetes cluster
 	workloadData.Start()
-	err := workloadData.WaitOptions().Poll(ctx, k8s.WorkloadsReadyConditionWithContextFunc(kubeClient,
+	err := workloadData.WaitOptions().Poll(ctx, k8s.WorkloadsReadyConditionWithContextFunc(
+		kubeClient,
+		workloadData.Logger(),
 		func(allReady bool, total int, ready, unready []*v1alpha1.WorkloadState, iteration, okIterations int) bool {
 			workloadData.SetOk(allReady)
 			workloadData.SetWorkloadCount(total)

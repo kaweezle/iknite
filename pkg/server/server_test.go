@@ -16,7 +16,7 @@ limitations under the License.
 //nolint:gosec,errcheck,forcetypeassert // Unit testing
 package server_test
 
-// cSpell: words pkiutil certutil clientcmd kubeadmapi noctx ikniteapi
+// cSpell: words pkiutil certutil clientcmd kubeadmapi noctx ikniteapi testutil
 
 import (
 	"context"
@@ -43,6 +43,7 @@ import (
 	"github.com/kaweezle/iknite/pkg/k8s"
 	"github.com/kaweezle/iknite/pkg/pki"
 	"github.com/kaweezle/iknite/pkg/server"
+	"github.com/kaweezle/iknite/pkg/testutil"
 )
 
 const pkiDir = "pki"
@@ -77,9 +78,10 @@ func TestEnsureServerCertAndKey(t *testing.T) {
 
 	dnsNames := []string{"iknite.local"}
 	ips := []net.IP{net.ParseIP("192.168.1.1")}
+	logger := testutil.TestLogger(t)
 
 	// First call creates the cert
-	err := server.EnsureServerCertAndKey(fs, pkiDir, dnsNames, ips)
+	err := server.EnsureServerCertAndKey(fs, pkiDir, dnsNames, ips, logger)
 	require.NoError(t, err)
 
 	certPath, keyPath := pki.PathsForCertAndKey(pkiDir, constants.IkniteServerCertName)
@@ -91,7 +93,7 @@ func TestEnsureServerCertAndKey(t *testing.T) {
 	require.True(t, ok, "expected key file to exist at %s", keyPath)
 
 	// Second call is idempotent
-	err = server.EnsureServerCertAndKey(fs, pkiDir, dnsNames, ips)
+	err = server.EnsureServerCertAndKey(fs, pkiDir, dnsNames, ips, logger)
 	require.NoError(t, err)
 }
 
@@ -99,9 +101,10 @@ func TestEnsureClientCertAndKey(t *testing.T) {
 	t.Parallel()
 	fs := host.NewMemMapFS()
 	createTestCA(t, fs, pkiDir)
+	logger := testutil.TestLogger(t)
 
 	// First call creates the cert
-	err := server.EnsureClientCertAndKey(fs, pkiDir)
+	err := server.EnsureClientCertAndKey(fs, pkiDir, logger)
 	require.NoError(t, err)
 
 	certPath, keyPath := pkiutil.PathsForCertAndKey(pkiDir, constants.IkniteClientCertName)
@@ -113,7 +116,7 @@ func TestEnsureClientCertAndKey(t *testing.T) {
 	require.True(t, ok, "expected key file to exist at %s", keyPath)
 
 	// Second call is idempotent
-	err = server.EnsureClientCertAndKey(fs, pkiDir)
+	err = server.EnsureClientCertAndKey(fs, pkiDir, logger)
 	require.NoError(t, err)
 }
 
@@ -123,9 +126,10 @@ func TestNewIkniteServer(t *testing.T) {
 	createTestCA(t, fs, pkiDir)
 
 	spec := makeTestSpec(0)
-	require.NoError(t, server.EnsureServerCertAndKey(fs, pkiDir, []string{"iknite.local"}, []net.IP{spec.Ip}))
+	logger := testutil.TestLogger(t)
+	require.NoError(t, server.EnsureServerCertAndKey(fs, pkiDir, []string{"iknite.local"}, []net.IP{spec.Ip}, logger))
 
-	srv, err := server.NewIkniteServer(fs, pkiDir, spec)
+	srv, err := server.NewIkniteServer(fs, pkiDir, spec, logger)
 	require.NoError(t, err)
 	require.NotNil(t, srv)
 }
@@ -134,11 +138,12 @@ func TestSetClusterUpdatesInMemoryStatus(t *testing.T) {
 	t.Parallel()
 	fs := host.NewMemMapFS()
 	createTestCA(t, fs, pkiDir)
+	logger := testutil.TestLogger(t)
 
 	spec := makeTestSpec(0)
-	require.NoError(t, server.EnsureServerCertAndKey(fs, pkiDir, []string{"iknite.local"}, []net.IP{spec.Ip}))
+	require.NoError(t, server.EnsureServerCertAndKey(fs, pkiDir, []string{"iknite.local"}, []net.IP{spec.Ip}, logger))
 
-	iSrv, err := server.NewIkniteServer(fs, pkiDir, spec)
+	iSrv, err := server.NewIkniteServer(fs, pkiDir, spec, logger)
 	require.NoError(t, err)
 
 	cluster := &v1alpha1.IkniteCluster{}
@@ -169,9 +174,10 @@ func TestHealthzEndpoint(t *testing.T) {
 	createTestCA(t, fs, pkiDir)
 
 	spec := makeTestSpec(0)
-	require.NoError(t, server.EnsureServerCertAndKey(fs, pkiDir, []string{"iknite.local"}, []net.IP{spec.Ip}))
+	logger := testutil.TestLogger(t)
+	require.NoError(t, server.EnsureServerCertAndKey(fs, pkiDir, []string{"iknite.local"}, []net.IP{spec.Ip}, logger))
 
-	iSrv, err := server.NewIkniteServer(fs, pkiDir, spec)
+	iSrv, err := server.NewIkniteServer(fs, pkiDir, spec, logger)
 	require.NoError(t, err)
 
 	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, "/healthz", http.NoBody)
@@ -190,8 +196,9 @@ func TestStatusEndpoint(t *testing.T) {
 	createTestCA(t, fs, pkiDir)
 
 	spec := makeTestSpec(0)
-	require.NoError(t, server.EnsureServerCertAndKey(fs, pkiDir, []string{spec.DomainName}, []net.IP{spec.Ip}))
-	require.NoError(t, server.EnsureClientCertAndKey(fs, pkiDir))
+	logger := testutil.TestLogger(t)
+	require.NoError(t, server.EnsureServerCertAndKey(fs, pkiDir, []string{spec.DomainName}, []net.IP{spec.Ip}, logger))
+	require.NoError(t, server.EnsureClientCertAndKey(fs, pkiDir, logger))
 
 	// Build server TLS config
 	caCertPEM, err := fs.ReadFile(filepath.Join(pkiDir, "ca.crt"))
@@ -215,7 +222,7 @@ func TestStatusEndpoint(t *testing.T) {
 	cluster.APIVersion = "iknite.kaweezle.com/v1alpha1"
 
 	// Create the IkniteServer and seed it with the cluster status
-	iSrv, err := server.NewIkniteServer(fs, pkiDir, spec)
+	iSrv, err := server.NewIkniteServer(fs, pkiDir, spec, logger)
 	require.NoError(t, err)
 	iSrv.SetCluster(cluster)
 
@@ -277,11 +284,12 @@ func TestEnsureIkniteConf(t *testing.T) {
 	createTestCA(t, fs, pkiDir)
 
 	spec := makeTestSpec(11443)
-	require.NoError(t, server.EnsureServerCertAndKey(fs, pkiDir, []string{spec.DomainName}, []net.IP{spec.Ip}))
-	require.NoError(t, server.EnsureClientCertAndKey(fs, pkiDir))
+	logger := testutil.TestLogger(t)
+	require.NoError(t, server.EnsureServerCertAndKey(fs, pkiDir, []string{spec.DomainName}, []net.IP{spec.Ip}, logger))
+	require.NoError(t, server.EnsureClientCertAndKey(fs, pkiDir, logger))
 
 	confPath := filepath.Join(pkiDir, "iknite.conf")
-	err := server.EnsureIkniteConf(fs, pkiDir, confPath, spec)
+	err := server.EnsureIkniteConf(fs, pkiDir, confPath, spec, logger)
 	require.NoError(t, err)
 	ok, err := fs.Exists(confPath)
 	require.NoError(t, err)
@@ -306,7 +314,7 @@ func TestEnsureIkniteConf(t *testing.T) {
 	require.NotEmpty(t, authInfo.ClientKeyData)
 
 	// Regeneration should succeed (overwrites with updated IP)
-	err = server.EnsureIkniteConf(fs, pkiDir, confPath, spec)
+	err = server.EnsureIkniteConf(fs, pkiDir, confPath, spec, logger)
 	require.NoError(t, err)
 }
 
@@ -317,9 +325,10 @@ func TestStatusAndHealthzMethodHandling(t *testing.T) {
 	fs := host.NewMemMapFS()
 	createTestCA(t, fs, pkiDir)
 	spec := makeTestSpec(0)
-	req.NoError(server.EnsureServerCertAndKey(fs, pkiDir, []string{spec.DomainName}, []net.IP{spec.Ip}))
+	logger := testutil.TestLogger(t)
+	req.NoError(server.EnsureServerCertAndKey(fs, pkiDir, []string{spec.DomainName}, []net.IP{spec.Ip}, logger))
 
-	iSrv, err := server.NewIkniteServer(fs, pkiDir, spec)
+	iSrv, err := server.NewIkniteServer(fs, pkiDir, spec, logger)
 	req.NoError(err)
 
 	postStatusReq, err := http.NewRequestWithContext(context.Background(), http.MethodPost, "/status", http.NoBody)
@@ -383,10 +392,11 @@ func TestEnsureIkniteConfAddressSelection(t *testing.T) {
 
 			fs := host.NewMemMapFS()
 			createTestCA(t, fs, pkiDir)
-			req.NoError(server.EnsureClientCertAndKey(fs, pkiDir))
+			logger := testutil.TestLogger(t)
+			req.NoError(server.EnsureClientCertAndKey(fs, pkiDir, logger))
 
 			confPath := filepath.Join(pkiDir, constants.IkniteConfName+".conf")
-			req.NoError(server.EnsureIkniteConf(fs, pkiDir, confPath, tt.spec))
+			req.NoError(server.EnsureIkniteConf(fs, pkiDir, confPath, tt.spec, logger))
 
 			cfg, err := k8s.LoadFromFile(fs, confPath)
 			req.NoError(err)
@@ -402,8 +412,9 @@ func TestEnsureIkniteServerConfiguration(t *testing.T) {
 	fs := host.NewMemMapFS()
 	req := require.New(t)
 	createTestCA(t, fs, pkiDir)
+	logger := testutil.TestLogger(t)
 
-	err := server.EnsureIkniteServerConfiguration(fs, pkiDir, makeTestSpec(11443))
+	err := server.EnsureIkniteServerConfiguration(fs, pkiDir, makeTestSpec(11443), logger)
 	require.NoError(t, err)
 
 	ok, err := fs.Exists(constants.IkniteConfPath)
@@ -436,7 +447,8 @@ func TestStartIkniteServer(t *testing.T) {
 	cluster, err := v1alpha1.LoadIkniteClusterOrDefault(fs)
 	require.NoError(t, err)
 
-	srv, err := server.StartIkniteServer(fs, pkiDir, cluster)
+	logger := testutil.TestLogger(t)
+	srv, err := server.StartIkniteServer(fs, pkiDir, cluster, logger)
 	require.NoError(t, err)
 	require.NotNil(t, srv)
 

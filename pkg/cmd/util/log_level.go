@@ -13,29 +13,34 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-// cSpell: words sirupsen logrus
 package util
 
 import (
 	"fmt"
+	"log/slog"
+	"strings"
 
-	log "github.com/sirupsen/logrus"
 	"github.com/spf13/pflag"
 )
 
-type LogLevelValue log.Level
+type LogLevelValue slog.Level
 
 // Ensure logLevelValue implements the pflag.Value interface.
 var _ pflag.Value = (*LogLevelValue)(nil)
 
-func NewLogLevelValue(p *log.Level) *LogLevelValue {
+func NewLogLevelValue(p *slog.Level) *LogLevelValue {
 	return (*LogLevelValue)(p)
 }
 
 func (c *LogLevelValue) Set(s string) error {
-	level, err := log.ParseLevel(s)
-	if err != nil {
-		return fmt.Errorf("while parsing log level: %w", err)
+	level := slog.Level(*c)
+	if strings.EqualFold(s, "TRACE") {
+		level = slog.Level(-8) // Custom trace level below debug
+	} else {
+		err := level.UnmarshalText([]byte(s))
+		if err != nil {
+			return fmt.Errorf("while parsing log level: %w", err)
+		}
 	}
 	*c = LogLevelValue(level)
 	return nil
@@ -45,4 +50,4 @@ func (s *LogLevelValue) Type() string {
 	return "logLevel"
 }
 
-func (s *LogLevelValue) String() string { return log.Level(*s).String() }
+func (s *LogLevelValue) String() string { return slog.Level(*s).String() }

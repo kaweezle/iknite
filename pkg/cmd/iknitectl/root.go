@@ -21,7 +21,6 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 
 	"github.com/kaweezle/iknite/pkg/cmd/secrets"
 	"github.com/kaweezle/iknite/pkg/cmd/util"
@@ -51,6 +50,8 @@ func CreateRootCmd(opts *RootOptions) *cobra.Command {
 		opts = NewRootOptions()
 	}
 
+	cmdIf := util.NewCmdInterface(&opts.BaseOptions)
+
 	rootCmd := &cobra.Command{
 		Use:   "iknitectl",
 		Short: "Development tools for iknite",
@@ -59,13 +60,14 @@ func CreateRootCmd(opts *RootOptions) *cobra.Command {
 It provides utilities for managing secrets, building artifacts, and other
 development tasks that are not part of the main iknite binary.`,
 		PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
-			opts.SetUpLogs(cmd.OutOrStderr())
-			err := util.InitializeConfiguration(cmd.Root(), viper.GetViper())
+			opts.SetUpLogs(cmd.OutOrStderr(), cmdIf)
+			err := util.InitializeConfiguration(cmd.Root(), cmdIf)
 			if err != nil {
 				return fmt.Errorf("failed to initialize configuration: %w", err)
 			}
 			// Re-setup logs after configuration is loaded to apply any log-related settings from the config file
-			opts.SetUpLogs(cmd.OutOrStderr())
+			opts.SetUpLogs(cmd.OutOrStderr(), cmdIf)
+			util.SetCmdInterface(cmd, cmdIf)
 			return nil
 		},
 	}
@@ -80,7 +82,7 @@ development tasks that are not part of the main iknite binary.`,
 	rootCmd.AddCommand(secrets.CreateSecretsCmd(opts.FileExecutor, nil))
 	util.AddConfigFlag(rootCmd)
 
-	util.BindFlagsToViper(rootCmd, viper.GetViper())
+	util.BindFlagsToViper(rootCmd, cmdIf)
 
 	return rootCmd
 }

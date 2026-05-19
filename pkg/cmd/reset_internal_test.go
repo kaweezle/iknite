@@ -20,6 +20,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	kubeadmConstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 
+	"github.com/kaweezle/iknite/pkg/cmd/util"
 	"github.com/kaweezle/iknite/pkg/config"
 )
 
@@ -27,10 +28,12 @@ const testCRISocket = "unix:///var/run/containerd/containerd.sock"
 
 // makeResetCmd creates a cobra.Command with all reset flags, along with customized resetOptions.
 // SkipCRIDetect=true and a known CRISocket are set so tests run without a real container runtime.
-func makeResetCmd(opts *resetOptions) *cobra.Command {
+func makeResetCmd(t *testing.T, opts *resetOptions) *cobra.Command {
+	t.Helper()
 	cmd := &cobra.Command{Use: "reset"}
 	AddResetFlags(cmd.Flags(), opts)
 	config.AddIkniteClusterFlags(cmd.Flags(), opts.ikniteCfg)
+	cmd.SetContext(util.WithCmdInterface(t.Context(), util.NewCmdInterface(nil)))
 	return cmd
 }
 
@@ -134,7 +137,7 @@ func TestNewResetData(t *testing.T) {
 			opts := newResetOptions()
 			var input, output bytes.Buffer
 
-			cmd := makeResetCmd(opts)
+			cmd := makeResetCmd(t, opts)
 
 			if tt.customizeOptions != nil {
 				cleanup, err := tt.customizeOptions(t, cmd, opts)
@@ -202,6 +205,7 @@ func TestNewCmdReset(t *testing.T) {
 
 	runner := workflow.NewRunner()
 	cmd := newCmdReset(&in, &out, nil, runner)
+	cmd.SetContext(util.WithCmdInterface(t.Context(), util.NewCmdInterface(nil)))
 
 	req.NotNil(cmd)
 	req.Equal("reset", cmd.Name())
@@ -265,7 +269,7 @@ func TestResetDataWithKubeconfig(t *testing.T) {
 	opts.kubeconfigPath = kubeconfigPath
 
 	var input, output bytes.Buffer
-	cmd := makeResetCmd(opts)
+	cmd := makeResetCmd(t, opts)
 
 	data, err := newResetData(cmd, opts, &input, &output, true)
 	if err != nil {

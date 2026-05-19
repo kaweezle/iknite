@@ -13,19 +13,22 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-// cSpell: words sirupsen logrus wrapcheck
+// cSpell: words wrapcheck
 package util
 
 import (
+	"context"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
 
-	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
+
+	"github.com/kaweezle/iknite/pkg/utils"
 )
 
 const (
@@ -170,13 +173,12 @@ func toStringSlice(val any) ([]string, error) {
 }
 
 // BindFlagValue applies the viper config value to the flag when the flag is not set and viper has a value.
-func BindFlagValue(f *pflag.Flag, v *viper.Viper, viperName string) error {
+func BindFlagValue(f *pflag.Flag, v *viper.Viper, viperName string, logger *slog.Logger) error {
 	// Apply the viper config value to the flag when the flag is not set and viper has a value
+	logger = logger.With(optionKey, f.Name, viperKey, viperName)
 	if f.Changed || !v.IsSet(viperName) {
-		logrus.WithFields(logrus.Fields{
-			optionKey: f.Name,
-			viperKey:  viperName,
-		}).Trace("skipping applying viper config to flag because flag is already set or viper key is not set")
+		logger.Log(context.TODO(), utils.LevelTrace,
+			"skipping viper -> pflag", "flag_changed", f.Changed, "viper_set", v.IsSet(viperName))
 		return nil
 	}
 	val := v.Get(viperName)
@@ -184,19 +186,21 @@ func BindFlagValue(f *pflag.Flag, v *viper.Viper, viperName string) error {
 	if vi, ok := f.Value.(pflag.SliceValue); ok {
 		stringValues, err := toStringSlice(val)
 		if err != nil {
-			logrus.WithFields(logrus.Fields{
-				optionKey: f.Name,
-				viperKey:  viperName,
-				valueKey:  val,
-			}).WithError(err).Error("error converting options")
+			logger.Error(
+				"error converting options",
+				optionKey, f.Name,
+				viperKey, viperName,
+				valueKey, val,
+				utils.ErrorKey, err,
+			)
 			return fmt.Errorf("while getting viper array value for %s: %w", viperName, err)
 		}
 		if err := vi.Replace(stringValues); err != nil {
-			logrus.WithFields(logrus.Fields{
-				optionKey: f.Name,
-				viperKey:  viperName,
-				valueKey:  val,
-			}).WithError(err).Error("error replacing options")
+			logger.Error(
+				"error replacing options",
+				valueKey, val,
+				utils.ErrorKey, err,
+			)
 			return fmt.Errorf(
 				"while replacing viper array value for %s from viper key %s with value %v: %w",
 				f.Name,
@@ -207,11 +211,11 @@ func BindFlagValue(f *pflag.Flag, v *viper.Viper, viperName string) error {
 		}
 	} else {
 		if err := f.Value.Set(fmt.Sprintf("%v", val)); err != nil {
-			logrus.WithFields(logrus.Fields{
-				optionKey: f.Name,
-				viperKey:  viperName,
-				valueKey:  val,
-			}).WithError(err).Error("error replacing options")
+			logger.Error(
+				"error replacing options",
+				valueKey, val,
+				utils.ErrorKey, err,
+			)
 			return fmt.Errorf(
 				"while setting viper value for %s from viper key %s with value %v: %w",
 				f.Name,
@@ -224,7 +228,9 @@ func BindFlagValue(f *pflag.Flag, v *viper.Viper, viperName string) error {
 	return nil
 }
 
-func BindFlag(f *pflag.Flag, v *viper.Viper, viperName string) error {
+type binderFunc func(f *pflag.Flag, v *viper.Viper, viperName string, logger *slog.Logger) error
+
+func BindFlag(f *pflag.Flag, v *viper.Viper, viperName string, _ *slog.Logger) error {
 	return v.BindPFlag(viperName, f) //nolint:wrapcheck // no added value from wrapping error
 }
 
@@ -233,18 +239,21 @@ func BindFlagSet(
 	flagSet *pflag.FlagSet,
 	v *viper.Viper,
 	prefix string,
-	binder func(f *pflag.Flag, v *viper.Viper, viperName string) error,
+	binder binderFunc,
+	logger *slog.Logger,
 ) {
 	flagSet.VisitAll(func(f *pflag.Flag) {
 		if !FlagShouldSkipViperBind(f) {
 			// Environment variables can't have dashes in them, so bind them to their equivalent
 			// keys with underscores, e.g. --favorite-color to STING_FAVORITE_COLOR
 			viperName := GetFlagViperName(f, prefix)
-			if err := binder(f, v, viperName); err != nil {
-				logrus.WithFields(logrus.Fields{
-					optionKey: f.Name,
-					viperKey:  viperName,
-				}).WithError(err).Error("error binding flag to viper")
+			if err := binder(f, v, viperName, logger); err != nil {
+				logger.Error(
+					"error binding flag to viper",
+					optionKey, f.Name,
+					viperKey, viperName,
+					utils.ErrorKey, err,
+				)
 			}
 		}
 	})
@@ -253,9 +262,9 @@ func BindFlagSet(
 // BindFlags binds each cobra flag to its associated viper configuration (config file and environment variable).
 func BindFlags(
 	cmd *cobra.Command,
-	v *viper.Viper,
+	cmdIf CmdInterface,
 	prefix string,
-	binder func(f *pflag.Flag, v *viper.Viper, viperName string) error,
+	binder binderFunc,
 ) {
 	if CmdShouldSkipViperBind(cmd) {
 		return
@@ -264,29 +273,31 @@ func BindFlags(
 		prefix = CommandConfigSection(cmd) + "."
 	}
 
-	BindFlagSet(cmd.PersistentFlags(), v, prefix, binder)
-	BindFlagSet(cmd.Flags(), v, prefix, binder)
+	BindFlagSet(cmd.PersistentFlags(), cmdIf.Viper(), prefix, binder, cmdIf.Logger())
+	BindFlagSet(cmd.Flags(), cmdIf.Viper(), prefix, binder, cmdIf.Logger())
 
 	// visit the subcommands
 	for _, c := range cmd.Commands() {
-		BindFlags(c, v, prefix, binder)
+		BindFlags(c, cmdIf, prefix, binder)
 	}
 }
 
 // BindFlagsToViper binds each cobra flag to its associated viper configuration (config file and environment variable).
-func BindFlagsToViper(cmd *cobra.Command, v *viper.Viper) {
-	BindFlags(cmd, v, "", BindFlag)
+func BindFlagsToViper(cmd *cobra.Command, cmdIf CmdInterface) {
+	BindFlags(cmd, cmdIf, "", BindFlag)
 }
 
 // ApplyViperConfigToFlags applies the viper configuration to the flags of the command when the flags are not set.
 // This allows the configuration file and environment variables to override the default flag values,
 // but still allow the user to override them with command line flags.
-func ApplyViperConfigToFlags(cmd *cobra.Command, v *viper.Viper) {
-	BindFlags(cmd, v, "", BindFlagValue)
+func ApplyViperConfigToFlags(cmd *cobra.Command, cmdIf CmdInterface) {
+	BindFlags(cmd, cmdIf, "", BindFlagValue)
 }
 
 // InitializeConfiguration reads in config file and ENV variables if set.
-func InitializeConfiguration(rootCmd *cobra.Command, v *viper.Viper) error {
+func InitializeConfiguration(rootCmd *cobra.Command, cmdIf CmdInterface) error {
+	v := cmdIf.Viper()
+	logger := cmdIf.Logger()
 	commandName := rootCmd.Name()
 	envPrefix := strings.ToUpper(commandName)
 	configFileFlag := rootCmd.PersistentFlags().Lookup(ConfigFlag)
@@ -305,7 +316,7 @@ func InitializeConfiguration(rootCmd *cobra.Command, v *viper.Viper) error {
 		if baseDir, err := GetBaseDirectory(); err == nil {
 			v.AddConfigPath(baseDir) // adding current directory as first search path
 		} else {
-			logrus.WithError(err).Warn("could not determine base directory for config file search, skipping")
+			logger.Warn("could not determine base directory for config file search, skipping", utils.ErrorKey, err)
 		}
 	}
 
@@ -315,9 +326,9 @@ func InitializeConfiguration(rootCmd *cobra.Command, v *viper.Viper) error {
 
 	// If a config file is found, read it in.
 	if err := v.ReadInConfig(); err != nil {
-		logrus.WithError(err).Debug("could not read config file, skipping")
+		logger.Debug("could not read config file, skipping", utils.ErrorKey, err)
 	}
-	ApplyViperConfigToFlags(rootCmd, v)
+	ApplyViperConfigToFlags(rootCmd, cmdIf)
 	return nil
 }
 

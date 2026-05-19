@@ -1,16 +1,17 @@
-// cSpell: words sirupsen paralleltest unwrapable
+// cSpell: words paralleltest unwrapable testutil
 package utils
 
 import (
 	"errors"
 	"fmt"
+	"log/slog"
 	"sync"
 	"testing"
 	"time"
 
-	"github.com/sirupsen/logrus"
-	testHook "github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/require"
+
+	"github.com/kaweezle/iknite/pkg/testutil"
 )
 
 type namedHook struct {
@@ -61,7 +62,8 @@ func TestHookManager_Register_Run(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			m := &HookManager{}
+			logger := testutil.TestLogger(t)
+			m := NewHookManager(logger)
 
 			for _, h := range tt.hooks {
 				m.Register(h.name, h.fn)
@@ -89,7 +91,8 @@ func TestHookManager_Register_Run(t *testing.T) {
 
 func TestHookManager_ConcurrentRegister(t *testing.T) {
 	t.Parallel()
-	m := &HookManager{}
+	logger := testutil.TestLogger(t)
+	m := NewHookManager(logger)
 	var wg sync.WaitGroup
 	numHooks := 20
 	for i := range numHooks {
@@ -108,7 +111,8 @@ func TestHookManager_ConcurrentRegister(t *testing.T) {
 
 func TestHookManager_ConcurrentRun_Parallel(t *testing.T) {
 	t.Parallel()
-	m := &HookManager{}
+	logger := testutil.TestLogger(t)
+	m := NewHookManager(logger)
 	numHooks := 10
 	for i := 0; i < numHooks; i++ {
 		m.Register(fmt.Sprintf("slow-%d", i), func() error {
@@ -123,17 +127,10 @@ func TestHookManager_ConcurrentRun_Parallel(t *testing.T) {
 	require.Less(t, time.Since(start), 200*time.Millisecond) // concurrent, ~50ms total
 }
 
-//nolint:paralleltest  // messing with global logger
 func TestHookManager_ErrorsLogged(t *testing.T) {
-	hooks := make(logrus.LevelHooks)
-	hook := &testHook.Hook{}
-	hooks.Add(hook)
-	oldHooks := logrus.StandardLogger().ReplaceHooks(hooks)
-	t.Cleanup(func() {
-		_ = logrus.StandardLogger().ReplaceHooks(oldHooks)
-	})
-
-	m := &HookManager{}
+	t.Parallel()
+	logger, hook := testutil.TestLoggerWithHook(t)
+	m := NewHookManager(logger)
 	m.Register("failing", func() error { return errors.New("test fail") })
 
 	err := m.Run()
@@ -141,10 +138,12 @@ func TestHookManager_ErrorsLogged(t *testing.T) {
 
 	require.Len(t, hook.AllEntries(), 1)
 	entry := hook.LastEntry()
-	require.Equal(t, logrus.ErrorLevel, entry.Level)
+	require.Equal(t, slog.LevelError, entry.Level)
 	require.Equal(t, "Error while running hook", entry.Message)
-	require.Equal(t, "failing", entry.Data["hook"])
-	errorEntry := entry.Data["error"]
+	attrs := make(map[string]any)
+	entry.Attrs(func(a slog.Attr) bool { attrs[a.Key] = a.Value.Any(); return true })
+	require.Equal(t, "failing", attrs["hook"])
+	errorEntry := attrs[ErrorKey]
 	require.NotNil(t, errorEntry)
 	err, ok := errorEntry.(error)
 	require.True(t, ok)

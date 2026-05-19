@@ -5,6 +5,8 @@
 package init
 
 import (
+	"log/slog"
+
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
 	"github.com/kaweezle/iknite/pkg/host"
 	mock "github.com/stretchr/testify/mock"
@@ -125,6 +127,52 @@ func (_c *MockServerData_IkniteCluster_Call) Return(ikniteCluster *v1alpha1.Ikni
 }
 
 func (_c *MockServerData_IkniteCluster_Call) RunAndReturn(run func() *v1alpha1.IkniteCluster) *MockServerData_IkniteCluster_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// Logger provides a mock function for the type MockServerData
+func (_mock *MockServerData) Logger() *slog.Logger {
+	ret := _mock.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for Logger")
+	}
+
+	var r0 *slog.Logger
+	if returnFunc, ok := ret.Get(0).(func() *slog.Logger); ok {
+		r0 = returnFunc()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*slog.Logger)
+		}
+	}
+	return r0
+}
+
+// MockServerData_Logger_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Logger'
+type MockServerData_Logger_Call struct {
+	*mock.Call
+}
+
+// Logger is a helper method to define mock.On call
+func (_e *MockServerData_Expecter) Logger() *MockServerData_Logger_Call {
+	return &MockServerData_Logger_Call{Call: _e.mock.On("Logger")}
+}
+
+func (_c *MockServerData_Logger_Call) Run(run func()) *MockServerData_Logger_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *MockServerData_Logger_Call) Return(logger *slog.Logger) *MockServerData_Logger_Call {
+	_c.Call.Return(logger)
+	return _c
+}
+
+func (_c *MockServerData_Logger_Call) RunAndReturn(run func() *slog.Logger) *MockServerData_Logger_Call {
 	_c.Call.Return(run)
 	return _c
 }

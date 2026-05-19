@@ -19,10 +19,10 @@ package cmd
 import (
 	"context"
 
-	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
+	"github.com/kaweezle/iknite/pkg/cmd/util"
 	"github.com/kaweezle/iknite/pkg/config"
 	"github.com/kaweezle/iknite/pkg/host"
 	"github.com/kaweezle/iknite/pkg/k8s"
@@ -54,5 +54,5 @@ func NewPrepareCommand(ikniteConfig *v1alpha1.IkniteClusterSpec) *cobra.Command 
 func performPrepare(ctx context.Context, ikniteConfig *v1alpha1.IkniteClusterSpec) {
 	alpineHost := host.NewDefaultHost()
 	cobra.CheckErr(k8s.PrepareKubernetesEnvironment(ctx, alpineHost, ikniteConfig))
-	log.Info("VM is ready")
+	util.LoggerFromContext(ctx).Info("VM is prepared for Kubernetes")
 }

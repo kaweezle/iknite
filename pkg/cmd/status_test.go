@@ -1,4 +1,4 @@
-// cSpell: words paralleltest configurer testutil charmbracelet bubbletea sirupsen
+// cSpell: words paralleltest configurer testutil charmbracelet bubbletea
 //
 //nolint:paralleltest // mutates viper
 package cmd_test
@@ -9,12 +9,12 @@ import (
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
 	"github.com/kaweezle/iknite/pkg/check"
 	"github.com/kaweezle/iknite/pkg/cmd"
+	"github.com/kaweezle/iknite/pkg/cmd/util"
 	"github.com/kaweezle/iknite/pkg/host"
 	"github.com/kaweezle/iknite/pkg/testutil"
 	"github.com/kaweezle/iknite/pkg/utils"
@@ -28,7 +28,6 @@ func simpleConfigurer(
 	executor.AddCheck(&check.Check{
 		Name: "simple",
 		CheckFn: func(_ context.Context, _ check.CheckData) (bool, string, error) {
-			logrus.Info("Running simple check")
 			return true, "simple check passed", nil
 		},
 	})
@@ -51,6 +50,7 @@ func TestStatusCommand(t *testing.T) {
 		tea.WithInput(input),
 		tea.WithoutRenderer(),
 	)
-	err = command.ExecuteContext(t.Context())
+	ctx := util.WithCmdInterface(t.Context(), util.NewCmdInterface(nil))
+	err = command.ExecuteContext(ctx)
 	req.NoError(err)
 }

@@ -1,19 +1,20 @@
-// cSpell: words wrapcheck sirupsen apimachinery
+// cSpell: words wrapcheck apimachinery
 package v1alpha1
 
 import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net"
 	"os"
 
-	log "github.com/sirupsen/logrus"
 	metaV1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	ikniteApi "github.com/kaweezle/iknite/pkg/apis/iknite"
 	"github.com/kaweezle/iknite/pkg/constants"
 	"github.com/kaweezle/iknite/pkg/host"
+	"github.com/kaweezle/iknite/pkg/utils"
 )
 
 // cSpell: disable-next-line
@@ -100,13 +101,13 @@ func (ikniteCluster *IkniteCluster) Update(
 	ikniteCluster.Status.WorkloadsState.UnreadyCount = len(unready)
 }
 
-func (ikniteCluster *IkniteCluster) Persist(fs host.FileSystem) {
+func (ikniteCluster *IkniteCluster) Persist(fs host.FileSystem, logger *slog.Logger) {
 	ikniteClusterJSON, err := json.MarshalIndent(ikniteCluster, "", "  ")
 	if err == nil {
 		// Write JSON to file
 		err = fs.MkdirAll(constants.StatusDirectory, 0o755)
 		if err != nil {
-			log.WithError(err).Warn("Failed to create status directory")
+			logger.Warn("Failed to create status directory", utils.ErrorKey, err)
 			return
 		}
 		err = fs.WriteFile(
@@ -115,10 +116,10 @@ func (ikniteCluster *IkniteCluster) Persist(fs host.FileSystem) {
 			0o644,
 		)
 		if err != nil {
-			log.WithError(err).Warn("Failed to write status.json")
+			logger.Warn("Failed to write status.json", utils.ErrorKey, err)
 		}
 	} else {
-		log.WithError(err).Warn("Failed to marshal status.json")
+		logger.Warn("Failed to marshal status.json", utils.ErrorKey, err)
 	}
 }
 

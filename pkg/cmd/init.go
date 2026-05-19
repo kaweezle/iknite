@@ -28,7 +28,6 @@ import (
 	"time"
 	_ "unsafe"
 
-	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	flag "github.com/spf13/pflag"
 	metaV1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -54,6 +53,7 @@ import (
 	"github.com/kaweezle/iknite/pkg/alpine"
 	ikniteApi "github.com/kaweezle/iknite/pkg/apis/iknite"
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
+	"github.com/kaweezle/iknite/pkg/cmd/util"
 	"github.com/kaweezle/iknite/pkg/config"
 	"github.com/kaweezle/iknite/pkg/constants"
 	"github.com/kaweezle/iknite/pkg/host"
@@ -187,8 +187,7 @@ func newCmdInit(
 				return errors.New("invalid data struct")
 			}
 
-			log.WithField("phase", "init").
-				Infof("Using Kubernetes version: %s", data.cfg.KubernetesVersion)
+			data.Logger().Info("Kubernetes version", "phase", "init", "version", data.cfg.KubernetesVersion)
 
 			return initRunner.Run(args)
 		},
@@ -204,7 +203,7 @@ func newCmdInit(
 			}
 			// Stop the status server if it was started
 			if shutdownErr := data.RunShutdownHooks(); shutdownErr != nil {
-				log.WithError(shutdownErr).Warn("Failed to stop iknite status server")
+				data.Logger().Warn("Failed to stop iknite status server", utils.ErrorKey, shutdownErr)
 			}
 			// Stop the kubelet process if it was started
 			kubeletProcess := data.KubeletProcess()
@@ -225,7 +224,7 @@ func newCmdInit(
 					)
 				}
 			}
-			alpine.RemovePidFile(alpineHost, k8s.KubeletName)
+			alpine.RemovePidFile(alpineHost, k8s.KubeletName, data.Logger())
 
 			return nil
 		},
@@ -530,6 +529,22 @@ func newInitData(
 	// Apply ikniteCluster spec to the internal InitConfiguration
 	config.ApplyIkniteClusterSpecToInitConfiguration(&(ikniteCluster.Spec), cfg)
 
+	ctx := cmd.Context()
+	if ctx == nil {
+		return nil, errors.New("command context is nil")
+	}
+	logger := util.LoggerFromContext(ctx)
+
+	// ensure outbound IP is included in the API server cert SANs
+	var externalIP string
+	ip, err := alpineHost.GetOutboundIP()
+	if err != nil {
+		logger.Warn("Failed to get outbound IP address, API server certificate may not be valid", "error", err)
+	} else {
+		externalIP = ip.String()
+	}
+	cfg.APIServer.CertSANs = append(cfg.APIServer.CertSANs, externalIP)
+
 	return &initData{
 		cfg:                     cfg,
 		certificatesDir:         cfg.CertificatesDir,
@@ -544,14 +559,17 @@ func newInitData(
 		skipCertificateKeyPrint: initOptions.skipCertificateKeyPrint,
 		patchesDir:              initOptions.patchesDir,
 		ikniteCluster:           ikniteCluster,
-		ctx:                     cmd.Context(),
+		ctx:                     ctx,
 		kustomizeOptions:        initOptions.kustomizeOptions,
 		dryRun: cmdUtil.ValueFromFlagsOrConfig( //nolint:errcheck,forcetypeassert // default value is false
 			cmd.Flags(),
 			options.DryRun,
 			cfg.DryRun,
 			initOptions.dryRun).(bool),
-		alpineHost: alpineHost,
+		alpineHost:  alpineHost,
+		hookManager: utils.NewHookManager(logger),
+		logger:      logger,
+		viper:       util.ViperFromContext(ctx),
 	}, nil
 }
 
@@ -621,10 +639,7 @@ func WrapPhase(
 			phaseName := PhaseName(p, parentPhases)
 			data.UpdateIkniteCluster(state, phaseName, nil, nil)
 
-			log.WithFields(log.Fields{
-				"phase": phaseName,
-				"state": state.String(),
-			}).Infof("Running phase %s...", phaseName)
+			data.Logger().Info("Running phase...", "phase", phaseName, "state", state.String())
 
 			return oldRun(c)
 		}

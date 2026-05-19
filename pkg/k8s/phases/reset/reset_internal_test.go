@@ -13,6 +13,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
+// cSpell: words testutil
 package reset
 
 import (
@@ -25,6 +26,7 @@ import (
 	kubeadmConstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 
 	"github.com/kaweezle/iknite/pkg/host"
+	"github.com/kaweezle/iknite/pkg/testutil"
 )
 
 const testDir = "test"
@@ -149,8 +151,9 @@ func TestResetConfigDirDeletesExpectedFiles(t *testing.T) {
 	for _, fileName := range filesToCreate {
 		req.NoError(fs.WriteFile(filepath.Join(testDir, fileName), []byte("conf"), 0o600))
 	}
+	logger := testutil.TestLogger(t)
 
-	resetConfigDir(fs, testDir, []string{manifestDir}, false)
+	resetConfigDir(fs, testDir, []string{manifestDir}, false, logger)
 
 	empty, err := IsDirEmpty(fs, manifestDir)
 	req.NoError(err)

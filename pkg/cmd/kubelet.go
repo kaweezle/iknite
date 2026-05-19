@@ -7,6 +7,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
+	"github.com/kaweezle/iknite/pkg/cmd/util"
 	"github.com/kaweezle/iknite/pkg/config"
 	"github.com/kaweezle/iknite/pkg/host"
 	"github.com/kaweezle/iknite/pkg/k8s"
@@ -60,7 +61,7 @@ func performKubelet(
 		return fmt.Errorf("failed to prepare Kubernetes environment: %w", err)
 	}
 
-	runtime := k8s.NewKubeletRuntime(alpineHost, kubeClient)
+	runtime := k8s.NewKubeletRuntime(alpineHost, kubeClient, util.LoggerFromContext(ctx))
 	err = k8s.StartAndConfigureKubelet(ctx, runtime, kustomizeOptions)
 	if err != nil {
 		return fmt.Errorf("failed to start and configure kubelet: %w", err)

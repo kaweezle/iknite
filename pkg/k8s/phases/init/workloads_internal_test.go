@@ -43,6 +43,7 @@ func TestRunMonitorWorkloads(t *testing.T) {
 	t.Run("Normal flow", func(t *testing.T) {
 		t.Parallel()
 		req := require.New(t)
+		logger := testutil.TestLogger(t)
 		m := mockData.NewMockMonitorData(t)
 		sOpts := &testutil.TestServerOptions{}
 		getter := testutil.CreateDefaultTestClientGetter(t, sOpts)
@@ -55,6 +56,7 @@ func TestRunMonitorWorkloads(t *testing.T) {
 		defer cancel()
 		m.EXPECT().Context().Return(ctx).Maybe()
 		m.EXPECT().IkniteCluster().Return(cluster).Twice()
+		m.EXPECT().Logger().Return(logger).Maybe()
 		m.EXPECT().UpdateIkniteCluster(
 			mock.Anything,
 			mock.Anything,
@@ -107,6 +109,8 @@ func TestRunMonitorWorkloads(t *testing.T) {
 
 		m.EXPECT().Context().Return(ctx).Maybe()
 		m.EXPECT().IkniteCluster().Return(cluster).Once()
+		logger := testutil.TestLogger(t)
+		m.EXPECT().Logger().Return(logger).Once()
 		err := runMonitorWorkloads(m)
 		req.NoError(err)
 		err = errGroup.Wait()
@@ -130,6 +134,8 @@ func TestNewWorkloadsPhase(t *testing.T) {
 	defer cancel()
 	m.EXPECT().Context().Return(ctx).Maybe()
 	m.EXPECT().IkniteCluster().Return(cluster).Twice()
+	logger := testutil.TestLogger(t)
+	m.EXPECT().Logger().Return(logger).Once()
 	m.EXPECT().UpdateIkniteCluster(
 		mock.Anything,
 		mock.Anything,

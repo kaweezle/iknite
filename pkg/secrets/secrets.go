@@ -1,4 +1,4 @@
-// cSpell: words getsops sopsage agessh filippo sirupsen
+// cSpell: words getsops sopsage agessh filippo
 /*
 Copyright © 2025 Antoine Martin <antoine@openance.com>
 
@@ -19,6 +19,7 @@ package secrets
 import (
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -32,10 +33,10 @@ import (
 	"github.com/getsops/sops/v3/cmd/sops/formats"
 	"github.com/getsops/sops/v3/config"
 	"github.com/getsops/sops/v3/version"
-	"github.com/sirupsen/logrus"
 	"sigs.k8s.io/yaml"
 
 	"github.com/kaweezle/iknite/pkg/host"
+	"github.com/kaweezle/iknite/pkg/utils"
 )
 
 const (
@@ -45,6 +46,7 @@ const (
 // Options contains configuration for secrets operations.
 type Options struct {
 	Fs          host.FileSystem
+	Logger      *slog.Logger
 	SecretsFile string
 	HomeDir     string
 	KeyFile     string
@@ -343,7 +345,7 @@ func loadAndDecryptSecrets(opts *Options) (*FileSecrets, error) {
 	if ok {
 		dataKey, err = getDataKeyFromOpts(opts, ageMasterKey)
 		if err != nil {
-			logrus.WithError(err).Debug("failed to decrypt data key with SSH identity")
+			opts.Logger.Debug("failed to decrypt data key with SSH identity", utils.ErrorKey, err)
 		}
 	}
 	if dataKey == nil {

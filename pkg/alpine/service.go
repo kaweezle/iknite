@@ -20,13 +20,12 @@ package alpine
 import (
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"path"
 	"strconv"
 	"strings"
 	"syscall"
-
-	log "github.com/sirupsen/logrus"
 
 	"github.com/kaweezle/iknite/pkg/constants"
 	"github.com/kaweezle/iknite/pkg/host"
@@ -43,10 +42,10 @@ const (
 
 var startedServicesDir = path.Join(openRCDirectory, "started")
 
-func EnsureOpenRC(h host.Executor, level string) error {
-	log.WithField("level", level).Info("Ensuring OpenRC...")
+func EnsureOpenRC(h host.Executor, level string, logger *slog.Logger) error {
+	logger.Info("Ensuring OpenRC...", "level", level)
 	if out, err := h.Run(true, "/sbin/openrc", "default"); err == nil {
-		log.Trace(string(out))
+		logger.Debug(string(out))
 		return nil
 	} else {
 		return fmt.Errorf("error while starting openrc: %w", err)
@@ -56,9 +55,9 @@ func EnsureOpenRC(h host.Executor, level string) error {
 // StartOpenRC starts the openrc services in the default runlevel.
 // If one of the services is already started, it is not restarted. It one is
 // not started, it is started.
-func StartOpenRC(h host.FileExecutor) error {
+func StartOpenRC(h host.FileExecutor, logger *slog.Logger) error {
 	if err := host.ExecuteIfNotExist(h, constants.SoftLevelPath, func() error {
-		return EnsureOpenRC(h, "default")
+		return EnsureOpenRC(h, "default", logger)
 	}); err != nil {
 		return fmt.Errorf("failed to start OpenRC: %w", err)
 	}
@@ -127,10 +126,10 @@ func DisableService(h host.FileSystem, serviceName string) error {
 }
 
 // StartService start the serviceName service if it is not already started.
-func StartService(h host.FileExecutor, serviceName string) error {
+func StartService(h host.FileExecutor, serviceName string, logger *slog.Logger) error {
 	return ExecuteIfServiceNotStarted(h, serviceName, func() error {
 		if out, err := h.Run(false, "/sbin/rc-service", serviceName, "start"); err == nil {
-			log.Trace(string(out))
+			logger.Debug(string(out))
 			return nil
 		} else {
 			return fmt.Errorf("error while starting service %s: %w", serviceName, err)
@@ -139,10 +138,10 @@ func StartService(h host.FileExecutor, serviceName string) error {
 }
 
 // StopService stops the serviceName service if it is  started.
-func StopService(h host.FileExecutor, serviceName string) error {
+func StopService(h host.FileExecutor, serviceName string, logger *slog.Logger) error {
 	return ExecuteIfServiceStarted(h, serviceName, func() error {
 		if out, err := h.Run(false, "/sbin/rc-service", serviceName, "stop"); err == nil {
-			log.Trace(string(out))
+			logger.Debug(string(out))
 			return nil
 		} else {
 			return fmt.Errorf("error while stopping service %s: %w", serviceName, err)
@@ -174,9 +173,9 @@ func ServicePidFilePath(serviceName string) string {
 	return fmt.Sprintf("/run/%s.pid", serviceName)
 }
 
-func CheckPidFile(h host.FileExecutor, service string) (int, host.Process, error) {
+func CheckPidFile(h host.FileExecutor, service string, logger *slog.Logger) (int, host.Process, error) {
 	pidFilePath := ServicePidFilePath(service)
-	logger := log.WithField("pidfile", pidFilePath)
+	logger = logger.With("pidfile", pidFilePath)
 	pidBytes, err := h.ReadFile(pidFilePath)
 	if err != nil && errors.Is(err, os.ErrNotExist) {
 		pidFilePath = fmt.Sprintf("/var/run/supervise-%s.pid", service)
@@ -194,7 +193,7 @@ func CheckPidFile(h host.FileExecutor, service string) (int, host.Process, error
 	var pid int
 	pid, err = strconv.Atoi(pidStr)
 	if err != nil {
-		logger.WithField("content", pidStr).Warn("Failed to convert pid file to integer")
+		logger.Warn("Failed to convert pid file to integer", "content", pidStr)
 		return 0, nil, fmt.Errorf("failed to convert pid file to integer: %w", err)
 	}
 	var process host.Process
@@ -202,7 +201,7 @@ func CheckPidFile(h host.FileExecutor, service string) (int, host.Process, error
 	if err == nil && process.Signal(syscall.Signal(0)) == nil {
 		return pid, process, nil
 	}
-	logger.WithField("pid", pid).Warn("Pidfile contained an invalid pid")
+	logger.Warn("Pidfile contained an invalid pid", "pid", pid)
 	// remove kubeletPidFile
 	err = h.Remove(pidFilePath)
 	if err != nil {
@@ -211,13 +210,10 @@ func CheckPidFile(h host.FileExecutor, service string) (int, host.Process, error
 	return 0, nil, nil
 }
 
-func RemovePidFile(h host.FileSystem, service string) {
+func RemovePidFile(h host.FileSystem, service string, logger *slog.Logger) {
 	pidFilePath := ServicePidFilePath(service)
 	err := h.Remove(pidFilePath)
 	if err != nil {
-		log.WithFields(log.Fields{
-			"err":     err,
-			"pidFile": pidFilePath,
-		}).Warn("Failed to remove PID file")
+		logger.Warn("Failed to remove PID file", "err", err, "pidFile", pidFilePath)
 	}
 }

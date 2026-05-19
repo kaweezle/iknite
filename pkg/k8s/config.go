@@ -24,7 +24,6 @@ import (
 	"strings"
 	"time"
 
-	log "github.com/sirupsen/logrus"
 	appsV1 "k8s.io/api/apps/v1"
 	coreV1 "k8s.io/api/core/v1"
 	k8Errors "k8s.io/apimachinery/pkg/api/errors"
@@ -36,6 +35,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd/api"
 	kubeadmConstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 
+	"github.com/kaweezle/iknite/pkg/cmd/util"
 	"github.com/kaweezle/iknite/pkg/host"
 	"github.com/kaweezle/iknite/pkg/provision"
 	"github.com/kaweezle/iknite/pkg/utils"
@@ -156,12 +156,10 @@ func CheckClusterRunning(
 	okTries := 0
 	query := client.Get().AbsPath("/readyz")
 	first := true
+	logger := util.LoggerFromContext(ctx)
 	for ; retries > 0; retries-- {
 		if !first {
-			log.WithFields(log.Fields{
-				errKey:      err,
-				"wait_time": interval,
-			}).Debug("Waiting...")
+			logger.Debug("Waiting...", utils.ErrorKey, err, "wait_time", interval)
 			select {
 			case <-ctx.Done():
 				return fmt.Errorf("context canceled: %w", ctx.Err())
@@ -173,17 +171,17 @@ func CheckClusterRunning(
 		var content []byte
 		content, err = query.DoRaw(ctx)
 		if err != nil {
-			log.WithError(err).Debug("while querying cluster readiness")
+			logger.Debug("while querying cluster readiness", utils.ErrorKey, err)
 			continue
 		}
 
 		contentStr := string(content)
 		if strings.TrimSpace(contentStr) != "ok" {
 			err = fmt.Errorf("cluster health API returned: %s", contentStr)
-			log.WithError(err).Debug("Bad response")
+			logger.Debug("Bad response", utils.ErrorKey, err)
 		} else {
 			okTries++
-			log.WithField("okTries", okTries).Trace("Ok response from server")
+			logger.Debug("Ok response from server", "okTries", okTries)
 			if okTries == okResponses {
 				break
 			}
@@ -191,7 +189,7 @@ func CheckClusterRunning(
 	}
 
 	if retries == 0 && okTries < okResponses {
-		log.Trace("No more retries left.")
+		logger.Debug("No more retries left.")
 	}
 
 	return err
@@ -263,8 +261,9 @@ func Kustomize(
 	fs host.FileSystem,
 	options *utils.KustomizeOptions,
 ) error {
+	logger := util.LoggerFromContext(ctx)
 	if options.Kustomization == "" && !options.ForceEmbedded {
-		log.Warn("Empty kustomization.")
+		logger.Warn("Empty kustomization.")
 		return nil
 	}
 
@@ -278,19 +277,17 @@ func Kustomize(
 		return err
 	}
 	if cm.Data["configured"] == configuredValueTrue && !options.ForceConfig {
-		log.Info("configuration has already occurred. Use -C to force.")
+		logger.Info("configuration has already occurred. Use -C to force.")
 		return nil
 	}
 
-	log.WithFields(log.Fields{
-		kustKey: options.Kustomization,
-	}).Info("Performing configuration")
+	logger.Info("Performing configuration", kustKey, options.Kustomization)
 
-	resources, err := provision.GetBaseKustomizationResources(fs, options.Kustomization, options.ForceEmbedded)
+	resources, err := provision.GetBaseKustomizationResources(fs, options.Kustomization, options.ForceEmbedded, logger)
 	if err != nil {
 		return fmt.Errorf("while getting kustomization resources: %w", err)
 	}
-	log.WithField("resourceCount", resources.Size()).Info("Applying base kustomization resources")
+	logger.Info("Applying base kustomization resources", "resourceCount", resources.Size())
 
 	ids, err := ApplyResMapWithServerSideApply(kubeClient, resources)
 	if err != nil {
@@ -303,10 +300,7 @@ func Kustomize(
 		return fmt.Errorf("while writing configuration: %w", err)
 	}
 
-	log.WithFields(log.Fields{
-		kustKey:     options.Kustomization,
-		"resources": ids,
-	}).Info("Configuration applied")
+	logger.Info("Configuration applied", kustKey, options.Kustomization, "resources", ids)
 
 	return nil
 }
