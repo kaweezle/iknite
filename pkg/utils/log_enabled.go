@@ -39,7 +39,7 @@ func NewLogger(out io.Writer, level slog.Level, jsonLogs bool) *slog.Logger {
 	}
 	zl := zerolog.New(out).Level(zLevel)
 	if !jsonLogs {
-		output := zerolog.ConsoleWriter{Out: os.Stdout}
+		output := zerolog.ConsoleWriter{Out: out}
 		zl = zl.Output(output)
 	}
 	handler := zerolog.NewSlogHandler(zl)
