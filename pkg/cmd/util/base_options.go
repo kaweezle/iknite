@@ -1,4 +1,4 @@
-// cSpell: words viper logrus sirupsen sloglogrus samber
+// cSpell: words viper logrus sloglogrus samber
 package util
 
 import (

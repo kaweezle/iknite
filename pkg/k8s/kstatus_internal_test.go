@@ -1,4 +1,4 @@
-// cSpell: words kstatus apimachinery sirupsen testutil
+// cSpell: words kstatus apimachinery testutil
 package k8s
 
 import (

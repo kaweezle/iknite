@@ -1,4 +1,4 @@
-// cSpell: words errgroup sirupsen
+// cSpell: words errgroup
 package init
 
 import (

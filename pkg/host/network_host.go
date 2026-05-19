@@ -1,4 +1,4 @@
-// cSpell: words iface ifaces sirupsen wrapcheck
+// cSpell: words iface ifaces wrapcheck
 package host
 
 import (

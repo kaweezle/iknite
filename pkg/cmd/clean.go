@@ -1,6 +1,6 @@
 package cmd
 
-// cSpell:words txeh ikniteapi sirupsen
+// cSpell: words txeh ikniteapi
 import (
 	"fmt"
 	"log/slog"

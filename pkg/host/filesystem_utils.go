@@ -1,4 +1,4 @@
-// cSpell: words joho godotenv sirupsen
+// cSpell: words joho godotenv
 package host
 
 import (

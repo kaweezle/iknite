@@ -1,6 +1,6 @@
 package k8s
 
-// cSpell: words kstatus clientcmd apimachinery clientconfig sirupsen
+// cSpell: words kstatus clientcmd apimachinery clientconfig
 
 import (
 	"context"

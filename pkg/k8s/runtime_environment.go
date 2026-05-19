@@ -15,7 +15,7 @@ limitations under the License.
 */
 package k8s
 
-// cSpell: words tmpl netfilter cpuset sirupsen procs lithammer
+// cSpell: words tmpl netfilter cpuset procs lithammer
 import (
 	"context"
 	"fmt"

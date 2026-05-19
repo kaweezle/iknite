@@ -15,7 +15,7 @@ limitations under the License.
 */
 package cmd
 
-// cSpell: words forbidigo sirupsen
+// cSpell: words forbidigo
 
 import (
 	"fmt"

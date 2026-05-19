@@ -1,4 +1,4 @@
-// cSpell: words paralleltest apimachinery kubeadmapiv1 sirupsen
+// cSpell: words paralleltest apimachinery kubeadmapiv1
 //
 //nolint:paralleltest // These tests modify global state and cannot be run in parallel
 package cmd

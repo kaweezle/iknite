@@ -1,4 +1,4 @@
-// cSpell: words wrapcheck sirupsen apimachinery
+// cSpell: words wrapcheck apimachinery
 package v1alpha1
 
 import (

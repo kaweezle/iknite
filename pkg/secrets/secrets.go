@@ -1,4 +1,4 @@
-// cSpell: words getsops sopsage agessh filippo sirupsen
+// cSpell: words getsops sopsage agessh filippo
 /*
 Copyright © 2025 Antoine Martin <antoine@openance.com>
 

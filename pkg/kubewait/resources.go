@@ -20,7 +20,7 @@ limitations under the License.
 // a bootstrap repository script.
 package kubewait
 
-// cSpell: words godotenv clientcmd apimachinery kstatus errorf sirupsen joho metav1 serviceaccount genericclioptions
+// cSpell: words godotenv clientcmd apimachinery kstatus errorf joho metav1 serviceaccount genericclioptions
 
 import (
 	"context"

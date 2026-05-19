@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// cSpell: words kstatus sirupsen logrus
+// cSpell: words kstatus logrus
 // Package kubewait implements the kubewait command.
 // It waits for Kubernetes resources in specified namespaces to become ready
 // using kstatus (one goroutine per namespace), then optionally clones and runs

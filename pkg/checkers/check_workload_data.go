@@ -1,4 +1,4 @@
-// cSpell: words sirupsen
+// cSpell: words
 package checkers
 
 import (

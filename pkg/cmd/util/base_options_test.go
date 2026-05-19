@@ -1,4 +1,4 @@
-// cSpell: words logrus sirupsen paralleltest sloglogrus samber
+// cSpell: words logrus paralleltest sloglogrus samber
 package util_test
 
 import (

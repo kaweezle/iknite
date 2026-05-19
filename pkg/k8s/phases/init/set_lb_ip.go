@@ -1,6 +1,6 @@
 package init
 
-// cSpell: words clientset corev metav apierrors apimachinery lbip sirupsen
+// cSpell: words clientset corev metav apierrors apimachinery lbip
 import (
 	"context"
 	"fmt"

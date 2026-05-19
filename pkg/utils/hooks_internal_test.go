@@ -1,4 +1,4 @@
-// cSpell: words sirupsen paralleltest unwrapable testutil
+// cSpell: words paralleltest unwrapable testutil
 package utils
 
 import (

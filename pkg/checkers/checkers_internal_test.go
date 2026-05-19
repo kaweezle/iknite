@@ -1,4 +1,4 @@
-// cSpell: words fakefi testdir noresolve testutil sirupsen
+// cSpell: words fakefi testdir noresolve testutil
 package checkers
 
 import (

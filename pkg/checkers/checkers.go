@@ -1,6 +1,6 @@
 package checkers
 
-// cSpell: words apiclient lipgloss clientcmd charmbracelet staticpod wrapcheck sirupsen
+// cSpell: words apiclient lipgloss clientcmd charmbracelet staticpod wrapcheck
 import (
 	"context"
 	"errors"

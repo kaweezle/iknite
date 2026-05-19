@@ -1,6 +1,6 @@
 package k8s
 
-// cSpell:words godotenv txeh joho sirupsen ipcns utsns apimachinery
+// cSpell:words godotenv txeh joho ipcns utsns apimachinery
 import (
 	"context"
 	"fmt"

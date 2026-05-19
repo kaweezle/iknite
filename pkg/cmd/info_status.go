@@ -15,7 +15,7 @@ limitations under the License.
 */
 package cmd
 
-// cSpell: words clientcmd sirupsen
+// cSpell: words clientcmd
 
 import (
 	"context"

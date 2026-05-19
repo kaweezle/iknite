@@ -16,7 +16,7 @@ limitations under the License.
 
 package server
 
-// cSpell: words pkiutil certutil sirupsen kubeadmapi
+// cSpell: words pkiutil certutil kubeadmapi
 
 import (
 	"context"

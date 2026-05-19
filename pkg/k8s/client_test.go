@@ -1,4 +1,4 @@
-// cSpell: words kstatus apimachinery wrapcheck testrestmapper clientcmd genericclioptions sirupsen kyaml testutil
+// cSpell: words kstatus apimachinery wrapcheck testrestmapper clientcmd genericclioptions kyaml testutil
 // cSpell: words serviceaccount
 //
 //nolint:errcheck // Tests

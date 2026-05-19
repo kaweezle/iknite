@@ -1,4 +1,4 @@
-// cSpell: words clientset corev metav apimachinery errgroup genericclioptions lbip testutil errchkjson sirupsen
+// cSpell: words clientset corev metav apimachinery errgroup genericclioptions lbip testutil errchkjson
 // cSpell: words paralleltest
 package init
 

@@ -1,4 +1,4 @@
-// cSpell: words clientcmdapi clientcmd apimachinery wrapcheck genericclioptions errgroup sirupsen
+// cSpell: words clientcmdapi clientcmd apimachinery wrapcheck genericclioptions errgroup
 package cmd
 
 import (
