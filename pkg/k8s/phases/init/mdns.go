@@ -3,13 +3,11 @@ package init
 // cSpell: disable
 import (
 	"fmt"
-	"net"
 
-	"github.com/pion/mdns/v2"
-	"golang.org/x/net/ipv4"
-	"golang.org/x/net/ipv6"
+	mdnsLib "github.com/pion/mdns/v2"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 
+	"github.com/kaweezle/iknite/pkg/mdns"
 	"github.com/kaweezle/iknite/pkg/utils"
 )
 
@@ -29,51 +27,26 @@ type mdnsData interface {
 	utils.LoggerProvider
 }
 
-// runPrepare executes the node initialization process.
+// runMDnsPublish executes the mdns publish phase.
 func runMDnsPublish(c workflow.RunData) error {
 	data, ok := c.(mdnsData)
 	if !ok {
-		return fmt.Errorf("prepare phase invoked with an invalid data struct. ")
+		return fmt.Errorf("mdns phase invoked with an invalid data struct. ")
 	}
-	ikniteConfig := data.IkniteCluster().Spec
 	logger := data.Logger().With("phase", "mdns-publish")
+	ikniteConfig := data.IkniteCluster().Spec
 
 	if !ikniteConfig.EnableMDNS {
 		logger.Info("MDNS is disabled, skipping mdns publish phase.")
 		return nil
 	}
-
-	addr4, err := net.ResolveUDPAddr("udp", mdns.DefaultAddressIPv4)
-	if err != nil {
-		return fmt.Errorf("cannot resolve default address: %w", err)
-	}
-
-	l4, err := net.ListenUDP("udp4", addr4)
-	if err != nil {
-		return fmt.Errorf("cannot listen on default address: %w", err)
-	}
-
-	addr6, err := net.ResolveUDPAddr("udp6", mdns.DefaultAddressIPv6)
-	if err != nil {
-		return fmt.Errorf("cannot resolve default address: %w", err)
-	}
-
-	l6, err := net.ListenUDP("udp6", addr6)
-	if err != nil {
-		return fmt.Errorf("cannot listen on default address: %w", err)
-	}
-
-	logger.Debug("Start mdns responder...", "addr4", addr4, "addr6", addr6, "interface4", l4.LocalAddr(),
-		"interface6", l6.LocalAddr())
-
-	var conn *mdns.Conn
-	logger.Info("Starting the mdns responder...")
-	conn, err = mdns.Server(ipv4.NewPacketConn(l4), ipv6.NewPacketConn(l6), &mdns.Config{
+	conn, err := mdns.CreateMDNSConnection(&mdnsLib.Config{
 		LocalNames: []string{ikniteConfig.DomainName},
-	})
-	if err != nil {
-		return fmt.Errorf("cannot create server: %w", err)
+	}, logger)
+	if err != nil { // nocov -- hard to test mdns server creation failure
+		return fmt.Errorf("cannot create mdns server: %w", err)
 	}
+
 	data.RegisterShutdownHook("mdns", conn.Close)
 
 	return nil

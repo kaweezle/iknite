@@ -49,9 +49,7 @@ func NewCmdInterface(opts *BaseOptions) CmdInterface {
 	}
 }
 
-var defaultLogger = slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
-	Level: slog.LevelDebug,
-}))
+var defaultLogger = utils.NewLogger(os.Stdout, slog.LevelDebug, false)
 
 func WithCmdInterface(ctx context.Context, cmdInterface CmdInterface) context.Context {
 	return WithViper(WithLogger(ctx, cmdInterface), cmdInterface)
