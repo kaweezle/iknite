@@ -8,6 +8,7 @@ import (
 	"net/netip"
 	"sync"
 	"testing"
+	"time"
 
 	mdnsLib "github.com/pion/mdns/v2"
 	"github.com/stretchr/testify/require"
@@ -112,6 +113,20 @@ func TestMdnsCmd(t *testing.T) {
 	err = command.ExecuteContext(t.Context())
 	req.NoError(err)
 	req.Contains(out.String(), "TypeA")
+
+	spec.DomainName = "failed"
+	out.Reset()
+	command = NewMdnsCmd(spec)
+	command.SetOut(out)
+	command.SetErr(out)
+	command.SetArgs([]string{"test"})
+	ctx, queryCancel := context.WithTimeout(t.Context(), 300*time.Millisecond)
+	t.Cleanup(queryCancel)
+
+	err = command.ExecuteContext(ctx)
+	req.Error(err)
+	req.Contains(err.Error(), "cannot query domain \"failed\": mDNS: context has elapsed")
+
 	cancel()
 	dnsErrMu.Lock()
 	defer dnsErrMu.Unlock()

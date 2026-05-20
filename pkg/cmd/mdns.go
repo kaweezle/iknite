@@ -86,7 +86,7 @@ func performMdns(ctx context.Context, ikniteConfig *v1alpha1.IkniteClusterSpec) 
 func performMdnsTest(ctx context.Context, out io.Writer, ikniteConfig *v1alpha1.IkniteClusterSpec) error {
 	logger := util.LoggerFromContext(ctx)
 	conn, err := newMdnsServerFn(&mdnsLib.Config{}, logger)
-	if err != nil {
+	if err != nil { // nocov -- should not happen on supported platforms
 		return err
 	}
 	defer conn.Close() //nolint:errcheck // should not fail.
