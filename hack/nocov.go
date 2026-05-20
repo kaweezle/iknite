@@ -87,6 +87,16 @@ func main() {
 		die("parse coverage profile", fmt.Errorf("first line must start with mode:, got %q", mode))
 	}
 
+	visited := make(map[string]bool)
+	uniques := make([]string, 0, len(lines))
+	for _, line := range lines[1:] {
+		if _, exists := visited[line]; exists {
+			continue
+		}
+		visited[line] = true
+		uniques = append(uniques, line)
+	}
+
 	analyses := make(map[string]*fileAnalysis)
 	ignoredByFile := make(map[string]int)
 	totalIgnored := 0
@@ -94,20 +104,20 @@ func main() {
 	outLines := make([]string, 0, len(lines))
 	outLines = append(outLines, mode)
 
-	for i := 1; i < len(lines); i++ {
-		line := strings.TrimSpace(lines[i])
+	for i := 0; i < len(uniques); i++ {
+		line := strings.TrimSpace(uniques[i])
 		if line == "" {
 			continue
 		}
 
 		var entry *coverageEntry
-		entry, err = parseCoverageEntry(lines[i], i+1)
+		entry, err = parseCoverageEntry(uniques[i], i+1)
 		if err != nil {
 			die("parse coverage profile", err)
 		}
 
 		if entry.execCount != 0 {
-			outLines = append(outLines, lines[i])
+			outLines = append(outLines, uniques[i])
 			continue
 		}
 
@@ -132,7 +142,7 @@ func main() {
 			continue
 		}
 
-		outLines = append(outLines, lines[i])
+		outLines = append(outLines, uniques[i])
 	}
 
 	if err = writeLines(outputPath, outLines); err != nil {
