@@ -33,8 +33,6 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
-	certutil "k8s.io/client-go/util/cert"
-	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	pkiutil "k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
 
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
@@ -53,14 +51,7 @@ const pkiDir = "pki"
 //nolint:unparam // Want to reuse the same CA for multiple tests
 func createTestCA(t *testing.T, fs host.FileSystem, dir string) {
 	t.Helper()
-	caCert, caKey, err := pkiutil.NewCertificateAuthority(&pkiutil.CertConfig{
-		Config: certutil.Config{
-			CommonName: "test-ca",
-		},
-		EncryptionAlgorithm: kubeadmapi.EncryptionAlgorithmRSA2048,
-	})
-	require.NoError(t, err)
-	require.NoError(t, pki.WriteCertAndKey(fs, dir, "ca", caCert, caKey))
+	require.NoError(t, testutil.CreateTestCA(fs, dir))
 }
 
 func makeTestSpec(port int) *v1alpha1.IkniteClusterSpec {

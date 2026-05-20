@@ -44,29 +44,31 @@ func runCopyConfig(c workflow.RunData) error {
 	}
 
 	ikniteConfig := data.IkniteCluster().Spec
+	alpineHost := data.Host()
+	logger := data.Logger()
 
 	// Copy admin.conf to /root/.kube/config (renamed to the cluster name).
-	if err := copyAdminConf(data.Host(), ikniteConfig.ClusterName, data.Logger()); err != nil {
+	if err := copyAdminConf(alpineHost, ikniteConfig.ClusterName, logger); err != nil {
 		return fmt.Errorf("failed to copy admin.conf to %s: %w", constants.KubernetesRootConfig, err)
 	}
 
 	// Ensure the iknite configuration actually exists
 	// TODO: This should be done where all the certificates are done.
 	if err := server.EnsureIkniteServerConfiguration(
-		data.Host(),
+		alpineHost,
 		constants.KubernetesPKIDir,
 		&ikniteConfig,
-		data.Logger(),
+		logger,
 	); err != nil {
 		return fmt.Errorf("failed to ensure iknite server configuration: %w", err)
 	}
 
 	// Copy iknite.conf to /root/.kube/iknite.conf.
 	if err := copyFile(
-		data.Host(),
+		alpineHost,
 		constants.IkniteConfPath,
 		constants.IkniteLocalConfPath,
-		data.Logger(),
+		logger,
 	); err != nil {
 		return fmt.Errorf("failed to copy iknite.conf to %s: %w", constants.IkniteLocalConfPath, err)
 	}

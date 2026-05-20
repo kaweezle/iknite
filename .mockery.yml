@@ -64,6 +64,7 @@ packages:
         prepareHostData,
         manifestData,
         kubeletStartData,
+        copyConfigData,
       }
   github.com/kaweezle/iknite/pkg/checkers:
     config:
