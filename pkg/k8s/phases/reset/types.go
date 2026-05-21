@@ -8,8 +8,8 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	kubeadmApi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 
-	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
 	"github.com/kaweezle/iknite/pkg/host"
+	ikniteInit "github.com/kaweezle/iknite/pkg/k8s/phases/init"
 	"github.com/kaweezle/iknite/pkg/utils"
 )
 
@@ -28,7 +28,7 @@ type IkniteResetData interface {
 	CRISocketPath() string
 	CleanupTmpDir() bool
 
-	IkniteCluster() *v1alpha1.IkniteCluster
-	Host() host.Host
+	ikniteInit.IkniteClusterProvider
+	host.HostProvider
 	utils.LoggerProvider
 }

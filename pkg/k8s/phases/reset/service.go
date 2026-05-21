@@ -24,7 +24,11 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
-	initSystem "k8s.io/kubernetes/cmd/kubeadm/app/util/initsystem"
+
+	"github.com/kaweezle/iknite/pkg/alpine"
+	"github.com/kaweezle/iknite/pkg/constants"
+	"github.com/kaweezle/iknite/pkg/host"
+	"github.com/kaweezle/iknite/pkg/utils"
 )
 
 // cSpell:enable
@@ -45,32 +49,33 @@ func NewCleanupServicePhase() workflow.Phase {
 	}
 }
 
+type cleanupServiceData interface {
+	utils.LoggerProvider
+	host.HostProvider
+	DryRun() bool
+}
+
 func runCleanupService(c workflow.RunData) error {
-	r, ok := c.(IkniteResetData)
+	r, ok := c.(cleanupServiceData)
 	if !ok {
 		return errors.New("cleanup-node phase invoked with an invalid data struct")
 	}
 
-	logger := r.Logger().With("phase", "reset")
+	logger := r.Logger().With("phase", "reset", "service", constants.IkniteService)
+	alpineHost := r.Host()
 
 	// Try to stop the kubelet service
 	logger.Info("Getting the init system...")
-	osInitSystem, err := initSystem.GetInitSystem()
-	if err != nil {
-		klog.Warningln(
-			"[reset] The iknite service could not be stopped by kubeadm. Unable to detect a supported init system!",
-		)
-		klog.Warningln("[reset] Please ensure iknite is stopped manually")
-		return nil //nolint:nilerr // TODO: return error?
-	}
+
 	if !r.DryRun() {
-		logger.Info("Stopping the iknite service...")
-		if err := osInitSystem.ServiceStop("iknite"); err != nil {
-			klog.Warningf("[reset] The iknite service could not be stopped by kubeadm: [%v]\n", err)
+		logger.Info("Stopping the service")
+		err := alpine.StopService(alpineHost, constants.IkniteService, logger)
+		if err != nil {
+			klog.Warningf("[reset] The iknite service could not be stopped: [%v]\n", err)
 			klog.Warningln("[reset] Please ensure iknite is stopped manually")
 		}
 	} else {
-		logger.Info("Would stop the iknite service")
+		logger.Info("Would stop the service")
 	}
 
 	return nil

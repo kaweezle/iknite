@@ -66,6 +66,15 @@ packages:
         kubeletStartData,
         copyConfigData,
       }
+  github.com/kaweezle/iknite/pkg/k8s/phases/reset:
+    config:
+      dir: mocks/{{.InterfaceDirRelative}}
+      structname: "Mock{{.InterfaceName | firstUpper }}"
+    interfaces:
+      {
+        IkniteResetData,
+        cleanupServiceData
+      }
   github.com/kaweezle/iknite/pkg/checkers:
     config:
       dir: mocks/{{.InterfaceDirRelative}}
