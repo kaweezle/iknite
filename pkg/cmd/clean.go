@@ -25,16 +25,15 @@ import (
 )
 
 type cleanOptions struct {
+	k8s.CleanAllOptions
 	dryRun             bool
 	cleanAll           bool
 	stopContainers     bool
 	stopContainerd     bool
 	unmountPaths       bool
 	cleanCni           bool
-	cleanIptables      bool
 	cleanAPIBackend    bool
 	cleanClusterConfig bool
-	cleanIpAddress     bool
 }
 
 func newCleanOptions() *cleanOptions {
@@ -45,16 +44,19 @@ func newCleanOptions() *cleanOptions {
 		stopContainerd:     false,
 		unmountPaths:       true,
 		cleanCni:           true,
-		cleanIptables:      true,
 		cleanAPIBackend:    false,
 		cleanClusterConfig: false,
-		cleanIpAddress:     false,
+		CleanAllOptions: k8s.CleanAllOptions{
+			CleanIptables:  true,
+			CleanIpAddress: false,
+			SkipErrors:     false,
+		},
 	}
 }
 
 func (o *cleanOptions) hasActualWorkToDo() bool {
 	return o.stopContainers || o.stopContainerd || o.unmountPaths || o.cleanCni ||
-		o.cleanIptables || o.cleanAPIBackend || o.cleanIpAddress || o.cleanClusterConfig ||
+		o.CleanIptables || o.cleanAPIBackend || o.CleanIpAddress || o.cleanClusterConfig ||
 		o.cleanAll
 }
 
@@ -65,9 +67,9 @@ func (o *cleanOptions) validate() error {
 		o.stopContainerd = true
 		o.unmountPaths = true
 		o.cleanCni = true
-		o.cleanIptables = true
+		o.CleanIptables = true
 		o.cleanAPIBackend = true
-		o.cleanIpAddress = true
+		o.CleanIpAddress = true
 		o.cleanClusterConfig = true
 	}
 
@@ -128,9 +130,9 @@ func initializeClean(flags *flag.FlagSet, cleanOptions *cleanOptions) {
 	)
 	flags.BoolVar(&cleanOptions.cleanCni, options.CleanCNI, cleanOptions.cleanCni, "Reset CNI")
 	flags.BoolVar(
-		&cleanOptions.cleanIptables,
+		&cleanOptions.CleanIptables,
 		options.CleanIPTables,
-		cleanOptions.cleanIptables,
+		cleanOptions.CleanIptables,
 		"Reset iptables",
 	)
 	flags.BoolVar(
@@ -140,9 +142,9 @@ func initializeClean(flags *flag.FlagSet, cleanOptions *cleanOptions) {
 		"Reset API backend data",
 	)
 	flags.BoolVar(
-		&cleanOptions.cleanIpAddress,
+		&cleanOptions.CleanIpAddress,
 		options.CleanIPAddress,
-		cleanOptions.cleanIpAddress,
+		cleanOptions.CleanIpAddress,
 		"Reset IP address",
 	)
 	flags.BoolVar(&cleanOptions.dryRun, kubeadmOptions.DryRun, cleanOptions.dryRun, "Dry run")
@@ -213,7 +215,7 @@ func performClean(
 
 	if cleanOptions.unmountPaths {
 		cleaner.Info("Unmounting paths...")
-		err = cleaner.UnmountPaths(true)
+		err = cleaner.UnmountPaths(false)
 		if err != nil {
 			return fmt.Errorf("failed to unmount paths: %w", err)
 		}
@@ -235,14 +237,14 @@ func performClean(
 		}
 	}
 
-	if cleanOptions.cleanIptables {
+	if cleanOptions.CleanIptables {
 		err = cleaner.ResetIPTables()
 		if err != nil {
 			return fmt.Errorf("failed to reset iptables: %w", err)
 		}
 	}
 
-	if cleanOptions.cleanIpAddress {
+	if cleanOptions.CleanIpAddress {
 		err = cleaner.ResetIPAddress()
 		if err != nil {
 			cleaner.Warn("Error resetting IP address", utils.ErrorKey, err)

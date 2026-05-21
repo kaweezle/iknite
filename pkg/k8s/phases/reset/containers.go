@@ -54,7 +54,11 @@ func runCleanupNode(c workflow.RunData) error {
 
 	cleaner := k8s.NewCleaner(r.Host(), r.Logger(), &r.IkniteCluster().Spec, r.DryRun())
 
-	if err := cleaner.CleanAll(true, true, true); err != nil {
+	if err := cleaner.CleanAll(&k8s.CleanAllOptions{
+		CleanIpAddress: true,
+		CleanIptables:  true,
+		SkipErrors:     false,
+	}); err != nil {
 		return fmt.Errorf("failed to cleanup node: %w", err)
 	}
 	return nil

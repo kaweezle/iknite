@@ -114,10 +114,10 @@ func TestCleanOptionsBehavior(t *testing.T) {
 				o.stopContainerd = false
 				o.unmountPaths = false
 				o.cleanCni = false
-				o.cleanIptables = false
+				o.CleanIptables = false
 				o.cleanAPIBackend = false
 				o.cleanClusterConfig = false
-				o.cleanIpAddress = false
+				o.CleanIpAddress = false
 				o.cleanAll = false
 			},
 			wantHasWork: false,
@@ -130,10 +130,10 @@ func TestCleanOptionsBehavior(t *testing.T) {
 				o.stopContainerd = false
 				o.unmountPaths = false
 				o.cleanCni = false
-				o.cleanIptables = false
+				o.CleanIptables = false
 				o.cleanAPIBackend = false
 				o.cleanClusterConfig = false
-				o.cleanIpAddress = false
+				o.CleanIpAddress = false
 			},
 			wantHasWork:    true,
 			wantAllEnabled: true,
@@ -155,10 +155,10 @@ func TestCleanOptionsBehavior(t *testing.T) {
 				req.True(o.stopContainerd)
 				req.True(o.unmountPaths)
 				req.True(o.cleanCni)
-				req.True(o.cleanIptables)
+				req.True(o.CleanIptables)
 				req.True(o.cleanAPIBackend)
 				req.True(o.cleanClusterConfig)
-				req.True(o.cleanIpAddress)
+				req.True(o.CleanIpAddress)
 			}
 		})
 	}

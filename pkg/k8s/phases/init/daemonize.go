@@ -91,7 +91,11 @@ func runDaemonize(c workflow.RunData) error {
 	}
 	cleaner := k8s.NewCleaner(data.Host(), logger, &data.IkniteCluster().Spec, false)
 
-	err = cleaner.CleanAll(true, false, false)
+	err = cleaner.CleanAll(&k8s.CleanAllOptions{
+		CleanIpAddress: true,
+		CleanIptables:  false,
+		SkipErrors:     true,
+	})
 	if err != nil {
 		logger.Warn("Error during cleanup after kubelet stopped", utils.ErrorKey, err)
 	}
