@@ -1,4 +1,4 @@
-// cSpell: words paralleltest wrapcheck testutil
+// cSpell: words paralleltest wrapcheck
 package secrets
 
 import (

@@ -1,4 +1,4 @@
-// cSpell: words testutil
+// cSpell: words
 package secrets
 
 import (

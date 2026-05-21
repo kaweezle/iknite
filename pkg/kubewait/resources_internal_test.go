@@ -1,4 +1,4 @@
-// cSpell: words kstatus apimachinery testutil clientcmd genericclioptions corev metav unknownresource
+// cSpell: words kstatus apimachinery clientcmd genericclioptions corev metav unknownresource
 //
 //nolint:gocognit // Complex test cases.
 package kubewait

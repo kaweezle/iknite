@@ -20,55 +20,17 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"net"
-	"net/netip"
 
-	"github.com/pion/mdns/v2"
+	mdnsLib "github.com/pion/mdns/v2"
 	"github.com/spf13/cobra"
-	"golang.org/x/net/dns/dnsmessage"
-	"golang.org/x/net/ipv4"
-	"golang.org/x/net/ipv6"
 
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
 	"github.com/kaweezle/iknite/pkg/cmd/util"
 	"github.com/kaweezle/iknite/pkg/config"
+	"github.com/kaweezle/iknite/pkg/mdns"
 )
 
-type mdnsServer interface {
-	QueryAddr(context.Context, string) (dnsmessage.ResourceHeader, netip.Addr, error)
-	Close() error
-}
-
-var newMdnsServerFn = func(cfg *mdns.Config) (mdnsServer, net.Addr, net.Addr, error) {
-	addr4, err := net.ResolveUDPAddr("udp", mdns.DefaultAddressIPv4)
-	if err != nil { // nocov -- should not happen on supported platforms
-		return nil, nil, nil, fmt.Errorf("cannot resolve default address: %w", err)
-	}
-
-	l4, err := net.ListenUDP("udp4", addr4)
-	if err != nil { // nocov -- should not happen on supported platforms
-		return nil, nil, nil, fmt.Errorf("cannot listen on default address: %w", err)
-	}
-
-	addr6, err := net.ResolveUDPAddr("udp6", mdns.DefaultAddressIPv6)
-	if err != nil { // nocov -- should not happen on supported platforms
-		return nil, nil, nil, fmt.Errorf("cannot resolve default address: %w", err)
-	}
-
-	l6, err := net.ListenUDP("udp6", addr6)
-	if err != nil { // nocov -- should not happen on supported platforms
-		return nil, nil, nil, fmt.Errorf("cannot listen on default address: %w", err)
-	}
-
-	conn, err := mdns.Server(ipv4.NewPacketConn(l4), ipv6.NewPacketConn(l6), cfg)
-	if err != nil {
-		_ = l4.Close() //nolint:errcheck // best effort cleanup
-		_ = l6.Close() //nolint:errcheck // best effort cleanup
-		return nil, nil, nil, fmt.Errorf("cannot create server: %w", err)
-	}
-
-	return conn, addr4, addr6, nil
-}
+var newMdnsServerFn = mdns.CreateMDNSConnection
 
 func NewMdnsCmd(ikniteConfig *v1alpha1.IkniteClusterSpec) *cobra.Command {
 	// configureCmd represents the start command
@@ -107,15 +69,13 @@ queries the configured domain name once.
 }
 
 func performMdns(ctx context.Context, ikniteConfig *v1alpha1.IkniteClusterSpec) error {
-	conn, addr4, addr6, err := newMdnsServerFn(&mdns.Config{
+	logger := util.LoggerFromContext(ctx)
+	conn, err := newMdnsServerFn(&mdnsLib.Config{
 		LocalNames: []string{ikniteConfig.DomainName},
-	})
+	}, logger)
 	if err != nil {
 		return err
 	}
-
-	logger := util.LoggerFromContext(ctx)
-	logger.Debug("Start mdns responder...", "domainName", ikniteConfig.DomainName, "addr4", addr4, "addr6", addr6)
 
 	defer conn.Close() //nolint:errcheck // should not fail.
 	<-ctx.Done()
@@ -124,8 +84,9 @@ func performMdns(ctx context.Context, ikniteConfig *v1alpha1.IkniteClusterSpec) 
 }
 
 func performMdnsTest(ctx context.Context, out io.Writer, ikniteConfig *v1alpha1.IkniteClusterSpec) error {
-	conn, _, _, err := newMdnsServerFn(&mdns.Config{})
-	if err != nil {
+	logger := util.LoggerFromContext(ctx)
+	conn, err := newMdnsServerFn(&mdnsLib.Config{}, logger)
+	if err != nil { // nocov -- should not happen on supported platforms
 		return err
 	}
 	defer conn.Close() //nolint:errcheck // should not fail.

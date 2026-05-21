@@ -1,6 +1,6 @@
 package alpine_test
 
-// cSpell: words RTNETLINK Nilf testutil
+// cSpell: words RTNETLINK Nilf
 // cSpell: disable
 import (
 	"net"

@@ -33,7 +33,11 @@ func runPreCleanHost(c workflow.RunData) error {
 	ikniteConfig := &data.IkniteCluster().Spec
 
 	cleaner := k8s.NewCleaner(data.Host(), data.Logger(), ikniteConfig, false)
-	if err := cleaner.CleanAll(false, false, true); err != nil {
+	if err := cleaner.CleanAll(&k8s.CleanAllOptions{
+		CleanIpAddress: false,
+		CleanIptables:  false,
+		SkipErrors:     false,
+	}); err != nil {
 		return fmt.Errorf("failed to pre-clean host: %w", err)
 	}
 	return nil

@@ -1,4 +1,4 @@
-// cSpell: words kyaml paralleltest testutil
+// cSpell: words kyaml paralleltest
 //
 //nolint:paralleltest // kustomization has race conditions
 package config

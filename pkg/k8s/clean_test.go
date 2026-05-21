@@ -1,6 +1,6 @@
 package k8s_test
 
-// cSpell: words txeh ifname wrapcheck testutil
+// cSpell: words txeh ifname wrapcheck
 
 import (
 	"bytes"
@@ -411,7 +411,7 @@ func TestUnmountPaths_AllNotExist(t *testing.T) {
 	setupAllEvalSymlinksNotExist(mockH)
 
 	cleaner := k8s.NewCleaner(mockH, testutil.TestLogger(t), nil, false)
-	err := cleaner.UnmountPaths(false)
+	err := cleaner.UnmountPaths(true)
 	req.NoError(err)
 }
 
@@ -426,7 +426,7 @@ func TestUnmountPaths_EvalSymlinksOtherError_ContinueOnError(t *testing.T) {
 	mockH.On("EvalSymlinks", mock.Anything).Return("", os.ErrNotExist)
 
 	cleaner := k8s.NewCleaner(mockH, testutil.TestLogger(t), nil, false)
-	err := cleaner.UnmountPaths(false)
+	err := cleaner.UnmountPaths(true)
 	req.NoError(err)
 }
 
@@ -438,7 +438,7 @@ func TestUnmountPaths_EvalSymlinksOtherError_FailOnError(t *testing.T) {
 	mockH.On("EvalSymlinks", "/var/lib/kubelet/pods").Return("", errors.New("perm denied")).Once()
 
 	cleaner := k8s.NewCleaner(mockH, testutil.TestLogger(t), nil, false)
-	err := cleaner.UnmountPaths(true)
+	err := cleaner.UnmountPaths(false)
 	req.Error(err)
 }
 
@@ -703,7 +703,11 @@ func TestCleanAll_DryRun(t *testing.T) {
 
 	config := &v1alpha1.IkniteClusterSpec{CreateIp: false}
 	cleaner := k8s.NewCleaner(mockH, testutil.TestLogger(t), config, true /* isDryRun */)
-	err := cleaner.CleanAll(false, false, false)
+	err := cleaner.CleanAll(&k8s.CleanAllOptions{
+		CleanIptables:  false,
+		CleanIpAddress: false,
+		SkipErrors:     true,
+	})
 	req.NoError(err)
 }
 
@@ -737,11 +741,11 @@ func TestCleanAll_WithIPTablesAndIPAddress_DryRun(t *testing.T) {
 		DomainName: "nonexistent.local",
 	}
 	cleaner := k8s.NewCleaner(mockH, testutil.TestLogger(t), config, true /* isDryRun */)
-	err := cleaner.CleanAll(
-		true,  /* resetIPAddress */
-		true,  /* resetIPTables */
-		false, /* failOnError */
-	)
+	err := cleaner.CleanAll(&k8s.CleanAllOptions{
+		CleanIpAddress: true,
+		CleanIptables:  true,
+		SkipErrors:     true,
+	})
 
 	req.NoError(err)
 }
@@ -854,7 +858,7 @@ func TestUnmountPaths_RemovePath_FailOnError(t *testing.T) {
 	mockH.On("EvalSymlinks", "/run/containerd").Return("", errors.New("perm denied")).Once()
 
 	cleaner := k8s.NewCleaner(mockH, testutil.TestLogger(t), nil, false)
-	err := cleaner.UnmountPaths(true /* failOnError */)
+	err := cleaner.UnmountPaths(false)
 	req.Error(err)
 }
 
@@ -872,7 +876,7 @@ func TestUnmountPaths_RemovePath_ContinueOnError(t *testing.T) {
 	mockH.On("EvalSymlinks", mock.Anything).Return("", os.ErrNotExist)
 
 	cleaner := k8s.NewCleaner(mockH, testutil.TestLogger(t), nil, false)
-	err := cleaner.UnmountPaths(false /* failOnError */)
+	err := cleaner.UnmountPaths(true)
 	req.NoError(err) // errors are logged but not returned
 }
 
@@ -898,7 +902,11 @@ func TestCleanAll_StopContainersError_FailOnError(t *testing.T) {
 
 	config := &v1alpha1.IkniteClusterSpec{CreateIp: false}
 	cleaner := k8s.NewCleaner(mockH, testutil.TestLogger(t), config, false /* isDryRun */)
-	err := cleaner.CleanAll(false, false, true /* failOnError */)
+	err := cleaner.CleanAll(&k8s.CleanAllOptions{
+		CleanIpAddress: false,
+		CleanIptables:  false,
+		SkipErrors:     false,
+	})
 	req.Error(err)
 	req.Contains(err.Error(), "failed to stop all containers")
 }
@@ -915,7 +923,11 @@ func TestCleanAll_UnmountError_FailOnError(t *testing.T) {
 
 	config := &v1alpha1.IkniteClusterSpec{CreateIp: false}
 	cleaner := k8s.NewCleaner(mockH, testutil.TestLogger(t), config, false /* isDryRun */)
-	err := cleaner.CleanAll(false, false, true /* failOnError */)
+	err := cleaner.CleanAll(&k8s.CleanAllOptions{
+		CleanIpAddress: false,
+		CleanIptables:  false,
+		SkipErrors:     false,
+	})
 	req.Error(err)
 	req.Contains(err.Error(), "failed to evaluate symlinks")
 }
@@ -935,7 +947,11 @@ func TestCleanAll_RemoveKubeletError_FailOnError(t *testing.T) {
 
 	config := &v1alpha1.IkniteClusterSpec{CreateIp: false}
 	cleaner := k8s.NewCleaner(mockH, testutil.TestLogger(t), config, false /* isDryRun */)
-	err := cleaner.CleanAll(false, false, true /* failOnError */)
+	err := cleaner.CleanAll(&k8s.CleanAllOptions{
+		CleanIpAddress: false,
+		CleanIptables:  false,
+		SkipErrors:     false,
+	})
 	req.Error(err)
 	req.Contains(err.Error(), "failed to remove kubelet files")
 }
@@ -959,7 +975,11 @@ func TestCleanAll_DeleteCniError_FailOnError(t *testing.T) {
 
 	config := &v1alpha1.IkniteClusterSpec{CreateIp: false}
 	cleaner := k8s.NewCleaner(mockH, testutil.TestLogger(t), config, false /* isDryRun */)
-	err := cleaner.CleanAll(false, false, true /* failOnError */)
+	err := cleaner.CleanAll(&k8s.CleanAllOptions{
+		CleanIpAddress: false,
+		CleanIptables:  false,
+		SkipErrors:     false,
+	})
 	req.Error(err)
 	req.Contains(err.Error(), "failed to delete CNI namespaces")
 }
@@ -985,7 +1005,11 @@ func TestCleanAll_DeleteNetworkInterfacesError_FailOnError(t *testing.T) {
 
 	config := &v1alpha1.IkniteClusterSpec{CreateIp: false}
 	cleaner := k8s.NewCleaner(mockH, testutil.TestLogger(t), config, false /* isDryRun */)
-	err := cleaner.CleanAll(false, false, true /* failOnError */)
+	err := cleaner.CleanAll(&k8s.CleanAllOptions{
+		CleanIpAddress: false,
+		CleanIptables:  false,
+		SkipErrors:     false,
+	})
 	req.Error(err)
 	req.Contains(err.Error(), "failed to delete network interfaces")
 }
@@ -1014,7 +1038,11 @@ func TestCleanAll_IPTablesError_FailOnError(t *testing.T) {
 
 	config := &v1alpha1.IkniteClusterSpec{CreateIp: false}
 	cleaner := k8s.NewCleaner(mockH, testutil.TestLogger(t), config, false /* isDryRun */)
-	err := cleaner.CleanAll(false, true /* resetIpTables */, true /* failOnError */)
+	err := cleaner.CleanAll(&k8s.CleanAllOptions{
+		CleanIpAddress: false,
+		CleanIptables:  true,
+		SkipErrors:     false,
+	})
 	req.Error(err)
 	req.Contains(err.Error(), "failed to clean up iptables rules")
 }
@@ -1051,7 +1079,11 @@ func TestCleanAll_IPAddressError_FailOnError(t *testing.T) {
 		DomainName: "kaweezle.local",
 	}
 	cleaner := k8s.NewCleaner(mockH, testutil.TestLogger(t), config, true /* isDryRun */)
-	err := cleaner.CleanAll(true /* resetIpAddress */, false, true /* failOnError */)
+	err := cleaner.CleanAll(&k8s.CleanAllOptions{
+		CleanIpAddress: true,
+		CleanIptables:  false,
+		SkipErrors:     false,
+	})
 	req.Error(err)
 	req.Contains(err.Error(), "failed to create hosts file handler")
 }

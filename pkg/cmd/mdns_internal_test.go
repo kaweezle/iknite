@@ -4,16 +4,18 @@ package cmd
 import (
 	"bytes"
 	"context"
-	"net"
+	"log/slog"
 	"net/netip"
 	"sync"
 	"testing"
+	"time"
 
-	"github.com/pion/mdns/v2"
+	mdnsLib "github.com/pion/mdns/v2"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/net/dns/dnsmessage"
 
 	"github.com/kaweezle/iknite/pkg/apis/iknite/v1alpha1"
+	"github.com/kaweezle/iknite/pkg/mdns"
 )
 
 type fakeMdnsServer struct {
@@ -49,11 +51,11 @@ func TestNewMdnsCmdTestSubcommand(t *testing.T) {
 	})
 
 	var factoryCalls int
-	newMdnsServerFn = func(cfg *mdns.Config) (mdnsServer, net.Addr, net.Addr, error) {
+	newMdnsServerFn = func(cfg *mdnsLib.Config, _ *slog.Logger) (mdns.MDNSServer, error) {
 		factoryCalls++
 		req.NotNil(cfg)
 		req.Empty(cfg.LocalNames)
-		return fakeServer, nil, nil, nil
+		return fakeServer, nil
 	}
 
 	command := NewMdnsCmd(spec)
@@ -111,6 +113,20 @@ func TestMdnsCmd(t *testing.T) {
 	err = command.ExecuteContext(t.Context())
 	req.NoError(err)
 	req.Contains(out.String(), "TypeA")
+
+	spec.DomainName = "failed"
+	out.Reset()
+	command = NewMdnsCmd(spec)
+	command.SetOut(out)
+	command.SetErr(out)
+	command.SetArgs([]string{"test"})
+	ctx, queryCancel := context.WithTimeout(t.Context(), 300*time.Millisecond)
+	t.Cleanup(queryCancel)
+
+	err = command.ExecuteContext(ctx)
+	req.Error(err)
+	req.Contains(err.Error(), "cannot query domain \"failed\": mDNS: context has elapsed")
+
 	cancel()
 	dnsErrMu.Lock()
 	defer dnsErrMu.Unlock()

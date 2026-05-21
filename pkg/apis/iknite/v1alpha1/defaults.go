@@ -32,7 +32,9 @@ func SetDefaults_IkniteClusterSpec(obj *IkniteClusterSpec) {
 	if obj.DomainName == "" && obj.CreateIp {
 		obj.DomainName = constants.WSLHostName
 	}
-	obj.EnableMDNS = wsl
+	if !obj.EnableMDNS && wsl {
+		obj.EnableMDNS = true
+	}
 	if obj.KubernetesVersion == "" {
 		obj.KubernetesVersion = KubernetesVersionDefault
 	}

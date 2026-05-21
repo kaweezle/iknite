@@ -1,6 +1,6 @@
 package util
 
-// cSpell: words pflag testutil
+// cSpell: words pflag
 
 import (
 	"errors"

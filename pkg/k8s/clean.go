@@ -147,13 +147,13 @@ func (c *Cleaner) StopAllContainers() error {
 	return nil
 }
 
-func (c *Cleaner) UnmountPaths(failOnError bool) error {
+func (c *Cleaner) UnmountPaths(skipErrors bool) error {
 	var err error
 	for _, path := range pathsToUnmount {
 		err = processMounts(c.Host, path, false, "Unmounting", c.isDryRun, c.Logger)
 		if err != nil {
 			c.Warn("Error unmounting path", utils.ErrorKey, err, "path", path)
-			if failOnError {
+			if !skipErrors {
 				return err
 			}
 		}
@@ -163,7 +163,7 @@ func (c *Cleaner) UnmountPaths(failOnError bool) error {
 		err = processMounts(c.Host, path, true, "Unmounting and removing", c.isDryRun, c.Logger)
 		if err != nil {
 			c.Warn("Error unmounting and removing path", utils.ErrorKey, err, "path", path)
-			if failOnError {
+			if !skipErrors {
 				return err
 			}
 		}
@@ -171,22 +171,26 @@ func (c *Cleaner) UnmountPaths(failOnError bool) error {
 	return nil
 }
 
+type CleanAllOptions struct {
+	CleanIpAddress bool
+	CleanIptables  bool
+	SkipErrors     bool
+}
+
 //nolint:gocyclo // TODO: Should use a runner pattern to reduce complexity
-func (c *Cleaner) CleanAll(
-	resetIpAddress, resetIpTables, failOnError bool,
-) error {
+func (c *Cleaner) CleanAll(opts *CleanAllOptions) error {
 	var err error
 	if err = c.StopAllContainers(); err != nil {
 		c.Warn("Error stopping all containers", utils.ErrorKey, err)
-		if failOnError {
+		if !opts.SkipErrors {
 			return err
 		}
 	}
 
-	err = c.UnmountPaths(failOnError)
+	err = c.UnmountPaths(opts.SkipErrors)
 	if err != nil {
 		c.Warn("Error unmounting paths", utils.ErrorKey, err)
-		if failOnError {
+		if !opts.SkipErrors {
 			return err
 		}
 	}
@@ -194,7 +198,7 @@ func (c *Cleaner) CleanAll(
 	err = c.RemoveKubeletFiles()
 	if err != nil {
 		c.Warn("Error removing kubelet files", utils.ErrorKey, err)
-		if failOnError {
+		if !opts.SkipErrors {
 			return err
 		}
 	}
@@ -202,7 +206,7 @@ func (c *Cleaner) CleanAll(
 	err = c.DeleteCniNamespaces()
 	if err != nil {
 		c.Warn("Error deleting CNI namespaces", utils.ErrorKey, err)
-		if failOnError {
+		if !opts.SkipErrors {
 			return err
 		}
 	}
@@ -210,27 +214,27 @@ func (c *Cleaner) CleanAll(
 	err = c.DeleteNetworkInterfaces()
 	if err != nil {
 		c.Warn("Error deleting network interfaces", utils.ErrorKey, err)
-		if failOnError {
+		if !opts.SkipErrors {
 			return err
 		}
 	}
 
-	if resetIpTables {
+	if opts.CleanIptables {
 		c.Info("Cleaning up iptables rules...")
 		err = c.ResetIPTables()
 		if err != nil {
 			c.Warn("Error cleaning up iptables rules", utils.ErrorKey, err)
-			if failOnError {
+			if !opts.SkipErrors {
 				return err
 			}
 		}
 	}
 
-	if resetIpAddress {
+	if opts.CleanIpAddress {
 		err = c.ResetIPAddress()
 		if err != nil {
 			c.Warn("Error resetting IP address", utils.ErrorKey, err)
-			if failOnError {
+			if !opts.SkipErrors {
 				return err
 			}
 		}

@@ -6,6 +6,7 @@ import (
 
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/clientcmd/api"
+	kubeadmConstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 
 	"github.com/kaweezle/iknite/pkg/host"
 )
@@ -35,6 +36,10 @@ func CreateBasicConfig(fs host.FileSystem, path, url string) error {
 	if err != nil {
 		return err
 	}
+	if path == "" {
+		path = kubeadmConstants.GetAdminKubeConfigPath()
+	}
+
 	dir := filepath.Dir(path)
 	if err := fs.MkdirAll(dir, 0o700); err != nil {
 		return fmt.Errorf("failed to create directory for kubeconfig file: %w", err)

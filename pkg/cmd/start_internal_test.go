@@ -1,4 +1,4 @@
-// cSpell: words ikniteapi procs runlevels cpuset testutil paralleltest
+// cSpell: words ikniteapi procs runlevels cpuset paralleltest
 package cmd
 
 import (

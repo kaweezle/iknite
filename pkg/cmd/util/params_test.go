@@ -1,6 +1,6 @@
 package util_test
 
-// cSpell: words pflag myflag mysection testcmd testapp paralleltest testutil
+// cSpell: words pflag myflag mysection testcmd testapp paralleltest
 import (
 	"errors"
 	"fmt"

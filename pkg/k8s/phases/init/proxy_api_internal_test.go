@@ -1,4 +1,4 @@
-// cSpell: words errgroup wrapcheck testutil
+// cSpell: words errgroup wrapcheck
 package init
 
 import (

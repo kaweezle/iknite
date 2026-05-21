@@ -219,7 +219,9 @@ func EnableCGroupSubtreeControl(fs host.FileSystem, logger *slog.Logger) error {
 	controllers := strings.Fields(string(controllersContent))
 	var enableControllers strings.Builder
 	for _, controller := range controllers {
-		enableControllers.WriteString("+" + controller + " ")
+		enableControllers.WriteString("+")
+		enableControllers.WriteString(controller)
+		enableControllers.WriteString(" ")
 	}
 
 	// Enable subtree control
