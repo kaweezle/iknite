@@ -16,6 +16,8 @@ require (
 	github.com/joho/godotenv v1.5.1
 	github.com/lithammer/dedent v1.1.0
 	github.com/mitchellh/mapstructure v1.5.0
+	github.com/opencontainers/go-digest v1.0.0
+	github.com/opencontainers/image-spec v1.1.1
 	github.com/pion/mdns/v2 v2.1.0
 	github.com/rs/zerolog v1.35.1
 	github.com/spf13/afero v1.15.0
@@ -40,6 +42,7 @@ require (
 	k8s.io/kubectl v0.36.1
 	k8s.io/kubelet v0.36.1
 	k8s.io/kubernetes v1.36.1
+	oras.land/oras-go/v2 v2.6.0
 	sigs.k8s.io/cli-utils v0.37.2
 	sigs.k8s.io/controller-runtime v0.24.1
 	sigs.k8s.io/kustomize/api v0.21.1
@@ -215,8 +218,6 @@ require (
 	github.com/muesli/cancelreader v0.2.2 // indirect
 	github.com/muesli/termenv v0.16.0 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
-	github.com/opencontainers/go-digest v1.0.0 // indirect
-	github.com/opencontainers/image-spec v1.1.1 // indirect
 	github.com/patrickmn/go-cache v2.1.1-0.20191004192108-46f407853014+incompatible // indirect
 	github.com/pelletier/go-toml/v2 v2.2.4 // indirect
 	github.com/peterbourgon/diskv v2.0.1+incompatible // indirect
@@ -302,7 +303,6 @@ require (
 	k8s.io/system-validators v1.12.1 // indirect
 	k8s.io/utils v0.0.0-20260210185600-b8788abfbbc2 // indirect
 	mvdan.cc/sh/v3 v3.7.0 // indirect
-	oras.land/oras-go/v2 v2.6.0 // indirect
 	sigs.k8s.io/json v0.0.0-20250730193827-2d320260d730 // indirect
 	sigs.k8s.io/randfill v1.0.0 // indirect
 	sigs.k8s.io/structured-merge-diff/v6 v6.3.2 // indirect

@@ -11,7 +11,6 @@ import (
 	"fmt"
 	"log/slog"
 	"net"
-	"os"
 	"sort"
 	"strings"
 	"time"
@@ -453,12 +452,12 @@ func WorkloadsReadyConditionWithContextFunc(
 	}
 }
 
-func InClusterConfig(fs host.FileSystem, logger *slog.Logger) (*rest.Config, error) {
+func InClusterConfig(fs host.FileEnvironment, logger *slog.Logger) (*rest.Config, error) {
 	const (
 		tokenFile  = "/var/run/secrets/kubernetes.io/serviceaccount/token" //nolint:gosec // From client-go
 		rootCAFile = "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
 	)
-	svcHost, port := os.Getenv("KUBERNETES_SERVICE_HOST"), os.Getenv("KUBERNETES_SERVICE_PORT")
+	svcHost, port := fs.Getenv("KUBERNETES_SERVICE_HOST"), fs.Getenv("KUBERNETES_SERVICE_PORT")
 	if svcHost == "" || port == "" {
 		return nil, rest.ErrNotInCluster
 	}

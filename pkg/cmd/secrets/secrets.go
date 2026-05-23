@@ -26,7 +26,7 @@ import (
 )
 
 // CreateSecretsCmd creates the secrets command.
-func CreateSecretsCmd(fs host.FileSystem, opts *pkgSecrets.Options) *cobra.Command {
+func CreateSecretsCmd(fs host.FileEnvironment, opts *pkgSecrets.Options) *cobra.Command {
 	if opts == nil {
 		opts = &pkgSecrets.Options{}
 	}

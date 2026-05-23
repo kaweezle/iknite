@@ -11,11 +11,10 @@ import (
 	"encoding/pem"
 	"fmt"
 	"math/big"
-	"os"
 	"path/filepath"
-	"runtime"
 	"time"
 
+	"github.com/kaweezle/iknite/pkg/constants"
 	"github.com/kaweezle/iknite/pkg/host"
 	pkgsecrets "github.com/kaweezle/iknite/pkg/secrets"
 )
@@ -24,16 +23,6 @@ const (
 	dirMode  = 0o755
 	fileMode = 0o644
 )
-
-// EnvironmentProvider provides access to process environment variables.
-type EnvironmentProvider interface {
-	Getenv(key string) string
-}
-
-// PlatformDetector provides OS detection.
-type PlatformDetector interface {
-	GOOS() string
-}
 
 // InitRequest defines env init behavior.
 type InitRequest struct {
@@ -52,10 +41,7 @@ type InitResult struct {
 
 // Service initializes the iknitectl environment tree.
 type Service struct {
-	FS       host.FileSystem
-	Env      EnvironmentProvider
-	Platform PlatformDetector
-	HomeDir  func() (string, error)
+	FS host.FileEnvironment
 }
 
 // Init creates required directories, secrets files, and default CA material.
@@ -67,7 +53,7 @@ func (s *Service) Init(req *InitRequest) (*InitResult, error) {
 		return nil, err
 	}
 
-	homeDir, configDir, paths, err := s.resolvePaths(req)
+	paths, err := s.resolvePaths(req)
 	if err != nil {
 		return nil, err
 	}
@@ -76,7 +62,7 @@ func (s *Service) Init(req *InitRequest) (*InitResult, error) {
 		return nil, mkErr
 	}
 
-	secretsResult, err := initSecrets(s.FS, homeDir, paths, req.Force)
+	secretsResult, err := initSecrets(s.FS, paths, req.Force)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize secrets: %w", err)
 	}
@@ -94,37 +80,25 @@ func (s *Service) Init(req *InitRequest) (*InitResult, error) {
 
 	messages := buildMessages(paths, secretsResult.Messages, req.PrintPaths)
 
-	return &InitResult{ConfigDir: configDir, Paths: paths, Messages: messages}, nil
+	return &InitResult{ConfigDir: paths["root"], Paths: paths, Messages: messages}, nil
 }
 
 func (s *Service) ensureDefaults() error {
 	if s.FS == nil {
 		return fmt.Errorf("filesystem dependency is required")
 	}
-	if s.Env == nil {
-		s.Env = osEnvironmentProvider{}
-	}
-	if s.Platform == nil {
-		s.Platform = runtimePlatformDetector{}
-	}
-	if s.HomeDir == nil {
-		s.HomeDir = os.UserHomeDir
-	}
 
 	return nil
 }
 
-func (s *Service) resolvePaths(req *InitRequest) (string, string, map[string]string, error) {
-	homeDir, err := s.HomeDir()
-	if err != nil {
-		return "", "", nil, fmt.Errorf("failed to resolve home directory: %w", err)
-	}
-
+func (s *Service) resolvePaths(req *InitRequest) (map[string]string, error) {
 	configDir := req.ConfigDir
+
 	if configDir == "" {
-		configDir, err = defaultConfigDir(s.Env, s.Platform, homeDir)
+		var err error
+		configDir, err = defaultConfigDir(s.FS)
 		if err != nil {
-			return "", "", nil, err
+			return nil, err
 		}
 	}
 	configDir = filepath.Clean(configDir)
@@ -137,7 +111,7 @@ func (s *Service) resolvePaths(req *InitRequest) (string, string, map[string]str
 		"clusters": filepath.Join(configDir, "clusters"),
 	}
 
-	return homeDir, configDir, paths, nil
+	return paths, nil
 }
 
 func ensureDirectoryTree(fs host.FileSystem, paths map[string]string) error {
@@ -151,14 +125,12 @@ func ensureDirectoryTree(fs host.FileSystem, paths map[string]string) error {
 }
 
 func initSecrets(
-	fs host.FileSystem,
-	homeDir string,
+	fs host.FileEnvironment,
 	paths map[string]string,
 	force bool,
 ) (*pkgsecrets.InitResult, error) {
 	secretsOpts := &pkgsecrets.Options{
 		Fs:          fs,
-		HomeDir:     homeDir,
 		Force:       force,
 		KeyFile:     filepath.Join(paths["auth"], "id_ed25519"),
 		SecretsFile: filepath.Join(paths["shared"], pkgsecrets.DefaultSecretsFile),
@@ -184,25 +156,12 @@ func buildMessages(paths map[string]string, secretMessages []string, printPaths 
 	return messages
 }
 
-func defaultConfigDir(env EnvironmentProvider, platform PlatformDetector, homeDir string) (string, error) {
-	if homeDir == "" {
-		return "", fmt.Errorf("home directory is required")
+func defaultConfigDir(fse host.FileEnvironment) (string, error) {
+	configDir, err := fse.UserConfigDir()
+	if err != nil {
+		return "", fmt.Errorf("failed to get user config directory: %w", err)
 	}
-
-	switch platform.GOOS() {
-	case "windows":
-		if appData := env.Getenv("APPDATA"); appData != "" {
-			return filepath.Join(appData, "iknite"), nil
-		}
-		return filepath.Join(homeDir, "AppData", "Roaming", "iknite"), nil
-	case "darwin":
-		return filepath.Join(homeDir, "Library", "Application Support", "iknite"), nil
-	default:
-		if xdgConfigHome := env.Getenv("XDG_CONFIG_HOME"); xdgConfigHome != "" {
-			return filepath.Join(xdgConfigHome, "iknite"), nil
-		}
-		return filepath.Join(homeDir, ".config", "iknite"), nil
-	}
+	return fse.JoinPath(configDir, constants.IkniteConfName), nil
 }
 
 func ensureSharedValuesFile(fs host.FileSystem, path string, force bool) error {
@@ -282,16 +241,4 @@ func ensureCertificateAuthority(fs host.FileSystem, certPath, keyPath string, fo
 	}
 
 	return nil
-}
-
-type osEnvironmentProvider struct{}
-
-func (osEnvironmentProvider) Getenv(key string) string {
-	return os.Getenv(key)
-}
-
-type runtimePlatformDetector struct{}
-
-func (runtimePlatformDetector) GOOS() string {
-	return runtime.GOOS
 }

@@ -115,7 +115,7 @@ func AddResourcesFlags(flags *pflag.FlagSet, opts *ResourcesOptions) {
 // waitForResources waits for all resources in the specified namespaces to become ready.
 func waitForResources(
 	ctx context.Context,
-	fs host.FileSystem,
+	fs host.FileEnvironment,
 	opts *ResourcesOptions,
 	namespaces []string,
 	logger *slog.Logger,

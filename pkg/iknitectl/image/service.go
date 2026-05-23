@@ -1,6 +1,5 @@
+// cSpell: words specv oras VMVHDX vhdx hyperv qcow2 artifacttype gochecknoglobals VMQCOW
 package image
-
-// cSpell: words specv oras VMVHDX vhdx hyperv qcow2 artifacttype
 
 import (
 	"bytes"
@@ -18,6 +17,7 @@ import (
 	"oras.land/oras-go/v2/registry/remote/auth"
 	"oras.land/oras-go/v2/registry/remote/retry"
 
+	"github.com/kaweezle/iknite/pkg/constants"
 	"github.com/kaweezle/iknite/pkg/host"
 )
 
@@ -57,9 +57,8 @@ type NewRepositoryFunc func(repository string) (Repository, error)
 
 // Service provides image inspect and pull operations.
 type Service struct {
-	FS            host.FileSystem
+	FS            host.FileEnvironment
 	NewRepository NewRepositoryFunc
-	HomeDir       func() (string, error)
 }
 
 // InspectResult contains parsed manifest details.
@@ -83,9 +82,6 @@ func (s *Service) ensureDefaults() error {
 	}
 	if s.NewRepository == nil {
 		s.NewRepository = newRemoteRepository
-	}
-	if s.HomeDir == nil {
-		s.HomeDir = os.UserHomeDir
 	}
 
 	return nil
@@ -158,12 +154,12 @@ func (s *Service) Pull(ctx context.Context, req *PullRequest) (string, error) {
 		return "", err
 	}
 
-	homeDir, err := s.HomeDir()
+	configDir, err := s.FS.UserConfigDir()
 	if err != nil {
-		return "", fmt.Errorf("failed to resolve home directory: %w", err)
+		return "", fmt.Errorf("failed to resolve config directory: %w", err)
 	}
 
-	outputDir := filepath.Join(homeDir, ".config", "iknite", "images", imageDirectoryName(inspectResult))
+	outputDir := s.FS.JoinPath(configDir, constants.IkniteConfName, "images", imageDirectoryName(inspectResult))
 	if err = s.FS.MkdirAll(outputDir, 0o755); err != nil {
 		return "", fmt.Errorf("failed to create output directory: %w", err)
 	}
@@ -211,7 +207,7 @@ func (s *Service) Pull(ctx context.Context, req *PullRequest) (string, error) {
 }
 
 func (s *Service) hasMatchingSavedManifest(outputDir string, inspectResult *InspectResult) (bool, error) {
-	inspectPath := filepath.Join(outputDir, inspectResultFileName)
+	inspectPath := s.FS.JoinPath(outputDir, inspectResultFileName)
 	if _, statErr := s.FS.Stat(inspectPath); os.IsNotExist(statErr) {
 		return false, nil
 	} else if statErr != nil {

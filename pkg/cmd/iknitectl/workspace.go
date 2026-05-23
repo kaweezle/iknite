@@ -10,7 +10,7 @@ import (
 )
 
 // CreateWorkspaceCmd creates the workspace command tree.
-func CreateWorkspaceCmd(fileExecutor host.FileExecutor, out io.Writer) *cobra.Command {
+func CreateWorkspaceCmd(fileExecutor host.UserHost, out io.Writer) *cobra.Command {
 	workspaceCmd := &cobra.Command{
 		Use:     "workspace",
 		Aliases: []string{"w", "ws"},

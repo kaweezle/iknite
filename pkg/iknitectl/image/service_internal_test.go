@@ -1,7 +1,5 @@
-//nolint:testpackage // Tests validate unexported helpers.
+// cSpell: words testpackage specv qcow2 VMQCOW2 VHDX VMVHDX
 package image
-
-// cSpell: words testpackage specv qcow2
 
 import (
 	"bytes"
@@ -15,7 +13,7 @@ import (
 	specv1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/stretchr/testify/require"
 
-	"github.com/kaweezle/iknite/pkg/host"
+	"github.com/kaweezle/iknite/pkg/testutil"
 )
 
 type fakeRepository struct {
@@ -127,9 +125,6 @@ func TestPullStoresArtifactsAndInspectJSON(t *testing.T) {
 		digest.FromString("meta").String(): []byte("meta-data"),
 	}
 	svc := newServiceForManifest(t, &manifest, blobs)
-	svc.HomeDir = func() (string, error) {
-		return "/home/alpine", nil
-	}
 
 	outputDir, err := svc.Pull(context.Background(), &PullRequest{ImageRef: "ghcr.io/kaweezle/iknite-vm-qcow2:latest"})
 	require.NoError(t, err)
@@ -216,14 +211,11 @@ func newServiceAndRepoForManifest(
 		blobs:      blobs,
 	}
 
-	fs := host.NewMemMapFS()
+	fs := testutil.NewDummyUserHost()
 	return &Service{
 		FS: fs,
 		NewRepository: func(string) (Repository, error) {
 			return fakeRepo, nil
-		},
-		HomeDir: func() (string, error) {
-			return "/home/alpine", nil
 		},
 	}, fakeRepo
 }

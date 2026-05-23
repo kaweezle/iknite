@@ -17,8 +17,8 @@ func TestCreateWorkspaceCmd(t *testing.T) {
 	t.Parallel()
 	req := require.New(t)
 
-	fileExecutor, ok := host.NewMemMapFS().(host.FileExecutor)
-	req.True(ok, "MemMapFS should implement FileExecutor")
+	fileExecutor, ok := host.NewMemMapFS().(host.UserHost)
+	req.True(ok, "MemMapFS should implement UserHost")
 
 	cmd := CreateWorkspaceCmd(fileExecutor, &bytes.Buffer{})
 	req.NotNil(cmd)
@@ -78,7 +78,7 @@ func TestRunRootCmd_Path(t *testing.T) {
 
 	out := &bytes.Buffer{}
 	options := &RootOptions{
-		Dependencies: &RootDependencies{Host: h, Env: &osEnvironmentProvider{}, Platform: &runtimePlatformDetector{}},
+		Dependencies: &RootDependencies{Host: h},
 		out:          out,
 	}
 	cmd := CreateRootCmd(options)
@@ -103,7 +103,7 @@ func TestRunRootCmd_ConfigError(t *testing.T) {
 
 	out := &bytes.Buffer{}
 	options := &RootOptions{
-		Dependencies: &RootDependencies{Host: h, Env: &osEnvironmentProvider{}, Platform: &runtimePlatformDetector{}},
+		Dependencies: &RootDependencies{Host: h},
 		out:          out,
 	}
 	cmd := CreateRootCmd(options)
