@@ -29,11 +29,18 @@ import (
 	"github.com/kaweezle/iknite/pkg/host"
 )
 
+const (
+	PlatformLinux   = "linux"
+	PlatformWindows = "windows"
+	PlatformDarwin  = "darwin"
+)
+
 type DelegateHost struct {
 	Fs   host.FileSystem
 	Exec host.Executor
 	Sys  host.System
 	Net  host.NetworkHost
+	Env  host.Environment
 }
 
 // Abs implements [Host].
@@ -213,14 +220,53 @@ func (d *DelegateHost) Listen(ctx context.Context, network, address string) (net
 	return d.Net.Listen(ctx, network, address)
 }
 
+// Getenv implements [host.Host].
+func (d *DelegateHost) Getenv(key string) string {
+	return d.Env.Getenv(key)
+}
+
+// LookupEnv implements [host.Host].
+func (d *DelegateHost) LookupEnv(key string) (string, bool) {
+	return d.Env.LookupEnv(key)
+}
+
+// UserConfigDir implements [host.Host].
+func (d *DelegateHost) UserConfigDir() (string, error) {
+	return d.Env.UserConfigDir()
+}
+
+// UserHomeDir implements [host.Host].
+func (d *DelegateHost) UserHomeDir() (string, error) {
+	return d.Env.UserHomeDir()
+}
+
+func (d *DelegateHost) GOOS() string {
+	return d.Env.GOOS()
+}
+
+func (d *DelegateHost) JoinPath(elem ...string) string {
+	return d.Env.JoinPath(elem...)
+}
+
+func (d *DelegateHost) Setenv(key, value string) error {
+	return d.Env.Setenv(key, value)
+}
+
 var _ host.Host = (*DelegateHost)(nil)
 
-func NewDelegateHost(fs host.FileSystem, exec host.Executor, sys host.System, n host.NetworkHost) *DelegateHost {
+func NewDelegateHost(
+	fs host.FileSystem,
+	exec host.Executor,
+	sys host.System,
+	n host.NetworkHost,
+	env host.Environment,
+) *DelegateHost {
 	return &DelegateHost{
 		Fs:   fs,
 		Exec: exec,
 		Sys:  sys,
 		Net:  n,
+		Env:  env,
 	}
 }
 
@@ -724,9 +770,110 @@ func NewDummyExecutor(processes map[int]host.Process, fakeOutputs map[string]*Fa
 	}
 }
 
+type DummyEnvironment struct {
+	env      map[string]string
+	platform string
+	username string
+}
+
+func (d *DummyEnvironment) IsRoot() bool {
+	return d.username == "root" || d.username == "Administrator" || d.username == ""
+}
+
+func (d *DummyEnvironment) FileSep() string {
+	if d.platform == PlatformWindows {
+		return "\\"
+	}
+	return "/"
+}
+
+func (d *DummyEnvironment) Getenv(key string) string {
+	v, exists := d.LookupEnv(key)
+	if exists {
+		return v
+	}
+	return ""
+}
+
+func (d *DummyEnvironment) LookupEnv(key string) (string, bool) {
+	value, exists := d.env[key]
+	return value, exists
+}
+
+func (d *DummyEnvironment) GOOS() string {
+	return d.platform
+}
+
+func (d *DummyEnvironment) UserHomeDir() (string, error) {
+	fromEnv, exists := d.LookupEnv("HOME")
+	if exists {
+		return fromEnv, nil
+	}
+	switch d.platform {
+	case PlatformWindows:
+		return fmt.Sprintf("C:\\Users\\%s", d.username), nil
+	case PlatformDarwin:
+		return fmt.Sprintf("/Users/%s", d.username), nil
+	default:
+		if d.IsRoot() {
+			return "/root", nil
+		}
+		return fmt.Sprintf("/home/%s", d.username), nil
+	}
+}
+
+func (d *DummyEnvironment) JoinPath(elem ...string) string {
+	return strings.Join(elem, d.FileSep())
+}
+
+func (d *DummyEnvironment) UserConfigDir() (string, error) {
+	switch d.platform {
+	case PlatformWindows:
+		fromEnv, exists := d.LookupEnv("APPDATA")
+		if exists {
+			return fromEnv, nil
+		}
+		return fmt.Sprintf("C:\\Users\\%s\\AppData\\Roaming", d.username), nil
+	case PlatformDarwin:
+		fromEnv, exists := d.LookupEnv("XDG_CONFIG_HOME")
+		if exists {
+			return fromEnv, nil
+		}
+		return fmt.Sprintf("/Users/%s/Library/Application Support", d.username), nil
+	default:
+		fromEnv, exists := d.LookupEnv("XDG_CONFIG_HOME")
+		if exists {
+			return fromEnv, nil
+		}
+		if d.IsRoot() {
+			return "/root/.config", nil
+		}
+		return fmt.Sprintf("/home/%s/.config", d.username), nil
+	}
+}
+
+func (d *DummyEnvironment) Setenv(key, value string) error {
+	d.env[key] = value
+	return nil
+}
+
+func NewDummyEnvironment(platform, username string, env map[string]string) *DummyEnvironment {
+	if env == nil {
+		env = make(map[string]string)
+	}
+	return &DummyEnvironment{
+		platform: platform,
+		username: username,
+		env:      env,
+	}
+}
+
 type DummyHostOptions struct {
 	FakeOutputs  map[string]*FakeProcessOutput
 	HostMappings map[string][]string
+	Env          map[string]string
+	Platform     string
+	Username     string
 	Processes    []DummyProcessOptions
 	Mounts       []string
 	NetworkIPs   []net.IP
@@ -750,6 +897,7 @@ func NewDummyHost(
 		Exec: NewDummyExecutor(processes, options.FakeOutputs),
 		Sys:  NewDummySystem(slices.Clone(options.Mounts)),
 		Net:  networkHost,
+		Env:  NewDummyEnvironment(options.Platform, options.Username, options.Env),
 	}
 	// Create the mount points in the dummy file system
 	for _, mount := range options.Mounts {
@@ -788,4 +936,14 @@ func NewDummyHost(
 	}
 
 	return r, nil
+}
+
+func NewDummyUserHost() *DelegateHost {
+	result, _ := NewDummyHost(host.NewMemMapFS(), &DummyHostOptions{Username: "alpine", Platform: "linux"})
+	return result
+}
+
+func NewDummyPlatformHost(platform, username string, env map[string]string) *DelegateHost {
+	result, _ := NewDummyHost(host.NewMemMapFS(), &DummyHostOptions{Username: username, Platform: platform, Env: env})
+	return result
 }

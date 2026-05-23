@@ -17,24 +17,20 @@ limitations under the License.
 package secrets_test
 
 import (
-	"bytes"
-	"fmt"
 	"strings"
 	"testing"
 
-	"github.com/getsops/sops/v3/cmd/sops/formats"
-	"github.com/getsops/sops/v3/decrypt"
-	"sigs.k8s.io/yaml"
+	"github.com/stretchr/testify/require"
 
 	secretsCmd "github.com/kaweezle/iknite/pkg/cmd/secrets"
-	"github.com/kaweezle/iknite/pkg/host"
 	"github.com/kaweezle/iknite/pkg/secrets"
+	"github.com/kaweezle/iknite/pkg/testutil"
 )
 
 func TestCreateSecretsCmd(t *testing.T) {
 	t.Parallel()
 
-	fs := host.NewMemMapFS()
+	fs := testutil.NewDummyUserHost()
 	cmd := secretsCmd.CreateSecretsCmd(fs, nil)
 	if cmd == nil {
 		t.Fatal("CreateSecretsCmd returned nil")
@@ -61,14 +57,14 @@ func TestCreateSecretsCmd(t *testing.T) {
 }
 
 func TestSecretsSetCommandFromStdin(t *testing.T) {
-	// Cannot use t.Parallel because this test sets process env for SOPS decryption.
-	t.Setenv("SOPS_AGE_KEY", testSecretsAgeKey)
+	t.Parallel()
+	req := require.New(t)
 
-	testFs := host.NewMemMapFS()
+	testFs := testutil.NewDummyUserHost()
+	req.NoError(testFs.Setenv("SOPS_AGE_KEY", testSecretsAgeKey))
+
 	secretsPath := "/test/secrets.sops.yaml"
-	if err := testFs.WriteFile(secretsPath, []byte(testSecretsEncryptedWithData), 0o644); err != nil {
-		t.Fatalf("failed to write test secrets file: %v", err)
-	}
+	req.NoError(testFs.WriteFile(secretsPath, []byte(testSecretsEncryptedWithData), 0o644))
 
 	opts := &secrets.Options{Fs: testFs}
 	cmd := secretsCmd.CreateSecretsCmd(testFs, opts)
@@ -79,60 +75,8 @@ func TestSecretsSetCommandFromStdin(t *testing.T) {
 		t.Fatalf("secrets set from stdin failed: %v", err)
 	}
 
-	assertSecretValue(t, testFs, secretsPath, "data.github.api_token", "new-token-from-stdin")
-}
-
-func assertSecretValue(t *testing.T, fs host.FileSystem, secretsPath, path, want string) {
-	t.Helper()
-
-	encrypted, err := fs.ReadFile(secretsPath)
-	if err != nil {
-		t.Fatalf("failed to read secrets file: %v", err)
-	}
-
-	cleartext, err := decrypt.DataWithFormat(encrypted, formats.Yaml)
-	if err != nil {
-		t.Fatalf("failed to decrypt secrets file: %v", err)
-	}
-
-	var data map[string]any
-	if err = yaml.Unmarshal(cleartext, &data); err != nil {
-		t.Fatalf("failed to unmarshal cleartext yaml: %v", err)
-	}
-
-	got, err := getMapValue(data, strings.Split(path, "."))
-	if err != nil {
-		t.Fatalf("failed to read value at %s: %v", path, err)
-	}
-
-	gotString, ok := got.(string)
-	if !ok {
-		t.Fatalf("expected string value at %s, got %T", path, got)
-	}
-
-	if gotString != want {
-		t.Fatalf("unexpected value at %s: got %q, want %q", path, gotString, want)
-	}
-
-	if bytes.Contains(encrypted, []byte(want)) {
-		t.Fatalf("encrypted file unexpectedly contains plaintext value %q", want)
-	}
-}
-
-func getMapValue(root map[string]any, parts []string) (any, error) {
-	var current any = root
-	for _, part := range parts {
-		asMap, ok := current.(map[string]any)
-		if !ok {
-			return nil, fmt.Errorf("path segment %q does not point to a map", part)
-		}
-		next, ok := asMap[part]
-		if !ok {
-			return nil, fmt.Errorf("path segment %q not found", part)
-		}
-		current = next
-	}
-	return current, nil
+	testutil.AssertSecretValue(t, testFs, testSecretsAgeKey, secretsPath, "github.api_token", "new-token-from-stdin",
+		false)
 }
 
 // cSpell: disable

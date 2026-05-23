@@ -24,7 +24,7 @@ const (
 )
 
 type errorFileSystem struct {
-	host.FileSystem
+	host.FileEnvironment
 	existsErrs map[string]error
 	statErrs   map[string]error
 	readErrs   map[string]error
@@ -35,7 +35,7 @@ func (f *errorFileSystem) Exists(path string) (bool, error) {
 	if err := f.existsErrs[path]; err != nil {
 		return false, err
 	}
-	exists, err := f.FileSystem.Exists(path)
+	exists, err := f.FileEnvironment.Exists(path)
 	if err != nil {
 		return false, fmt.Errorf("Exists %s: %w", path, err)
 	}
@@ -46,7 +46,7 @@ func (f *errorFileSystem) Stat(path string) (os.FileInfo, error) {
 	if err := f.statErrs[path]; err != nil {
 		return nil, err
 	}
-	info, err := f.FileSystem.Stat(path)
+	info, err := f.FileEnvironment.Stat(path)
 	if err != nil {
 		return nil, fmt.Errorf("Stat %s: %w", path, err)
 	}
@@ -57,7 +57,7 @@ func (f *errorFileSystem) ReadFile(path string) ([]byte, error) {
 	if err := f.readErrs[path]; err != nil {
 		return nil, err
 	}
-	data, err := f.FileSystem.ReadFile(path)
+	data, err := f.FileEnvironment.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("ReadFile %s: %w", path, err)
 	}
@@ -68,7 +68,7 @@ func (f *errorFileSystem) WriteFile(path string, data []byte, perm os.FileMode) 
 	if err := f.writeErrs[path]; err != nil {
 		return err
 	}
-	if err := f.FileSystem.WriteFile(path, data, perm); err != nil {
+	if err := f.FileEnvironment.WriteFile(path, data, perm); err != nil {
 		return fmt.Errorf("WriteFile %s: %w", path, err)
 	}
 	return nil
@@ -110,7 +110,7 @@ func TestGetSecret_internal(t *testing.T) {
 		req := require.New(t)
 
 		_, err := GetSecret(
-			&Options{Fs: host.NewMemMapFS(), SecretsFile: testSecretsFilePath},
+			&Options{Fs: testutil.NewDummyUserHost(), SecretsFile: testSecretsFilePath},
 			"github.api_token",
 		)
 		req.Error(err)
@@ -171,7 +171,7 @@ func TestSetSecret_internal(t *testing.T) {
 		req := require.New(t)
 
 		err := SetSecret(
-			&Options{Fs: host.NewMemMapFS(), SecretsFile: testSecretsFilePath},
+			&Options{Fs: testutil.NewDummyUserHost(), SecretsFile: testSecretsFilePath},
 			"github.api_token",
 			"new-token",
 		)
@@ -186,8 +186,8 @@ func TestSetSecret_internal(t *testing.T) {
 		opts, recipient := newSecretsFixture(t)
 		writeEncryptedPlaintext(t, opts, recipient, []byte("data:\n  github:\n    api_token: token\n"))
 		opts.Fs = &errorFileSystem{
-			FileSystem: opts.Fs,
-			writeErrs:  map[string]error{opts.SecretsFile: errors.New("write failed")},
+			FileEnvironment: opts.Fs,
+			writeErrs:       map[string]error{opts.SecretsFile: errors.New("write failed")},
 		}
 
 		err := SetSecret(opts, "github.api_token", "new-token")
@@ -215,7 +215,7 @@ func TestRemoveSecret_internal(t *testing.T) {
 		req := require.New(t)
 
 		err := RemoveSecret(
-			&Options{Fs: host.NewMemMapFS(), SecretsFile: testSecretsFilePath},
+			&Options{Fs: testutil.NewDummyUserHost(), SecretsFile: testSecretsFilePath},
 			"github.api_token",
 		)
 		req.Error(err)
@@ -241,8 +241,8 @@ func TestRemoveSecret_internal(t *testing.T) {
 		opts, recipient := newSecretsFixture(t)
 		writeEncryptedPlaintext(t, opts, recipient, []byte("data:\n  github:\n    api_token: token\n"))
 		opts.Fs = &errorFileSystem{
-			FileSystem: opts.Fs,
-			writeErrs:  map[string]error{opts.SecretsFile: errors.New("write failed")},
+			FileEnvironment: opts.Fs,
+			writeErrs:       map[string]error{opts.SecretsFile: errors.New("write failed")},
 		}
 
 		err := RemoveSecret(opts, "github.api_token")
@@ -261,8 +261,8 @@ func TestCheckSecretsFilesExists_internal(t *testing.T) {
 		result := &InitResult{}
 		err := checkSecretsFilesExists(
 			&Options{Fs: &errorFileSystem{
-				FileSystem: host.NewMemMapFS(),
-				existsErrs: map[string]error{paths.sopsConfigFile: errors.New("stat failed")},
+				FileEnvironment: testutil.NewDummyUserHost(),
+				existsErrs:      map[string]error{paths.sopsConfigFile: errors.New("stat failed")},
 			}},
 			paths,
 			result,
@@ -278,13 +278,13 @@ func TestCheckSecretsFilesExists_internal(t *testing.T) {
 
 		paths := &secretsInitPaths{secretsFile: testSecretsFilePath, sopsConfigFile: testSOPSConfigFilePath}
 		result := &InitResult{}
-		fs := host.NewMemMapFS()
-		req.NoError(fs.WriteFile(paths.sopsConfigFile, []byte("config"), 0o644))
+		h := testutil.NewDummyUserHost()
+		req.NoError(h.WriteFile(paths.sopsConfigFile, []byte("config"), 0o644))
 
 		err := checkSecretsFilesExists(
 			&Options{Fs: &errorFileSystem{
-				FileSystem: fs,
-				existsErrs: map[string]error{paths.secretsFile: errors.New("read failed")},
+				FileEnvironment: h,
+				existsErrs:      map[string]error{paths.secretsFile: errors.New("read failed")},
 			}},
 			paths,
 			result,
@@ -300,11 +300,11 @@ func TestCheckSecretsFilesExists_internal(t *testing.T) {
 
 		paths := &secretsInitPaths{secretsFile: testSecretsFilePath, sopsConfigFile: testSOPSConfigFilePath}
 		result := &InitResult{}
-		fs := host.NewMemMapFS()
-		req.NoError(fs.WriteFile(paths.sopsConfigFile, []byte("config"), 0o644))
-		req.NoError(fs.WriteFile(paths.secretsFile, []byte("secrets"), 0o644))
+		h := testutil.NewDummyUserHost()
+		req.NoError(h.WriteFile(paths.sopsConfigFile, []byte("config"), 0o644))
+		req.NoError(h.WriteFile(paths.secretsFile, []byte("secrets"), 0o644))
 
-		err := checkSecretsFilesExists(&Options{Fs: fs}, paths, result)
+		err := checkSecretsFilesExists(&Options{Fs: h}, paths, result)
 		req.NoError(err)
 		req.Len(result.Messages, 2)
 	})
@@ -317,13 +317,13 @@ func TestInitSecrets_internal(t *testing.T) {
 		t.Parallel()
 		req := require.New(t)
 
-		fs := host.NewMemMapFS()
+		h := testutil.NewDummyUserHost()
 		secretsFile := filepath.Join(workspaceDir, DefaultSecretsFile)
 		sopsConfigFile := filepath.Join(workspaceDir, ".sops.yaml")
 		opts := &Options{
 			Fs: &errorFileSystem{
-				FileSystem: fs,
-				existsErrs: map[string]error{sopsConfigFile: errors.New("stat failed")},
+				FileEnvironment: h,
+				existsErrs:      map[string]error{sopsConfigFile: errors.New("stat failed")},
 			},
 			SecretsFile: secretsFile,
 			HomeDir:     workspaceDir,
@@ -341,15 +341,15 @@ func TestInitSecrets_internal(t *testing.T) {
 		t.Parallel()
 		req := require.New(t)
 
-		fs := host.NewMemMapFS()
+		uh := testutil.NewDummyUserHost()
 		keyFile := filepath.Join(homeDir, ".ssh", "id_ed25519")
 		publicKeyFile := keyFile + ".pub"
-		_, err := createKeyPair(fs, keyFile, publicKeyFile, filepath.Base(keyFile))
+		_, err := createKeyPair(uh, keyFile, publicKeyFile, filepath.Base(keyFile))
 		req.NoError(err)
-		req.NoError(fs.Remove(keyFile))
+		req.NoError(uh.Remove(keyFile))
 
 		_, err = InitSecrets(&Options{
-			Fs:          fs,
+			Fs:          uh,
 			SecretsFile: filepath.Join(homeDir, DefaultSecretsFile),
 			HomeDir:     homeDir,
 			KeyFile:     keyFile,
@@ -363,15 +363,15 @@ func TestInitSecrets_internal(t *testing.T) {
 		t.Parallel()
 		req := require.New(t)
 
-		fs := host.NewMemMapFS()
+		h := testutil.NewDummyUserHost()
 		keyFile := filepath.Join(homeDir, ".ssh", "id_ed25519")
 		publicKeyFile := keyFile + ".pub"
-		_, err := createKeyPair(fs, keyFile, publicKeyFile, filepath.Base(keyFile))
+		_, err := createKeyPair(h, keyFile, publicKeyFile, filepath.Base(keyFile))
 		req.NoError(err)
-		req.NoError(fs.Remove(publicKeyFile))
+		req.NoError(h.Remove(publicKeyFile))
 
 		result, err := InitSecrets(&Options{
-			Fs:          fs,
+			Fs:          h,
 			SecretsFile: filepath.Join(homeDir, DefaultSecretsFile),
 			HomeDir:     homeDir,
 			KeyFile:     keyFile,
@@ -385,17 +385,17 @@ func TestInitSecrets_internal(t *testing.T) {
 		t.Parallel()
 		req := require.New(t)
 
-		fs := host.NewMemMapFS()
+		h := testutil.NewDummyUserHost()
 		secretsFile := filepath.Join(workspaceDir, DefaultSecretsFile)
 		sopsConfigFile := filepath.Join(workspaceDir, ".sops.yaml")
 		keyFile := filepath.Join(homeDir, ".ssh", "id_ed25519")
-		_, err := createKeyPair(fs, keyFile, keyFile+".pub", filepath.Base(keyFile))
+		_, err := createKeyPair(h, keyFile, keyFile+".pub", filepath.Base(keyFile))
 		req.NoError(err)
-		req.NoError(fs.WriteFile(sopsConfigFile, []byte("old config"), 0o644))
-		req.NoError(fs.WriteFile(secretsFile, []byte("old secrets"), 0o644))
+		req.NoError(h.WriteFile(sopsConfigFile, []byte("old config"), 0o644))
+		req.NoError(h.WriteFile(secretsFile, []byte("old secrets"), 0o644))
 
 		result, err := InitSecrets(&Options{
-			Fs:          fs,
+			Fs:          h,
 			SecretsFile: secretsFile,
 			HomeDir:     homeDir,
 			KeyFile:     keyFile,
@@ -405,7 +405,7 @@ func TestInitSecrets_internal(t *testing.T) {
 		req.NoError(err)
 		req.Contains(strings.Join(result.Messages, "\n"), "Using existing SSH key pair")
 
-		configData, readErr := fs.ReadFile(sopsConfigFile)
+		configData, readErr := h.ReadFile(sopsConfigFile)
 		req.NoError(readErr)
 		req.NotEqual("old config", string(configData))
 	})
@@ -414,17 +414,17 @@ func TestInitSecrets_internal(t *testing.T) {
 		t.Parallel()
 		req := require.New(t)
 
-		baseFS := host.NewMemMapFS()
+		uh := testutil.NewDummyUserHost()
 		secretsFile := filepath.Join(workspaceDir, DefaultSecretsFile)
 		sopsConfigFile := filepath.Join(workspaceDir, ".sops.yaml")
 		keyFile := filepath.Join(homeDir, ".ssh", "id_ed25519")
-		_, err := createKeyPair(baseFS, keyFile, keyFile+".pub", filepath.Base(keyFile))
+		_, err := createKeyPair(uh, keyFile, keyFile+".pub", filepath.Base(keyFile))
 		req.NoError(err)
 
 		_, err = InitSecrets(&Options{
 			Fs: &errorFileSystem{
-				FileSystem: baseFS,
-				writeErrs:  map[string]error{sopsConfigFile: errors.New("write failed")},
+				FileEnvironment: uh,
+				writeErrs:       map[string]error{sopsConfigFile: errors.New("write failed")},
 			},
 			SecretsFile: secretsFile,
 			HomeDir:     homeDir,
@@ -440,16 +440,16 @@ func TestInitSecrets_internal(t *testing.T) {
 		t.Parallel()
 		req := require.New(t)
 
-		baseFS := host.NewMemMapFS()
+		uh := testutil.NewDummyUserHost()
 		secretsFile := filepath.Join(workspaceDir, DefaultSecretsFile)
 		keyFile := filepath.Join(homeDir, ".ssh", "id_ed25519")
-		_, err := createKeyPair(baseFS, keyFile, keyFile+".pub", filepath.Base(keyFile))
+		_, err := createKeyPair(uh, keyFile, keyFile+".pub", filepath.Base(keyFile))
 		req.NoError(err)
 
 		_, err = InitSecrets(&Options{
 			Fs: &errorFileSystem{
-				FileSystem: baseFS,
-				writeErrs:  map[string]error{secretsFile: errors.New("write failed")},
+				FileEnvironment: uh,
+				writeErrs:       map[string]error{secretsFile: errors.New("write failed")},
 			},
 			Logger:      testutil.TestLogger(t),
 			SecretsFile: secretsFile,
@@ -471,8 +471,8 @@ func TestLoadAndDecryptSecrets_internal(t *testing.T) {
 
 		_, err := loadAndDecryptSecrets(&Options{
 			Fs: &errorFileSystem{
-				FileSystem: host.NewMemMapFS(),
-				existsErrs: map[string]error{testSecretsFilePath: errors.New("stat failed")},
+				FileEnvironment: testutil.NewDummyUserHost(),
+				existsErrs:      map[string]error{testSecretsFilePath: errors.New("stat failed")},
 			},
 			SecretsFile: testSecretsFilePath,
 		})
@@ -485,14 +485,14 @@ func TestLoadAndDecryptSecrets_internal(t *testing.T) {
 		t.Parallel()
 		req := require.New(t)
 
-		fs := host.NewMemMapFS()
+		fs := testutil.NewDummyUserHost()
 		secretsFile := testSecretsFilePath
 		req.NoError(fs.WriteFile(secretsFile, []byte("test"), 0o600))
 
 		_, err := loadAndDecryptSecrets(&Options{
 			Fs: &errorFileSystem{
-				FileSystem: fs,
-				statErrs:   map[string]error{secretsFile: errors.New("stat failed")},
+				FileEnvironment: fs,
+				statErrs:        map[string]error{secretsFile: errors.New("stat failed")},
 			},
 			SecretsFile: secretsFile,
 		})
@@ -502,8 +502,8 @@ func TestLoadAndDecryptSecrets_internal(t *testing.T) {
 
 		_, err = loadAndDecryptSecrets(&Options{
 			Fs: &errorFileSystem{
-				FileSystem: fs,
-				readErrs:   map[string]error{secretsFile: errors.New("read failed")},
+				FileEnvironment: fs,
+				readErrs:        map[string]error{secretsFile: errors.New("read failed")},
 			},
 			SecretsFile: secretsFile,
 		})
@@ -516,11 +516,11 @@ func TestLoadAndDecryptSecrets_internal(t *testing.T) {
 		t.Parallel()
 		req := require.New(t)
 
-		fs := host.NewMemMapFS()
+		uh := testutil.NewDummyUserHost()
 		secretsFile := testSecretsFilePath
-		req.NoError(fs.WriteFile(secretsFile, []byte("not: [valid"), 0o600))
+		req.NoError(uh.WriteFile(secretsFile, []byte("not: [valid"), 0o600))
 
-		_, err := loadAndDecryptSecrets(&Options{Fs: fs, SecretsFile: secretsFile})
+		_, err := loadAndDecryptSecrets(&Options{Fs: uh, SecretsFile: secretsFile})
 		req.Error(err)
 		req.Contains(err.Error(), "failed to parse encrypted secrets")
 	})
@@ -563,7 +563,7 @@ func TestHelpers_internal_defaultPaths(t *testing.T) {
 	t.Parallel()
 	req := require.New(t)
 
-	paths, err := resolveSecretsInitPaths(&Options{Fs: host.NewMemMapFS(), HomeDir: "/home/tester"})
+	paths, err := resolveSecretsInitPaths(&Options{Fs: testutil.NewDummyUserHost(), HomeDir: "/home/tester"})
 	req.NoError(err)
 	req.Equal(DefaultSecretsFile, paths.secretsFile)
 
@@ -591,17 +591,17 @@ func newSecretsFixture(t *testing.T) (*Options, string) {
 	t.Helper()
 	req := require.New(t)
 
-	fs := host.NewMemMapFS()
+	uh := testutil.NewDummyUserHost()
 	tempDir, err := os.UserHomeDir() // use real home dir to avoid permission issues with SSH key generation
 	req.NoError(err)
 	keyFile := filepath.Join(tempDir, ".ssh", "id_ed25519")
 	publicKeyFile := keyFile + ".pub"
 
-	keyInfo, err := createKeyPair(fs, keyFile, publicKeyFile, filepath.Base(keyFile))
+	keyInfo, err := createKeyPair(uh, keyFile, publicKeyFile, filepath.Base(keyFile))
 	req.NoError(err)
 
 	return &Options{
-		Fs:          fs,
+		Fs:          uh,
 		Logger:      testutil.TestLogger(t),
 		SecretsFile: filepath.Join(tempDir, DefaultSecretsFile),
 		HomeDir:     tempDir,

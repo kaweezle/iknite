@@ -27,9 +27,7 @@ func CreateEnvInitCmd(deps *RootDependencies) *cobra.Command {
 		Short: "Initialize iknitectl working directory",
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			service := &envsvc.Service{
-				FS:       deps.Host,
-				Env:      deps.Env,
-				Platform: deps.Platform,
+				FS: deps.Host,
 			}
 
 			result, err := service.Init(&envsvc.InitRequest{

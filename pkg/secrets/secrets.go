@@ -45,7 +45,7 @@ const (
 
 // Options contains configuration for secrets operations.
 type Options struct {
-	Fs          host.FileSystem
+	Fs          host.FileEnvironment
 	Logger      *slog.Logger
 	SecretsFile string
 	HomeDir     string
@@ -55,10 +55,10 @@ type Options struct {
 
 func (o *Options) SetDefaults() error {
 	if o.Fs == nil {
-		o.Fs = host.NewOsFS()
+		o.Fs = host.NewDefaultHost()
 	}
 	if o.HomeDir == "" {
-		homeDir, err := os.UserHomeDir()
+		homeDir, err := o.Fs.UserHomeDir()
 		if err != nil { // nocov -- Only happens if there is no home directory, which is very unlikely
 			return fmt.Errorf("failed to get user home directory: %w", err)
 		}
@@ -68,11 +68,11 @@ func (o *Options) SetDefaults() error {
 		o.SecretsFile = DefaultSecretsFile
 	}
 	if o.KeyFile == "" {
-		envFile := os.Getenv("SOPS_AGE_SSH_PRIVATE_KEY_FILE")
+		envFile := o.Fs.Getenv("SOPS_AGE_SSH_PRIVATE_KEY_FILE")
 		if envFile != "" {
 			o.KeyFile = envFile
 		} else {
-			o.KeyFile = filepath.Join(o.HomeDir, ".ssh", "id_ed25519")
+			o.KeyFile = o.Fs.JoinPath(o.HomeDir, ".ssh", "id_ed25519")
 		}
 	}
 	return nil
@@ -90,32 +90,7 @@ func GetSecret(opts *Options, path string) (string, error) {
 		return "", err
 	}
 
-	fullPath, err := buildSecretsPath(path)
-	if err != nil {
-		return "", err
-	}
-
-	tree := fileSecrets.Tree
-
-	if len(tree.Branches) == 0 { // nocov
-		return "", fmt.Errorf("secrets file has no data")
-	}
-
-	value, err := tree.Branches[0].Truncate(fullPath)
-	if err != nil {
-		return "", fmt.Errorf("secret path %q not found: %w", path, err)
-	}
-
-	switch typed := value.(type) {
-	case string:
-		return typed, nil
-	default:
-		yamlData, marshalErr := yaml.Marshal(typed)
-		if marshalErr != nil { // nocov
-			return "", fmt.Errorf("failed to marshal value at %q: %w", path, marshalErr)
-		}
-		return strings.TrimRight(string(yamlData), "\n"), nil
-	}
+	return fileSecrets.GetValue(path)
 }
 
 // SetSecret sets a secret in the SOPS file for a dot-notated path.
@@ -311,6 +286,35 @@ type FileSecrets struct {
 	Tree    *sops.Tree
 	DataKey []byte
 	Mode    os.FileMode
+}
+
+func (f *FileSecrets) GetValue(path string) (string, error) {
+	fullPath, err := buildSecretsPath(path)
+	if err != nil {
+		return "", err
+	}
+
+	tree := f.Tree
+
+	if len(tree.Branches) == 0 { // nocov
+		return "", fmt.Errorf("secrets file has no data")
+	}
+
+	value, err := tree.Branches[0].Truncate(fullPath)
+	if err != nil {
+		return "", fmt.Errorf("secret path %q not found: %w", path, err)
+	}
+
+	switch typed := value.(type) {
+	case string:
+		return typed, nil
+	default:
+		yamlData, marshalErr := yaml.Marshal(typed)
+		if marshalErr != nil { // nocov
+			return "", fmt.Errorf("failed to marshal value at %q: %w", path, marshalErr)
+		}
+		return strings.TrimRight(string(yamlData), "\n"), nil
+	}
 }
 
 func loadAndDecryptSecrets(opts *Options) (*FileSecrets, error) {
@@ -518,11 +522,20 @@ func getDataKeyFromOpts(opts *Options, ageMasterKey *sopsage.MasterKey) ([]byte,
 	if err != nil { // nocov -- Only happens if there is no home directory
 		return nil, fmt.Errorf("failed to resolve secrets init paths: %w", err)
 	}
+	var ids sopsage.ParsedIdentities = []age.Identity{}
+	var errs []error
 	id, err := parseSSHIdentityFromPrivateKeyFile(opts.Fs, paths.keyFile)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse SSH identity from private key file: %w", err)
+		errs = append(errs, fmt.Errorf("failed to parse SSH identity from private key file: %w", err))
 	}
-	var ids sopsage.ParsedIdentities = []age.Identity{id}
+	if id != nil {
+		ids = append(ids, id)
+	}
+	err = parseAgeIdentitiesFromEnv(opts.Fs, &ids)
+	if err != nil {
+		errs = append(errs, fmt.Errorf("failed to parse SSH identities from environment variables: %w", err))
+		return nil, errors.Join(errs...)
+	}
 	ids.ApplyToMasterKey(ageMasterKey)
 	dataKey, err := ageMasterKey.Decrypt()
 	if err != nil {
@@ -541,4 +554,47 @@ func parseSSHIdentityFromPrivateKeyFile(fs host.FileSystem, keyPath string) (age
 		return nil, fmt.Errorf("failed to parse SSH identity: %w", err)
 	}
 	return id, nil
+}
+
+func parseAgeIdentitiesFromEnv(fse host.FileEnvironment, ids *sopsage.ParsedIdentities) error {
+	key, exists := fse.LookupEnv(sopsage.SopsAgeKeyEnv)
+	if exists {
+		varIds, err := age.ParseIdentities(strings.NewReader(key))
+		if err != nil {
+			return fmt.Errorf("failed to parse SSH identity: %w", err)
+		}
+		if len(varIds) > 0 {
+			*ids = append(*ids, varIds...)
+		}
+	}
+	key, exists = fse.LookupEnv(sopsage.SopsAgeKeyFileEnv)
+	if exists {
+		keyReader, err := fse.Open(key)
+		if err != nil {
+			return fmt.Errorf("failed to read private key file specified in SOPS_AGE_KEY_FILE: %w", err)
+		}
+		varIds, err := age.ParseIdentities(keyReader)
+		if err != nil {
+			return fmt.Errorf("failed to parse SSH identity from file specified in SOPS_AGE_KEY_FILE: %w", err)
+		}
+		if len(varIds) > 0 {
+			*ids = append(*ids, varIds...)
+		}
+	}
+	key, exists = fse.LookupEnv(sopsage.SopsAgeSshPrivateKeyFileEnv)
+	if exists {
+		key, err := fse.ReadFile(key)
+		if err != nil {
+			return fmt.Errorf("failed to read private key file specified in SOPS_AGE_SSH_PRIVATE_KEY_FILE: %w", err)
+		}
+		id, err := agessh.ParseIdentity(key)
+		if err != nil {
+			return fmt.Errorf("failed to parse SSH identity from file specified in SOPS_AGE_SSH_PRIVATE_KEY_FILE: %w",
+				err)
+		}
+		if id != nil {
+			*ids = append(*ids, id)
+		}
+	}
+	return nil
 }

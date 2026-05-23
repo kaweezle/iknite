@@ -5,10 +5,22 @@ type FileExecutor interface {
 	Executor
 }
 
+type FileEnvironment interface {
+	FileSystem
+	Environment
+}
+
+type UserHost interface {
+	FileSystem
+	Environment
+	Executor
+}
+
 type Host interface {
 	FileExecutor
 	NetworkHost
 	System
+	Environment
 }
 
 type HostProvider interface {

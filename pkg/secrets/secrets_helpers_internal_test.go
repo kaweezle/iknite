@@ -7,7 +7,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/kaweezle/iknite/pkg/host"
 	"github.com/kaweezle/iknite/pkg/testutil"
 )
 
@@ -69,7 +68,7 @@ func TestResolveSecretsInitPaths(t *testing.T) {
 		{
 			name: "defaults use home dir key",
 			opts: &Options{
-				Fs:          host.NewMemMapFS(),
+				Fs:          testutil.NewDummyUserHost(),
 				HomeDir:     "/home/tester",
 				SecretsFile: filepath.Join("workspace", DefaultSecretsFile),
 			},
@@ -78,7 +77,7 @@ func TestResolveSecretsInitPaths(t *testing.T) {
 		{
 			name: "missing home dir with no key file errors",
 			opts: &Options{
-				Fs:          host.NewMemMapFS(),
+				Fs:          testutil.NewDummyUserHost(),
 				SecretsFile: DefaultSecretsFile,
 			},
 			wantErr: false,
@@ -86,7 +85,7 @@ func TestResolveSecretsInitPaths(t *testing.T) {
 		{
 			name: "custom key file supported",
 			opts: &Options{
-				Fs:          host.NewMemMapFS(),
+				Fs:          testutil.NewDummyUserHost(),
 				HomeDir:     "/home/tester",
 				SecretsFile: DefaultSecretsFile,
 				KeyFile:     "~/.ssh/custom",
@@ -123,7 +122,7 @@ func TestEncryptAndLoadSecretsErrorPaths(t *testing.T) {
 	req.Error(err)
 
 	opts := &Options{
-		Fs:          host.NewMemMapFS(),
+		Fs:          testutil.NewDummyUserHost(),
 		SecretsFile: filepath.Join("tmp", "missing.yaml"),
 		Logger:      testutil.TestLogger(t),
 	}
