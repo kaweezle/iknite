@@ -16,29 +16,29 @@ limitations under the License.
 package iknitectl
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/spf13/cobra"
 
-	"github.com/kaweezle/iknite/pkg/cmd/secrets"
 	"github.com/kaweezle/iknite/pkg/cmd/util"
-	"github.com/kaweezle/iknite/pkg/host"
 )
 
 // RootOptions contains configuration for the root command.
 type RootOptions struct {
-	FileExecutor host.FileExecutor
+	Dependencies *RootDependencies
 	out          io.Writer
 	util.BaseOptions
 }
 
 func NewRootOptions() *RootOptions {
-	defaultHost := host.NewDefaultHost()
 	opts := &RootOptions{
 		BaseOptions:  *util.DefaultBaseOptions(),
-		FileExecutor: defaultHost,
+		Dependencies: NewRootDependencies(),
 		out:          os.Stdout,
 	}
 	return opts
@@ -48,6 +48,9 @@ func NewRootOptions() *RootOptions {
 func CreateRootCmd(opts *RootOptions) *cobra.Command {
 	if opts == nil {
 		opts = NewRootOptions()
+	}
+	if opts.Dependencies == nil {
+		opts.Dependencies = NewRootDependencies()
 	}
 
 	cmdIf := util.NewCmdInterface(&opts.BaseOptions)
@@ -61,13 +64,13 @@ It provides utilities for managing secrets, building artifacts, and other
 development tasks that are not part of the main iknite binary.`,
 		PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
 			opts.SetUpLogs(cmd.OutOrStderr(), cmdIf)
+			util.SetCmdInterface(cmd, cmdIf)
 			err := util.InitializeConfiguration(cmd.Root(), cmdIf)
 			if err != nil {
 				return fmt.Errorf("failed to initialize configuration: %w", err)
 			}
 			// Re-setup logs after configuration is loaded to apply any log-related settings from the config file
 			opts.SetUpLogs(cmd.OutOrStderr(), cmdIf)
-			util.SetCmdInterface(cmd, cmdIf)
 			return nil
 		},
 	}
@@ -76,10 +79,12 @@ development tasks that are not part of the main iknite binary.`,
 	opts.AddFlags(rootCmd.PersistentFlags())
 
 	// Add subcommands
-	rootCmd.AddCommand(CreateInstallCmd(opts.FileExecutor))
-	rootCmd.AddCommand(CreateKustomizeCmd(opts.FileExecutor, opts.out))
-	rootCmd.AddCommand(CreateApplicationCmd(opts.FileExecutor, opts.out))
-	rootCmd.AddCommand(secrets.CreateSecretsCmd(opts.FileExecutor, nil))
+	rootCmd.AddCommand(CreateEnvCmd(opts.Dependencies))
+	rootCmd.AddCommand(CreateImageCmd(opts.Dependencies))
+	rootCmd.AddCommand(CreateClusterCmd(opts.Dependencies))
+	rootCmd.AddCommand(CreateWorkspaceCmd(opts.Dependencies.Host, opts.out))
+	rootCmd.AddCommand(CreateAuthCmd(opts.Dependencies))
+	rootCmd.AddCommand(CreateBackendCmd(opts.Dependencies))
 	util.AddConfigFlag(rootCmd)
 
 	util.BindFlagsToViper(rootCmd, cmdIf)
@@ -90,5 +95,7 @@ development tasks that are not part of the main iknite binary.`,
 // Execute adds all child commands to the root command and sets flags appropriately.
 // This is called by main.main(). It only needs to happen once to the rootCmd.
 func Execute() { // nocov - This is the main entry point for the CLI, which is hard to test in CI
-	cobra.CheckErr(CreateRootCmd(nil).Execute())
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer cancel()
+	cobra.CheckErr(CreateRootCmd(nil).ExecuteContext(ctx))
 }
