@@ -10,6 +10,7 @@ import (
 	"crypto/x509/pkix"
 	"encoding/pem"
 	"fmt"
+	"log/slog"
 	"math/big"
 	"path/filepath"
 	"time"
@@ -41,7 +42,8 @@ type InitResult struct {
 
 // Service initializes the iknitectl environment tree.
 type Service struct {
-	FS host.FileEnvironment
+	FS     host.FileEnvironment
+	Logger *slog.Logger
 }
 
 // Init creates required directories, secrets files, and default CA material.

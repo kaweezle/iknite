@@ -26,20 +26,21 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/kaweezle/iknite/pkg/cmd/util"
+	"github.com/kaweezle/iknite/pkg/host"
 )
 
 // RootOptions contains configuration for the root command.
 type RootOptions struct {
-	Dependencies *RootDependencies
-	out          io.Writer
+	host host.Host
+	out  io.Writer
 	util.BaseOptions
 }
 
 func NewRootOptions() *RootOptions {
 	opts := &RootOptions{
-		BaseOptions:  *util.DefaultBaseOptions(),
-		Dependencies: NewRootDependencies(),
-		out:          os.Stdout,
+		BaseOptions: *util.DefaultBaseOptions(),
+		host:        host.NewDefaultHost(),
+		out:         os.Stdout,
 	}
 	return opts
 }
@@ -48,9 +49,6 @@ func NewRootOptions() *RootOptions {
 func CreateRootCmd(opts *RootOptions) *cobra.Command {
 	if opts == nil {
 		opts = NewRootOptions()
-	}
-	if opts.Dependencies == nil {
-		opts.Dependencies = NewRootDependencies()
 	}
 
 	cmdIf := util.NewCmdInterface(&opts.BaseOptions)
@@ -79,12 +77,12 @@ development tasks that are not part of the main iknite binary.`,
 	opts.AddFlags(rootCmd.PersistentFlags())
 
 	// Add subcommands
-	rootCmd.AddCommand(CreateEnvCmd(opts.Dependencies))
-	rootCmd.AddCommand(CreateImageCmd(opts.Dependencies))
-	rootCmd.AddCommand(CreateClusterCmd(opts.Dependencies))
-	rootCmd.AddCommand(CreateWorkspaceCmd(opts.Dependencies.Host, opts.out))
-	rootCmd.AddCommand(CreateAuthCmd(opts.Dependencies))
-	rootCmd.AddCommand(CreateBackendCmd(opts.Dependencies))
+	rootCmd.AddCommand(CreateEnvCmd(opts.host))
+	rootCmd.AddCommand(CreateImageCmd(opts.host))
+	rootCmd.AddCommand(CreateClusterCmd(opts.host))
+	rootCmd.AddCommand(CreateWorkspaceCmd(opts.host, opts.out))
+	rootCmd.AddCommand(CreateAuthCmd(opts.host))
+	rootCmd.AddCommand(CreateBackendCmd(opts.host))
 	util.AddConfigFlag(rootCmd)
 
 	util.BindFlagsToViper(rootCmd, cmdIf)

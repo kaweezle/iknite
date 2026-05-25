@@ -38,7 +38,7 @@ func TestRootOptionsAndCreateRootCmd(t *testing.T) {
 
 	opts := NewRootOptions()
 	req.NotNil(opts)
-	req.NotNil(opts.Dependencies)
+	req.NotNil(opts.host)
 
 	root := CreateRootCmd(opts)
 	req.NotNil(root)
@@ -78,8 +78,8 @@ func TestRunRootCmd_Path(t *testing.T) {
 
 	out := &bytes.Buffer{}
 	options := &RootOptions{
-		Dependencies: &RootDependencies{Host: h},
-		out:          out,
+		host: h,
+		out:  out,
 	}
 	cmd := CreateRootCmd(options)
 	req.NotNil(cmd)
@@ -103,8 +103,8 @@ func TestRunRootCmd_ConfigError(t *testing.T) {
 
 	out := &bytes.Buffer{}
 	options := &RootOptions{
-		Dependencies: &RootDependencies{Host: h},
-		out:          out,
+		host: h,
+		out:  out,
 	}
 	cmd := CreateRootCmd(options)
 	req.NotNil(cmd)

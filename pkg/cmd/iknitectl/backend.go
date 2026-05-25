@@ -1,9 +1,13 @@
 package iknitectl
 
-import "github.com/spf13/cobra"
+import (
+	"github.com/spf13/cobra"
+
+	"github.com/kaweezle/iknite/pkg/host"
+)
 
 // CreateBackendCmd creates the backend command tree.
-func CreateBackendCmd(_ *RootDependencies) *cobra.Command {
+func CreateBackendCmd(_ host.Host) *cobra.Command {
 	backendCmd := &cobra.Command{
 		Use:     "backend",
 		Aliases: []string{"b", "bck"},

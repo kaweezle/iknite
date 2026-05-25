@@ -9,17 +9,18 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/kaweezle/iknite/pkg/host"
 	imagesvc "github.com/kaweezle/iknite/pkg/iknitectl/image"
 )
 
 // CreateImageInspectCmd creates the image inspect command.
-func CreateImageInspectCmd(deps *RootDependencies) *cobra.Command {
+func CreateImageInspectCmd(localHost host.Host) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "inspect <image-ref>",
 		Short: "Inspect image manifest details",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			service := &imagesvc.Service{FS: deps.Host}
+			service := &imagesvc.Service{FS: localHost}
 			result, err := service.Inspect(context.Background(), args[0])
 			if err != nil {
 				return fmt.Errorf("failed to inspect image: %w", err)

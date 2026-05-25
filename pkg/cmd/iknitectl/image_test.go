@@ -1,15 +1,19 @@
-package iknitectl
+package iknitectl_test
 
 import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+
+	iknitectl "github.com/kaweezle/iknite/pkg/cmd/iknitectl"
+	"github.com/kaweezle/iknite/pkg/testutil"
 )
 
 func TestCreateImageCmd(t *testing.T) {
 	t.Parallel()
 
-	cmd := CreateImageCmd(NewRootDependencies())
+	h := testutil.NewDummyUserHost()
+	cmd := iknitectl.CreateImageCmd(h)
 	require.NotNil(t, cmd)
 
 	for _, sub := range []string{"inspect", "pull"} {
