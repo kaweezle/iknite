@@ -1,22 +1,18 @@
+// cSpell: words pkgsecrets pkiutil certutil kubeadmapi
 package env
 
-// cSpell: words pkgsecrets
-
 import (
-	"crypto/ecdsa"
-	"crypto/elliptic"
-	"crypto/rand"
-	"crypto/x509"
-	"crypto/x509/pkix"
-	"encoding/pem"
 	"fmt"
 	"log/slog"
-	"math/big"
 	"path/filepath"
-	"time"
+
+	certutil "k8s.io/client-go/util/cert"
+	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	pkiutil "k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
 
 	"github.com/kaweezle/iknite/pkg/constants"
 	"github.com/kaweezle/iknite/pkg/host"
+	"github.com/kaweezle/iknite/pkg/pki"
 	pkgsecrets "github.com/kaweezle/iknite/pkg/secrets"
 )
 
@@ -31,6 +27,7 @@ metadata:
 data:
     cloudProviders: {}
 `
+	caCommonName = "iknite-local-ca"
 )
 
 // InitRequest defines env init behavior.
@@ -76,7 +73,7 @@ func (s *Service) Init(req *InitRequest) (*InitResult, error) {
 		return nil, fmt.Errorf("failed to initialize secrets: %w", err)
 	}
 
-	if err = ensureCertificateAuthority(s.FS, s.paths.CACert, s.paths.CAKey, req.Force); err != nil {
+	if err = s.ensureCertificateAuthority(req.Force); err != nil {
 		return nil, fmt.Errorf("failed to initialize certificate authority: %w", err)
 	}
 
@@ -203,64 +200,43 @@ func ensureSharedValuesFile(fs host.FileSystem, path string, force bool) error {
 	return nil
 }
 
-func ensureCertificateAuthority(fs host.FileSystem, certPath, keyPath string, force bool) error {
-	certExists, err := fs.Exists(certPath)
+func (s *Service) ensureCertificateAuthority(force bool) error {
+	certExists, err := s.FS.Exists(s.paths.CACert)
 	if err != nil {
 		return fmt.Errorf("failed to check CA certificate path: %w", err)
 	}
-	keyExists, err := fs.Exists(keyPath)
+	keyExists, err := s.FS.Exists(s.paths.CAKey)
 	if err != nil {
 		return fmt.Errorf("failed to check CA key path: %w", err)
 	}
 
 	if certExists && keyExists && !force {
+		s.Logger.Info("CA certificate and key already exist, skipping generation",
+			"certPath", s.paths.CACert, "keyPath", s.paths.CAKey)
 		return nil
 	}
 
-	privateKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-	if err != nil {
-		return fmt.Errorf("failed to generate CA private key: %w", err)
-	}
-
-	notBefore := time.Now().Add(-1 * time.Hour)
-	notAfter := notBefore.AddDate(10, 0, 0)
-	serialNumber, err := rand.Int(rand.Reader, new(big.Int).Lsh(big.NewInt(1), 128))
-	if err != nil {
-		return fmt.Errorf("failed to generate CA serial number: %w", err)
-	}
-
-	tmpl := &x509.Certificate{
-		SerialNumber: serialNumber,
-		Subject: pkix.Name{
-			CommonName:   "iknite-local-ca",
+	caCert, caKey, err := pkiutil.NewCertificateAuthority(&pkiutil.CertConfig{
+		Config: certutil.Config{
+			CommonName:   caCommonName,
 			Organization: []string{"iknitectl"},
 		},
-		NotBefore:             notBefore,
-		NotAfter:              notAfter,
-		KeyUsage:              x509.KeyUsageCertSign | x509.KeyUsageCRLSign,
-		BasicConstraintsValid: true,
-		IsCA:                  true,
-		MaxPathLenZero:        true,
-	}
-
-	certDER, err := x509.CreateCertificate(rand.Reader, tmpl, tmpl, &privateKey.PublicKey, privateKey)
+		EncryptionAlgorithm: kubeadmapi.EncryptionAlgorithmRSA2048,
+	})
 	if err != nil {
-		return fmt.Errorf("failed to create CA certificate: %w", err)
+		return fmt.Errorf("failed to generate CA certificate and key: %w", err)
 	}
 
-	certBytes := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: certDER})
-	if err = fs.WriteFile(certPath, certBytes, fileMode); err != nil {
+	err = pki.WriteCert(s.FS, s.paths.CACert, caCert)
+	if err != nil {
 		return fmt.Errorf("failed to write CA certificate: %w", err)
 	}
 
-	keyBytes, err := x509.MarshalECPrivateKey(privateKey)
+	err = pki.WriteKey(s.FS, s.paths.CAKey, caKey)
 	if err != nil {
-		return fmt.Errorf("failed to marshal CA private key: %w", err)
-	}
-	keyPEM := pem.EncodeToMemory(&pem.Block{Type: "EC PRIVATE KEY", Bytes: keyBytes})
-	if err = fs.WriteFile(keyPath, keyPEM, 0o600); err != nil {
-		return fmt.Errorf("failed to write CA private key: %w", err)
+		return fmt.Errorf("failed to write CA key: %w", err)
 	}
 
+	s.Logger.Info("Generated new CA certificate and key", "certPath", s.paths.CACert, "keyPath", s.paths.CAKey)
 	return nil
 }
