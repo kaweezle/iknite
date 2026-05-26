@@ -78,13 +78,15 @@ func TestServiceInitCreatesPaths(t *testing.T) {
 
 	fs := testutil.NewDummyPlatformHost("linux", "alpine", testEnv{"XDG_CONFIG_HOME": "/tmp/xdg"})
 	svc := &Service{
-		FS: fs,
+		FS:     fs,
+		Logger: testutil.TestLogger(t),
 	}
 
 	result, err := svc.Init(&InitRequest{PrintPaths: true})
 	require.NoError(t, err)
 	require.NotNil(t, result)
-	require.Equal(t, "/tmp/xdg/iknite", result.ConfigDir)
+	require.NotNil(t, result.Paths)
+	require.Equal(t, "/tmp/xdg/iknite", result.Paths.Root)
 
 	for _, path := range []string{
 		"/tmp/xdg/iknite/auth",
@@ -108,10 +110,12 @@ func TestServiceInitRespectsConfigDir(t *testing.T) {
 
 	fs := testutil.NewDummyUserHost()
 	svc := &Service{
-		FS: fs,
+		FS:     fs,
+		Logger: testutil.TestLogger(t),
 	}
 
 	result, err := svc.Init(&InitRequest{ConfigDir: "/iknite-custom"})
 	require.NoError(t, err)
-	require.Equal(t, "/iknite-custom", result.ConfigDir)
+	require.NotNil(t, result.Paths)
+	require.Equal(t, "/iknite-custom", result.Paths.Root)
 }
