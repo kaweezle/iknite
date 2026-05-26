@@ -21,8 +21,16 @@ import (
 )
 
 const (
-	dirMode  = 0o755
-	fileMode = 0o644
+	dirMode       = 0o755
+	fileMode      = 0o644
+	defaultValues = `
+apiVersion: config.iknite.app/v1alpha1
+kind: PlatformValues
+metadata:
+  name: iknite-values
+data:
+    cloudProviders: {}
+`
 )
 
 // InitRequest defines env init behavior.
@@ -35,15 +43,15 @@ type InitRequest struct {
 
 // InitResult reports created paths and messages.
 type InitResult struct {
-	ConfigDir string
-	Paths     map[string]string
-	Messages  []string
+	Paths    *ClientConfigPaths
+	Messages []string
 }
 
 // Service initializes the iknitectl environment tree.
 type Service struct {
 	FS     host.FileEnvironment
 	Logger *slog.Logger
+	paths  *ClientConfigPaths
 }
 
 // Init creates required directories, secrets files, and default CA material.
@@ -55,34 +63,30 @@ func (s *Service) Init(req *InitRequest) (*InitResult, error) {
 		return nil, err
 	}
 
-	paths, err := s.resolvePaths(req)
-	if err != nil {
+	if err := s.resolvePaths(req, s.paths); err != nil {
 		return nil, err
 	}
 
-	if mkErr := ensureDirectoryTree(s.FS, paths); mkErr != nil {
+	if mkErr := ensureDirectoryTree(s.FS, s.paths); mkErr != nil {
 		return nil, mkErr
 	}
 
-	secretsResult, err := initSecrets(s.FS, paths, req.Force)
+	secretsResult, err := initSecrets(s.FS, s.paths, req.Force)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize secrets: %w", err)
 	}
 
-	paths["caCert"] = filepath.Join(paths["auth"], "ca.crt")
-	paths["caKey"] = filepath.Join(paths["auth"], "ca.key")
-	if err = ensureCertificateAuthority(s.FS, paths["caCert"], paths["caKey"], req.Force); err != nil {
+	if err = ensureCertificateAuthority(s.FS, s.paths.CACert, s.paths.CAKey, req.Force); err != nil {
 		return nil, fmt.Errorf("failed to initialize certificate authority: %w", err)
 	}
 
-	paths["sharedValues"] = filepath.Join(paths["shared"], "values.yaml")
-	if err = ensureSharedValuesFile(s.FS, paths["sharedValues"], req.Force); err != nil {
+	if err = ensureSharedValuesFile(s.FS, s.paths.SharedValues, req.Force); err != nil {
 		return nil, fmt.Errorf("failed to initialize shared values file: %w", err)
 	}
 
-	messages := buildMessages(paths, secretsResult.Messages, req.PrintPaths)
+	messages := buildMessages(s.paths, secretsResult.Messages, req.PrintPaths)
 
-	return &InitResult{ConfigDir: paths["root"], Paths: paths, Messages: messages}, nil
+	return &InitResult{Paths: s.paths, Messages: messages}, nil
 }
 
 func (s *Service) ensureDefaults() error {
@@ -90,34 +94,46 @@ func (s *Service) ensureDefaults() error {
 		return fmt.Errorf("filesystem dependency is required")
 	}
 
+	if s.Logger == nil {
+		return fmt.Errorf("logger dependency is required")
+	}
+
+	if s.paths == nil {
+		s.paths = &ClientConfigPaths{}
+	}
+
 	return nil
 }
 
-func (s *Service) resolvePaths(req *InitRequest) (map[string]string, error) {
+func (s *Service) resolvePaths(req *InitRequest, paths *ClientConfigPaths) error {
 	configDir := req.ConfigDir
 
 	if configDir == "" {
 		var err error
 		configDir, err = defaultConfigDir(s.FS)
 		if err != nil {
-			return nil, err
+			return fmt.Errorf("failed to get default config directory: %w", err)
 		}
 	}
 	configDir = filepath.Clean(configDir)
+	paths.Root = configDir
 
-	paths := map[string]string{
-		"root":     configDir,
-		"auth":     filepath.Join(configDir, "auth"),
-		"shared":   filepath.Join(configDir, "shared"),
-		"images":   filepath.Join(configDir, "images"),
-		"clusters": filepath.Join(configDir, "clusters"),
-	}
+	paths.Auth = s.FS.JoinPath(configDir, defaultAuthDirname)
+	paths.Shared = s.FS.JoinPath(configDir, defaultSharedDirname)
+	paths.Images = s.FS.JoinPath(configDir, defaultImagesDirname)
+	paths.Clusters = s.FS.JoinPath(configDir, defaultClustersDirname)
+	paths.CACert = filepath.Join(paths.Auth, defaultCACertFilename)
+	paths.CAKey = filepath.Join(paths.Auth, defaultCAKeyFilename)
 
-	return paths, nil
+	paths.SharedSecrets = filepath.Join(paths.Shared, defaultSecretsFilename)
+	paths.SharedSecretsKey = filepath.Join(paths.Shared, defaultKeyFilename)
+	paths.SharedValues = filepath.Join(paths.Shared, defaultValuesFilename)
+
+	return nil
 }
 
-func ensureDirectoryTree(fs host.FileSystem, paths map[string]string) error {
-	for _, path := range []string{paths["root"], paths["auth"], paths["shared"], paths["images"], paths["clusters"]} {
+func ensureDirectoryTree(fs host.FileSystem, paths *ClientConfigPaths) error {
+	for _, path := range []string{paths.Root, paths.Auth, paths.Shared, paths.Images, paths.Clusters} {
 		if err := fs.MkdirAll(path, dirMode); err != nil {
 			return fmt.Errorf("failed to create directory %s: %w", path, err)
 		}
@@ -128,14 +144,14 @@ func ensureDirectoryTree(fs host.FileSystem, paths map[string]string) error {
 
 func initSecrets(
 	fs host.FileEnvironment,
-	paths map[string]string,
+	paths *ClientConfigPaths,
 	force bool,
 ) (*pkgsecrets.InitResult, error) {
 	secretsOpts := &pkgsecrets.Options{
 		Fs:          fs,
 		Force:       force,
-		KeyFile:     filepath.Join(paths["auth"], "id_ed25519"),
-		SecretsFile: filepath.Join(paths["shared"], pkgsecrets.DefaultSecretsFile),
+		KeyFile:     paths.SharedSecretsKey,
+		SecretsFile: paths.SharedSecrets,
 	}
 
 	result, err := pkgsecrets.InitSecrets(secretsOpts)
@@ -146,13 +162,17 @@ func initSecrets(
 	return result, nil
 }
 
-func buildMessages(paths map[string]string, secretMessages []string, printPaths bool) []string {
-	messages := []string{fmt.Sprintf("initialized iknitectl environment at %s", paths["root"])}
+func buildMessages(paths *ClientConfigPaths, secretMessages []string, printPaths bool) []string {
+	messages := []string{fmt.Sprintf("initialized iknitectl environment at %s", paths.Root)}
 	messages = append(messages, secretMessages...)
 	if printPaths {
-		for key, path := range paths {
-			messages = append(messages, fmt.Sprintf("%s=%s", key, path))
-		}
+		messages = append(
+			messages,
+			fmt.Sprintf("auth=%s", paths.Auth),
+			fmt.Sprintf("shared=%s", paths.Shared),
+			fmt.Sprintf("images=%s", paths.Images),
+			fmt.Sprintf("clusters=%s", paths.Clusters),
+		)
 	}
 
 	return messages
@@ -175,7 +195,7 @@ func ensureSharedValuesFile(fs host.FileSystem, path string, force bool) error {
 		return nil
 	}
 
-	content := []byte("shared:\n  backend: {}\n")
+	content := []byte(defaultValues)
 	if err = fs.WriteFile(path, content, fileMode); err != nil {
 		return fmt.Errorf("failed to write shared values file: %w", err)
 	}
