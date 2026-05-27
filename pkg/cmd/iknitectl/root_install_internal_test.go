@@ -10,6 +10,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/kaweezle/iknite/pkg/cmd/util"
 	"github.com/kaweezle/iknite/pkg/host"
 )
 
@@ -79,7 +80,9 @@ func TestRunRootCmd_Path(t *testing.T) {
 	out := &bytes.Buffer{}
 	options := &RootOptions{
 		host: h,
-		out:  out,
+		BaseOptions: util.BaseOptions{
+			Output: out,
+		},
 	}
 	cmd := CreateRootCmd(options)
 	req.NotNil(cmd)
@@ -104,7 +107,9 @@ func TestRunRootCmd_ConfigError(t *testing.T) {
 	out := &bytes.Buffer{}
 	options := &RootOptions{
 		host: h,
-		out:  out,
+		BaseOptions: util.BaseOptions{
+			Output: out,
+		},
 	}
 	cmd := CreateRootCmd(options)
 	req.NotNil(cmd)

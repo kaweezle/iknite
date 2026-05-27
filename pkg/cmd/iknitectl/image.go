@@ -3,19 +3,19 @@ package iknitectl
 import (
 	"github.com/spf13/cobra"
 
-	"github.com/kaweezle/iknite/pkg/host"
+	"github.com/kaweezle/iknite/pkg/iknitectl/base"
 )
 
 // CreateImageCmd creates the image command tree.
-func CreateImageCmd(localHost host.Host) *cobra.Command {
+func CreateImageCmd(baseService base.ServiceInterface) *cobra.Command {
 	imageCmd := &cobra.Command{
 		Use:     "image",
 		Aliases: []string{"i", "img"},
 		Short:   "Manage provisioning images",
 	}
 
-	imageCmd.AddCommand(CreateImageInspectCmd(localHost))
-	imageCmd.AddCommand(CreateImagePullCmd(localHost))
+	imageCmd.AddCommand(CreateImageInspectCmd(baseService))
+	imageCmd.AddCommand(CreateImagePullCmd(baseService))
 
 	return imageCmd
 }

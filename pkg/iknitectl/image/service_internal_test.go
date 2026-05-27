@@ -13,6 +13,7 @@ import (
 	specv1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/stretchr/testify/require"
 
+	"github.com/kaweezle/iknite/pkg/iknitectl/config"
 	"github.com/kaweezle/iknite/pkg/testutil"
 )
 
@@ -212,10 +213,14 @@ func newServiceAndRepoForManifest(
 	}
 
 	fs := testutil.NewDummyUserHost()
+	c := &config.Config{}
+	require.NoError(t, config.NewConfigOptions(fs).Resolve(fs, c))
 	return &Service{
 		FS: fs,
 		NewRepository: func(string) (Repository, error) {
 			return fakeRepo, nil
 		},
+		Logger: testutil.TestLogger(t),
+		Config: c,
 	}, fakeRepo
 }

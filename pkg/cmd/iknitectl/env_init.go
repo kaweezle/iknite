@@ -8,8 +8,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
-	"github.com/kaweezle/iknite/pkg/cmd/util"
-	"github.com/kaweezle/iknite/pkg/host"
+	"github.com/kaweezle/iknite/pkg/iknitectl/base"
 	envsvc "github.com/kaweezle/iknite/pkg/iknitectl/env"
 )
 
@@ -22,16 +21,17 @@ type EnvInitOptions struct {
 }
 
 // CreateEnvInitCmd creates the env init command.
-func CreateEnvInitCmd(localHost host.Host) *cobra.Command {
+func CreateEnvInitCmd(baseService base.ServiceInterface) *cobra.Command {
 	opts := &EnvInitOptions{}
 
 	cmd := &cobra.Command{
 		Use:   "init",
 		Short: "Initialize iknitectl working directory",
-		RunE: func(cmd *cobra.Command, _ []string) error {
+		RunE: func(_ *cobra.Command, _ []string) error {
 			service := &envsvc.Service{
-				FS:     localHost,
-				Logger: util.LoggerFromContext(cmd.Context()),
+				FS:     baseService.Host(),
+				Logger: baseService.Logger(),
+				Config: baseService.Config(),
 			}
 			return performEnvInit(service, opts)
 		},
@@ -43,7 +43,6 @@ func CreateEnvInitCmd(localHost host.Host) *cobra.Command {
 }
 
 func addEnvInitCmdFlags(flags *pflag.FlagSet, opts *EnvInitOptions) {
-	flags.StringVar(&opts.ConfigDir, "config-dir", "", "Override iknitectl working directory")
 	flags.BoolVar(&opts.Force, "force", false, "Overwrite existing generated files")
 	flags.BoolVar(&opts.NonInteractive, "non-interactive", false, "Disable prompts for CI usage")
 	flags.BoolVar(&opts.PrintPaths, "print-paths", false, "Print resolved directory and file paths")

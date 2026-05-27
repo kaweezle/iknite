@@ -6,6 +6,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/kaweezle/iknite/pkg/iknitectl/config"
 	"github.com/kaweezle/iknite/pkg/testutil"
 )
 
@@ -66,7 +67,7 @@ func TestDefaultConfigDir(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			fs := testutil.NewDummyPlatformHost(tt.os, tt.username, tt.env)
-			got, err := defaultConfigDir(fs)
+			got, err := config.DefaultConfigDir(fs)
 			require.NoError(t, err)
 			require.Equal(t, tt.want, got)
 		})
