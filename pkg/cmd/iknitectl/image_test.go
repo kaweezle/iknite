@@ -6,6 +6,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	iknitectl "github.com/kaweezle/iknite/pkg/cmd/iknitectl"
+	"github.com/kaweezle/iknite/pkg/iknitectl/base"
+	"github.com/kaweezle/iknite/pkg/iknitectl/config"
 	"github.com/kaweezle/iknite/pkg/testutil"
 )
 
@@ -13,7 +15,10 @@ func TestCreateImageCmd(t *testing.T) {
 	t.Parallel()
 
 	h := testutil.NewDummyUserHost()
-	cmd := iknitectl.CreateImageCmd(h)
+	logger := testutil.TestLogger(t)
+	c := config.NewConfigOptions(h)
+	baseService := base.NewService(h, logger, c)
+	cmd := iknitectl.CreateImageCmd(baseService)
 	require.NotNil(t, cmd)
 
 	for _, sub := range []string{"inspect", "pull"} {

@@ -7,8 +7,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
-	"path/filepath"
 	"regexp"
 	"strings"
 
@@ -17,8 +17,9 @@ import (
 	"oras.land/oras-go/v2/registry/remote/auth"
 	"oras.land/oras-go/v2/registry/remote/retry"
 
-	"github.com/kaweezle/iknite/pkg/constants"
+	"github.com/kaweezle/iknite/pkg/cmd/util"
 	"github.com/kaweezle/iknite/pkg/host"
+	"github.com/kaweezle/iknite/pkg/iknitectl/config"
 )
 
 // ArtifactType identifies expected image artifact content.
@@ -58,6 +59,8 @@ type NewRepositoryFunc func(repository string) (Repository, error)
 // Service provides image inspect and pull operations.
 type Service struct {
 	FS            host.FileEnvironment
+	Logger        *slog.Logger
+	Config        *config.Config
 	NewRepository NewRepositoryFunc
 }
 
@@ -82,6 +85,16 @@ func (s *Service) ensureDefaults() error {
 	}
 	if s.NewRepository == nil {
 		s.NewRepository = newRemoteRepository
+	}
+
+	if s.Logger == nil {
+		s.Logger = util.DefaultBaseOptions().Logger()
+	}
+	if s.Config == nil {
+		s.Config = &config.Config{}
+		if err := config.NewConfigOptions(s.FS).Resolve(s.FS, s.Config); err != nil {
+			return fmt.Errorf("failed to resolve config options: %w", err)
+		}
 	}
 
 	return nil
@@ -148,27 +161,33 @@ func (s *Service) Pull(ctx context.Context, req *PullRequest) (string, error) {
 	if req.ImageRef == "" {
 		return "", fmt.Errorf("image reference is required")
 	}
+	if err := s.ensureDefaults(); err != nil {
+		return "", err
+	}
 
+	c := s.Config
+	fs := s.FS
+
+	logger := s.Logger.With("imageRef", req.ImageRef)
+	logger.Info("Getting image information")
 	inspectResult, err := s.Inspect(ctx, req.ImageRef)
 	if err != nil {
 		return "", err
 	}
 
-	configDir, err := s.FS.UserConfigDir()
-	if err != nil {
-		return "", fmt.Errorf("failed to resolve config directory: %w", err)
-	}
-
-	outputDir := s.FS.JoinPath(configDir, constants.IkniteConfName, "images", imageDirectoryName(inspectResult))
-	if err = s.FS.MkdirAll(outputDir, 0o755); err != nil {
+	outputDir := fs.JoinPath(c.Images, imageDirectoryName(inspectResult))
+	if err = fs.MkdirAll(outputDir, 0o755); err != nil {
 		return "", fmt.Errorf("failed to create output directory: %w", err)
 	}
+
+	logger = logger.With("outputDir", outputDir)
 
 	alreadyDownloaded, err := s.hasMatchingSavedManifest(outputDir, inspectResult)
 	if err != nil {
 		return "", err
 	}
 	if alreadyDownloaded {
+		logger.Info("Image artifacts already exist locally, skipping download")
 		return outputDir, nil
 	}
 
@@ -183,14 +202,9 @@ func (s *Service) Pull(ctx context.Context, req *PullRequest) (string, error) {
 	}
 
 	for _, layer := range layers {
-		blob, readErr := readBlob(ctx, repo, layer.Descriptor)
-		if readErr != nil {
-			return "", readErr
-		}
-
-		outputPath := filepath.Join(outputDir, layer.FileName)
-		if writeErr := s.FS.WriteFile(outputPath, blob, 0o644); writeErr != nil {
-			return "", fmt.Errorf("failed to write output file %s: %w", outputPath, writeErr)
+		err = layer.download(ctx, repo, fs, outputDir, os.Stdout)
+		if err != nil {
+			return "", fmt.Errorf("failed to download layer %s: %w", layer.Descriptor.Digest.String(), err)
 		}
 	}
 
@@ -198,8 +212,8 @@ func (s *Service) Pull(ctx context.Context, req *PullRequest) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to marshal inspect result: %w", err)
 	}
-	inspectPath := filepath.Join(outputDir, inspectResultFileName)
-	if err = s.FS.WriteFile(inspectPath, inspectJSON, 0o644); err != nil {
+	inspectPath := fs.JoinPath(outputDir, inspectResultFileName)
+	if err = fs.WriteFile(inspectPath, inspectJSON, 0o644); err != nil {
 		return "", fmt.Errorf("failed to write inspect result file: %w", err)
 	}
 
@@ -285,6 +299,39 @@ type pullLayer struct {
 	FileName   string
 }
 
+func (layer *pullLayer) download(
+	ctx context.Context,
+	repo Repository,
+	fs host.FileEnvironment,
+	outputDir string,
+	out io.Writer,
+) error {
+	outputPath := fs.JoinPath(outputDir, layer.FileName)
+	destination, err := fs.Open(outputPath)
+	if err == nil {
+		if closeErr := destination.Close(); closeErr != nil {
+			return fmt.Errorf("failed to close existing output file: %w", closeErr)
+		}
+		return fmt.Errorf("output file %s already exists", outputPath)
+	}
+	destination, err = fs.Create(outputPath)
+	if err != nil {
+		return fmt.Errorf("failed to create output file: %w", err)
+	}
+
+	readErr := readBlob(ctx, repo, layer, destination, out)
+	if readErr != nil {
+		if closeErr := destination.Close(); closeErr != nil {
+			return fmt.Errorf("failed to close destination file after read error: %w", closeErr)
+		}
+		if removeErr := fs.Remove(outputPath); removeErr != nil {
+			return fmt.Errorf("failed to remove incomplete output file after read error: %w", removeErr)
+		}
+		return readErr
+	}
+	return nil
+}
+
 func selectArtifactLayers(manifest *specv1.Manifest, imageType ArtifactType) ([]pullLayer, error) {
 	result := make([]pullLayer, 0, len(manifest.Layers))
 
@@ -314,24 +361,26 @@ func selectArtifactLayers(manifest *specv1.Manifest, imageType ArtifactType) ([]
 	}
 }
 
-func readBlob(ctx context.Context, repo Repository, layer *specv1.Descriptor) ([]byte, error) {
-	blobReader, err := repo.Fetch(ctx, *layer)
+func readBlob(ctx context.Context, repo Repository, layer *pullLayer, destination, out io.Writer) error {
+	blobReader, err := repo.Fetch(ctx, *layer.Descriptor)
 	if err != nil {
-		return nil, fmt.Errorf("failed to fetch blob %s: %w", layer.Digest.String(), err)
+		return fmt.Errorf("failed to fetch blob %s: %w", layer.Descriptor.Digest.String(), err)
 	}
 
-	blob, err := io.ReadAll(blobReader)
+	progress := NewProgressReader(blobReader, layer.Descriptor.Size, layer.FileName, out)
+
+	_, err = io.Copy(destination, progress)
 	if err != nil {
 		if closeErr := blobReader.Close(); closeErr != nil {
-			return nil, fmt.Errorf("failed to close blob reader after read error: %w", closeErr)
+			return fmt.Errorf("failed to close blob reader after read error: %w", closeErr)
 		}
-		return nil, fmt.Errorf("failed to read blob data: %w", err)
+		return fmt.Errorf("failed to read blob data: %w", err)
 	}
 	if closeErr := blobReader.Close(); closeErr != nil {
-		return nil, fmt.Errorf("failed to close blob reader: %w", closeErr)
+		return fmt.Errorf("failed to close blob reader: %w", closeErr)
 	}
 
-	return blob, nil
+	return nil
 }
 
 func imageDirectoryName(result *InspectResult) string {

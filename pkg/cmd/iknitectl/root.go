@@ -18,29 +18,32 @@ package iknitectl
 import (
 	"context"
 	"fmt"
-	"io"
 	"os"
 	"os/signal"
 	"syscall"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 
 	"github.com/kaweezle/iknite/pkg/cmd/util"
 	"github.com/kaweezle/iknite/pkg/host"
+	"github.com/kaweezle/iknite/pkg/iknitectl/base"
+	"github.com/kaweezle/iknite/pkg/iknitectl/config"
 )
 
 // RootOptions contains configuration for the root command.
 type RootOptions struct {
 	host host.Host
-	out  io.Writer
+	config.ConfigOptions
 	util.BaseOptions
 }
 
 func NewRootOptions() *RootOptions {
+	localHost := host.NewDefaultHost()
 	opts := &RootOptions{
-		BaseOptions: *util.DefaultBaseOptions(),
-		host:        host.NewDefaultHost(),
-		out:         os.Stdout,
+		BaseOptions:   *util.DefaultBaseOptions(),
+		host:          localHost,
+		ConfigOptions: *config.NewConfigOptions(localHost),
 	}
 	return opts
 }
@@ -51,7 +54,9 @@ func CreateRootCmd(opts *RootOptions) *cobra.Command {
 		opts = NewRootOptions()
 	}
 
-	cmdIf := util.NewCmdInterface(&opts.BaseOptions)
+	logger := opts.Logger()
+
+	baseService := base.NewService(opts.host, logger, &opts.ConfigOptions)
 
 	rootCmd := &cobra.Command{
 		Use:   "iknitectl",
@@ -61,6 +66,8 @@ func CreateRootCmd(opts *RootOptions) *cobra.Command {
 It provides utilities for managing secrets, building artifacts, and other
 development tasks that are not part of the main iknite binary.`,
 		PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
+			cmdIf := util.NewCmdInterface(&opts.BaseOptions)
+			util.BindFlagsToViper(cmd.Root(), cmdIf)
 			opts.SetUpLogs(cmd.OutOrStderr(), cmdIf)
 			util.SetCmdInterface(cmd, cmdIf)
 			err := util.InitializeConfiguration(cmd.Root(), cmdIf)
@@ -69,25 +76,34 @@ development tasks that are not part of the main iknite binary.`,
 			}
 			// Re-setup logs after configuration is loaded to apply any log-related settings from the config file
 			opts.SetUpLogs(cmd.OutOrStderr(), cmdIf)
+			baseService.SetLogger(cmdIf.Logger())
+
+			err = opts.Resolve(baseService.Host(), baseService.Config())
+			if err != nil {
+				return fmt.Errorf("failed to resolve configuration: %w", err)
+			}
 			return nil
 		},
 	}
-	rootCmd.SetOut(opts.out)
+	rootCmd.SetOut(opts.Output)
 
 	opts.AddFlags(rootCmd.PersistentFlags())
 
 	// Add subcommands
-	rootCmd.AddCommand(CreateEnvCmd(opts.host))
-	rootCmd.AddCommand(CreateImageCmd(opts.host))
+	rootCmd.AddCommand(CreateEnvCmd(baseService))
+	rootCmd.AddCommand(CreateImageCmd(baseService))
 	rootCmd.AddCommand(CreateClusterCmd(opts.host))
-	rootCmd.AddCommand(CreateWorkspaceCmd(opts.host, opts.out))
+	rootCmd.AddCommand(CreateWorkspaceCmd(opts.host, opts.Output))
 	rootCmd.AddCommand(CreateAuthCmd(opts.host))
 	rootCmd.AddCommand(CreateBackendCmd(opts.host))
 	util.AddConfigFlag(rootCmd)
 
-	util.BindFlagsToViper(rootCmd, cmdIf)
-
 	return rootCmd
+}
+
+func (opts *RootOptions) AddFlags(flags *pflag.FlagSet) {
+	opts.BaseOptions.AddFlags(flags)
+	opts.ConfigOptions.AddFlags(flags)
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.

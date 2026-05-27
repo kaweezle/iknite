@@ -7,18 +7,22 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/kaweezle/iknite/pkg/host"
+	"github.com/kaweezle/iknite/pkg/iknitectl/base"
 	imagesvc "github.com/kaweezle/iknite/pkg/iknitectl/image"
 )
 
 // CreateImagePullCmd creates the image pull command.
-func CreateImagePullCmd(localHost host.Host) *cobra.Command {
+func CreateImagePullCmd(baseService base.ServiceInterface) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "pull <image-ref>",
 		Short: "Download image artifacts to the local filesystem",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			service := &imagesvc.Service{FS: localHost}
+			service := &imagesvc.Service{
+				FS:     baseService.Host(),
+				Logger: baseService.Logger(),
+				Config: baseService.Config(),
+			}
 			outputPath, err := service.Pull(cmd.Context(), &imagesvc.PullRequest{
 				ImageRef: args[0],
 			})

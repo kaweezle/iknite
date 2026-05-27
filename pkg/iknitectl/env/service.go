@@ -4,15 +4,9 @@ package env
 import (
 	"fmt"
 	"log/slog"
-	"path/filepath"
 
-	certutil "k8s.io/client-go/util/cert"
-	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	pkiutil "k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
-
-	"github.com/kaweezle/iknite/pkg/constants"
 	"github.com/kaweezle/iknite/pkg/host"
-	"github.com/kaweezle/iknite/pkg/pki"
+	"github.com/kaweezle/iknite/pkg/iknitectl/config"
 	pkgsecrets "github.com/kaweezle/iknite/pkg/secrets"
 )
 
@@ -40,7 +34,7 @@ type InitRequest struct {
 
 // InitResult reports created paths and messages.
 type InitResult struct {
-	Paths    *ClientConfigPaths
+	Paths    *config.Config
 	Messages []string
 }
 
@@ -48,7 +42,7 @@ type InitResult struct {
 type Service struct {
 	FS     host.FileEnvironment
 	Logger *slog.Logger
-	paths  *ClientConfigPaths
+	Config *config.Config
 }
 
 // Init creates required directories, secrets files, and default CA material.
@@ -56,37 +50,33 @@ func (s *Service) Init(req *InitRequest) (*InitResult, error) {
 	if req == nil {
 		req = &InitRequest{}
 	}
-	if err := s.ensureDefaults(); err != nil {
+	if err := s.ensureDefaults(req.ConfigDir); err != nil {
 		return nil, err
 	}
 
-	if err := s.resolvePaths(req, s.paths); err != nil {
-		return nil, err
+	if mkErr := s.Config.EnsureDirectoryTree(s.FS); mkErr != nil {
+		return nil, fmt.Errorf("failed to create config directory tree: %w", mkErr)
 	}
 
-	if mkErr := ensureDirectoryTree(s.FS, s.paths); mkErr != nil {
-		return nil, mkErr
-	}
-
-	secretsResult, err := initSecrets(s.FS, s.paths, req.Force)
+	secretsResult, err := initSecrets(s.FS, s.Config, req.Force)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize secrets: %w", err)
 	}
 
-	if err = s.ensureCertificateAuthority(req.Force); err != nil {
+	if err = s.Config.EnsureCertificateAuthority(s.FS, s.Logger, req.Force); err != nil {
 		return nil, fmt.Errorf("failed to initialize certificate authority: %w", err)
 	}
 
-	if err = ensureSharedValuesFile(s.FS, s.paths.SharedValues, req.Force); err != nil {
+	if err = ensureSharedValuesFile(s.FS, s.Config.SharedValues, req.Force); err != nil {
 		return nil, fmt.Errorf("failed to initialize shared values file: %w", err)
 	}
 
-	messages := buildMessages(s.paths, secretsResult.Messages, req.PrintPaths)
+	messages := buildMessages(s.Config, secretsResult.Messages, req.PrintPaths)
 
-	return &InitResult{Paths: s.paths, Messages: messages}, nil
+	return &InitResult{Paths: s.Config, Messages: messages}, nil
 }
 
-func (s *Service) ensureDefaults() error {
+func (s *Service) ensureDefaults(configDir string) error {
 	if s.FS == nil {
 		return fmt.Errorf("filesystem dependency is required")
 	}
@@ -95,44 +85,14 @@ func (s *Service) ensureDefaults() error {
 		return fmt.Errorf("logger dependency is required")
 	}
 
-	if s.paths == nil {
-		s.paths = &ClientConfigPaths{}
-	}
-
-	return nil
-}
-
-func (s *Service) resolvePaths(req *InitRequest, paths *ClientConfigPaths) error {
-	configDir := req.ConfigDir
-
-	if configDir == "" {
-		var err error
-		configDir, err = defaultConfigDir(s.FS)
-		if err != nil {
-			return fmt.Errorf("failed to get default config directory: %w", err)
+	if s.Config == nil {
+		s.Config = &config.Config{}
+		opts := config.NewConfigOptions(s.FS)
+		if configDir != "" {
+			opts.ConfigDir = configDir
 		}
-	}
-	configDir = filepath.Clean(configDir)
-	paths.Root = configDir
-
-	paths.Auth = s.FS.JoinPath(configDir, defaultAuthDirname)
-	paths.Shared = s.FS.JoinPath(configDir, defaultSharedDirname)
-	paths.Images = s.FS.JoinPath(configDir, defaultImagesDirname)
-	paths.Clusters = s.FS.JoinPath(configDir, defaultClustersDirname)
-	paths.CACert = filepath.Join(paths.Auth, defaultCACertFilename)
-	paths.CAKey = filepath.Join(paths.Auth, defaultCAKeyFilename)
-
-	paths.SharedSecrets = filepath.Join(paths.Shared, defaultSecretsFilename)
-	paths.SharedSecretsKey = filepath.Join(paths.Shared, defaultKeyFilename)
-	paths.SharedValues = filepath.Join(paths.Shared, defaultValuesFilename)
-
-	return nil
-}
-
-func ensureDirectoryTree(fs host.FileSystem, paths *ClientConfigPaths) error {
-	for _, path := range []string{paths.Root, paths.Auth, paths.Shared, paths.Images, paths.Clusters} {
-		if err := fs.MkdirAll(path, dirMode); err != nil {
-			return fmt.Errorf("failed to create directory %s: %w", path, err)
+		if err := opts.Resolve(s.FS, s.Config); err != nil {
+			return fmt.Errorf("failed to resolve config paths: %w", err)
 		}
 	}
 
@@ -141,7 +101,7 @@ func ensureDirectoryTree(fs host.FileSystem, paths *ClientConfigPaths) error {
 
 func initSecrets(
 	fs host.FileEnvironment,
-	paths *ClientConfigPaths,
+	paths *config.Config,
 	force bool,
 ) (*pkgsecrets.InitResult, error) {
 	secretsOpts := &pkgsecrets.Options{
@@ -159,7 +119,7 @@ func initSecrets(
 	return result, nil
 }
 
-func buildMessages(paths *ClientConfigPaths, secretMessages []string, printPaths bool) []string {
+func buildMessages(paths *config.Config, secretMessages []string, printPaths bool) []string {
 	messages := []string{fmt.Sprintf("initialized iknitectl environment at %s", paths.Root)}
 	messages = append(messages, secretMessages...)
 	if printPaths {
@@ -173,14 +133,6 @@ func buildMessages(paths *ClientConfigPaths, secretMessages []string, printPaths
 	}
 
 	return messages
-}
-
-func defaultConfigDir(fse host.FileEnvironment) (string, error) {
-	configDir, err := fse.UserConfigDir()
-	if err != nil {
-		return "", fmt.Errorf("failed to get user config directory: %w", err)
-	}
-	return fse.JoinPath(configDir, constants.IkniteConfName), nil
 }
 
 func ensureSharedValuesFile(fs host.FileSystem, path string, force bool) error {
@@ -197,46 +149,5 @@ func ensureSharedValuesFile(fs host.FileSystem, path string, force bool) error {
 		return fmt.Errorf("failed to write shared values file: %w", err)
 	}
 
-	return nil
-}
-
-func (s *Service) ensureCertificateAuthority(force bool) error {
-	certExists, err := s.FS.Exists(s.paths.CACert)
-	if err != nil {
-		return fmt.Errorf("failed to check CA certificate path: %w", err)
-	}
-	keyExists, err := s.FS.Exists(s.paths.CAKey)
-	if err != nil {
-		return fmt.Errorf("failed to check CA key path: %w", err)
-	}
-
-	if certExists && keyExists && !force {
-		s.Logger.Info("CA certificate and key already exist, skipping generation",
-			"certPath", s.paths.CACert, "keyPath", s.paths.CAKey)
-		return nil
-	}
-
-	caCert, caKey, err := pkiutil.NewCertificateAuthority(&pkiutil.CertConfig{
-		Config: certutil.Config{
-			CommonName:   caCommonName,
-			Organization: []string{"iknitectl"},
-		},
-		EncryptionAlgorithm: kubeadmapi.EncryptionAlgorithmRSA2048,
-	})
-	if err != nil {
-		return fmt.Errorf("failed to generate CA certificate and key: %w", err)
-	}
-
-	err = pki.WriteCert(s.FS, s.paths.CACert, caCert)
-	if err != nil {
-		return fmt.Errorf("failed to write CA certificate: %w", err)
-	}
-
-	err = pki.WriteKey(s.FS, s.paths.CAKey, caKey)
-	if err != nil {
-		return fmt.Errorf("failed to write CA key: %w", err)
-	}
-
-	s.Logger.Info("Generated new CA certificate and key", "certPath", s.paths.CACert, "keyPath", s.paths.CAKey)
 	return nil
 }

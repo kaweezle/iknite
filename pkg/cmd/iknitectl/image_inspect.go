@@ -3,41 +3,39 @@ package iknitectl
 // cSpell: words imagesvc
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 
 	"github.com/spf13/cobra"
 
-	"github.com/kaweezle/iknite/pkg/host"
+	"github.com/kaweezle/iknite/pkg/iknitectl/base"
 	imagesvc "github.com/kaweezle/iknite/pkg/iknitectl/image"
 )
 
 // CreateImageInspectCmd creates the image inspect command.
-func CreateImageInspectCmd(localHost host.Host) *cobra.Command {
+func CreateImageInspectCmd(baseService base.ServiceInterface) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "inspect <image-ref>",
 		Short: "Inspect image manifest details",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			service := &imagesvc.Service{FS: localHost}
-			result, err := service.Inspect(context.Background(), args[0])
+			service := &imagesvc.Service{
+				FS:     baseService.Host(),
+				Logger: baseService.Logger(),
+				Config: baseService.Config(),
+			}
+			result, err := service.Inspect(cmd.Context(), args[0])
 			if err != nil {
 				return fmt.Errorf("failed to inspect image: %w", err)
 			}
+			logger := baseService.Logger()
+			logger.Info("Image inspection successful",
+				"repository", result.Repository,
+				"reference", result.Reference,
+				"digest", result.Descriptor.Digest.String(),
+				"layers", len(result.Manifest.Layers),
+			)
 
-			if _, err = fmt.Fprintf(cmd.OutOrStdout(), "repository: %s\n", result.Repository); err != nil {
-				return fmt.Errorf("failed to write output: %w", err)
-			}
-			if _, err = fmt.Fprintf(cmd.OutOrStdout(), "reference: %s\n", result.Reference); err != nil {
-				return fmt.Errorf("failed to write output: %w", err)
-			}
-			if _, err = fmt.Fprintf(cmd.OutOrStdout(), "digest: %s\n", result.Descriptor.Digest.String()); err != nil {
-				return fmt.Errorf("failed to write output: %w", err)
-			}
-			if _, err = fmt.Fprintf(cmd.OutOrStdout(), "layers: %d\n", len(result.Manifest.Layers)); err != nil {
-				return fmt.Errorf("failed to write output: %w", err)
-			}
 			manifestJSON, err := json.MarshalIndent(result, "", "  ")
 			if err != nil {
 				return fmt.Errorf("failed to marshal manifest: %w", err)
