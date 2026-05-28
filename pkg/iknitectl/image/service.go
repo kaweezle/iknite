@@ -1,4 +1,4 @@
-// cSpell: words specv oras VMVHDX vhdx hyperv qcow2 artifacttype gochecknoglobals VMQCOW
+// cSpell: words specv oras VMVHDX hyperv qcow2 artifacttype gochecknoglobals VMQCOW
 package image
 
 import (
@@ -22,14 +22,7 @@ import (
 	"github.com/kaweezle/iknite/pkg/iknitectl/config"
 )
 
-// ArtifactType identifies expected image artifact content.
-type ArtifactType string
-
 const (
-	ArtifactRootFS  ArtifactType = "rootfs"
-	ArtifactVMVHDX  ArtifactType = "vm-vhdx"
-	ArtifactVMQCOW2 ArtifactType = "vm-qcow2"
-
 	defaultImageTag = "latest"
 
 	vhdxArtifactType  = "application/vnd.oci.image.layer.vhdx"
@@ -40,8 +33,7 @@ const (
 	vhdxMediaType         = "application/x-hyperv-disk"
 	qcow2MediaType        = "application/x-qcow2"
 	incusMetadataType     = "application/vnd.incus.metadata"
-
-	inspectResultFileName = "inspect-result.json"
+	manifestFilename      = "manifest.json"
 )
 
 //nolint:gochecknoglobals // Compiled regex reused by helper.
@@ -70,8 +62,8 @@ type InspectResult struct {
 	Descriptor       specv1.Descriptor
 	Repository       string
 	Reference        string
-	ImageType        ArtifactType
 	ManifestTypeHint string
+	ImageType        ImageType
 }
 
 // PullRequest defines image pull behavior.
@@ -212,7 +204,7 @@ func (s *Service) Pull(ctx context.Context, req *PullRequest) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to marshal inspect result: %w", err)
 	}
-	inspectPath := fs.JoinPath(outputDir, inspectResultFileName)
+	inspectPath := fs.JoinPath(outputDir, manifestFilename)
 	if err = fs.WriteFile(inspectPath, inspectJSON, 0o644); err != nil {
 		return "", fmt.Errorf("failed to write inspect result file: %w", err)
 	}
@@ -221,7 +213,7 @@ func (s *Service) Pull(ctx context.Context, req *PullRequest) (string, error) {
 }
 
 func (s *Service) hasMatchingSavedManifest(outputDir string, inspectResult *InspectResult) (bool, error) {
-	inspectPath := s.FS.JoinPath(outputDir, inspectResultFileName)
+	inspectPath := s.FS.JoinPath(outputDir, manifestFilename)
 	if _, statErr := s.FS.Stat(inspectPath); os.IsNotExist(statErr) {
 		return false, nil
 	} else if statErr != nil {
@@ -252,28 +244,28 @@ func (s *Service) hasMatchingSavedManifest(outputDir string, inspectResult *Insp
 	return false, nil
 }
 
-func inferImageType(manifest *specv1.Manifest) (ArtifactType, error) {
+func inferImageType(manifest *specv1.Manifest) (ImageType, error) {
 	if manifest.ArtifactType == "" && len(manifest.Layers) == 1 {
 		layerType := manifest.Layers[0].MediaType
 		if layerType == rootfsMediaTypeDocker || layerType == rootfsMediaTypeOCI {
-			return ArtifactRootFS, nil
+			return ImageTypeRootFS, nil
 		}
-		return "", fmt.Errorf("unsupported rootfs layer media type: %s", layerType)
+		return ImageTypeUnknown, fmt.Errorf("unsupported rootfs layer media type: %s", layerType)
 	}
 
 	if manifest.ArtifactType == vhdxArtifactType {
 		if len(manifest.Layers) != 1 {
-			return "", fmt.Errorf("vhdx image must have exactly one layer")
+			return ImageTypeUnknown, fmt.Errorf("vhdx image must have exactly one layer")
 		}
 		if manifest.Layers[0].MediaType != vhdxMediaType {
-			return "", fmt.Errorf("vhdx image layer media type must be %s", vhdxMediaType)
+			return ImageTypeUnknown, fmt.Errorf("vhdx image layer media type must be %s", vhdxMediaType)
 		}
-		return ArtifactVMVHDX, nil
+		return ImageTypeVHDX, nil
 	}
 
 	if manifest.ArtifactType == qcow2ArtifactType {
 		if len(manifest.Layers) != 2 {
-			return "", fmt.Errorf("qcow2 image must have exactly two layers")
+			return ImageTypeUnknown, fmt.Errorf("qcow2 image must have exactly two layers")
 		}
 		hasQCOW2 := false
 		hasIncusMetadata := false
@@ -286,12 +278,12 @@ func inferImageType(manifest *specv1.Manifest) (ArtifactType, error) {
 			}
 		}
 		if !hasQCOW2 || !hasIncusMetadata {
-			return "", fmt.Errorf("qcow2 image must contain qcow2 and incus metadata layers")
+			return ImageTypeUnknown, fmt.Errorf("qcow2 image must contain qcow2 and incus metadata layers")
 		}
-		return ArtifactVMQCOW2, nil
+		return ImageTypeQCOW2, nil
 	}
 
-	return "", fmt.Errorf("unsupported manifest artifactType %q", manifest.ArtifactType)
+	return ImageTypeUnknown, fmt.Errorf("unsupported manifest artifactType %q", manifest.ArtifactType)
 }
 
 type pullLayer struct {
@@ -332,17 +324,17 @@ func (layer *pullLayer) download(
 	return nil
 }
 
-func selectArtifactLayers(manifest *specv1.Manifest, imageType ArtifactType) ([]pullLayer, error) {
+func selectArtifactLayers(manifest *specv1.Manifest, imageType ImageType) ([]pullLayer, error) {
 	result := make([]pullLayer, 0, len(manifest.Layers))
 
 	switch imageType {
-	case ArtifactRootFS:
+	case ImageTypeRootFS:
 		result = append(result, pullLayer{Descriptor: &manifest.Layers[0], FileName: "rootfs.tar.gz"})
 		return result, nil
-	case ArtifactVMVHDX:
+	case ImageTypeVHDX:
 		result = append(result, pullLayer{Descriptor: &manifest.Layers[0], FileName: "disk.vhdx"})
 		return result, nil
-	case ArtifactVMQCOW2:
+	case ImageTypeQCOW2:
 		for i := range manifest.Layers {
 			layer := &manifest.Layers[i]
 			switch layer.MediaType {

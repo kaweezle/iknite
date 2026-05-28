@@ -51,6 +51,7 @@ Artifact types:
 
 - `rootfs`
 - `vm-vhdx`
+- `vm-qcow2`
 - `incus-metadata`
 
 Image flow:

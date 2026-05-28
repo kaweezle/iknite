@@ -197,7 +197,8 @@ func checkSecretsFilesExists(opts *Options, paths *secretsInitPaths, result *Ini
 }
 
 // InitSecrets initializes SOPS config, encrypted secrets, and an SSH key pair.
-// nolint:gocyclo // Multiple steps.
+//
+//nolint:gocyclo // Multiple steps.
 func InitSecrets(opts *Options) (*InitResult, error) {
 	result := &InitResult{}
 
