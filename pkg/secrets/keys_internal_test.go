@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/require"
 	"golang.org/x/crypto/ed25519"
 	"golang.org/x/crypto/ssh"
 
@@ -41,7 +42,7 @@ func Test_ensureSSHKeyPair_internal_generatesNewPair(t *testing.T) {
 	keyFile := "/tmp/test_id_ed25519"
 	pubFile := keyFile + ".pub"
 
-	info, err := ensureSSHKeyPair(fs, keyFile, pubFile)
+	info, err := ensureSSHKeyPair(fs, keyFile, pubFile, false)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -77,7 +78,7 @@ func Test_ensureSSHKeyPair_internal_readsExistingPair(t *testing.T) {
 	pubStr := marshalAuthorizedKey(sshPub, "test")
 	mustWriteFile(t, fs, pubFile, []byte(pubStr+"\n"), 0o644)
 
-	info, ensureErr := ensureSSHKeyPair(fs, keyFile, pubFile)
+	info, ensureErr := ensureSSHKeyPair(fs, keyFile, pubFile, false)
 	if ensureErr != nil {
 		t.Fatalf("unexpected error: %v", ensureErr)
 	}
@@ -93,10 +94,37 @@ func Test_ensureSSHKeyPair_internal_errorsWhenPublicExistsWithoutPrivate(t *test
 	pubFile := "/tmp/only.pub"
 	mustWriteFile(t, fs, pubFile, []byte(onlyPublicTestKey), 0o644)
 
-	_, err := ensureSSHKeyPair(fs, "/tmp/missing", pubFile)
+	_, err := ensureSSHKeyPair(fs, "/tmp/missing", pubFile, false)
 	if err == nil {
 		t.Error("expected error when public exists but private missing")
 	}
+}
+
+func Test_ensureSSHKeyPair_internal_forcesNewPair(t *testing.T) {
+	t.Parallel()
+	req := require.New(t)
+
+	fs := host.NewMemMapFS()
+	keyFile := "/tmp/test_id_ed25519"
+	pubFile := keyFile + ".pub"
+
+	info, err := ensureSSHKeyPair(fs, keyFile, pubFile, false)
+	req.NoError(err)
+	if info == nil || info.PrivateKeyPEM == "" || info.AuthorizedKey == "" {
+		t.Error("expected key info to be populated")
+	}
+	mustExist(t, fs, keyFile)
+	mustExist(t, fs, pubFile)
+
+	publicKeyBefore := info.AuthorizedKey
+	info, err = ensureSSHKeyPair(fs, keyFile, pubFile, true)
+	req.NoError(err)
+	req.True(info.Generated, "expected new key to be generated with force")
+	req.NotEmpty(info.PrivateKeyPEM, "expected new private key to be populated")
+	req.NotEmpty(info.AuthorizedKey, "expected new authorized key to be populated")
+	mustExist(t, fs, keyFile)
+	mustExist(t, fs, pubFile)
+	req.NotEqual(publicKeyBefore, info.AuthorizedKey, "expected new authorized key after force")
 }
 
 func Test_sshAuthorizedKeyFromPrivateKey_internal(t *testing.T) {

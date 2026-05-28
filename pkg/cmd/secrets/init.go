@@ -45,6 +45,8 @@ func createSecretsInitCmd(opts *pkgSecrets.Options) *cobra.Command {
 	}
 
 	cmd.Flags().BoolVarP(&opts.Force, "force", "f", false, "Overwrite existing generated files")
+	cmd.Flags().BoolVarP(&opts.OverwriteKey, "overwrite-key", "o", false,
+		"Overwrite existing SSH key pair (implies --force)")
 	cmd.Flags().StringVarP(&opts.KeyFile, "key-file", "k", defaultKeyFile, "SSH private key file to use or generate")
 
 	return cmd

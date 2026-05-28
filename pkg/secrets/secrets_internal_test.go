@@ -410,6 +410,34 @@ func TestInitSecrets_internal(t *testing.T) {
 		req.NotEqual("old config", string(configData))
 	})
 
+	t.Run("Overwrite key pair when asked to", func(t *testing.T) {
+		t.Parallel()
+		req := require.New(t)
+
+		h := testutil.NewDummyUserHost()
+		secretsFile := filepath.Join(workspaceDir, DefaultSecretsFile)
+		sopsConfigFile := filepath.Join(workspaceDir, ".sops.yaml")
+		keyFile := filepath.Join(homeDir, ".ssh", "id_ed25519")
+		keyInfo, err := createKeyPair(h, keyFile, keyFile+".pub", filepath.Base(keyFile))
+		req.NoError(err)
+		req.NoError(h.WriteFile(sopsConfigFile, []byte("old config"), 0o644))
+		req.NoError(h.WriteFile(secretsFile, []byte("old secrets"), 0o644))
+
+		result, err := InitSecrets(&Options{
+			Fs:           h,
+			SecretsFile:  secretsFile,
+			HomeDir:      homeDir,
+			KeyFile:      keyFile,
+			Force:        false,
+			OverwriteKey: true,
+		})
+
+		req.NoError(err)
+		req.NotContains(strings.Join(result.Messages, "\n"), "Using existing SSH key pair")
+		req.True(result.Generated)
+		req.NotEqual(keyInfo.AuthorizedKey, result.AuthorizedKey)
+	})
+
 	t.Run("wraps sops config write errors", func(t *testing.T) {
 		t.Parallel()
 		req := require.New(t)

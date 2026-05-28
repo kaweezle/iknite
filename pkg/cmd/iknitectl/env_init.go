@@ -14,10 +14,8 @@ import (
 
 // EnvInitOptions contains flags for env init command.
 type EnvInitOptions struct {
-	ConfigDir      string
-	Force          bool
-	NonInteractive bool
-	PrintPaths     bool
+	Force      bool
+	PrintPaths bool
 }
 
 // CreateEnvInitCmd creates the env init command.
@@ -44,16 +42,13 @@ func CreateEnvInitCmd(baseService base.ServiceInterface) *cobra.Command {
 
 func addEnvInitCmdFlags(flags *pflag.FlagSet, opts *EnvInitOptions) {
 	flags.BoolVar(&opts.Force, "force", false, "Overwrite existing generated files")
-	flags.BoolVar(&opts.NonInteractive, "non-interactive", false, "Disable prompts for CI usage")
 	flags.BoolVar(&opts.PrintPaths, "print-paths", false, "Print resolved directory and file paths")
 }
 
 func performEnvInit(service *envsvc.Service, opts *EnvInitOptions) error {
 	result, err := service.Init(&envsvc.InitRequest{
-		ConfigDir:      opts.ConfigDir,
-		Force:          opts.Force,
-		NonInteractive: opts.NonInteractive,
-		PrintPaths:     opts.PrintPaths,
+		Force:      opts.Force,
+		PrintPaths: opts.PrintPaths,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to initialize environment: %w", err)

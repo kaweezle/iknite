@@ -45,12 +45,13 @@ const (
 
 // Options contains configuration for secrets operations.
 type Options struct {
-	Fs          host.FileEnvironment
-	Logger      *slog.Logger
-	SecretsFile string
-	HomeDir     string
-	KeyFile     string
-	Force       bool
+	Fs           host.FileEnvironment
+	Logger       *slog.Logger
+	SecretsFile  string
+	HomeDir      string
+	KeyFile      string
+	Force        bool
+	OverwriteKey bool
 }
 
 func (o *Options) SetDefaults() error {
@@ -80,6 +81,7 @@ func (o *Options) SetDefaults() error {
 
 // InitResult contains messages produced during secrets init.
 type InitResult struct {
+	sshKeyInfo
 	Messages []string
 }
 
@@ -195,6 +197,7 @@ func checkSecretsFilesExists(opts *Options, paths *secretsInitPaths, result *Ini
 }
 
 // InitSecrets initializes SOPS config, encrypted secrets, and an SSH key pair.
+// nolint:gocyclo // Multiple steps.
 func InitSecrets(opts *Options) (*InitResult, error) {
 	result := &InitResult{}
 
@@ -203,7 +206,7 @@ func InitSecrets(opts *Options) (*InitResult, error) {
 		return nil, err
 	}
 
-	if !opts.Force {
+	if !opts.Force && !opts.OverwriteKey {
 		if err = checkSecretsFilesExists(opts, paths, result); err != nil {
 			return nil, fmt.Errorf("failed to check existing secrets files: %w", err)
 		}
@@ -212,7 +215,7 @@ func InitSecrets(opts *Options) (*InitResult, error) {
 		}
 	}
 
-	keyInfo, err := ensureSSHKeyPair(opts.Fs, paths.keyFile, paths.publicKeyFile)
+	keyInfo, err := ensureSSHKeyPair(opts.Fs, paths.keyFile, paths.publicKeyFile, opts.OverwriteKey)
 	if err != nil {
 		return nil, err
 	}
@@ -277,6 +280,7 @@ func InitSecrets(opts *Options) (*InitResult, error) {
 			fmt.Sprintf("Set SOPS_AGE_SSH_PRIVATE_KEY_FILE=%s to decrypt the generated secrets file", paths.keyFile),
 		)
 	}
+	result.sshKeyInfo = *keyInfo
 
 	return result, nil
 }
