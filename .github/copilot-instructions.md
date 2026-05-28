@@ -29,7 +29,7 @@ not `<=`. Fix:"
   the beginning of the offending file. Example:
 
   ```go
-  // cSpell: words chainguard vhdx gofmt softlevel covermode cover
+  // cSpell: words chainguard gofmt softlevel covermode cover
   ```
 
   ```md

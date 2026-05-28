@@ -1,4 +1,4 @@
-// cSpell: words testpackage specv qcow2 VMQCOW2 VHDX VMVHDX
+// cSpell: words testpackage specv qcow2 VMQCOW2 VMVHDX
 package image
 
 import (
@@ -66,7 +66,7 @@ func TestInspectInfersRootFS(t *testing.T) {
 	svc := newServiceForManifest(t, &manifest, map[string][]byte{digest.FromString("rootfs").String(): []byte("r")})
 	inspectResult, err := svc.Inspect(context.Background(), "ghcr.io/kaweezle/iknite:latest")
 	require.NoError(t, err)
-	require.Equal(t, ArtifactRootFS, inspectResult.ImageType)
+	require.Equal(t, ImageTypeRootFS, inspectResult.ImageType)
 	require.Empty(t, inspectResult.ManifestTypeHint)
 }
 
@@ -84,7 +84,7 @@ func TestInspectInfersVHDX(t *testing.T) {
 	svc := newServiceForManifest(t, &manifest, map[string][]byte{digest.FromString("vhdx").String(): []byte("v")})
 	inspectResult, err := svc.Inspect(context.Background(), "ghcr.io/kaweezle/iknite-vm-vhdx:latest")
 	require.NoError(t, err)
-	require.Equal(t, ArtifactVMVHDX, inspectResult.ImageType)
+	require.Equal(t, ImageTypeVHDX, inspectResult.ImageType)
 	require.Equal(t, vhdxArtifactType, inspectResult.ManifestTypeHint)
 }
 
@@ -106,7 +106,7 @@ func TestInspectInfersQCOW2(t *testing.T) {
 	svc := newServiceForManifest(t, &manifest, blobs)
 	inspectResult, err := svc.Inspect(context.Background(), "ghcr.io/kaweezle/iknite-vm-qcow2:latest")
 	require.NoError(t, err)
-	require.Equal(t, ArtifactVMQCOW2, inspectResult.ImageType)
+	require.Equal(t, ImageTypeQCOW2, inspectResult.ImageType)
 	require.Equal(t, qcow2ArtifactType, inspectResult.ManifestTypeHint)
 }
 
@@ -139,12 +139,12 @@ func TestPullStoresArtifactsAndInspectJSON(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, []byte("meta-data"), metaData)
 
-	inspectRaw, err := svc.FS.ReadFile(filepath.Join(outputDir, inspectResultFileName))
+	inspectRaw, err := svc.FS.ReadFile(filepath.Join(outputDir, manifestFilename))
 	require.NoError(t, err)
 
 	var inspectResult InspectResult
 	require.NoError(t, json.Unmarshal(inspectRaw, &inspectResult))
-	require.Equal(t, ArtifactVMQCOW2, inspectResult.ImageType)
+	require.Equal(t, ImageTypeQCOW2, inspectResult.ImageType)
 	require.Equal(t, qcow2ArtifactType, inspectResult.ManifestTypeHint)
 }
 
@@ -179,12 +179,12 @@ func TestPullSkipsDownloadWhenManifestMatches(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, 2, repo.blobFetches)
 
-	inspectRaw, err := service.FS.ReadFile(filepath.Join(outputDir, inspectResultFileName))
+	inspectRaw, err := service.FS.ReadFile(filepath.Join(outputDir, manifestFilename))
 	require.NoError(t, err)
 
 	var inspectResult InspectResult
 	require.NoError(t, json.Unmarshal(inspectRaw, &inspectResult))
-	require.Equal(t, ArtifactVMQCOW2, inspectResult.ImageType)
+	require.Equal(t, ImageTypeQCOW2, inspectResult.ImageType)
 }
 
 func newServiceForManifest(t *testing.T, manifest *specv1.Manifest, blobs map[string][]byte) *Service {

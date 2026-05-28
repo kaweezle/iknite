@@ -1,4 +1,4 @@
-<!-- cSpell: words gitops oras paru -->
+<!-- cSpell: words gitops oras paru gorm -->
 
 # Glossary
 
@@ -47,7 +47,7 @@ We want also iknitectl to manage the credentials related to the iknite clusters:
   clusters.
 
 The credentials are stored in the iknitectl working directory, in the `auth`
-subdirectory (to be discussed).
+subdirectory.
 
 The environment also contains values and secrets that are shared between the
 clusters and workspaces. For example, the openstack credentials are shared
@@ -72,16 +72,19 @@ centralized location. Examples of centralized locations are:
 The following are subcommands, each related to a specific aspect of the cluster
 management:
 
-- `env`: Commands related to the management of the environment, such as the
-  initialization of the iknitectl working directory and the management of the
-  shared information.
-- `image`: Commands related to the management of the images used to provision
-  the clusters.
-- `cluster`: Commands related to the management of the clusters.
-- `workspace`: Commands related to the management of the workspaces.
-- `auth`: Commands related to the management of the credentials of the clusters
-  and workspaces.
-- `backend`: Commands related to the management of the backends of the clusters.
+- `env` (alias `e`): Commands related to the management of the environment, such
+  as the initialization of the iknitectl working directory and the management of
+  the shared information.
+- `image` (alias `i` or `img`): Commands related to the management of the images
+  used to provision the clusters.
+- `cluster` (alias `c` or `cl`): Commands related to the management of the
+  clusters.
+- `workspace` (alias `w` or `ws`): Commands related to the management of the
+  workspaces.
+- `auth` (alias `a`): Commands related to the management of the credentials of
+  the clusters and workspaces.
+- `backend` (alias `b` or `bck`): Commands related to the management of the
+  backends of the clusters.
 
 The following are open to discussion.
 
@@ -99,15 +102,6 @@ subcommand has the following commands:
 - `delete`: Delete a cluster.
 - `sync-kubeconfig`: Synchronize the kubeconfig file of the cluster with the
   local kubeconfig file.
-
-Each subcommand has a shortcut alias:
-
-- `env` can be aliased as `e`.
-- `image` can be aliased as `i` or `img`.
-- `cluster` can be aliased as `c` or `cl`.
-- `workspace` can be aliased as `w` or `ws`.
-- `auth` can be aliased as `a`.
-- `backend` can be aliased as `b` or `bck`.
 
 **TBD**: There can be some shortcuts. For example, `iknitectl deploy` can be a
 shortcut for `iknitectl workspace deploy`. Other possible shortcut is to to
