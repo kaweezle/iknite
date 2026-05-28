@@ -11,7 +11,6 @@ import (
 )
 
 const (
-	dirMode       = 0o755
 	fileMode      = 0o644
 	defaultValues = `
 apiVersion: config.iknite.app/v1alpha1
@@ -21,15 +20,12 @@ metadata:
 data:
     cloudProviders: {}
 `
-	caCommonName = "iknite-local-ca"
 )
 
 // InitRequest defines env init behavior.
 type InitRequest struct {
-	ConfigDir      string
-	Force          bool
-	NonInteractive bool
-	PrintPaths     bool
+	Force      bool
+	PrintPaths bool
 }
 
 // InitResult reports created paths and messages.
@@ -50,7 +46,7 @@ func (s *Service) Init(req *InitRequest) (*InitResult, error) {
 	if req == nil {
 		req = &InitRequest{}
 	}
-	if err := s.ensureDefaults(req.ConfigDir); err != nil {
+	if err := s.ensureDefaults(); err != nil {
 		return nil, err
 	}
 
@@ -76,7 +72,7 @@ func (s *Service) Init(req *InitRequest) (*InitResult, error) {
 	return &InitResult{Paths: s.Config, Messages: messages}, nil
 }
 
-func (s *Service) ensureDefaults(configDir string) error {
+func (s *Service) ensureDefaults() error {
 	if s.FS == nil {
 		return fmt.Errorf("filesystem dependency is required")
 	}
@@ -86,14 +82,11 @@ func (s *Service) ensureDefaults(configDir string) error {
 	}
 
 	if s.Config == nil {
-		s.Config = &config.Config{}
-		opts := config.NewConfigOptions(s.FS)
-		if configDir != "" {
-			opts.ConfigDir = configDir
+		c, err := config.NewDefaultConfig(s.FS)
+		if err != nil {
+			return fmt.Errorf("failed to create default config: %w", err)
 		}
-		if err := opts.Resolve(s.FS, s.Config); err != nil {
-			return fmt.Errorf("failed to resolve config paths: %w", err)
-		}
+		s.Config = c
 	}
 
 	return nil
@@ -105,10 +98,11 @@ func initSecrets(
 	force bool,
 ) (*pkgsecrets.InitResult, error) {
 	secretsOpts := &pkgsecrets.Options{
-		Fs:          fs,
-		Force:       force,
-		KeyFile:     paths.SharedSecretsKey,
-		SecretsFile: paths.SharedSecrets,
+		Fs:           fs,
+		Force:        force,
+		OverwriteKey: force,
+		KeyFile:      paths.SharedSecretsKey,
+		SecretsFile:  paths.SharedSecrets,
 	}
 
 	result, err := pkgsecrets.InitSecrets(secretsOpts)

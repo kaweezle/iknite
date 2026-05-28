@@ -78,8 +78,17 @@ func (o *ConfigOptions) Resolve(fse host.FileEnvironment, paths *Config) error {
 	paths.CA.KeyPath = pki.PathForKey(paths.Auth, o.CAName)
 
 	paths.SharedSecrets = fse.JoinPath(paths.Shared, DefaultSecretsFilename)
-	paths.SharedSecretsKey = fse.JoinPath(paths.Shared, DefaultKeyFilename)
+	paths.SharedSecretsKey = fse.JoinPath(paths.Auth, DefaultKeyFilename)
 	paths.SharedValues = fse.JoinPath(paths.Shared, DefaultValuesFilename)
 
 	return nil
+}
+
+func NewDefaultConfig(fse host.FileEnvironment) (*Config, error) {
+	c := &Config{}
+	opts := NewConfigOptions(fse)
+	if err := opts.Resolve(fse, c); err != nil {
+		return nil, fmt.Errorf("failed to resolve config paths: %w", err)
+	}
+	return c, nil
 }

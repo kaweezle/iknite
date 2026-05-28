@@ -1,4 +1,4 @@
-// cSpell: words testpackage
+// cSpell: words testpackage testconfig
 package env
 
 import (
@@ -6,6 +6,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/kaweezle/iknite/pkg/constants"
 	"github.com/kaweezle/iknite/pkg/iknitectl/config"
 	"github.com/kaweezle/iknite/pkg/testutil"
 )
@@ -106,17 +107,41 @@ func TestServiceInitCreatesPaths(t *testing.T) {
 	}
 }
 
-func TestServiceInitRespectsConfigDir(t *testing.T) {
+func TestServiceInit(t *testing.T) {
 	t.Parallel()
+	req := require.New(t)
 
 	fs := testutil.NewDummyUserHost()
 	svc := &Service{
 		FS:     fs,
 		Logger: testutil.TestLogger(t),
 	}
+	configDir, err := fs.UserConfigDir()
+	req.NoError(err)
 
-	result, err := svc.Init(&InitRequest{ConfigDir: "/iknite-custom"})
+	result, err := svc.Init(&InitRequest{})
 	require.NoError(t, err)
 	require.NotNil(t, result.Paths)
-	require.Equal(t, "/iknite-custom", result.Paths.Root)
+	expectedRoot := fs.JoinPath(configDir, constants.IkniteConfName)
+	require.Equal(t, expectedRoot, result.Paths.Root)
+}
+
+func TestServiceInitRespectsConfigDir(t *testing.T) {
+	t.Parallel()
+	req := require.New(t)
+
+	fs := testutil.NewDummyUserHost()
+	svc := &Service{
+		FS:     fs,
+		Logger: testutil.TestLogger(t),
+		Config: &config.Config{},
+	}
+	opts := config.NewConfigOptions(fs)
+	opts.ConfigDir = "/tmp/testconfig"
+	req.NoError(opts.Resolve(fs, svc.Config))
+
+	result, err := svc.Init(&InitRequest{})
+	req.NoError(err)
+	req.NotNil(result.Paths)
+	req.Equal("/tmp/testconfig/auth", result.Paths.Auth)
 }
