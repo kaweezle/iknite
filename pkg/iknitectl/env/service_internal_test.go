@@ -100,6 +100,7 @@ func TestServiceInitCreatesPaths(t *testing.T) {
 		"/tmp/xdg/iknite/shared/values.yaml",
 		"/tmp/xdg/iknite/shared/secrets.sops.yaml",
 		"/tmp/xdg/iknite/shared/.sops.yaml",
+		"/tmp/xdg/iknite/iknite.db",
 	} {
 		exists, existsErr := fs.Exists(path)
 		require.NoError(t, existsErr)

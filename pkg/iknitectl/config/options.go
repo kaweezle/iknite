@@ -66,6 +66,7 @@ func (o *ConfigOptions) Resolve(fse host.FileEnvironment, paths *Config) error {
 	}
 	configDir := filepath.Clean(o.ConfigDir)
 	paths.Root = configDir
+	paths.Database = fse.JoinPath(configDir, DefaultDatabaseFile)
 
 	paths.Auth = fse.JoinPath(configDir, DefaultAuthDirname)
 	paths.Shared = fse.JoinPath(configDir, DefaultSharedDirname)

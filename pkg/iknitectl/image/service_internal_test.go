@@ -1,4 +1,5 @@
 // cSpell: words testpackage specv qcow2 VMQCOW2 VMVHDX
+// cSpell: words imagemocks
 package image
 
 import (
@@ -6,6 +7,7 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"path"
 	"path/filepath"
 	"testing"
 
@@ -14,6 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/kaweezle/iknite/pkg/iknitectl/config"
+	"github.com/kaweezle/iknite/pkg/iknitectl/db"
 	"github.com/kaweezle/iknite/pkg/testutil"
 )
 
@@ -126,10 +129,11 @@ func TestPullStoresArtifactsAndInspectJSON(t *testing.T) {
 		digest.FromString("meta").String(): []byte("meta-data"),
 	}
 	svc := newServiceForManifest(t, &manifest, blobs)
+	expectedOutputDir := "/home/alpine/.config/iknite/images/ghcr.io_kaweezle_iknite-vm-qcow2_latest"
 
 	outputDir, err := svc.Pull(context.Background(), &PullRequest{ImageRef: "ghcr.io/kaweezle/iknite-vm-qcow2:latest"})
 	require.NoError(t, err)
-	require.Equal(t, "/home/alpine/.config/iknite/images/ghcr.io_kaweezle_iknite-vm-qcow2_latest", outputDir)
+	require.Equal(t, expectedOutputDir, outputDir)
 
 	qcowData, err := svc.FS.ReadFile(filepath.Join(outputDir, "disk.qcow2"))
 	require.NoError(t, err)
@@ -165,6 +169,7 @@ func TestPullSkipsDownloadWhenManifestMatches(t *testing.T) {
 	}
 
 	service, repo := newServiceAndRepoForManifest(t, &manifest, blobs)
+
 	_, err := service.Pull(
 		context.Background(),
 		&PullRequest{ImageRef: "ghcr.io/kaweezle/iknite-vm-qcow2:latest"},
@@ -185,6 +190,33 @@ func TestPullSkipsDownloadWhenManifestMatches(t *testing.T) {
 	var inspectResult InspectResult
 	require.NoError(t, json.Unmarshal(inspectRaw, &inspectResult))
 	require.Equal(t, ImageTypeQCOW2, inspectResult.ImageType)
+}
+
+func TestPullStoresRootFSAndInspectJSON(t *testing.T) {
+	t.Parallel()
+
+	manifest := specv1.Manifest{
+		Layers: []specv1.Descriptor{{
+			MediaType: rootfsMediaTypeDocker,
+			Digest:    digest.FromString("rootfs"),
+		}},
+	}
+
+	blobs := map[string][]byte{digest.FromString("rootfs").String(): []byte("rootfs-data")}
+	service, _ := newServiceAndRepoForManifest(t, &manifest, blobs)
+	outputDir, err := service.Pull(context.Background(), &PullRequest{ImageRef: "ghcr.io/kaweezle/iknite:latest"})
+	require.NoError(t, err)
+
+	rootfsData, err := service.FS.ReadFile(path.Join(outputDir, "rootfs.tar.gz"))
+	require.NoError(t, err)
+	require.Equal(t, []byte("rootfs-data"), rootfsData)
+
+	inspectRaw, err := service.FS.ReadFile(path.Join(outputDir, manifestFilename))
+	require.NoError(t, err)
+
+	var inspectResult InspectResult
+	require.NoError(t, json.Unmarshal(inspectRaw, &inspectResult))
+	require.Equal(t, ImageTypeRootFS, inspectResult.ImageType)
 }
 
 func newServiceForManifest(t *testing.T, manifest *specv1.Manifest, blobs map[string][]byte) *Service {
@@ -215,6 +247,12 @@ func newServiceAndRepoForManifest(
 	fs := testutil.NewDummyUserHost()
 	c := &config.Config{}
 	require.NoError(t, config.NewConfigOptions(fs).Resolve(fs, c))
+	store, err := db.Open(filepath.Join(t.TempDir(), "iknite.db"))
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		require.NoError(t, store.Close())
+	})
+
 	return &Service{
 		FS: fs,
 		NewRepository: func(string) (Repository, error) {
@@ -222,5 +260,6 @@ func newServiceAndRepoForManifest(
 		},
 		Logger: testutil.TestLogger(t),
 		Config: c,
+		Store:  store,
 	}, fakeRepo
 }

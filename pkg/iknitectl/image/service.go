@@ -20,6 +20,7 @@ import (
 	"github.com/kaweezle/iknite/pkg/cmd/util"
 	"github.com/kaweezle/iknite/pkg/host"
 	"github.com/kaweezle/iknite/pkg/iknitectl/config"
+	"github.com/kaweezle/iknite/pkg/iknitectl/db"
 )
 
 const (
@@ -48,11 +49,28 @@ type Repository interface {
 // NewRepositoryFunc creates a repository client.
 type NewRepositoryFunc func(repository string) (Repository, error)
 
+// MetadataStore exposes the subset of database operations needed by image pull.
+type MetadataStore interface {
+	GetImageSource(id string) (*db.ImageSource, error)
+	CreateImageSource(item *db.ImageSource) error
+	UpdateImageSource(item *db.ImageSource) error
+	GetImageVersion(id string) (*db.ImageVersion, error)
+	CreateImageVersion(item *db.ImageVersion) error
+	UpdateImageVersion(item *db.ImageVersion) error
+	GetImage(id string) (*db.Image, error)
+	CreateImage(item *db.Image) error
+	UpdateImage(item *db.Image) error
+	GetImageArtifact(id string) (*db.ImageArtifact, error)
+	CreateImageArtifact(item *db.ImageArtifact) error
+	UpdateImageArtifact(item *db.ImageArtifact) error
+}
+
 // Service provides image inspect and pull operations.
 type Service struct {
 	FS            host.FileEnvironment
 	Logger        *slog.Logger
 	Config        *config.Config
+	Store         MetadataStore
 	NewRepository NewRepositoryFunc
 }
 
@@ -75,6 +93,10 @@ func (s *Service) ensureDefaults() error {
 	if s.FS == nil {
 		return fmt.Errorf("filesystem dependency is required")
 	}
+	if s.Store == nil {
+		return fmt.Errorf("store dependency is required")
+	}
+
 	if s.NewRepository == nil {
 		s.NewRepository = newRemoteRepository
 	}
@@ -146,6 +168,8 @@ func (s *Service) Inspect(ctx context.Context, imageRef string) (*InspectResult,
 }
 
 // Pull downloads image artifacts into ~/.config/iknite/images/<image-id>/ and writes inspect-result.json.
+//
+//nolint:gocyclo // Pull orchestrates validation, local cache checks, downloads, and metadata persistence.
 func (s *Service) Pull(ctx context.Context, req *PullRequest) (string, error) {
 	if req == nil {
 		return "", fmt.Errorf("pull request is required")
@@ -172,20 +196,30 @@ func (s *Service) Pull(ctx context.Context, req *PullRequest) (string, error) {
 		return "", fmt.Errorf("failed to create output directory: %w", err)
 	}
 
+	imageID, err := persistImageMetadata(s.Store, inspectResult, outputDir)
+	if err != nil {
+		return "", err
+	}
+
 	logger = logger.With("outputDir", outputDir)
+
+	layers, err := selectArtifactLayers(&inspectResult.Manifest, inspectResult.ImageType)
+	if err != nil {
+		return "", err
+	}
 
 	alreadyDownloaded, err := s.hasMatchingSavedManifest(outputDir, inspectResult)
 	if err != nil {
 		return "", err
 	}
 	if alreadyDownloaded {
+		for _, layer := range layers {
+			if persistErr := persistImageArtifact(s.Store, imageID, outputDir, layer); persistErr != nil {
+				return "", persistErr
+			}
+		}
 		logger.Info("Image artifacts already exist locally, skipping download")
 		return outputDir, nil
-	}
-
-	layers, err := selectArtifactLayers(&inspectResult.Manifest, inspectResult.ImageType)
-	if err != nil {
-		return "", err
 	}
 
 	repo, err := s.NewRepository(inspectResult.Repository)
@@ -197,6 +231,9 @@ func (s *Service) Pull(ctx context.Context, req *PullRequest) (string, error) {
 		err = layer.download(ctx, repo, fs, outputDir, os.Stdout)
 		if err != nil {
 			return "", fmt.Errorf("failed to download layer %s: %w", layer.Descriptor.Digest.String(), err)
+		}
+		if persistErr := persistImageArtifact(s.Store, imageID, outputDir, layer); persistErr != nil {
+			return "", persistErr
 		}
 	}
 

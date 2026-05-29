@@ -54,6 +54,10 @@ func (s *Service) Init(req *InitRequest) (*InitResult, error) {
 		return nil, fmt.Errorf("failed to create config directory tree: %w", mkErr)
 	}
 
+	if dbErr := s.Config.EnsureDatabase(s.FS); dbErr != nil {
+		return nil, fmt.Errorf("failed to initialize database: %w", dbErr)
+	}
+
 	secretsResult, err := initSecrets(s.FS, s.Config, req.Force)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize secrets: %w", err)
