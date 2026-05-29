@@ -369,8 +369,8 @@ func TestRunInitCmd_Success(t *testing.T) {
 	req.NoError(err)
 }
 
+//nolint:paralleltest // kubeadm phases use static variables to hold flags.
 func TestAddInitWorkflowPhases_RegistersProxyAPI(t *testing.T) {
-	t.Parallel()
 	req := require.New(t)
 
 	initRunner := workflow.NewRunner()
@@ -393,8 +393,8 @@ func TestAddInitWorkflowPhases_RegistersProxyAPI(t *testing.T) {
 	// req.Equal(proxyIndex+1, workloadsIndex)
 }
 
+//nolint:paralleltest // kubeadm phases use static variables to hold flags.
 func TestAddInitWorkflowPhases_RegistersSetLBIP(t *testing.T) {
-	t.Parallel()
 	req := require.New(t)
 
 	initRunner := workflow.NewRunner()

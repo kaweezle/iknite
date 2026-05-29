@@ -4,6 +4,7 @@ package config
 import (
 	"fmt"
 	"log/slog"
+	"os"
 
 	certutil "k8s.io/client-go/util/cert"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
@@ -15,11 +16,13 @@ import (
 
 const (
 	dirMode = 0o755
+	dbMode  = 0o600
 
 	DefaultAuthDirname     = "auth"
 	DefaultSharedDirname   = "shared"
 	DefaultImagesDirname   = "images"
 	DefaultClustersDirname = "clusters"
+	DefaultDatabaseFile    = "iknite.db"
 	DefaultValuesFilename  = "values.yaml"
 	DefaultKeyFilename     = "id_ed25519"
 	DefaultSecretsFilename = "secrets.sops.yaml" //nolint:gosec // This is just a filename.
@@ -38,6 +41,7 @@ type Config struct {
 	Shared   string
 	Images   string
 	Clusters string
+	Database string
 
 	SharedSecrets    string
 	SharedSecretsKey string
@@ -98,5 +102,25 @@ func (c *Config) EnsureCertificateAuthority(fs host.FileSystem, logger *slog.Log
 	}
 
 	logger.Info("Generated new CA certificate and key", "certPath", c.CA.CertPath, "keyPath", c.CA.KeyPath)
+	return nil
+}
+
+func (c *Config) EnsureDatabase(fs host.FileSystem) error {
+	exists, err := fs.Exists(c.Database)
+	if err != nil {
+		return fmt.Errorf("failed to check database file: %w", err)
+	}
+	if exists {
+		return nil
+	}
+
+	dbFile, err := fs.OpenFile(c.Database, os.O_CREATE|os.O_RDWR, dbMode)
+	if err != nil {
+		return fmt.Errorf("failed to initialize database file: %w", err)
+	}
+	if err = dbFile.Close(); err != nil {
+		return fmt.Errorf("failed to close database file: %w", err)
+	}
+
 	return nil
 }
