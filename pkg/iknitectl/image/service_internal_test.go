@@ -219,6 +219,83 @@ func TestPullStoresRootFSAndInspectJSON(t *testing.T) {
 	require.Equal(t, ImageTypeRootFS, inspectResult.ImageType)
 }
 
+func TestListImages(t *testing.T) {
+	t.Parallel()
+
+	store := newPersistenceStore(t)
+	fs := testutil.NewDummyUserHost()
+	configOptions := config.NewConfigOptions(fs)
+	configOptions.ConfigDir = t.TempDir()
+	c := &config.Config{}
+	require.NoError(t, configOptions.Resolve(fs, c))
+
+	require.NoError(t, db.CreateItem(store, &db.ImageSource{
+		BaseModel: db.BaseModel{ID: "repo-a"},
+		Kind:      "registry",
+		Location:  "repo-a",
+	}))
+	require.NoError(t, db.CreateItem(store, &db.ImageVersion{
+		BaseModel:         db.BaseModel{ID: "repo-a@v1"},
+		SourceID:          "repo-a",
+		Tag:               "v1",
+		ManifestDigest:    "sha256:aaa",
+		ManifestMediaType: "application/vnd.oci.image.manifest.v1+json",
+	}))
+	require.NoError(t, db.CreateItem(store, &db.Image{
+		BaseModel: db.BaseModel{ID: "image-a"},
+		VersionID: "repo-a@v1",
+		Name:      "/tmp/images/a",
+	}))
+	require.NoError(t, db.CreateItem(store, &db.ImageArtifact{
+		BaseModel: db.BaseModel{ID: "artifact-a-1"},
+		ImageID:   "image-a",
+		Type:      db.ArtifactTypeRootFS,
+	}))
+
+	require.NoError(t, db.CreateItem(store, &db.ImageSource{
+		BaseModel: db.BaseModel{ID: "repo-b"},
+		Kind:      "registry",
+		Location:  "repo-b",
+	}))
+	require.NoError(t, db.CreateItem(store, &db.ImageVersion{
+		BaseModel:         db.BaseModel{ID: "repo-b@v2"},
+		SourceID:          "repo-b",
+		Tag:               "v2",
+		ManifestDigest:    "sha256:bbb",
+		ManifestMediaType: "application/vnd.oci.image.manifest.v1+json",
+	}))
+	require.NoError(t, db.CreateItem(store, &db.Image{
+		BaseModel: db.BaseModel{ID: "image-b"},
+		VersionID: "repo-b@v2",
+		Name:      "/tmp/images/z",
+	}))
+	require.NoError(t, db.CreateItem(store, &db.ImageArtifact{
+		BaseModel: db.BaseModel{ID: "artifact-b-1"},
+		ImageID:   "image-b",
+		Type:      db.ArtifactTypeRootFS,
+	}))
+	require.NoError(t, db.CreateItem(store, &db.ImageArtifact{
+		BaseModel: db.BaseModel{ID: "artifact-b-2"},
+		ImageID:   "image-b",
+		Type:      db.ArtifactTypeIncusMetadata,
+	}))
+
+	svc := &Service{FS: fs, Logger: testutil.TestLogger(t), Config: c, Store: store}
+	items, err := svc.ListImages()
+	require.NoError(t, err)
+	require.Len(t, items, 2)
+	require.Equal(t, "/tmp/images/a", items[0].Path)
+	require.Equal(t, "repo-a", items[0].Source)
+	require.Equal(t, "v1", items[0].Reference)
+	require.Equal(t, "1 [rootfs]", items[0].Artifacts)
+	require.EqualValues(t, 0, items[0].TotalSize)
+	require.Equal(t, "/tmp/images/z", items[1].Path)
+	require.Equal(t, "repo-b", items[1].Source)
+	require.Equal(t, "v2", items[1].Reference)
+	require.Equal(t, "2 [incus-metadata, rootfs]", items[1].Artifacts)
+	require.EqualValues(t, 0, items[1].TotalSize)
+}
+
 func newServiceForManifest(t *testing.T, manifest *specv1.Manifest, blobs map[string][]byte) *Service {
 	t.Helper()
 

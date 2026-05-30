@@ -14,6 +14,7 @@ func CreateImageCmd(baseService base.ServiceInterface) *cobra.Command {
 		Short:   "Manage provisioning images",
 	}
 
+	imageCmd.AddCommand(CreateImageListCmd(baseService))
 	imageCmd.AddCommand(CreateImageInspectCmd(baseService))
 	imageCmd.AddCommand(CreateImagePullCmd(baseService))
 

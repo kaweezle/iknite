@@ -36,16 +36,16 @@ func (_m *MockMetadataStore) EXPECT() *MockMetadataStore_Expecter {
 	return &MockMetadataStore_Expecter{mock: &_m.Mock}
 }
 
-// CreateImage provides a mock function for the type MockMetadataStore
-func (_mock *MockMetadataStore) CreateImage(item *db.Image) error {
+// CreateItem provides a mock function for the type MockMetadataStore
+func (_mock *MockMetadataStore) CreateItem(item db.IDAccessor) error {
 	ret := _mock.Called(item)
 
 	if len(ret) == 0 {
-		panic("no return value specified for CreateImage")
+		panic("no return value specified for CreateItem")
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(*db.Image) error); ok {
+	if returnFunc, ok := ret.Get(0).(func(db.IDAccessor) error); ok {
 		r0 = returnFunc(item)
 	} else {
 		r0 = ret.Error(0)
@@ -53,22 +53,22 @@ func (_mock *MockMetadataStore) CreateImage(item *db.Image) error {
 	return r0
 }
 
-// MockMetadataStore_CreateImage_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CreateImage'
-type MockMetadataStore_CreateImage_Call struct {
+// MockMetadataStore_CreateItem_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CreateItem'
+type MockMetadataStore_CreateItem_Call struct {
 	*mock.Call
 }
 
-// CreateImage is a helper method to define mock.On call
-//   - item *db.Image
-func (_e *MockMetadataStore_Expecter) CreateImage(item interface{}) *MockMetadataStore_CreateImage_Call {
-	return &MockMetadataStore_CreateImage_Call{Call: _e.mock.On("CreateImage", item)}
+// CreateItem is a helper method to define mock.On call
+//   - item db.IDAccessor
+func (_e *MockMetadataStore_Expecter) CreateItem(item interface{}) *MockMetadataStore_CreateItem_Call {
+	return &MockMetadataStore_CreateItem_Call{Call: _e.mock.On("CreateItem", item)}
 }
 
-func (_c *MockMetadataStore_CreateImage_Call) Run(run func(item *db.Image)) *MockMetadataStore_CreateImage_Call {
+func (_c *MockMetadataStore_CreateItem_Call) Run(run func(item db.IDAccessor)) *MockMetadataStore_CreateItem_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 *db.Image
+		var arg0 db.IDAccessor
 		if args[0] != nil {
-			arg0 = args[0].(*db.Image)
+			arg0 = args[0].(db.IDAccessor)
 		}
 		run(
 			arg0,
@@ -77,26 +77,26 @@ func (_c *MockMetadataStore_CreateImage_Call) Run(run func(item *db.Image)) *Moc
 	return _c
 }
 
-func (_c *MockMetadataStore_CreateImage_Call) Return(err error) *MockMetadataStore_CreateImage_Call {
+func (_c *MockMetadataStore_CreateItem_Call) Return(err error) *MockMetadataStore_CreateItem_Call {
 	_c.Call.Return(err)
 	return _c
 }
 
-func (_c *MockMetadataStore_CreateImage_Call) RunAndReturn(run func(item *db.Image) error) *MockMetadataStore_CreateImage_Call {
+func (_c *MockMetadataStore_CreateItem_Call) RunAndReturn(run func(item db.IDAccessor) error) *MockMetadataStore_CreateItem_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
-// CreateImageArtifact provides a mock function for the type MockMetadataStore
-func (_mock *MockMetadataStore) CreateImageArtifact(item *db.ImageArtifact) error {
+// CreateOrUpdateItem provides a mock function for the type MockMetadataStore
+func (_mock *MockMetadataStore) CreateOrUpdateItem(item db.IDAccessor) error {
 	ret := _mock.Called(item)
 
 	if len(ret) == 0 {
-		panic("no return value specified for CreateImageArtifact")
+		panic("no return value specified for CreateOrUpdateItem")
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(*db.ImageArtifact) error); ok {
+	if returnFunc, ok := ret.Get(0).(func(db.IDAccessor) error); ok {
 		r0 = returnFunc(item)
 	} else {
 		r0 = ret.Error(0)
@@ -104,22 +104,22 @@ func (_mock *MockMetadataStore) CreateImageArtifact(item *db.ImageArtifact) erro
 	return r0
 }
 
-// MockMetadataStore_CreateImageArtifact_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CreateImageArtifact'
-type MockMetadataStore_CreateImageArtifact_Call struct {
+// MockMetadataStore_CreateOrUpdateItem_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CreateOrUpdateItem'
+type MockMetadataStore_CreateOrUpdateItem_Call struct {
 	*mock.Call
 }
 
-// CreateImageArtifact is a helper method to define mock.On call
-//   - item *db.ImageArtifact
-func (_e *MockMetadataStore_Expecter) CreateImageArtifact(item interface{}) *MockMetadataStore_CreateImageArtifact_Call {
-	return &MockMetadataStore_CreateImageArtifact_Call{Call: _e.mock.On("CreateImageArtifact", item)}
+// CreateOrUpdateItem is a helper method to define mock.On call
+//   - item db.IDAccessor
+func (_e *MockMetadataStore_Expecter) CreateOrUpdateItem(item interface{}) *MockMetadataStore_CreateOrUpdateItem_Call {
+	return &MockMetadataStore_CreateOrUpdateItem_Call{Call: _e.mock.On("CreateOrUpdateItem", item)}
 }
 
-func (_c *MockMetadataStore_CreateImageArtifact_Call) Run(run func(item *db.ImageArtifact)) *MockMetadataStore_CreateImageArtifact_Call {
+func (_c *MockMetadataStore_CreateOrUpdateItem_Call) Run(run func(item db.IDAccessor)) *MockMetadataStore_CreateOrUpdateItem_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 *db.ImageArtifact
+		var arg0 db.IDAccessor
 		if args[0] != nil {
-			arg0 = args[0].(*db.ImageArtifact)
+			arg0 = args[0].(db.IDAccessor)
 		}
 		run(
 			arg0,
@@ -128,376 +128,134 @@ func (_c *MockMetadataStore_CreateImageArtifact_Call) Run(run func(item *db.Imag
 	return _c
 }
 
-func (_c *MockMetadataStore_CreateImageArtifact_Call) Return(err error) *MockMetadataStore_CreateImageArtifact_Call {
+func (_c *MockMetadataStore_CreateOrUpdateItem_Call) Return(err error) *MockMetadataStore_CreateOrUpdateItem_Call {
 	_c.Call.Return(err)
 	return _c
 }
 
-func (_c *MockMetadataStore_CreateImageArtifact_Call) RunAndReturn(run func(item *db.ImageArtifact) error) *MockMetadataStore_CreateImageArtifact_Call {
+func (_c *MockMetadataStore_CreateOrUpdateItem_Call) RunAndReturn(run func(item db.IDAccessor) error) *MockMetadataStore_CreateOrUpdateItem_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
-// CreateImageSource provides a mock function for the type MockMetadataStore
-func (_mock *MockMetadataStore) CreateImageSource(item *db.ImageSource) error {
-	ret := _mock.Called(item)
+// GetItem provides a mock function for the type MockMetadataStore
+func (_mock *MockMetadataStore) GetItem(id string, out any) error {
+	ret := _mock.Called(id, out)
 
 	if len(ret) == 0 {
-		panic("no return value specified for CreateImageSource")
+		panic("no return value specified for GetItem")
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(*db.ImageSource) error); ok {
-		r0 = returnFunc(item)
+	if returnFunc, ok := ret.Get(0).(func(string, any) error); ok {
+		r0 = returnFunc(id, out)
 	} else {
 		r0 = ret.Error(0)
 	}
 	return r0
 }
 
-// MockMetadataStore_CreateImageSource_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CreateImageSource'
-type MockMetadataStore_CreateImageSource_Call struct {
+// MockMetadataStore_GetItem_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetItem'
+type MockMetadataStore_GetItem_Call struct {
 	*mock.Call
 }
 
-// CreateImageSource is a helper method to define mock.On call
-//   - item *db.ImageSource
-func (_e *MockMetadataStore_Expecter) CreateImageSource(item interface{}) *MockMetadataStore_CreateImageSource_Call {
-	return &MockMetadataStore_CreateImageSource_Call{Call: _e.mock.On("CreateImageSource", item)}
-}
-
-func (_c *MockMetadataStore_CreateImageSource_Call) Run(run func(item *db.ImageSource)) *MockMetadataStore_CreateImageSource_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 *db.ImageSource
-		if args[0] != nil {
-			arg0 = args[0].(*db.ImageSource)
-		}
-		run(
-			arg0,
-		)
-	})
-	return _c
-}
-
-func (_c *MockMetadataStore_CreateImageSource_Call) Return(err error) *MockMetadataStore_CreateImageSource_Call {
-	_c.Call.Return(err)
-	return _c
-}
-
-func (_c *MockMetadataStore_CreateImageSource_Call) RunAndReturn(run func(item *db.ImageSource) error) *MockMetadataStore_CreateImageSource_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// CreateImageVersion provides a mock function for the type MockMetadataStore
-func (_mock *MockMetadataStore) CreateImageVersion(item *db.ImageVersion) error {
-	ret := _mock.Called(item)
-
-	if len(ret) == 0 {
-		panic("no return value specified for CreateImageVersion")
-	}
-
-	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(*db.ImageVersion) error); ok {
-		r0 = returnFunc(item)
-	} else {
-		r0 = ret.Error(0)
-	}
-	return r0
-}
-
-// MockMetadataStore_CreateImageVersion_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CreateImageVersion'
-type MockMetadataStore_CreateImageVersion_Call struct {
-	*mock.Call
-}
-
-// CreateImageVersion is a helper method to define mock.On call
-//   - item *db.ImageVersion
-func (_e *MockMetadataStore_Expecter) CreateImageVersion(item interface{}) *MockMetadataStore_CreateImageVersion_Call {
-	return &MockMetadataStore_CreateImageVersion_Call{Call: _e.mock.On("CreateImageVersion", item)}
-}
-
-func (_c *MockMetadataStore_CreateImageVersion_Call) Run(run func(item *db.ImageVersion)) *MockMetadataStore_CreateImageVersion_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 *db.ImageVersion
-		if args[0] != nil {
-			arg0 = args[0].(*db.ImageVersion)
-		}
-		run(
-			arg0,
-		)
-	})
-	return _c
-}
-
-func (_c *MockMetadataStore_CreateImageVersion_Call) Return(err error) *MockMetadataStore_CreateImageVersion_Call {
-	_c.Call.Return(err)
-	return _c
-}
-
-func (_c *MockMetadataStore_CreateImageVersion_Call) RunAndReturn(run func(item *db.ImageVersion) error) *MockMetadataStore_CreateImageVersion_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// GetImage provides a mock function for the type MockMetadataStore
-func (_mock *MockMetadataStore) GetImage(id string) (*db.Image, error) {
-	ret := _mock.Called(id)
-
-	if len(ret) == 0 {
-		panic("no return value specified for GetImage")
-	}
-
-	var r0 *db.Image
-	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(string) (*db.Image, error)); ok {
-		return returnFunc(id)
-	}
-	if returnFunc, ok := ret.Get(0).(func(string) *db.Image); ok {
-		r0 = returnFunc(id)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*db.Image)
-		}
-	}
-	if returnFunc, ok := ret.Get(1).(func(string) error); ok {
-		r1 = returnFunc(id)
-	} else {
-		r1 = ret.Error(1)
-	}
-	return r0, r1
-}
-
-// MockMetadataStore_GetImage_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetImage'
-type MockMetadataStore_GetImage_Call struct {
-	*mock.Call
-}
-
-// GetImage is a helper method to define mock.On call
+// GetItem is a helper method to define mock.On call
 //   - id string
-func (_e *MockMetadataStore_Expecter) GetImage(id interface{}) *MockMetadataStore_GetImage_Call {
-	return &MockMetadataStore_GetImage_Call{Call: _e.mock.On("GetImage", id)}
+//   - out any
+func (_e *MockMetadataStore_Expecter) GetItem(id interface{}, out interface{}) *MockMetadataStore_GetItem_Call {
+	return &MockMetadataStore_GetItem_Call{Call: _e.mock.On("GetItem", id, out)}
 }
 
-func (_c *MockMetadataStore_GetImage_Call) Run(run func(id string)) *MockMetadataStore_GetImage_Call {
+func (_c *MockMetadataStore_GetItem_Call) Run(run func(id string, out any)) *MockMetadataStore_GetItem_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 string
 		if args[0] != nil {
 			arg0 = args[0].(string)
 		}
+		var arg1 any
+		if args[1] != nil {
+			arg1 = args[1].(any)
+		}
 		run(
 			arg0,
+			arg1,
 		)
 	})
 	return _c
 }
 
-func (_c *MockMetadataStore_GetImage_Call) Return(image *db.Image, err error) *MockMetadataStore_GetImage_Call {
-	_c.Call.Return(image, err)
+func (_c *MockMetadataStore_GetItem_Call) Return(err error) *MockMetadataStore_GetItem_Call {
+	_c.Call.Return(err)
 	return _c
 }
 
-func (_c *MockMetadataStore_GetImage_Call) RunAndReturn(run func(id string) (*db.Image, error)) *MockMetadataStore_GetImage_Call {
+func (_c *MockMetadataStore_GetItem_Call) RunAndReturn(run func(id string, out any) error) *MockMetadataStore_GetItem_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
-// GetImageArtifact provides a mock function for the type MockMetadataStore
-func (_mock *MockMetadataStore) GetImageArtifact(id string) (*db.ImageArtifact, error) {
-	ret := _mock.Called(id)
+// ListItems provides a mock function for the type MockMetadataStore
+func (_mock *MockMetadataStore) ListItems(out any) error {
+	ret := _mock.Called(out)
 
 	if len(ret) == 0 {
-		panic("no return value specified for GetImageArtifact")
-	}
-
-	var r0 *db.ImageArtifact
-	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(string) (*db.ImageArtifact, error)); ok {
-		return returnFunc(id)
-	}
-	if returnFunc, ok := ret.Get(0).(func(string) *db.ImageArtifact); ok {
-		r0 = returnFunc(id)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*db.ImageArtifact)
-		}
-	}
-	if returnFunc, ok := ret.Get(1).(func(string) error); ok {
-		r1 = returnFunc(id)
-	} else {
-		r1 = ret.Error(1)
-	}
-	return r0, r1
-}
-
-// MockMetadataStore_GetImageArtifact_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetImageArtifact'
-type MockMetadataStore_GetImageArtifact_Call struct {
-	*mock.Call
-}
-
-// GetImageArtifact is a helper method to define mock.On call
-//   - id string
-func (_e *MockMetadataStore_Expecter) GetImageArtifact(id interface{}) *MockMetadataStore_GetImageArtifact_Call {
-	return &MockMetadataStore_GetImageArtifact_Call{Call: _e.mock.On("GetImageArtifact", id)}
-}
-
-func (_c *MockMetadataStore_GetImageArtifact_Call) Run(run func(id string)) *MockMetadataStore_GetImageArtifact_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 string
-		if args[0] != nil {
-			arg0 = args[0].(string)
-		}
-		run(
-			arg0,
-		)
-	})
-	return _c
-}
-
-func (_c *MockMetadataStore_GetImageArtifact_Call) Return(imageArtifact *db.ImageArtifact, err error) *MockMetadataStore_GetImageArtifact_Call {
-	_c.Call.Return(imageArtifact, err)
-	return _c
-}
-
-func (_c *MockMetadataStore_GetImageArtifact_Call) RunAndReturn(run func(id string) (*db.ImageArtifact, error)) *MockMetadataStore_GetImageArtifact_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// GetImageSource provides a mock function for the type MockMetadataStore
-func (_mock *MockMetadataStore) GetImageSource(id string) (*db.ImageSource, error) {
-	ret := _mock.Called(id)
-
-	if len(ret) == 0 {
-		panic("no return value specified for GetImageSource")
-	}
-
-	var r0 *db.ImageSource
-	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(string) (*db.ImageSource, error)); ok {
-		return returnFunc(id)
-	}
-	if returnFunc, ok := ret.Get(0).(func(string) *db.ImageSource); ok {
-		r0 = returnFunc(id)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*db.ImageSource)
-		}
-	}
-	if returnFunc, ok := ret.Get(1).(func(string) error); ok {
-		r1 = returnFunc(id)
-	} else {
-		r1 = ret.Error(1)
-	}
-	return r0, r1
-}
-
-// MockMetadataStore_GetImageSource_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetImageSource'
-type MockMetadataStore_GetImageSource_Call struct {
-	*mock.Call
-}
-
-// GetImageSource is a helper method to define mock.On call
-//   - id string
-func (_e *MockMetadataStore_Expecter) GetImageSource(id interface{}) *MockMetadataStore_GetImageSource_Call {
-	return &MockMetadataStore_GetImageSource_Call{Call: _e.mock.On("GetImageSource", id)}
-}
-
-func (_c *MockMetadataStore_GetImageSource_Call) Run(run func(id string)) *MockMetadataStore_GetImageSource_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 string
-		if args[0] != nil {
-			arg0 = args[0].(string)
-		}
-		run(
-			arg0,
-		)
-	})
-	return _c
-}
-
-func (_c *MockMetadataStore_GetImageSource_Call) Return(imageSource *db.ImageSource, err error) *MockMetadataStore_GetImageSource_Call {
-	_c.Call.Return(imageSource, err)
-	return _c
-}
-
-func (_c *MockMetadataStore_GetImageSource_Call) RunAndReturn(run func(id string) (*db.ImageSource, error)) *MockMetadataStore_GetImageSource_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// GetImageVersion provides a mock function for the type MockMetadataStore
-func (_mock *MockMetadataStore) GetImageVersion(id string) (*db.ImageVersion, error) {
-	ret := _mock.Called(id)
-
-	if len(ret) == 0 {
-		panic("no return value specified for GetImageVersion")
-	}
-
-	var r0 *db.ImageVersion
-	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(string) (*db.ImageVersion, error)); ok {
-		return returnFunc(id)
-	}
-	if returnFunc, ok := ret.Get(0).(func(string) *db.ImageVersion); ok {
-		r0 = returnFunc(id)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*db.ImageVersion)
-		}
-	}
-	if returnFunc, ok := ret.Get(1).(func(string) error); ok {
-		r1 = returnFunc(id)
-	} else {
-		r1 = ret.Error(1)
-	}
-	return r0, r1
-}
-
-// MockMetadataStore_GetImageVersion_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetImageVersion'
-type MockMetadataStore_GetImageVersion_Call struct {
-	*mock.Call
-}
-
-// GetImageVersion is a helper method to define mock.On call
-//   - id string
-func (_e *MockMetadataStore_Expecter) GetImageVersion(id interface{}) *MockMetadataStore_GetImageVersion_Call {
-	return &MockMetadataStore_GetImageVersion_Call{Call: _e.mock.On("GetImageVersion", id)}
-}
-
-func (_c *MockMetadataStore_GetImageVersion_Call) Run(run func(id string)) *MockMetadataStore_GetImageVersion_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 string
-		if args[0] != nil {
-			arg0 = args[0].(string)
-		}
-		run(
-			arg0,
-		)
-	})
-	return _c
-}
-
-func (_c *MockMetadataStore_GetImageVersion_Call) Return(imageVersion *db.ImageVersion, err error) *MockMetadataStore_GetImageVersion_Call {
-	_c.Call.Return(imageVersion, err)
-	return _c
-}
-
-func (_c *MockMetadataStore_GetImageVersion_Call) RunAndReturn(run func(id string) (*db.ImageVersion, error)) *MockMetadataStore_GetImageVersion_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// UpdateImage provides a mock function for the type MockMetadataStore
-func (_mock *MockMetadataStore) UpdateImage(item *db.Image) error {
-	ret := _mock.Called(item)
-
-	if len(ret) == 0 {
-		panic("no return value specified for UpdateImage")
+		panic("no return value specified for ListItems")
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(*db.Image) error); ok {
+	if returnFunc, ok := ret.Get(0).(func(any) error); ok {
+		r0 = returnFunc(out)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockMetadataStore_ListItems_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ListItems'
+type MockMetadataStore_ListItems_Call struct {
+	*mock.Call
+}
+
+// ListItems is a helper method to define mock.On call
+//   - out any
+func (_e *MockMetadataStore_Expecter) ListItems(out interface{}) *MockMetadataStore_ListItems_Call {
+	return &MockMetadataStore_ListItems_Call{Call: _e.mock.On("ListItems", out)}
+}
+
+func (_c *MockMetadataStore_ListItems_Call) Run(run func(out any)) *MockMetadataStore_ListItems_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 any
+		if args[0] != nil {
+			arg0 = args[0].(any)
+		}
+		run(
+			arg0,
+		)
+	})
+	return _c
+}
+
+func (_c *MockMetadataStore_ListItems_Call) Return(err error) *MockMetadataStore_ListItems_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockMetadataStore_ListItems_Call) RunAndReturn(run func(out any) error) *MockMetadataStore_ListItems_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// UpdateItem provides a mock function for the type MockMetadataStore
+func (_mock *MockMetadataStore) UpdateItem(item db.IDAccessor) error {
+	ret := _mock.Called(item)
+
+	if len(ret) == 0 {
+		panic("no return value specified for UpdateItem")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(db.IDAccessor) error); ok {
 		r0 = returnFunc(item)
 	} else {
 		r0 = ret.Error(0)
@@ -505,22 +263,22 @@ func (_mock *MockMetadataStore) UpdateImage(item *db.Image) error {
 	return r0
 }
 
-// MockMetadataStore_UpdateImage_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'UpdateImage'
-type MockMetadataStore_UpdateImage_Call struct {
+// MockMetadataStore_UpdateItem_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'UpdateItem'
+type MockMetadataStore_UpdateItem_Call struct {
 	*mock.Call
 }
 
-// UpdateImage is a helper method to define mock.On call
-//   - item *db.Image
-func (_e *MockMetadataStore_Expecter) UpdateImage(item interface{}) *MockMetadataStore_UpdateImage_Call {
-	return &MockMetadataStore_UpdateImage_Call{Call: _e.mock.On("UpdateImage", item)}
+// UpdateItem is a helper method to define mock.On call
+//   - item db.IDAccessor
+func (_e *MockMetadataStore_Expecter) UpdateItem(item interface{}) *MockMetadataStore_UpdateItem_Call {
+	return &MockMetadataStore_UpdateItem_Call{Call: _e.mock.On("UpdateItem", item)}
 }
 
-func (_c *MockMetadataStore_UpdateImage_Call) Run(run func(item *db.Image)) *MockMetadataStore_UpdateImage_Call {
+func (_c *MockMetadataStore_UpdateItem_Call) Run(run func(item db.IDAccessor)) *MockMetadataStore_UpdateItem_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 *db.Image
+		var arg0 db.IDAccessor
 		if args[0] != nil {
-			arg0 = args[0].(*db.Image)
+			arg0 = args[0].(db.IDAccessor)
 		}
 		run(
 			arg0,
@@ -529,165 +287,12 @@ func (_c *MockMetadataStore_UpdateImage_Call) Run(run func(item *db.Image)) *Moc
 	return _c
 }
 
-func (_c *MockMetadataStore_UpdateImage_Call) Return(err error) *MockMetadataStore_UpdateImage_Call {
+func (_c *MockMetadataStore_UpdateItem_Call) Return(err error) *MockMetadataStore_UpdateItem_Call {
 	_c.Call.Return(err)
 	return _c
 }
 
-func (_c *MockMetadataStore_UpdateImage_Call) RunAndReturn(run func(item *db.Image) error) *MockMetadataStore_UpdateImage_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// UpdateImageArtifact provides a mock function for the type MockMetadataStore
-func (_mock *MockMetadataStore) UpdateImageArtifact(item *db.ImageArtifact) error {
-	ret := _mock.Called(item)
-
-	if len(ret) == 0 {
-		panic("no return value specified for UpdateImageArtifact")
-	}
-
-	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(*db.ImageArtifact) error); ok {
-		r0 = returnFunc(item)
-	} else {
-		r0 = ret.Error(0)
-	}
-	return r0
-}
-
-// MockMetadataStore_UpdateImageArtifact_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'UpdateImageArtifact'
-type MockMetadataStore_UpdateImageArtifact_Call struct {
-	*mock.Call
-}
-
-// UpdateImageArtifact is a helper method to define mock.On call
-//   - item *db.ImageArtifact
-func (_e *MockMetadataStore_Expecter) UpdateImageArtifact(item interface{}) *MockMetadataStore_UpdateImageArtifact_Call {
-	return &MockMetadataStore_UpdateImageArtifact_Call{Call: _e.mock.On("UpdateImageArtifact", item)}
-}
-
-func (_c *MockMetadataStore_UpdateImageArtifact_Call) Run(run func(item *db.ImageArtifact)) *MockMetadataStore_UpdateImageArtifact_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 *db.ImageArtifact
-		if args[0] != nil {
-			arg0 = args[0].(*db.ImageArtifact)
-		}
-		run(
-			arg0,
-		)
-	})
-	return _c
-}
-
-func (_c *MockMetadataStore_UpdateImageArtifact_Call) Return(err error) *MockMetadataStore_UpdateImageArtifact_Call {
-	_c.Call.Return(err)
-	return _c
-}
-
-func (_c *MockMetadataStore_UpdateImageArtifact_Call) RunAndReturn(run func(item *db.ImageArtifact) error) *MockMetadataStore_UpdateImageArtifact_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// UpdateImageSource provides a mock function for the type MockMetadataStore
-func (_mock *MockMetadataStore) UpdateImageSource(item *db.ImageSource) error {
-	ret := _mock.Called(item)
-
-	if len(ret) == 0 {
-		panic("no return value specified for UpdateImageSource")
-	}
-
-	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(*db.ImageSource) error); ok {
-		r0 = returnFunc(item)
-	} else {
-		r0 = ret.Error(0)
-	}
-	return r0
-}
-
-// MockMetadataStore_UpdateImageSource_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'UpdateImageSource'
-type MockMetadataStore_UpdateImageSource_Call struct {
-	*mock.Call
-}
-
-// UpdateImageSource is a helper method to define mock.On call
-//   - item *db.ImageSource
-func (_e *MockMetadataStore_Expecter) UpdateImageSource(item interface{}) *MockMetadataStore_UpdateImageSource_Call {
-	return &MockMetadataStore_UpdateImageSource_Call{Call: _e.mock.On("UpdateImageSource", item)}
-}
-
-func (_c *MockMetadataStore_UpdateImageSource_Call) Run(run func(item *db.ImageSource)) *MockMetadataStore_UpdateImageSource_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 *db.ImageSource
-		if args[0] != nil {
-			arg0 = args[0].(*db.ImageSource)
-		}
-		run(
-			arg0,
-		)
-	})
-	return _c
-}
-
-func (_c *MockMetadataStore_UpdateImageSource_Call) Return(err error) *MockMetadataStore_UpdateImageSource_Call {
-	_c.Call.Return(err)
-	return _c
-}
-
-func (_c *MockMetadataStore_UpdateImageSource_Call) RunAndReturn(run func(item *db.ImageSource) error) *MockMetadataStore_UpdateImageSource_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// UpdateImageVersion provides a mock function for the type MockMetadataStore
-func (_mock *MockMetadataStore) UpdateImageVersion(item *db.ImageVersion) error {
-	ret := _mock.Called(item)
-
-	if len(ret) == 0 {
-		panic("no return value specified for UpdateImageVersion")
-	}
-
-	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(*db.ImageVersion) error); ok {
-		r0 = returnFunc(item)
-	} else {
-		r0 = ret.Error(0)
-	}
-	return r0
-}
-
-// MockMetadataStore_UpdateImageVersion_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'UpdateImageVersion'
-type MockMetadataStore_UpdateImageVersion_Call struct {
-	*mock.Call
-}
-
-// UpdateImageVersion is a helper method to define mock.On call
-//   - item *db.ImageVersion
-func (_e *MockMetadataStore_Expecter) UpdateImageVersion(item interface{}) *MockMetadataStore_UpdateImageVersion_Call {
-	return &MockMetadataStore_UpdateImageVersion_Call{Call: _e.mock.On("UpdateImageVersion", item)}
-}
-
-func (_c *MockMetadataStore_UpdateImageVersion_Call) Run(run func(item *db.ImageVersion)) *MockMetadataStore_UpdateImageVersion_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 *db.ImageVersion
-		if args[0] != nil {
-			arg0 = args[0].(*db.ImageVersion)
-		}
-		run(
-			arg0,
-		)
-	})
-	return _c
-}
-
-func (_c *MockMetadataStore_UpdateImageVersion_Call) Return(err error) *MockMetadataStore_UpdateImageVersion_Call {
-	_c.Call.Return(err)
-	return _c
-}
-
-func (_c *MockMetadataStore_UpdateImageVersion_Call) RunAndReturn(run func(item *db.ImageVersion) error) *MockMetadataStore_UpdateImageVersion_Call {
+func (_c *MockMetadataStore_UpdateItem_Call) RunAndReturn(run func(item db.IDAccessor) error) *MockMetadataStore_UpdateItem_Call {
 	_c.Call.Return(run)
 	return _c
 }

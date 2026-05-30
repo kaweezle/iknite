@@ -10,6 +10,7 @@ import (
 	"log/slog"
 	"os"
 	"regexp"
+	"sort"
 	"strings"
 
 	specv1 "github.com/opencontainers/image-spec/specs-go/v1"
@@ -80,6 +81,97 @@ type InspectResult struct {
 // PullRequest defines image pull behavior.
 type PullRequest struct {
 	ImageRef string
+}
+
+func summarizeArtifacts(artifacts []db.ImageArtifact) string {
+	if len(artifacts) == 0 {
+		return ""
+	}
+
+	types := make([]string, 0, len(artifacts))
+	for i := range artifacts {
+		types = append(types, string(artifacts[i].Type))
+	}
+	sort.Strings(types)
+
+	return fmt.Sprintf("%d [%s]", len(types), strings.Join(types, ", "))
+}
+
+func sumArtifactSizes(artifacts []db.ImageArtifact) int64 {
+	var total int64
+	for i := range artifacts {
+		total += artifacts[i].Size
+	}
+
+	return total
+}
+
+// ListImages loads persisted image metadata and joins source, version, and artifact details.
+func (s *Service) ListImages() ([]ImageListItem, error) {
+	if err := s.ensureDefaults(); err != nil {
+		return nil, err
+	}
+
+	images := make([]db.Image, 0)
+	err := s.Store.ListItems(&images)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list images: %w", err)
+	}
+	versions := make([]db.ImageVersion, 0)
+	err = s.Store.ListItems(&versions)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list image versions: %w", err)
+	}
+	sources := make([]db.ImageSource, 0)
+	err = s.Store.ListItems(&sources)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list image sources: %w", err)
+	}
+	artifacts := make([]db.ImageArtifact, 0)
+	err = s.Store.ListItems(&artifacts)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list image artifacts: %w", err)
+	}
+
+	versionByID := make(map[string]db.ImageVersion, len(versions))
+	for i := range versions {
+		versionByID[versions[i].ID] = versions[i]
+	}
+
+	sourceByID := make(map[string]db.ImageSource, len(sources))
+	for i := range sources {
+		sourceByID[sources[i].ID] = sources[i]
+	}
+
+	artifactByImageID := make(map[string][]db.ImageArtifact)
+	for i := range artifacts {
+		artifact := artifacts[i]
+		artifactByImageID[artifact.ImageID] = append(artifactByImageID[artifact.ImageID], artifact)
+	}
+
+	sort.Slice(images, func(i, j int) bool {
+		if images[i].Name == images[j].Name {
+			return images[i].ID < images[j].ID
+		}
+		return images[i].Name < images[j].Name
+	})
+
+	result := make([]ImageListItem, 0, len(images))
+	for _, image := range images {
+		version := versionByID[image.VersionID]
+		source := sourceByID[version.SourceID]
+		imageArtifacts := artifactByImageID[image.ID]
+		result = append(result, ImageListItem{
+			Source:    source.Location,
+			Reference: version.Tag,
+			Path:      image.Name,
+			Artifacts: summarizeArtifacts(imageArtifacts),
+			TotalSize: sumArtifactSizes(imageArtifacts),
+			UpdatedAt: image.UpdatedAt,
+		})
+	}
+
+	return result, nil
 }
 
 func (s *Service) ensureDefaults() error {

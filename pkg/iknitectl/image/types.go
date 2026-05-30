@@ -4,6 +4,7 @@ package image
 import (
 	"encoding/json"
 	"fmt"
+	"time"
 )
 
 type ImageType int
@@ -147,4 +148,14 @@ func (at *ArtifactType) UnmarshalJSON(data []byte) error {
 	}
 	*at = parsed
 	return nil
+}
+
+// ImageListItem describes one image entry shown by the ls command.
+type ImageListItem struct {
+	UpdatedAt time.Time
+	Source    string
+	Reference string
+	Path      string
+	Artifacts string
+	TotalSize int64
 }

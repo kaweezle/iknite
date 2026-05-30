@@ -1,4 +1,4 @@
-// cSpell: words KMGTPE charmbracelet lipgloss wrapcheck
+// cSpell: words charmbracelet lipgloss wrapcheck
 package image
 
 import (
@@ -8,6 +8,8 @@ import (
 	"time"
 
 	"charm.land/lipgloss/v2"
+
+	"github.com/kaweezle/iknite/pkg/utils"
 )
 
 type ProgressReader struct {
@@ -58,9 +60,9 @@ func (pr *ProgressReader) updateProgress() {
 		speed = float64(pr.current) / elapsed.Seconds()
 	}
 
-	currentSize := formatBytes(pr.current)
-	totalSize := formatBytes(pr.total)
-	speedStr := formatBytes(int64(speed)) + "/s"
+	currentSize := utils.FormatBytes(pr.current)
+	totalSize := utils.FormatBytes(pr.total)
+	speedStr := utils.FormatBytes(int64(speed)) + "/s"
 
 	barWidth := 20
 	completed := int(float64(barWidth) * percentage / 100)
@@ -91,17 +93,4 @@ func (pr *ProgressReader) updateProgress() {
 	if pr.current >= pr.total {
 		fmt.Fprint(pr.out, "\n") //nolint:errcheck // Ignore write errors to progress output
 	}
-}
-
-func formatBytes(bytes int64) string {
-	const unit = 1024
-	if bytes < unit {
-		return fmt.Sprintf("%dB", bytes)
-	}
-	div, exp := int64(unit), 0
-	for n := bytes / unit; n >= unit; n /= unit {
-		div *= unit
-		exp++
-	}
-	return fmt.Sprintf("%.1f%cB", float64(bytes)/float64(div), "KMGTPE"[exp])
 }
