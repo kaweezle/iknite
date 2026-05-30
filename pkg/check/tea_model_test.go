@@ -5,8 +5,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/charmbracelet/bubbles/spinner"
-	tea "github.com/charmbracelet/bubbletea"
+	"charm.land/bubbles/v2/spinner"
+	tea "charm.land/bubbletea/v2"
 	"github.com/stretchr/testify/require"
 
 	"github.com/kaweezle/iknite/pkg/check"
@@ -42,7 +42,7 @@ func TestCheckModelView(t *testing.T) {
 	logger := testutil.TestLogger(t)
 	model := check.NewCheckModel(t.Context(), executor, nil, logger)
 	view := model.View()
-	req.Contains(view, "desc-a")
+	req.Contains(view.Content, "desc-a")
 }
 
 func TestCheckModelUpdateKeyCancelsContext(t *testing.T) {
@@ -62,7 +62,7 @@ func TestCheckModelUpdateKeyCancelsContext(t *testing.T) {
 	logger := testutil.TestLogger(t)
 	model := check.NewCheckModel(context.Background(), executor, nil, logger)
 
-	_, cmd := model.Update(tea.KeyMsg{})
+	_, cmd := model.Update(tea.KeyPressMsg{})
 	req.NotNil(cmd)
 
 	select {
