@@ -32,6 +32,14 @@ var (
 
 type validationFunc func(tx *bbolt.Tx, item any) error
 
+type saveMode int
+
+const (
+	saveModeCreate saveMode = iota
+	saveModeUpdate
+	saveModeCreateOrUpdate
+)
+
 type IDAccessorPointer[M any] interface {
 	*M
 	IDAccessor
@@ -236,11 +244,12 @@ func ensureRecordID(value IDAccessor) (string, error) {
 	return id, nil
 }
 
+//nolint:gocyclo // save centralizes create, update, and create-or-update write semantics.
 func (s *Store) save(
 	bucketName []byte,
 	value IDAccessor,
 	validate validationFunc,
-	mustExist bool,
+	mode saveMode,
 ) error {
 	id, resolveErr := ensureRecordID(value)
 	if resolveErr != nil {
@@ -266,12 +275,22 @@ func (s *Store) save(
 		}
 
 		existing := bucket.Get([]byte(id))
-		if mustExist && existing == nil {
-			return fmt.Errorf("%w: %s %q", ErrNotFound, string(bucketName), id)
+		switch mode {
+		case saveModeUpdate:
+			if existing == nil {
+				return fmt.Errorf("%w: %s %q", ErrNotFound, string(bucketName), id)
+			}
+		case saveModeCreate:
+			if existing != nil {
+				return fmt.Errorf("%w: %s %q", ErrAlreadyExists, string(bucketName), id)
+			}
+		case saveModeCreateOrUpdate:
+			// no-op
+		default:
+			return fmt.Errorf("unknown save mode: %d", mode)
 		}
-		if !mustExist && existing != nil {
-			return fmt.Errorf("%w: %s %q", ErrAlreadyExists, string(bucketName), id)
-		}
+
+		mustExist := existing != nil
 
 		timestampErr := applyTimestamps(value, mustExist, existing, time.Now().UTC())
 		if timestampErr != nil {
@@ -283,9 +302,14 @@ func (s *Store) save(
 			return fmt.Errorf("failed to marshal %s %q: %w", string(bucketName), id, err)
 		}
 
-		action := "save"
-		if mustExist {
+		action := "create-or-update"
+		switch mode {
+		case saveModeCreate:
+			action = "create"
+		case saveModeUpdate:
 			action = "update"
+		case saveModeCreateOrUpdate:
+			action = "create-or-update"
 		}
 		if err = bucket.Put([]byte(id), payload); err != nil {
 			return fmt.Errorf("failed to %s %s %q: %w", action, string(bucketName), id, err)
@@ -300,7 +324,7 @@ func (s *Store) save(
 }
 
 func (s *Store) create(bucketName []byte, value IDAccessor, validate validationFunc) error {
-	return s.save(bucketName, value, validate, false)
+	return s.save(bucketName, value, validate, saveModeCreate)
 }
 
 func (s *Store) get(bucketName []byte, id string, out any) error {
@@ -330,7 +354,11 @@ func (s *Store) get(bucketName []byte, id string, out any) error {
 }
 
 func (s *Store) update(bucketName []byte, value IDAccessor, validate validationFunc) error {
-	return s.save(bucketName, value, validate, true)
+	return s.save(bucketName, value, validate, saveModeUpdate)
+}
+
+func (s *Store) createOrUpdate(bucketName []byte, value IDAccessor, validate validationFunc) error {
+	return s.save(bucketName, value, validate, saveModeCreateOrUpdate)
 }
 
 func (s *Store) delete(bucketName []byte, id string) error {
@@ -469,6 +497,21 @@ func UpdateItem[T any, PT IDAccessorPointer[T]](s *Store, item PT) error {
 	return s.update(bucketName, item, nil)
 }
 
+func CreateOrUpdateItem[T any, PT IDAccessorPointer[T]](s *Store, item PT) error {
+	if item == nil {
+		return fmt.Errorf("item is required")
+	}
+	bucketName, err := getBucketNameForType(item)
+	if err != nil {
+		return err
+	}
+	parameters, err := getParametersForType(item)
+	if err != nil {
+		return err
+	}
+	return s.createOrUpdate(bucketName, item, parameters.validate)
+}
+
 func GetItem[T any](s *Store, id string) (*T, error) {
 	var item T
 	bucketName, err := getBucketNameForType(&item)
@@ -494,22 +537,33 @@ func (s *Store) CreateItem(item IDAccessor) error {
 	if item == nil {
 		return fmt.Errorf("item is required")
 	}
-	bucketName, err := getBucketNameForType(item)
+	parameters, err := getParametersForType(item)
 	if err != nil {
 		return err
 	}
-	return s.create(bucketName, item, nil)
+	return s.create(parameters.bucketName, item, parameters.validate)
 }
 
 func (s *Store) UpdateItem(item IDAccessor) error {
 	if item == nil {
 		return fmt.Errorf("item is required")
 	}
-	bucketName, err := getBucketNameForType(item)
+	parameters, err := getParametersForType(item)
 	if err != nil {
 		return err
 	}
-	return s.update(bucketName, item, nil)
+	return s.update(parameters.bucketName, item, parameters.validate)
+}
+
+func (s *Store) CreateOrUpdateItem(item IDAccessor) error {
+	if item == nil {
+		return fmt.Errorf("item is required")
+	}
+	parameters, err := getParametersForType(item)
+	if err != nil {
+		return err
+	}
+	return s.createOrUpdate(parameters.bucketName, item, parameters.validate)
 }
 
 func (s *Store) DeleteItem(item IDAccessor) error {

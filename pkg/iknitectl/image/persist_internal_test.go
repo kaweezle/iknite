@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/opencontainers/go-digest"
 	specv1 "github.com/opencontainers/image-spec/specs-go/v1"
@@ -74,8 +75,11 @@ func TestPersistImageSourceUpdatesExistingSource(t *testing.T) {
 	existing := &db.ImageSource{}
 	err = store.GetItem(sourceID, existing)
 	require.NoError(t, err)
+	previousCreatedAt := existing.CreatedAt
+	previousUpdatedAt := existing.UpdatedAt
 	existing.Location = "stale"
 	require.NoError(t, db.UpdateItem(store, existing))
+	time.Sleep(time.Millisecond)
 
 	_, err = persistImageSource(store, inspectResult)
 	require.NoError(t, err)
@@ -83,6 +87,8 @@ func TestPersistImageSourceUpdatesExistingSource(t *testing.T) {
 	updated := &db.ImageSource{}
 	err = store.GetItem(sourceID, updated)
 	require.NoError(t, err)
+	require.Equal(t, previousCreatedAt, updated.CreatedAt)
+	require.True(t, updated.UpdatedAt.After(previousUpdatedAt))
 	require.Equal(t, inspectResult.Repository, updated.Location)
 }
 
@@ -103,8 +109,11 @@ func TestPersistImageVersionUpdatesExistingVersion(t *testing.T) {
 	version := &db.ImageVersion{}
 	err = store.GetItem(versionID, version)
 	require.NoError(t, err)
+	previousCreatedAt := version.CreatedAt
+	previousUpdatedAt := version.UpdatedAt
 	version.Tag = "stale"
 	require.NoError(t, db.UpdateItem(store, version))
+	time.Sleep(time.Millisecond)
 
 	_, err = persistImageVersion(store, inspectResult, sourceID)
 	require.NoError(t, err)
@@ -112,6 +121,8 @@ func TestPersistImageVersionUpdatesExistingVersion(t *testing.T) {
 	updated := &db.ImageVersion{}
 	err = store.GetItem(versionID, updated)
 	require.NoError(t, err)
+	require.Equal(t, previousCreatedAt, updated.CreatedAt)
+	require.True(t, updated.UpdatedAt.After(previousUpdatedAt))
 	require.Equal(t, inspectResult.Reference, updated.Tag)
 	require.Equal(t, inspectResult.Descriptor.Digest.String(), updated.ManifestDigest)
 }
@@ -148,10 +159,15 @@ func TestPersistImageArtifactCreatesAndUpdatesArtifact(t *testing.T) {
 
 	artifact.Path = "stale"
 	require.NoError(t, db.UpdateItem(store, artifact))
+	previousCreatedAt := artifact.CreatedAt
+	previousUpdatedAt := artifact.UpdatedAt
+	time.Sleep(time.Millisecond)
 	require.NoError(t, persistImageArtifact(store, imageID, outputDir, layer))
 
 	updated, err := db.GetItem[db.ImageArtifact](store, artifactID)
 	require.NoError(t, err)
+	require.Equal(t, previousCreatedAt, updated.CreatedAt)
+	require.True(t, updated.UpdatedAt.After(previousUpdatedAt))
 	require.Equal(t, filepath.Join(outputDir, layer.FileName), updated.Path)
 }
 
