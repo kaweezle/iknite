@@ -51,18 +51,10 @@ type NewRepositoryFunc func(repository string) (Repository, error)
 
 // MetadataStore exposes the subset of database operations needed by image pull.
 type MetadataStore interface {
-	GetImageSource(id string) (*db.ImageSource, error)
-	CreateImageSource(item *db.ImageSource) error
-	UpdateImageSource(item *db.ImageSource) error
-	GetImageVersion(id string) (*db.ImageVersion, error)
-	CreateImageVersion(item *db.ImageVersion) error
-	UpdateImageVersion(item *db.ImageVersion) error
-	GetImage(id string) (*db.Image, error)
-	CreateImage(item *db.Image) error
-	UpdateImage(item *db.Image) error
-	GetImageArtifact(id string) (*db.ImageArtifact, error)
-	CreateImageArtifact(item *db.ImageArtifact) error
-	UpdateImageArtifact(item *db.ImageArtifact) error
+	GetItem(id string, out any) error
+	CreateItem(item db.IDAccessor) error
+	UpdateItem(item db.IDAccessor) error
+	ListItems(out any) error
 }
 
 // Service provides image inspect and pull operations.

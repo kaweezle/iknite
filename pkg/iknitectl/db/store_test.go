@@ -48,7 +48,7 @@ func seedDataGraph(t *testing.T, store *db.Store) seededGraph {
 
 	require.NoError(
 		t,
-		store.CreateImageSource(&db.ImageSource{
+		store.CreateItem(&db.ImageSource{
 			BaseModel: db.BaseModel{ID: graph.sourceID},
 			Kind:      "registry",
 			Location:  "ghcr.io/kaweezle/iknite",
@@ -56,7 +56,7 @@ func seedDataGraph(t *testing.T, store *db.Store) seededGraph {
 	)
 	require.NoError(
 		t,
-		store.CreateImageVersion(&db.ImageVersion{
+		store.CreateItem(&db.ImageVersion{
 			BaseModel: db.BaseModel{ID: graph.versionID},
 			SourceID:  graph.sourceID,
 			Tag:       "v0.7.1-devel-1.36.1",
@@ -64,7 +64,7 @@ func seedDataGraph(t *testing.T, store *db.Store) seededGraph {
 	)
 	require.NoError(
 		t,
-		store.CreateImage(&db.Image{
+		store.CreateItem(&db.Image{
 			BaseModel: db.BaseModel{ID: graph.imageID},
 			VersionID: graph.versionID,
 			Name:      "iknite-rootfs",
@@ -72,7 +72,7 @@ func seedDataGraph(t *testing.T, store *db.Store) seededGraph {
 	)
 	require.NoError(
 		t,
-		store.CreateImageArtifact(&db.ImageArtifact{
+		store.CreateItem(&db.ImageArtifact{
 			BaseModel: db.BaseModel{ID: graph.artifactID},
 			ImageID:   graph.imageID,
 			Type:      db.ArtifactTypeRootFS,
@@ -81,7 +81,7 @@ func seedDataGraph(t *testing.T, store *db.Store) seededGraph {
 	)
 	require.NoError(
 		t,
-		store.CreateBackendImage(&db.BackendImage{
+		store.CreateItem(&db.BackendImage{
 			BaseModel:  db.BaseModel{ID: graph.backendImageID},
 			Backend:    "incus",
 			ImageID:    graph.imageID,
@@ -90,7 +90,7 @@ func seedDataGraph(t *testing.T, store *db.Store) seededGraph {
 	)
 	require.NoError(
 		t,
-		store.CreateCluster(&db.Cluster{
+		store.CreateItem(&db.Cluster{
 			BaseModel:      db.BaseModel{ID: graph.clusterID},
 			Name:           "dev",
 			Backend:        "incus",
@@ -108,15 +108,19 @@ func TestOpenCreatesStoreReadyForWrites(t *testing.T) {
 	store := newTestStore(t)
 	require.NoError(
 		t,
-		store.CreateImageSource(&db.ImageSource{
+		store.CreateItem(&db.ImageSource{
 			BaseModel: db.BaseModel{ID: "src"},
 			Kind:      "registry",
 			Location:  "ghcr.io/kaweezle/iknite",
 		}),
 	)
 
-	sources, err := store.ListImageSources()
+	sources, err := db.ListItems[db.ImageSource](store)
 	require.NoError(t, err)
+	require.Len(t, sources, 1)
+
+	sources = make([]db.ImageSource, 0)
+	require.NoError(t, store.ListItems(&sources))
 	require.Len(t, sources, 1)
 }
 
@@ -126,19 +130,22 @@ func TestStoreCRUDLifecycle(t *testing.T) {
 	store := newTestStore(t)
 	graph := seedDataGraph(t, store)
 
-	source, err := store.GetImageSource(graph.sourceID)
+	source := &db.ImageSource{}
+	err := store.GetItem(graph.sourceID, source)
 	require.NoError(t, err)
 	require.Equal(t, "registry", source.Kind)
 	require.False(t, source.CreatedAt.IsZero())
 	require.False(t, source.UpdatedAt.IsZero())
 
-	version, err := store.GetImageVersion(graph.versionID)
+	version := &db.ImageVersion{}
+	err = store.GetItem(graph.versionID, version)
 	require.NoError(t, err)
 	require.Equal(t, "v0.7.1-devel-1.36.1", version.Tag)
 	require.False(t, version.CreatedAt.IsZero())
 	require.False(t, version.UpdatedAt.IsZero())
 
-	img, err := store.GetImage(graph.imageID)
+	img := &db.Image{}
+	err = store.GetItem(graph.imageID, img)
 	require.NoError(t, err)
 	require.Equal(t, graph.versionID, img.VersionID)
 	require.False(t, img.CreatedAt.IsZero())
@@ -147,51 +154,57 @@ func TestStoreCRUDLifecycle(t *testing.T) {
 	previousUpdatedAt := img.UpdatedAt
 	time.Sleep(time.Millisecond)
 
-	artifact, err := store.GetImageArtifact(graph.artifactID)
+	artifact := &db.ImageArtifact{}
+	err = store.GetItem(graph.artifactID, artifact)
 	require.NoError(t, err)
 	require.Equal(t, db.ArtifactTypeRootFS, artifact.Type)
 
-	backendImage, err := store.GetBackendImage(graph.backendImageID)
+	backendImage := &db.BackendImage{}
+	err = store.GetItem(graph.backendImageID, backendImage)
 	require.NoError(t, err)
 	require.Equal(t, "incus", backendImage.Backend)
 
-	cluster, err := store.GetCluster(graph.clusterID)
+	cluster := &db.Cluster{}
+	err = store.GetItem(graph.clusterID, cluster)
 	require.NoError(t, err)
 	require.Equal(t, "dev", cluster.Name)
 
 	img.Name = "iknite-rootfs-updated"
-	require.NoError(t, store.UpdateImage(img))
-	imgAfterUpdate, err := store.GetImage(graph.imageID)
+	require.NoError(t, store.UpdateItem(img))
+	imgAfterUpdate := &db.Image{}
+	err = store.GetItem(graph.imageID, imgAfterUpdate)
 	require.NoError(t, err)
 	require.Equal(t, previousCreatedAt, imgAfterUpdate.CreatedAt)
 	require.True(t, imgAfterUpdate.UpdatedAt.After(previousUpdatedAt))
 	require.Equal(t, "iknite-rootfs-updated", imgAfterUpdate.Name)
 
 	cluster.Workspace = "/workspace/my-repo"
-	require.NoError(t, store.UpdateCluster(cluster))
-	clusterAfterUpdate, err := store.GetCluster(graph.clusterID)
+	require.NoError(t, store.UpdateItem(cluster))
+	clusterAfterUpdate := &db.Cluster{}
+	err = store.GetItem(graph.clusterID, clusterAfterUpdate)
 	require.NoError(t, err)
 	require.False(t, clusterAfterUpdate.CreatedAt.IsZero())
 	require.False(t, clusterAfterUpdate.UpdatedAt.IsZero())
 
-	images, err := store.ListImages()
+	images, err := db.ListItems[db.Image](store)
 	require.NoError(t, err)
 	require.Len(t, images, 1)
 	require.Equal(t, "iknite-rootfs-updated", images[0].Name)
 
-	clusters, err := store.ListClusters()
+	clusters, err := db.ListItems[db.Cluster](store)
 	require.NoError(t, err)
 	require.Len(t, clusters, 1)
 	require.Equal(t, "/workspace/my-repo", clusters[0].Workspace)
 
-	require.NoError(t, store.DeleteCluster(graph.clusterID))
-	require.NoError(t, store.DeleteBackendImage(graph.backendImageID))
-	require.NoError(t, store.DeleteImageArtifact(graph.artifactID))
-	require.NoError(t, store.DeleteImage(graph.imageID))
-	require.NoError(t, store.DeleteImageVersion(graph.versionID))
-	require.NoError(t, store.DeleteImageSource(graph.sourceID))
+	require.NoError(t, store.DeleteItem(clusterAfterUpdate))
+	require.NoError(t, store.DeleteItem(backendImage))
+	require.NoError(t, store.DeleteItem(artifact))
+	require.NoError(t, store.DeleteItem(imgAfterUpdate))
+	require.NoError(t, store.DeleteItem(version))
+	require.NoError(t, store.DeleteItem(source))
 
-	_, err = store.GetCluster(graph.clusterID)
+	cluster = &db.Cluster{}
+	err = store.GetItem(graph.clusterID, cluster)
 	require.Error(t, err)
 	require.ErrorIs(t, err, db.ErrNotFound)
 }
@@ -201,7 +214,7 @@ func TestStoreValidatesReferences(t *testing.T) {
 
 	store := newTestStore(t)
 
-	err := store.CreateImageVersion(&db.ImageVersion{
+	err := db.CreateItem(store, &db.ImageVersion{
 		BaseModel: db.BaseModel{ID: "ver-missing"},
 		SourceID:  "missing-source",
 		Tag:       "v1",
@@ -209,11 +222,11 @@ func TestStoreValidatesReferences(t *testing.T) {
 	require.Error(t, err)
 	require.ErrorIs(t, err, db.ErrNotFound)
 
-	err = store.CreateImage(&db.Image{BaseModel: db.BaseModel{ID: "img-missing"}, VersionID: "missing-version"})
+	err = db.CreateItem(store, &db.Image{BaseModel: db.BaseModel{ID: "img-missing"}, VersionID: "missing-version"})
 	require.Error(t, err)
 	require.ErrorIs(t, err, db.ErrNotFound)
 
-	err = store.CreateBackendImage(&db.BackendImage{
+	err = db.CreateItem(store, &db.BackendImage{
 		BaseModel: db.BaseModel{ID: "bimg-missing"},
 		Backend:   "incus",
 		ImageID:   "missing-image",
@@ -221,7 +234,7 @@ func TestStoreValidatesReferences(t *testing.T) {
 	require.Error(t, err)
 	require.ErrorIs(t, err, db.ErrNotFound)
 
-	err = store.CreateCluster(&db.Cluster{
+	err = db.CreateItem(store, &db.Cluster{
 		BaseModel:      db.BaseModel{ID: "cl-missing"},
 		Name:           "dev",
 		Backend:        "wsl",
@@ -239,13 +252,13 @@ func TestStoreDetectsAlreadyExistsAndInvalidIDs(t *testing.T) {
 
 	require.NoError(
 		t,
-		store.CreateImageSource(&db.ImageSource{
+		db.CreateItem(store, &db.ImageSource{
 			BaseModel: db.BaseModel{ID: "src-1"},
 			Kind:      "registry",
 			Location:  "ghcr.io/kaweezle/iknite",
 		}),
 	)
-	err := store.CreateImageSource(&db.ImageSource{
+	err := db.CreateItem(store, &db.ImageSource{
 		BaseModel: db.BaseModel{ID: "src-1"},
 		Kind:      "registry",
 		Location:  "ghcr.io/kaweezle/iknite",
@@ -254,18 +267,19 @@ func TestStoreDetectsAlreadyExistsAndInvalidIDs(t *testing.T) {
 	require.ErrorIs(t, err, db.ErrAlreadyExists)
 
 	generated := &db.ImageSource{BaseModel: db.BaseModel{}, Kind: "registry"}
-	err = store.CreateImageSource(generated)
+	err = store.CreateItem(generated)
 	require.NoError(t, err)
 	require.NotEmpty(t, generated.ID)
 	parsed, err := uuid.Parse(generated.ID)
 	require.NoError(t, err)
 	require.Equal(t, uuid.Version(7), parsed.Version())
 
-	err = store.DeleteImageSource("missing")
+	missing := &db.ImageSource{BaseModel: db.BaseModel{ID: "missing"}, Kind: "registry"}
+	err = db.DeleteItem(store, missing)
 	require.Error(t, err)
 	require.ErrorIs(t, err, db.ErrNotFound)
 
-	err = store.DeleteImageSource("")
+	err = db.DeleteItem(store, &db.ImageSource{BaseModel: db.BaseModel{ID: ""}, Kind: "registry"})
 	require.Error(t, err)
 	require.ErrorIs(t, err, db.ErrInvalidID)
 }

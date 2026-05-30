@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"reflect"
 	"time"
 
 	"github.com/google/uuid"
@@ -28,6 +29,90 @@ var (
 	bucketBackendImages  = []byte("backend_images")
 	bucketClusters       = []byte("clusters")
 )
+
+type validationFunc func(tx *bbolt.Tx, item any) error
+
+type IDAccessorPointer[M any] interface {
+	*M
+	IDAccessor
+}
+
+type typeStoreParameters struct {
+	validate   validationFunc
+	bucketName []byte
+}
+
+var typeParameters = map[reflect.Type]typeStoreParameters{
+	reflect.TypeFor[*ImageSource](): {
+		bucketName: bucketImageSources,
+		validate:   nil,
+	},
+	reflect.TypeFor[*ImageVersion](): {
+		bucketName: bucketImageVersions,
+		validate: func(tx *bbolt.Tx, item any) error {
+			version, ok := item.(*ImageVersion)
+			if !ok {
+				return fmt.Errorf("invalid type for validation: %T", item)
+			}
+			return requireReference(tx, bucketImageSources, version.SourceID, "image source")
+		},
+	},
+	reflect.TypeFor[*Image](): {
+		bucketName: bucketImages,
+		validate: func(tx *bbolt.Tx, item any) error {
+			image, ok := item.(*Image)
+			if !ok {
+				return fmt.Errorf("invalid type for validation: %T", item)
+			}
+			if err := requireReference(tx, bucketImageVersions, image.VersionID, "image version"); err != nil {
+				return err
+			}
+			return nil
+		},
+	},
+	reflect.TypeFor[*ImageArtifact](): {
+		bucketName: bucketImageArtifacts,
+		validate: func(tx *bbolt.Tx, item any) error {
+			artifact, ok := item.(*ImageArtifact)
+			if !ok {
+				return fmt.Errorf("invalid type for validation: %T", item)
+			}
+			if err := requireReference(tx, bucketImages, artifact.ImageID, "image"); err != nil {
+				return err
+			}
+			return nil
+		},
+	},
+	reflect.TypeFor[*BackendImage](): {
+		bucketName: bucketBackendImages,
+		validate: func(tx *bbolt.Tx, item any) error {
+			backendImage, ok := item.(*BackendImage)
+			if !ok {
+				return fmt.Errorf("invalid type for validation: %T", item)
+			}
+			if err := requireReference(tx, bucketImages, backendImage.ImageID, "image"); err != nil {
+				return err
+			}
+			return nil
+		},
+	},
+	reflect.TypeFor[*Cluster](): {
+		bucketName: bucketClusters,
+		validate: func(tx *bbolt.Tx, item any) error {
+			cluster, ok := item.(*Cluster)
+			if !ok {
+				return fmt.Errorf("invalid type for validation: %T", item)
+			}
+			if err := requireReference(tx, bucketImages, cluster.ImageID, "image"); err != nil {
+				return err
+			}
+			if err := requireReference(tx, bucketBackendImages, cluster.BackendImageID, "backend image"); err != nil {
+				return err
+			}
+			return nil
+		},
+	},
+}
 
 // Store provides bbolt-backed persistence for iknitectl client objects.
 type Store struct {
@@ -62,16 +147,9 @@ func (s *Store) Close() error {
 
 func (s *Store) ensureBuckets() error {
 	err := s.db.Update(func(tx *bbolt.Tx) error {
-		for _, bucket := range [][]byte{
-			bucketImageSources,
-			bucketImageVersions,
-			bucketImages,
-			bucketImageArtifacts,
-			bucketBackendImages,
-			bucketClusters,
-		} {
-			if _, err := tx.CreateBucketIfNotExists(bucket); err != nil {
-				return fmt.Errorf("failed to create bucket %q: %w", string(bucket), err)
+		for _, params := range typeParameters {
+			if _, err := tx.CreateBucketIfNotExists(params.bucketName); err != nil {
+				return fmt.Errorf("failed to create bucket %q: %w", string(params.bucketName), err)
 			}
 		}
 		return nil
@@ -161,7 +239,7 @@ func ensureRecordID(value IDAccessor) (string, error) {
 func (s *Store) save(
 	bucketName []byte,
 	value IDAccessor,
-	validate func(tx *bbolt.Tx) error,
+	validate validationFunc,
 	mustExist bool,
 ) error {
 	id, resolveErr := ensureRecordID(value)
@@ -176,7 +254,7 @@ func (s *Store) save(
 
 	persistErr := s.db.Update(func(tx *bbolt.Tx) error {
 		if validate != nil {
-			validateErr := validate(tx)
+			validateErr := validate(tx, value)
 			if validateErr != nil {
 				return validateErr
 			}
@@ -221,7 +299,7 @@ func (s *Store) save(
 	return nil
 }
 
-func (s *Store) create(bucketName []byte, value IDAccessor, validate func(tx *bbolt.Tx) error) error {
+func (s *Store) create(bucketName []byte, value IDAccessor, validate validationFunc) error {
 	return s.save(bucketName, value, validate, false)
 }
 
@@ -251,7 +329,7 @@ func (s *Store) get(bucketName []byte, id string, out any) error {
 	return nil
 }
 
-func (s *Store) update(bucketName []byte, value IDAccessor, validate func(tx *bbolt.Tx) error) error {
+func (s *Store) update(bucketName []byte, value IDAccessor, validate validationFunc) error {
 	return s.save(bucketName, value, validate, true)
 }
 
@@ -280,6 +358,24 @@ func (s *Store) delete(bucketName []byte, id string) error {
 	return nil
 }
 
+func getParametersForType(value any) (*typeStoreParameters, error) {
+	valueType := reflect.TypeOf(value)
+	parameters, ok := typeParameters[valueType]
+	if !ok {
+		return nil, fmt.Errorf("unsupported type: %s", valueType.String())
+	}
+	return &parameters, nil
+}
+
+func getBucketNameForType(value any) ([]byte, error) {
+	valueType := reflect.TypeOf(value)
+	parameters, ok := typeParameters[valueType]
+	if !ok {
+		return nil, fmt.Errorf("unsupported type: %s", valueType.String())
+	}
+	return parameters.bucketName, nil
+}
+
 func list[T any](s *Store, bucketName []byte) ([]T, error) {
 	result := make([]T, 0)
 	err := s.db.View(func(tx *bbolt.Tx) error {
@@ -302,238 +398,138 @@ func list[T any](s *Store, bucketName []byte) ([]T, error) {
 	return result, nil
 }
 
-// CreateImageSource stores a new image source.
-func (s *Store) CreateImageSource(item *ImageSource) error {
-	if item == nil {
-		return fmt.Errorf("image source is required")
+// Same as before but with type passed as parameter, using reflect.
+func (s *Store) ListItems(out any) error {
+	if out == nil {
+		return fmt.Errorf("output parameter is required")
 	}
-	return s.create(bucketImageSources, item, nil)
-}
-
-// GetImageSource fetches an image source by ID.
-func (s *Store) GetImageSource(id string) (*ImageSource, error) {
-	item := &ImageSource{}
-	if err := s.get(bucketImageSources, id, item); err != nil {
-		return nil, err
+	outValue := reflect.ValueOf(out)
+	if outValue.Kind() != reflect.Pointer || outValue.Elem().Kind() != reflect.Slice {
+		return fmt.Errorf("output parameter must be a pointer to a slice")
 	}
-	return item, nil
-}
+	sliceValue := outValue.Elem()
+	// Get the element type of the slice
+	itemType := sliceValue.Type().Elem()
 
-// UpdateImageSource updates an existing image source.
-func (s *Store) UpdateImageSource(item *ImageSource) error {
-	if item == nil {
-		return fmt.Errorf("image source is required")
+	parameters, ok := typeParameters[reflect.PointerTo(itemType)]
+	if !ok {
+		return fmt.Errorf("unsupported type: %s", itemType.String())
 	}
-	return s.update(bucketImageSources, item, nil)
-}
-
-// DeleteImageSource deletes an image source by ID.
-func (s *Store) DeleteImageSource(id string) error {
-	return s.delete(bucketImageSources, id)
-}
-
-// ListImageSources lists all image sources.
-func (s *Store) ListImageSources() ([]ImageSource, error) {
-	return list[ImageSource](s, bucketImageSources)
-}
-
-// CreateImageVersion stores a new image version.
-func (s *Store) CreateImageVersion(item *ImageVersion) error {
-	if item == nil {
-		return fmt.Errorf("image version is required")
-	}
-	return s.create(bucketImageVersions, item, func(tx *bbolt.Tx) error {
-		return requireReference(tx, bucketImageSources, item.SourceID, "image source")
-	})
-}
-
-// GetImageVersion fetches an image version by ID.
-func (s *Store) GetImageVersion(id string) (*ImageVersion, error) {
-	item := &ImageVersion{}
-	if err := s.get(bucketImageVersions, id, item); err != nil {
-		return nil, err
-	}
-	return item, nil
-}
-
-// UpdateImageVersion updates an existing image version.
-func (s *Store) UpdateImageVersion(item *ImageVersion) error {
-	if item == nil {
-		return fmt.Errorf("image version is required")
-	}
-	return s.update(bucketImageVersions, item, func(tx *bbolt.Tx) error {
-		return requireReference(tx, bucketImageSources, item.SourceID, "image source")
-	})
-}
-
-// DeleteImageVersion deletes an image version by ID.
-func (s *Store) DeleteImageVersion(id string) error {
-	return s.delete(bucketImageVersions, id)
-}
-
-// ListImageVersions lists all image versions.
-func (s *Store) ListImageVersions() ([]ImageVersion, error) {
-	return list[ImageVersion](s, bucketImageVersions)
-}
-
-// CreateImage stores a new image.
-func (s *Store) CreateImage(item *Image) error {
-	if item == nil {
-		return fmt.Errorf("image is required")
-	}
-	return s.create(bucketImages, item, func(tx *bbolt.Tx) error {
-		return requireReference(tx, bucketImageVersions, item.VersionID, "image version")
-	})
-}
-
-// GetImage fetches an image by ID.
-func (s *Store) GetImage(id string) (*Image, error) {
-	item := &Image{}
-	if err := s.get(bucketImages, id, item); err != nil {
-		return nil, err
-	}
-	return item, nil
-}
-
-// UpdateImage updates an existing image.
-func (s *Store) UpdateImage(item *Image) error {
-	if item == nil {
-		return fmt.Errorf("image is required")
-	}
-	return s.update(bucketImages, item, func(tx *bbolt.Tx) error {
-		return requireReference(tx, bucketImageVersions, item.VersionID, "image version")
-	})
-}
-
-// DeleteImage deletes an image by ID.
-func (s *Store) DeleteImage(id string) error {
-	return s.delete(bucketImages, id)
-}
-
-// ListImages lists all images.
-func (s *Store) ListImages() ([]Image, error) {
-	return list[Image](s, bucketImages)
-}
-
-// CreateImageArtifact stores a new image artifact.
-func (s *Store) CreateImageArtifact(item *ImageArtifact) error {
-	if item == nil {
-		return fmt.Errorf("image artifact is required")
-	}
-	return s.create(bucketImageArtifacts, item, func(tx *bbolt.Tx) error {
-		return requireReference(tx, bucketImages, item.ImageID, "image")
-	})
-}
-
-// GetImageArtifact fetches an image artifact by ID.
-func (s *Store) GetImageArtifact(id string) (*ImageArtifact, error) {
-	item := &ImageArtifact{}
-	if err := s.get(bucketImageArtifacts, id, item); err != nil {
-		return nil, err
-	}
-	return item, nil
-}
-
-// UpdateImageArtifact updates an existing image artifact.
-func (s *Store) UpdateImageArtifact(item *ImageArtifact) error {
-	if item == nil {
-		return fmt.Errorf("image artifact is required")
-	}
-	return s.update(bucketImageArtifacts, item, func(tx *bbolt.Tx) error {
-		return requireReference(tx, bucketImages, item.ImageID, "image")
-	})
-}
-
-// DeleteImageArtifact deletes an image artifact by ID.
-func (s *Store) DeleteImageArtifact(id string) error {
-	return s.delete(bucketImageArtifacts, id)
-}
-
-// ListImageArtifacts lists all image artifacts.
-func (s *Store) ListImageArtifacts() ([]ImageArtifact, error) {
-	return list[ImageArtifact](s, bucketImageArtifacts)
-}
-
-// CreateBackendImage stores a new backend image.
-func (s *Store) CreateBackendImage(item *BackendImage) error {
-	if item == nil {
-		return fmt.Errorf("backend image is required")
-	}
-	return s.create(bucketBackendImages, item, func(tx *bbolt.Tx) error {
-		return requireReference(tx, bucketImages, item.ImageID, "image")
-	})
-}
-
-// GetBackendImage fetches a backend image by ID.
-func (s *Store) GetBackendImage(id string) (*BackendImage, error) {
-	item := &BackendImage{}
-	if err := s.get(bucketBackendImages, id, item); err != nil {
-		return nil, err
-	}
-	return item, nil
-}
-
-// UpdateBackendImage updates an existing backend image.
-func (s *Store) UpdateBackendImage(item *BackendImage) error {
-	if item == nil {
-		return fmt.Errorf("backend image is required")
-	}
-	return s.update(bucketBackendImages, item, func(tx *bbolt.Tx) error {
-		return requireReference(tx, bucketImages, item.ImageID, "image")
-	})
-}
-
-// DeleteBackendImage deletes a backend image by ID.
-func (s *Store) DeleteBackendImage(id string) error {
-	return s.delete(bucketBackendImages, id)
-}
-
-// ListBackendImages lists all backend images.
-func (s *Store) ListBackendImages() ([]BackendImage, error) {
-	return list[BackendImage](s, bucketBackendImages)
-}
-
-// CreateCluster stores a new cluster.
-func (s *Store) CreateCluster(item *Cluster) error {
-	if item == nil {
-		return fmt.Errorf("cluster is required")
-	}
-	return s.create(bucketClusters, item, func(tx *bbolt.Tx) error {
-		if err := requireReference(tx, bucketImages, item.ImageID, "image"); err != nil {
+	bucketName := parameters.bucketName
+	err := s.db.View(func(tx *bbolt.Tx) error {
+		bucket, err := getBucket(tx, bucketName)
+		if err != nil {
 			return err
 		}
-		return requireReference(tx, bucketBackendImages, item.BackendImageID, "backend image")
+		return bucket.ForEach(func(_, value []byte) error {
+			itemPtr := reflect.New(itemType)
+			if err = json.Unmarshal(value, itemPtr.Interface()); err != nil {
+				return fmt.Errorf("failed to decode %s record: %w", string(bucketName), err)
+			}
+			sliceValue.Set(reflect.Append(sliceValue, itemPtr.Elem()))
+			return nil
+		})
 	})
+	if err != nil {
+		return fmt.Errorf("failed to list %s: %w", string(bucketName), err)
+	}
+	return nil
 }
 
-// GetCluster fetches a cluster by ID.
-func (s *Store) GetCluster(id string) (*Cluster, error) {
-	item := &Cluster{}
-	if err := s.get(bucketClusters, id, item); err != nil {
+func CreateItem[T any, PT IDAccessorPointer[T]](s *Store, item PT) error {
+	if item == nil {
+		return fmt.Errorf("item is required")
+	}
+	parameters, err := getParametersForType(item)
+	if err != nil {
+		return err
+	}
+	return s.create(parameters.bucketName, item, parameters.validate)
+}
+
+func DeleteItem[T any, PT IDAccessorPointer[T]](s *Store, item PT) error {
+	if item == nil {
+		return fmt.Errorf("item is required")
+	}
+	bucketName, err := getBucketNameForType(item)
+	if err != nil {
+		return err
+	}
+	return s.delete(bucketName, item.GetID())
+}
+
+func UpdateItem[T any, PT IDAccessorPointer[T]](s *Store, item PT) error {
+	if item == nil {
+		return fmt.Errorf("item is required")
+	}
+	bucketName, err := getBucketNameForType(item)
+	if err != nil {
+		return err
+	}
+	return s.update(bucketName, item, nil)
+}
+
+func GetItem[T any](s *Store, id string) (*T, error) {
+	var item T
+	bucketName, err := getBucketNameForType(&item)
+	if err != nil {
 		return nil, err
 	}
-	return item, nil
-}
-
-// UpdateCluster updates an existing cluster.
-func (s *Store) UpdateCluster(item *Cluster) error {
-	if item == nil {
-		return fmt.Errorf("cluster is required")
+	if err := s.get(bucketName, id, &item); err != nil {
+		return nil, err
 	}
-	return s.update(bucketClusters, item, func(tx *bbolt.Tx) error {
-		if err := requireReference(tx, bucketImages, item.ImageID, "image"); err != nil {
-			return err
-		}
-		return requireReference(tx, bucketBackendImages, item.BackendImageID, "backend image")
-	})
+	return &item, nil
 }
 
-// DeleteCluster deletes a cluster by ID.
-func (s *Store) DeleteCluster(id string) error {
-	return s.delete(bucketClusters, id)
+func ListItems[T any](s *Store) ([]T, error) {
+	var item T
+	bucketName, err := getBucketNameForType(&item)
+	if err != nil {
+		return nil, err
+	}
+	return list[T](s, bucketName)
 }
 
-// ListClusters lists all clusters.
-func (s *Store) ListClusters() ([]Cluster, error) {
-	return list[Cluster](s, bucketClusters)
+func (s *Store) CreateItem(item IDAccessor) error {
+	if item == nil {
+		return fmt.Errorf("item is required")
+	}
+	bucketName, err := getBucketNameForType(item)
+	if err != nil {
+		return err
+	}
+	return s.create(bucketName, item, nil)
+}
+
+func (s *Store) UpdateItem(item IDAccessor) error {
+	if item == nil {
+		return fmt.Errorf("item is required")
+	}
+	bucketName, err := getBucketNameForType(item)
+	if err != nil {
+		return err
+	}
+	return s.update(bucketName, item, nil)
+}
+
+func (s *Store) DeleteItem(item IDAccessor) error {
+	if item == nil {
+		return fmt.Errorf("item is required")
+	}
+	bucketName, err := getBucketNameForType(item)
+	if err != nil {
+		return err
+	}
+	return s.delete(bucketName, item.GetID())
+}
+
+func (s *Store) GetItem(id string, out any) error {
+	if out == nil {
+		return fmt.Errorf("output parameter is required")
+	}
+	bucketName, err := getBucketNameForType(out)
+	if err != nil {
+		return err
+	}
+	return s.get(bucketName, id, out)
 }

@@ -42,7 +42,8 @@ func artifactTypeFromMediaType(mediaType string) db.ArtifactType {
 
 func persistImageSource(store MetadataStore, inspectResult *InspectResult) (string, error) {
 	sourceID := imageSourceID(inspectResult.Repository)
-	source, getSourceErr := store.GetImageSource(sourceID)
+	source := &db.ImageSource{}
+	getSourceErr := store.GetItem(sourceID, source)
 	if getSourceErr != nil {
 		if !errors.Is(getSourceErr, db.ErrNotFound) {
 			return "", fmt.Errorf("failed to get image source: %w", getSourceErr)
@@ -52,11 +53,11 @@ func persistImageSource(store MetadataStore, inspectResult *InspectResult) (stri
 	source.Kind = "registry"
 	source.Location = inspectResult.Repository
 	if errors.Is(getSourceErr, db.ErrNotFound) {
-		if createErr := store.CreateImageSource(source); createErr != nil {
+		if createErr := store.CreateItem(source); createErr != nil {
 			return "", fmt.Errorf("failed to create image source: %w", createErr)
 		}
 	} else {
-		if updateErr := store.UpdateImageSource(source); updateErr != nil {
+		if updateErr := store.UpdateItem(source); updateErr != nil {
 			return "", fmt.Errorf("failed to update image source: %w", updateErr)
 		}
 	}
@@ -71,7 +72,8 @@ func persistImageVersion(store MetadataStore, inspectResult *InspectResult, sour
 	}
 
 	versionID := imageVersionID(inspectResult.Repository, inspectResult.Reference)
-	version, getVersionErr := store.GetImageVersion(versionID)
+	version := &db.ImageVersion{}
+	getVersionErr := store.GetItem(versionID, version)
 	if getVersionErr != nil {
 		if !errors.Is(getVersionErr, db.ErrNotFound) {
 			return "", fmt.Errorf("failed to get image version: %w", getVersionErr)
@@ -84,11 +86,11 @@ func persistImageVersion(store MetadataStore, inspectResult *InspectResult, sour
 	version.ManifestMediaType = inspectResult.Descriptor.MediaType
 	version.Manifest = manifestBytes
 	if errors.Is(getVersionErr, db.ErrNotFound) {
-		if createErr := store.CreateImageVersion(version); createErr != nil {
+		if createErr := store.CreateItem(version); createErr != nil {
 			return "", fmt.Errorf("failed to create image version: %w", createErr)
 		}
 	} else {
-		if updateErr := store.UpdateImageVersion(version); updateErr != nil {
+		if updateErr := store.UpdateItem(version); updateErr != nil {
 			return "", fmt.Errorf("failed to update image version: %w", updateErr)
 		}
 	}
@@ -98,7 +100,8 @@ func persistImageVersion(store MetadataStore, inspectResult *InspectResult, sour
 
 func persistImageRecord(store MetadataStore, versionID, outputDir string) (string, error) {
 	imageID := imageRecordID(versionID)
-	imageRecord, getImageErr := store.GetImage(imageID)
+	imageRecord := &db.Image{}
+	getImageErr := store.GetItem(imageID, imageRecord)
 	if getImageErr != nil {
 		if !errors.Is(getImageErr, db.ErrNotFound) {
 			return "", fmt.Errorf("failed to get image record: %w", getImageErr)
@@ -108,11 +111,11 @@ func persistImageRecord(store MetadataStore, versionID, outputDir string) (strin
 	imageRecord.VersionID = versionID
 	imageRecord.Name = outputDir
 	if errors.Is(getImageErr, db.ErrNotFound) {
-		if createErr := store.CreateImage(imageRecord); createErr != nil {
+		if createErr := store.CreateItem(imageRecord); createErr != nil {
 			return "", fmt.Errorf("failed to create image record: %w", createErr)
 		}
 	} else {
-		if updateErr := store.UpdateImage(imageRecord); updateErr != nil {
+		if updateErr := store.UpdateItem(imageRecord); updateErr != nil {
 			return "", fmt.Errorf("failed to update image record: %w", updateErr)
 		}
 	}
@@ -122,7 +125,8 @@ func persistImageRecord(store MetadataStore, versionID, outputDir string) (strin
 
 func persistImageArtifact(store MetadataStore, imageID, outputDir string, layer pullLayer) error {
 	artifactID := imageArtifactID(imageID, layer.Descriptor.Digest.String())
-	artifact, getArtifactErr := store.GetImageArtifact(artifactID)
+	artifact := &db.ImageArtifact{}
+	getArtifactErr := store.GetItem(artifactID, artifact)
 	if getArtifactErr != nil {
 		if !errors.Is(getArtifactErr, db.ErrNotFound) {
 			return fmt.Errorf("failed to get image artifact: %w", getArtifactErr)
@@ -137,11 +141,11 @@ func persistImageArtifact(store MetadataStore, imageID, outputDir string, layer 
 	artifact.Size = layer.Descriptor.Size
 
 	if errors.Is(getArtifactErr, db.ErrNotFound) {
-		if err := store.CreateImageArtifact(artifact); err != nil {
+		if err := store.CreateItem(artifact); err != nil {
 			return fmt.Errorf("failed to create image artifact: %w", err)
 		}
 	} else {
-		if err := store.UpdateImageArtifact(artifact); err != nil {
+		if err := store.UpdateItem(artifact); err != nil {
 			return fmt.Errorf("failed to update image artifact: %w", err)
 		}
 	}
