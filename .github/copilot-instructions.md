@@ -474,6 +474,9 @@ Keep commits atomic and descriptive (see [CONTRIBUTING.md](../CONTRIBUTING.md)).
    or metadata-free encrypted YAML before helper code can inspect it. Cover
    parser-level errors directly; use `// nocov` on guards that only protect
    against invalid in-memory SOPS state.
+8. **Iknitectl metadata upserts**: Prefer `CreateOrUpdateItem` in image metadata
+   persistence paths. Upsert semantics must preserve existing `CreatedAt` and
+   refresh `UpdatedAt`.
 
 ## CI/CD
 

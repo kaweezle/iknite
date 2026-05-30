@@ -3,4 +3,5 @@
 - [ ] Add logger to store
 - [ ] Move download progress to utils
 - [ ] Store descriptors with objects
-- [ ] Implement Upsert in database, CreateOrUpdate behavior
+- [ ] Change filenames to digests in order to easily detect duplicates and avoid
+      collisions

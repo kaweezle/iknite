@@ -283,3 +283,39 @@ func TestStoreDetectsAlreadyExistsAndInvalidIDs(t *testing.T) {
 	require.Error(t, err)
 	require.ErrorIs(t, err, db.ErrInvalidID)
 }
+
+func TestStoreCreateOrUpdateItem(t *testing.T) {
+	t.Parallel()
+
+	store := newTestStore(t)
+
+	source := &db.ImageSource{
+		BaseModel: db.BaseModel{ID: "src-upsert"},
+		Kind:      "registry",
+		Location:  "ghcr.io/kaweezle/iknite",
+	}
+	require.NoError(t, store.CreateOrUpdateItem(source))
+
+	stored := &db.ImageSource{}
+	require.NoError(t, store.GetItem("src-upsert", stored))
+	require.Equal(t, source.Location, stored.Location)
+	require.False(t, stored.CreatedAt.IsZero())
+	require.False(t, stored.UpdatedAt.IsZero())
+
+	previousCreatedAt := stored.CreatedAt
+	previousUpdatedAt := stored.UpdatedAt
+	time.Sleep(time.Millisecond)
+
+	updatedSource := &db.ImageSource{
+		BaseModel: db.BaseModel{ID: "src-upsert"},
+		Kind:      "registry",
+		Location:  "ghcr.io/kaweezle/iknite-new",
+	}
+	require.NoError(t, store.CreateOrUpdateItem(updatedSource))
+
+	storedAfterUpdate := &db.ImageSource{}
+	require.NoError(t, store.GetItem("src-upsert", storedAfterUpdate))
+	require.Equal(t, previousCreatedAt, storedAfterUpdate.CreatedAt)
+	require.True(t, storedAfterUpdate.UpdatedAt.After(previousUpdatedAt))
+	require.Equal(t, "ghcr.io/kaweezle/iknite-new", storedAfterUpdate.Location)
+}

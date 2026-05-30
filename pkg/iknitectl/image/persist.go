@@ -2,23 +2,14 @@ package image
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"path/filepath"
 
 	"github.com/kaweezle/iknite/pkg/iknitectl/db"
 )
 
-func imageSourceID(repository string) string {
-	return repository
-}
-
 func imageVersionID(repository, reference string) string {
 	return fmt.Sprintf("%s@%s", repository, reference)
-}
-
-func imageRecordID(versionID string) string {
-	return versionID
 }
 
 func imageArtifactID(imageID, digest string) string {
@@ -41,25 +32,14 @@ func artifactTypeFromMediaType(mediaType string) db.ArtifactType {
 }
 
 func persistImageSource(store MetadataStore, inspectResult *InspectResult) (string, error) {
-	sourceID := imageSourceID(inspectResult.Repository)
-	source := &db.ImageSource{}
-	getSourceErr := store.GetItem(sourceID, source)
-	if getSourceErr != nil {
-		if !errors.Is(getSourceErr, db.ErrNotFound) {
-			return "", fmt.Errorf("failed to get image source: %w", getSourceErr)
-		}
-		source = &db.ImageSource{BaseModel: db.BaseModel{ID: sourceID}}
+	sourceID := inspectResult.Repository
+	source := &db.ImageSource{
+		BaseModel: db.BaseModel{ID: sourceID},
+		Kind:      "registry",
+		Location:  inspectResult.Repository,
 	}
-	source.Kind = "registry"
-	source.Location = inspectResult.Repository
-	if errors.Is(getSourceErr, db.ErrNotFound) {
-		if createErr := store.CreateItem(source); createErr != nil {
-			return "", fmt.Errorf("failed to create image source: %w", createErr)
-		}
-	} else {
-		if updateErr := store.UpdateItem(source); updateErr != nil {
-			return "", fmt.Errorf("failed to update image source: %w", updateErr)
-		}
+	if err := store.CreateOrUpdateItem(source); err != nil {
+		return "", fmt.Errorf("failed to create or update image source: %w", err)
 	}
 
 	return sourceID, nil
@@ -72,82 +52,46 @@ func persistImageVersion(store MetadataStore, inspectResult *InspectResult, sour
 	}
 
 	versionID := imageVersionID(inspectResult.Repository, inspectResult.Reference)
-	version := &db.ImageVersion{}
-	getVersionErr := store.GetItem(versionID, version)
-	if getVersionErr != nil {
-		if !errors.Is(getVersionErr, db.ErrNotFound) {
-			return "", fmt.Errorf("failed to get image version: %w", getVersionErr)
-		}
-		version = &db.ImageVersion{BaseModel: db.BaseModel{ID: versionID}}
+	version := &db.ImageVersion{
+		BaseModel:         db.BaseModel{ID: versionID},
+		SourceID:          sourceID,
+		Tag:               inspectResult.Reference,
+		ManifestDigest:    inspectResult.Descriptor.Digest.String(),
+		ManifestMediaType: inspectResult.Descriptor.MediaType,
+		Manifest:          manifestBytes,
 	}
-	version.SourceID = sourceID
-	version.Tag = inspectResult.Reference
-	version.ManifestDigest = inspectResult.Descriptor.Digest.String()
-	version.ManifestMediaType = inspectResult.Descriptor.MediaType
-	version.Manifest = manifestBytes
-	if errors.Is(getVersionErr, db.ErrNotFound) {
-		if createErr := store.CreateItem(version); createErr != nil {
-			return "", fmt.Errorf("failed to create image version: %w", createErr)
-		}
-	} else {
-		if updateErr := store.UpdateItem(version); updateErr != nil {
-			return "", fmt.Errorf("failed to update image version: %w", updateErr)
-		}
+	if err = store.CreateOrUpdateItem(version); err != nil {
+		return "", fmt.Errorf("failed to create or update image version: %w", err)
 	}
 
 	return versionID, nil
 }
 
 func persistImageRecord(store MetadataStore, versionID, outputDir string) (string, error) {
-	imageID := imageRecordID(versionID)
-	imageRecord := &db.Image{}
-	getImageErr := store.GetItem(imageID, imageRecord)
-	if getImageErr != nil {
-		if !errors.Is(getImageErr, db.ErrNotFound) {
-			return "", fmt.Errorf("failed to get image record: %w", getImageErr)
-		}
-		imageRecord = &db.Image{BaseModel: db.BaseModel{ID: imageID}}
+	imageRecord := &db.Image{
+		BaseModel: db.BaseModel{ID: versionID},
+		VersionID: versionID,
+		Name:      outputDir,
 	}
-	imageRecord.VersionID = versionID
-	imageRecord.Name = outputDir
-	if errors.Is(getImageErr, db.ErrNotFound) {
-		if createErr := store.CreateItem(imageRecord); createErr != nil {
-			return "", fmt.Errorf("failed to create image record: %w", createErr)
-		}
-	} else {
-		if updateErr := store.UpdateItem(imageRecord); updateErr != nil {
-			return "", fmt.Errorf("failed to update image record: %w", updateErr)
-		}
+	if err := store.CreateOrUpdateItem(imageRecord); err != nil {
+		return "", fmt.Errorf("failed to create or update image record: %w", err)
 	}
 
-	return imageID, nil
+	return versionID, nil
 }
 
 func persistImageArtifact(store MetadataStore, imageID, outputDir string, layer pullLayer) error {
-	artifactID := imageArtifactID(imageID, layer.Descriptor.Digest.String())
-	artifact := &db.ImageArtifact{}
-	getArtifactErr := store.GetItem(artifactID, artifact)
-	if getArtifactErr != nil {
-		if !errors.Is(getArtifactErr, db.ErrNotFound) {
-			return fmt.Errorf("failed to get image artifact: %w", getArtifactErr)
-		}
-		artifact = &db.ImageArtifact{BaseModel: db.BaseModel{ID: artifactID}}
+	artifact := &db.ImageArtifact{
+		BaseModel: db.BaseModel{ID: imageArtifactID(imageID, layer.Descriptor.Digest.String())},
+		ImageID:   imageID,
+		Path:      filepath.Join(outputDir, layer.FileName),
+		Digest:    layer.Descriptor.Digest.String(),
+		Type:      artifactTypeFromMediaType(layer.Descriptor.MediaType),
+		Size:      layer.Descriptor.Size,
 	}
 
-	artifact.ImageID = imageID
-	artifact.Path = filepath.Join(outputDir, layer.FileName)
-	artifact.Digest = layer.Descriptor.Digest.String()
-	artifact.Type = artifactTypeFromMediaType(layer.Descriptor.MediaType)
-	artifact.Size = layer.Descriptor.Size
-
-	if errors.Is(getArtifactErr, db.ErrNotFound) {
-		if err := store.CreateItem(artifact); err != nil {
-			return fmt.Errorf("failed to create image artifact: %w", err)
-		}
-	} else {
-		if err := store.UpdateItem(artifact); err != nil {
-			return fmt.Errorf("failed to update image artifact: %w", err)
-		}
+	if err := store.CreateOrUpdateItem(artifact); err != nil {
+		return fmt.Errorf("failed to create or update image artifact: %w", err)
 	}
 
 	return nil

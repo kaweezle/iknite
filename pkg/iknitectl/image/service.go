@@ -54,6 +54,7 @@ type MetadataStore interface {
 	GetItem(id string, out any) error
 	CreateItem(item db.IDAccessor) error
 	UpdateItem(item db.IDAccessor) error
+	CreateOrUpdateItem(item db.IDAccessor) error
 	ListItems(out any) error
 }
 
