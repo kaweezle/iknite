@@ -34,18 +34,21 @@ func TestPersistImageMetadataStoresSourceVersionAndImage(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "ghcr.io/kaweezle/iknite-vm-qcow2@latest", imageID)
 
-	source, err := store.GetImageSource("ghcr.io/kaweezle/iknite-vm-qcow2")
+	source := &db.ImageSource{}
+	err = store.GetItem("ghcr.io/kaweezle/iknite-vm-qcow2", source)
 	require.NoError(t, err)
 	require.Equal(t, "registry", source.Kind)
 	require.Equal(t, inspectResult.Repository, source.Location)
 
-	version, err := store.GetImageVersion(imageID)
+	version := &db.ImageVersion{}
+	err = store.GetItem(imageID, version)
 	require.NoError(t, err)
 	require.Equal(t, source.ID, version.SourceID)
 	require.Equal(t, inspectResult.Reference, version.Tag)
 	require.Equal(t, inspectResult.Descriptor.Digest.String(), version.ManifestDigest)
 
-	imageRecord, err := store.GetImage(imageID)
+	imageRecord := &db.Image{}
+	err = store.GetItem(imageID, imageRecord)
 	require.NoError(t, err)
 	require.Equal(t, version.ID, imageRecord.VersionID)
 	require.Equal(t, outputDir, imageRecord.Name)
@@ -68,15 +71,17 @@ func TestPersistImageSourceUpdatesExistingSource(t *testing.T) {
 	sourceID, err := persistImageSource(store, inspectResult)
 	require.NoError(t, err)
 
-	existing, err := store.GetImageSource(sourceID)
+	existing := &db.ImageSource{}
+	err = store.GetItem(sourceID, existing)
 	require.NoError(t, err)
 	existing.Location = "stale"
-	require.NoError(t, store.UpdateImageSource(existing))
+	require.NoError(t, db.UpdateItem(store, existing))
 
 	_, err = persistImageSource(store, inspectResult)
 	require.NoError(t, err)
 
-	updated, err := store.GetImageSource(sourceID)
+	updated := &db.ImageSource{}
+	err = store.GetItem(sourceID, updated)
 	require.NoError(t, err)
 	require.Equal(t, inspectResult.Repository, updated.Location)
 }
@@ -95,15 +100,17 @@ func TestPersistImageVersionUpdatesExistingVersion(t *testing.T) {
 	versionID, err := persistImageVersion(store, inspectResult, sourceID)
 	require.NoError(t, err)
 
-	version, err := store.GetImageVersion(versionID)
+	version := &db.ImageVersion{}
+	err = store.GetItem(versionID, version)
 	require.NoError(t, err)
 	version.Tag = "stale"
-	require.NoError(t, store.UpdateImageVersion(version))
+	require.NoError(t, db.UpdateItem(store, version))
 
 	_, err = persistImageVersion(store, inspectResult, sourceID)
 	require.NoError(t, err)
 
-	updated, err := store.GetImageVersion(versionID)
+	updated := &db.ImageVersion{}
+	err = store.GetItem(versionID, updated)
 	require.NoError(t, err)
 	require.Equal(t, inspectResult.Reference, updated.Tag)
 	require.Equal(t, inspectResult.Descriptor.Digest.String(), updated.ManifestDigest)
@@ -130,7 +137,8 @@ func TestPersistImageArtifactCreatesAndUpdatesArtifact(t *testing.T) {
 	require.NoError(t, persistImageArtifact(store, imageID, outputDir, layer))
 
 	artifactID := imageID + "@" + manifest.Layers[0].Digest.String()
-	artifact, err := store.GetImageArtifact(artifactID)
+
+	artifact, err := db.GetItem[db.ImageArtifact](store, artifactID)
 	require.NoError(t, err)
 	require.Equal(t, imageID, artifact.ImageID)
 	require.Equal(t, filepath.Join(outputDir, layer.FileName), artifact.Path)
@@ -139,10 +147,10 @@ func TestPersistImageArtifactCreatesAndUpdatesArtifact(t *testing.T) {
 	require.Equal(t, manifest.Layers[0].Size, artifact.Size)
 
 	artifact.Path = "stale"
-	require.NoError(t, store.UpdateImageArtifact(artifact))
+	require.NoError(t, db.UpdateItem(store, artifact))
 	require.NoError(t, persistImageArtifact(store, imageID, outputDir, layer))
 
-	updated, err := store.GetImageArtifact(artifactID)
+	updated, err := db.GetItem[db.ImageArtifact](store, artifactID)
 	require.NoError(t, err)
 	require.Equal(t, filepath.Join(outputDir, layer.FileName), updated.Path)
 }
