@@ -8,11 +8,11 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
-	"strings"
 	"time"
 
 	"github.com/google/uuid"
-	_ "modernc.org/sqlite"
+	sqlite "modernc.org/sqlite"
+	sqlitelib "modernc.org/sqlite/lib"
 
 	"github.com/kaweezle/iknite/pkg/iknitectl/db/sqlc"
 )
@@ -82,6 +82,9 @@ func (s *Store) initialize() error {
 	if _, err := s.db.ExecContext(ctx, "PRAGMA foreign_keys = ON"); err != nil {
 		return fmt.Errorf("failed to enable foreign keys: %w", err)
 	}
+	if _, err := s.db.ExecContext(ctx, "PRAGMA journal_mode = WAL"); err != nil {
+		return fmt.Errorf("failed to enable WAL journal mode: %w", err)
+	}
 	if _, err := s.db.ExecContext(ctx, "PRAGMA busy_timeout = 5000"); err != nil {
 		return fmt.Errorf("failed to set busy timeout: %w", err)
 	}
@@ -143,7 +146,7 @@ func setTimestamps(value IDAccessor, existingCreatedAt time.Time, now time.Time)
 	return nil
 }
 
-func rowNotFound(err error) bool {
+func isRowNotFound(err error) bool {
 	return errors.Is(err, sql.ErrNoRows)
 }
 
@@ -151,16 +154,19 @@ func normalizeSQLError(err error) error {
 	if err == nil {
 		return nil
 	}
-	message := strings.ToLower(err.Error())
-	if strings.Contains(message, "constraint failed") || strings.Contains(message, "constraint constraint") {
-		if strings.Contains(message, "foreign key") {
-			return fmt.Errorf("%w: referenced record", ErrNotFound)
-		}
-		if strings.Contains(message, "unique") || strings.Contains(message, "primary key") {
-			return fmt.Errorf("%w: duplicate id", ErrAlreadyExists)
-		}
+	var sqliteErr *sqlite.Error
+	if !errors.As(err, &sqliteErr) {
+		return err
 	}
-	return err
+
+	switch sqliteErr.Code() {
+	case sqlitelib.SQLITE_CONSTRAINT_FOREIGNKEY:
+		return fmt.Errorf("%w: referenced record", ErrNotFound)
+	case sqlitelib.SQLITE_CONSTRAINT_PRIMARYKEY, sqlitelib.SQLITE_CONSTRAINT_UNIQUE:
+		return fmt.Errorf("%w: duplicate id", ErrAlreadyExists)
+	default:
+		return err
+	}
 }
 
 func withTx[T any](s *Store, fn func(*sqlc.Queries) (T, error)) (result T, err error) {
@@ -263,7 +269,7 @@ func (s *Store) getCreatedAt(q *sqlc.Queries, value IDAccessor) (time.Time, bool
 }
 
 func getExistingTimestamp(value string, err error) (time.Time, bool, error) {
-	if rowNotFound(err) {
+	if isRowNotFound(err) {
 		return time.Time{}, false, nil
 	}
 	if err != nil {
@@ -320,10 +326,7 @@ func (s *Store) saveWithQueries(q *sqlc.Queries, value IDAccessor, mode saveMode
 			return q.UpsertImageArtifact(ctx, sqlc.UpsertImageArtifactParams(params))
 		}
 	case *BackendImage:
-		placeholder := int64(0)
-		if item.Placeholder {
-			placeholder = 1
-		}
+		placeholder := boolToInt(item.Placeholder)
 		params := sqlc.CreateBackendImageParams{ID: item.ID, CreatedAt: timestampString(item.CreatedAt), UpdatedAt: timestampString(item.UpdatedAt), Backend: item.Backend, ImageID: item.ImageID, ExternalID: item.ExternalID, Placeholder: placeholder}
 		switch mode {
 		case saveModeCreate:
@@ -407,7 +410,7 @@ func (s *Store) get(id string, out any) error {
 		return fmt.Errorf("output parameter is required")
 	}
 	err := s.getWithQueries(s.queries, id, out)
-	if rowNotFound(err) {
+	if isRowNotFound(err) {
 		return fmt.Errorf("failed to read %q: %w", id, ErrNotFound)
 	}
 	if err != nil {
@@ -520,6 +523,13 @@ func imageArtifactFromRow(row sqlc.ImageArtifact) (ImageArtifact, error) {
 func backendImageFromRow(row sqlc.BackendImage) (BackendImage, error) {
 	base, err := baseModelFromRow(row.ID, row.CreatedAt, row.UpdatedAt)
 	return BackendImage{BaseModel: base, Backend: row.Backend, ImageID: row.ImageID, ExternalID: row.ExternalID, Placeholder: row.Placeholder != 0}, err
+}
+
+func boolToInt(value bool) int64 {
+	if value {
+		return 1
+	}
+	return 0
 }
 
 func clusterFromRow(row sqlc.Cluster) (Cluster, error) {
