@@ -701,6 +701,7 @@ generate: sqlc-generate
 .PHONY: sqlc-generate
 sqlc-generate:
 	@command -v sqlc >/dev/null 2>&1 || { echo "Error: sqlc is not installed; run 'aqua i' or install sqlc"; exit 1; }
+	@test "$$(sqlc version)" = "v1.31.1" || { echo "Error: sqlc v1.31.1 is required"; exit 1; }
 	sqlc generate
 
 .PHONY: generate-vm-host-key

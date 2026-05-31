@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	sqlite "modernc.org/sqlite"
+	_ "modernc.org/sqlite"
 	sqlitelib "modernc.org/sqlite/lib"
 
 	"github.com/kaweezle/iknite/pkg/iknitectl/db/sqlc"
@@ -57,7 +57,7 @@ func Open(path string) (*Store, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to open database: %w", err)
 	}
-	// Keep one connection so connection-local PRAGMA settings, especially foreign_keys, apply to every query.
+	// Keep one connection so connection-local PRAGMA settings apply to every query and writes remain serialized.
 	database.SetMaxOpenConns(1)
 
 	store := &Store{db: database, queries: sqlc.New(database)}
@@ -156,7 +156,7 @@ func normalizeSQLError(err error) error {
 	if err == nil {
 		return nil
 	}
-	var sqliteErr *sqlite.Error
+	var sqliteErr interface{ Code() int }
 	if !errors.As(err, &sqliteErr) {
 		return err
 	}
@@ -328,7 +328,10 @@ func (s *Store) saveWithQueries(q *sqlc.Queries, value IDAccessor, mode saveMode
 			return q.UpsertImageArtifact(ctx, sqlc.UpsertImageArtifactParams(params))
 		}
 	case *BackendImage:
-		placeholder := boolToInt(item.Placeholder)
+		placeholder := int64(0)
+		if item.Placeholder {
+			placeholder = 1
+		}
 		params := sqlc.CreateBackendImageParams{ID: item.ID, CreatedAt: timestampString(item.CreatedAt), UpdatedAt: timestampString(item.UpdatedAt), Backend: item.Backend, ImageID: item.ImageID, ExternalID: item.ExternalID, Placeholder: placeholder}
 		switch mode {
 		case saveModeCreate:
@@ -525,13 +528,6 @@ func imageArtifactFromRow(row sqlc.ImageArtifact) (ImageArtifact, error) {
 func backendImageFromRow(row sqlc.BackendImage) (BackendImage, error) {
 	base, err := baseModelFromRow(row.ID, row.CreatedAt, row.UpdatedAt)
 	return BackendImage{BaseModel: base, Backend: row.Backend, ImageID: row.ImageID, ExternalID: row.ExternalID, Placeholder: row.Placeholder != 0}, err
-}
-
-func boolToInt(value bool) int64 {
-	if value {
-		return 1
-	}
-	return 0
 }
 
 func clusterFromRow(row sqlc.Cluster) (Cluster, error) {
