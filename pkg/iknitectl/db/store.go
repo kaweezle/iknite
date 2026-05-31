@@ -37,6 +37,7 @@ const (
 	saveModeCreateOrUpdate
 )
 
+// timestampFormat keeps database timestamps human-readable while preserving nanosecond precision.
 const timestampFormat = time.RFC3339Nano
 
 type IDAccessorPointer[M any] interface {
@@ -56,6 +57,7 @@ func Open(path string) (*Store, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to open database: %w", err)
 	}
+	// Keep one connection so connection-local PRAGMA settings, especially foreign_keys, apply to every query.
 	database.SetMaxOpenConns(1)
 
 	store := &Store{db: database, queries: sqlc.New(database)}
@@ -161,7 +163,7 @@ func normalizeSQLError(err error) error {
 
 	switch sqliteErr.Code() {
 	case sqlitelib.SQLITE_CONSTRAINT_FOREIGNKEY:
-		return fmt.Errorf("%w: referenced record", ErrNotFound)
+		return fmt.Errorf("%w: referenced record not found", ErrNotFound)
 	case sqlitelib.SQLITE_CONSTRAINT_PRIMARYKEY, sqlitelib.SQLITE_CONSTRAINT_UNIQUE:
 		return fmt.Errorf("%w: duplicate id", ErrAlreadyExists)
 	default:

@@ -15,7 +15,7 @@ CREATE TABLE IF NOT EXISTS image_versions (
     manifest_digest TEXT NOT NULL DEFAULT '',
     manifest_media_type TEXT NOT NULL DEFAULT '',
     manifest BLOB,
-    FOREIGN KEY (source_id) REFERENCES image_sources(id)
+    FOREIGN KEY (source_id) REFERENCES image_sources(id) ON UPDATE RESTRICT ON DELETE RESTRICT
 );
 
 CREATE TABLE IF NOT EXISTS images (
@@ -24,7 +24,7 @@ CREATE TABLE IF NOT EXISTS images (
     updated_at TEXT NOT NULL,
     version_id TEXT NOT NULL,
     name TEXT NOT NULL DEFAULT '',
-    FOREIGN KEY (version_id) REFERENCES image_versions(id)
+    FOREIGN KEY (version_id) REFERENCES image_versions(id) ON UPDATE RESTRICT ON DELETE RESTRICT
 );
 
 CREATE TABLE IF NOT EXISTS image_artifacts (
@@ -36,7 +36,7 @@ CREATE TABLE IF NOT EXISTS image_artifacts (
     digest TEXT NOT NULL DEFAULT '',
     type TEXT NOT NULL,
     size INTEGER NOT NULL DEFAULT 0,
-    FOREIGN KEY (image_id) REFERENCES images(id)
+    FOREIGN KEY (image_id) REFERENCES images(id) ON UPDATE RESTRICT ON DELETE RESTRICT
 );
 
 CREATE TABLE IF NOT EXISTS backend_images (
@@ -47,7 +47,7 @@ CREATE TABLE IF NOT EXISTS backend_images (
     image_id TEXT NOT NULL,
     external_id TEXT NOT NULL DEFAULT '',
     placeholder INTEGER NOT NULL DEFAULT 0,
-    FOREIGN KEY (image_id) REFERENCES images(id)
+    FOREIGN KEY (image_id) REFERENCES images(id) ON UPDATE RESTRICT ON DELETE RESTRICT
 );
 
 CREATE TABLE IF NOT EXISTS clusters (
@@ -60,6 +60,6 @@ CREATE TABLE IF NOT EXISTS clusters (
     backend_image_id TEXT NOT NULL,
     workspace TEXT NOT NULL DEFAULT '',
     ref TEXT NOT NULL DEFAULT '',
-    FOREIGN KEY (image_id) REFERENCES images(id),
-    FOREIGN KEY (backend_image_id) REFERENCES backend_images(id)
+    FOREIGN KEY (image_id) REFERENCES images(id) ON UPDATE RESTRICT ON DELETE RESTRICT,
+    FOREIGN KEY (backend_image_id) REFERENCES backend_images(id) ON UPDATE RESTRICT ON DELETE RESTRICT
 );
