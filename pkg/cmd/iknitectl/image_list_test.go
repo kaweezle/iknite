@@ -88,7 +88,8 @@ func seedImageListData(t *testing.T, databasePath string) {
 	require.NoError(t, db.CreateItem(store, &db.Image{
 		BaseModel: db.BaseModel{ID: "ghcr.io/kaweezle/iknite@latest"},
 		VersionID: "ghcr.io/kaweezle/iknite@latest",
-		Name:      "/tmp/images/rootfs",
+		Name:      "ghcr.io/kaweezle/iknite:latest",
+		Path:      "/tmp/images/rootfs",
 	}))
 	require.NoError(t, db.CreateItem(store, &db.ImageArtifact{
 		BaseModel: db.BaseModel{ID: "ghcr.io/kaweezle/iknite@latest@sha256:one"},

@@ -98,6 +98,7 @@ type Image struct {
 	BaseModel
 	VersionID string `json:"versionId"`
 	Name      string `json:"name,omitempty"`
+	Path      string `json:"path,omitempty"`
 }
 
 // ImageArtifact describes one physical artifact associated with an image.

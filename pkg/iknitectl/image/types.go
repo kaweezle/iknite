@@ -153,6 +153,7 @@ func (at *ArtifactType) UnmarshalJSON(data []byte) error {
 // ImageListItem describes one image entry shown by the ls command.
 type ImageListItem struct {
 	UpdatedAt time.Time
+	Name      string
 	Source    string
 	Reference string
 	Path      string

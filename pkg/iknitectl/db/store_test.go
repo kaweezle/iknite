@@ -67,7 +67,8 @@ func seedDataGraph(t *testing.T, store *db.Store) seededGraph {
 		store.CreateItem(&db.Image{
 			BaseModel: db.BaseModel{ID: graph.imageID},
 			VersionID: graph.versionID,
-			Name:      "iknite-rootfs",
+			Name:      "iknite:latest",
+			Path:      "/tmp/images/iknite",
 		}),
 	)
 	require.NoError(

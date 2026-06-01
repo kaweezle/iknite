@@ -3,6 +3,7 @@ package image
 
 import (
 	"encoding/json"
+	"fmt"
 	"path/filepath"
 	"testing"
 	"time"
@@ -52,7 +53,9 @@ func TestPersistImageMetadataStoresSourceVersionAndImage(t *testing.T) {
 	err = store.GetItem(imageID, imageRecord)
 	require.NoError(t, err)
 	require.Equal(t, version.ID, imageRecord.VersionID)
-	require.Equal(t, outputDir, imageRecord.Name)
+	require.Equal(t, fmt.Sprintf("%s:%s", filepath.Base(inspectResult.Repository), inspectResult.Reference),
+		imageRecord.Name)
+	require.Equal(t, outputDir, imageRecord.Path)
 }
 
 func TestPersistImageSourceUpdatesExistingSource(t *testing.T) {

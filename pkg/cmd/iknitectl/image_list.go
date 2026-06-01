@@ -67,6 +67,7 @@ func renderImageListTable(items []imagesvc.ImageListItem) string {
 	rows := make([]table.Row, 0, len(items))
 	for _, item := range items {
 		rows = append(rows, table.Row{
+			item.Name,
 			item.Source,
 			item.Reference,
 			// Keep for reference
@@ -80,8 +81,9 @@ func renderImageListTable(items []imagesvc.ImageListItem) string {
 	width := 180
 	listTable := table.New(
 		table.WithColumns([]table.Column{
+			{Title: "NAME", Width: 30},
 			{Title: "SOURCE", Width: 36},
-			{Title: "REF", Width: 18},
+			{Title: "REF", Width: 20},
 			// Keep for reference
 			// {Title: "PATH", Width: 36},
 			{Title: "ARTIFACTS", Width: 30},
