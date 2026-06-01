@@ -162,9 +162,10 @@ func (s *Service) ListImages() ([]ImageListItem, error) {
 		source := sourceByID[version.SourceID]
 		imageArtifacts := artifactByImageID[image.ID]
 		result = append(result, ImageListItem{
+			Name:      image.Name,
 			Source:    source.Location,
 			Reference: version.Tag,
-			Path:      image.Name,
+			Path:      image.Path,
 			Artifacts: summarizeArtifacts(imageArtifacts),
 			TotalSize: sumArtifactSizes(imageArtifacts),
 			UpdatedAt: image.UpdatedAt,

@@ -244,7 +244,8 @@ func TestListImages(t *testing.T) {
 	require.NoError(t, db.CreateItem(store, &db.Image{
 		BaseModel: db.BaseModel{ID: "image-a"},
 		VersionID: "repo-a@v1",
-		Name:      "/tmp/images/a",
+		Name:      "repo-a:v1",
+		Path:      "/tmp/images/a",
 	}))
 	require.NoError(t, db.CreateItem(store, &db.ImageArtifact{
 		BaseModel: db.BaseModel{ID: "artifact-a-1"},
@@ -267,7 +268,8 @@ func TestListImages(t *testing.T) {
 	require.NoError(t, db.CreateItem(store, &db.Image{
 		BaseModel: db.BaseModel{ID: "image-b"},
 		VersionID: "repo-b@v2",
-		Name:      "/tmp/images/z",
+		Name:      "repo-b:v2",
+		Path:      "/tmp/images/z",
 	}))
 	require.NoError(t, db.CreateItem(store, &db.ImageArtifact{
 		BaseModel: db.BaseModel{ID: "artifact-b-1"},

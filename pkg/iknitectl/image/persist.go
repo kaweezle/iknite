@@ -67,11 +67,12 @@ func persistImageVersion(store MetadataStore, inspectResult *InspectResult, sour
 	return versionID, nil
 }
 
-func persistImageRecord(store MetadataStore, versionID, outputDir string) (string, error) {
+func persistImageRecord(store MetadataStore, versionID, imageRef, outputDir string) (string, error) {
 	imageRecord := &db.Image{
 		BaseModel: db.BaseModel{ID: versionID},
 		VersionID: versionID,
-		Name:      outputDir,
+		Name:      imageRef,
+		Path:      outputDir,
 	}
 	if err := store.CreateOrUpdateItem(imageRecord); err != nil {
 		return "", fmt.Errorf("failed to create or update image record: %w", err)
@@ -108,7 +109,12 @@ func persistImageMetadata(store MetadataStore, inspectResult *InspectResult, out
 		return "", err
 	}
 
-	imageID, err := persistImageRecord(store, versionID, outputDir)
+	imageID, err := persistImageRecord(
+		store,
+		versionID,
+		fmt.Sprintf("%s:%s", filepath.Base(inspectResult.Repository), inspectResult.Reference),
+		outputDir,
+	)
 	if err != nil {
 		return "", err
 	}
