@@ -241,6 +241,7 @@ help: # ignore checkmake
 	@echo "  make e2e-tg-destroy                 Destroy Terraform infrastructure for e2e tests"
 	@echo "  make e2e-tg-init                    Initialize Terraform for e2e tests"
 	@echo "  make e2e-tg-refresh                 Refresh Terraform state for e2e tests"
+	@echo "  make generate                      Generate code artifacts"
 	@echo "  make generate-vm-host-key           Generate VM SSH host key"
 	@echo "  make help                           Show this help message"
 	@echo "  make incus-metadata-build           Build Incus metadata tarball"
@@ -693,6 +694,15 @@ $(IKNITE_KNOWN_HOSTS_FILE): $(SECRETS_FILE) | check-prerequisites
 
 .PHONY: ci-vm-known-hosts
 ci-vm-known-hosts: $(IKNITE_KNOWN_HOSTS_FILE) ## Extract VM SSH host public key to ~/.ssh/iknite_known_hosts
+
+.PHONY: generate
+generate: sqlc-generate
+
+.PHONY: sqlc-generate
+sqlc-generate:
+	@command -v sqlc >/dev/null 2>&1 || { echo "Error: sqlc is not installed; run 'aqua i' or install sqlc"; exit 1; }
+	@test "$$(sqlc version)" = "v1.31.1" || { echo "Error: sqlc v1.31.1 is required"; exit 1; }
+	sqlc generate
 
 .PHONY: generate-vm-host-key
 generate-vm-host-key: ## Generate new fixed SSH host keys for iknite VMs and update devcontainer known_hosts

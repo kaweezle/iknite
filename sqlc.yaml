@@ -1,0 +1,11 @@
+version: "2"
+sql:
+  - engine: "sqlite"
+    schema: "pkg/iknitectl/db/schema.sql"
+    queries: "pkg/iknitectl/db/query"
+    gen:
+      go:
+        package: "sqlc"
+        out: "pkg/iknitectl/db/sqlc"
+        sql_package: "database/sql"
+        emit_json_tags: false
