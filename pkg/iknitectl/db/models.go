@@ -1,7 +1,10 @@
+// cSpell: words specv
 package db
 
 import (
 	"time"
+
+	specv1 "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 // ArtifactType identifies the format of a stored image artifact.
@@ -104,11 +107,12 @@ type Image struct {
 // ImageArtifact describes one physical artifact associated with an image.
 type ImageArtifact struct {
 	BaseModel
-	ImageID string       `json:"imageId"`
-	Path    string       `json:"path,omitempty"`
-	Digest  string       `json:"digest,omitempty"`
-	Type    ArtifactType `json:"type"`
-	Size    int64        `json:"size,omitempty"`
+	ImageID    string            `json:"imageId"`
+	Path       string            `json:"path,omitempty"`
+	Digest     string            `json:"digest,omitempty"`
+	Type       ArtifactType      `json:"type"`
+	Descriptor specv1.Descriptor `json:"descriptor,omitempty"`
+	Size       int64             `json:"size,omitempty"`
 }
 
 // BackendImage describes one image import into a backend provider.

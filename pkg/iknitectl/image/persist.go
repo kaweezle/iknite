@@ -83,12 +83,13 @@ func persistImageRecord(store MetadataStore, versionID, imageRef, outputDir stri
 
 func persistImageArtifact(store MetadataStore, imageID, outputDir string, layer pullLayer) error {
 	artifact := &db.ImageArtifact{
-		BaseModel: db.BaseModel{ID: imageArtifactID(imageID, layer.Descriptor.Digest.String())},
-		ImageID:   imageID,
-		Path:      filepath.Join(outputDir, layer.FileName),
-		Digest:    layer.Descriptor.Digest.String(),
-		Type:      artifactTypeFromMediaType(layer.Descriptor.MediaType),
-		Size:      layer.Descriptor.Size,
+		BaseModel:  db.BaseModel{ID: imageArtifactID(imageID, layer.Descriptor.Digest.String())},
+		Descriptor: *layer.Descriptor,
+		ImageID:    imageID,
+		Path:       filepath.Join(outputDir, layer.FileName),
+		Digest:     layer.Descriptor.Digest.String(),
+		Type:       artifactTypeFromMediaType(layer.Descriptor.MediaType),
+		Size:       layer.Descriptor.Size,
 	}
 
 	if err := store.CreateOrUpdateItem(artifact); err != nil {

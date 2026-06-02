@@ -2,9 +2,9 @@
 package image
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -278,6 +278,17 @@ func (s *Service) Pull(ctx context.Context, req *PullRequest) (string, error) {
 	}
 
 	outputDir := fs.JoinPath(c.Images, imageDirectoryName(inspectResult))
+	logger = logger.With("outputDir", outputDir)
+
+	alreadyDownloaded, err := s.hasMatchingSavedManifest(inspectResult)
+	if err != nil {
+		return "", err
+	}
+	if alreadyDownloaded {
+		logger.Info("Image artifacts already exist locally, skipping download")
+		return outputDir, nil
+	}
+
 	if err = fs.MkdirAll(outputDir, 0o755); err != nil {
 		return "", fmt.Errorf("failed to create output directory: %w", err)
 	}
@@ -287,25 +298,9 @@ func (s *Service) Pull(ctx context.Context, req *PullRequest) (string, error) {
 		return "", err
 	}
 
-	logger = logger.With("outputDir", outputDir)
-
 	layers, err := selectArtifactLayers(&inspectResult.Manifest, inspectResult.ImageType)
 	if err != nil {
 		return "", err
-	}
-
-	alreadyDownloaded, err := s.hasMatchingSavedManifest(outputDir, inspectResult)
-	if err != nil {
-		return "", err
-	}
-	if alreadyDownloaded {
-		for _, layer := range layers {
-			if persistErr := persistImageArtifact(s.Store, imageID, outputDir, layer); persistErr != nil {
-				return "", persistErr
-			}
-		}
-		logger.Info("Image artifacts already exist locally, skipping download")
-		return outputDir, nil
 	}
 
 	repo, err := s.NewRepository(inspectResult.Repository)
@@ -335,36 +330,29 @@ func (s *Service) Pull(ctx context.Context, req *PullRequest) (string, error) {
 	return outputDir, nil
 }
 
-func (s *Service) hasMatchingSavedManifest(outputDir string, inspectResult *InspectResult) (bool, error) {
-	inspectPath := s.FS.JoinPath(outputDir, manifestFilename)
-	if _, statErr := s.FS.Stat(inspectPath); os.IsNotExist(statErr) {
-		return false, nil
-	} else if statErr != nil {
-		return false, fmt.Errorf("failed to stat saved inspect result: %w", statErr)
-	}
-
-	savedInspectRaw, err := s.FS.ReadFile(inspectPath)
+func (s *Service) hasMatchingSavedManifest(inspectResult *InspectResult) (bool, error) {
+	versionID := imageVersionID(inspectResult.Repository, inspectResult.Reference)
+	var existingImage db.Image
+	err := s.Store.GetItem(versionID, &existingImage)
 	if err != nil {
-		return false, fmt.Errorf("failed to read saved inspect result: %w", err)
-	}
-
-	var savedInspect InspectResult
-	if unmarshalErr := json.Unmarshal(savedInspectRaw, &savedInspect); unmarshalErr == nil {
-		savedManifest, err := json.Marshal(savedInspect.Manifest)
-		if err != nil {
-			return false, fmt.Errorf("failed to marshal saved manifest: %w", err)
+		if !errors.Is(err, db.ErrNotFound) {
+			return false, fmt.Errorf("failed to check for existing image version: %w", err)
 		}
-
-		fetchedManifest, err := json.Marshal(inspectResult.Manifest)
-		if err != nil {
-			return false, fmt.Errorf("failed to marshal fetched manifest: %w", err)
-		}
-
-		return bytes.Equal(savedManifest, fetchedManifest), nil
+		return false, nil // No existing version, so no matching manifest.
 	}
-
-	// Corrupted or legacy inspect file: refresh local artifacts.
-	return false, nil
+	// Get the corresponding image version
+	var existingVersion db.ImageVersion
+	err = s.Store.GetItem(existingImage.VersionID, &existingVersion)
+	if err != nil {
+		if !errors.Is(err, db.ErrNotFound) {
+			return false, fmt.Errorf("failed to check for existing image version: %w", err)
+		}
+		return false, nil // No existing version, so no matching manifest.
+	}
+	if existingVersion.ManifestDigest != inspectResult.Descriptor.Digest.String() {
+		return false, nil // Manifest digest doesn't match, so no matching manifest.
+	}
+	return true, nil // Found existing version with matching manifest digest, so we have a matching manifest.
 }
 
 func inferImageType(manifest *specv1.Manifest) (ImageType, error) {
@@ -422,14 +410,14 @@ func (layer *pullLayer) download(
 	out io.Writer,
 ) error {
 	outputPath := fs.JoinPath(outputDir, layer.FileName)
-	destination, err := fs.Open(outputPath)
-	if err == nil {
-		if closeErr := destination.Close(); closeErr != nil {
-			return fmt.Errorf("failed to close existing output file: %w", closeErr)
-		}
+	exists, err := fs.Exists(outputPath)
+	if err != nil {
+		return fmt.Errorf("failed to check if output file exists: %w", err)
+	}
+	if exists {
 		return fmt.Errorf("output file %s already exists", outputPath)
 	}
-	destination, err = fs.Create(outputPath)
+	destination, err := fs.Create(outputPath)
 	if err != nil {
 		return fmt.Errorf("failed to create output file: %w", err)
 	}
