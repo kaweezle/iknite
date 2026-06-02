@@ -84,6 +84,12 @@ development tasks that are not part of the main iknite binary.`,
 			}
 			return nil
 		},
+		PersistentPostRunE: func(_ *cobra.Command, _ []string) error {
+			if err := baseService.CloseStore(); err != nil {
+				return fmt.Errorf("failed to close metadata store: %w", err)
+			}
+			return nil
+		},
 	}
 	rootCmd.SetOut(opts.Output)
 

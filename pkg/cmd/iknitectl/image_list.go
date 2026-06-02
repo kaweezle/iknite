@@ -10,7 +10,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/kaweezle/iknite/pkg/iknitectl/base"
-	"github.com/kaweezle/iknite/pkg/iknitectl/db"
 	imagesvc "github.com/kaweezle/iknite/pkg/iknitectl/image"
 	"github.com/kaweezle/iknite/pkg/utils"
 )
@@ -22,17 +21,10 @@ func CreateImageListCmd(baseService base.ServiceInterface) *cobra.Command {
 		Aliases: []string{"ls"},
 		Short:   "List persisted images",
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			store, err := db.Open(baseService.Config().Database)
+			store, err := baseService.Store()
 			if err != nil {
 				return fmt.Errorf("failed to open metadata store: %w", err)
 			}
-
-			defer func() {
-				if closeErr := store.Close(); closeErr != nil {
-					//nolint:errcheck // We can only report close failures to stderr here.
-					fmt.Fprintf(cmd.ErrOrStderr(), "Warning: failed to close metadata store: %v\n", closeErr)
-				}
-			}()
 
 			service := &imagesvc.Service{
 				FS:     baseService.Host(),

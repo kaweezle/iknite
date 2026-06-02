@@ -19,10 +19,15 @@ func CreateImageInspectCmd(baseService base.ServiceInterface) *cobra.Command {
 		Short: "Inspect image manifest details",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			store, err := baseService.Store()
+			if err != nil {
+				return fmt.Errorf("failed to open metadata store: %w", err)
+			}
 			service := &imagesvc.Service{
 				FS:     baseService.Host(),
 				Logger: baseService.Logger(),
 				Config: baseService.Config(),
+				Store:  store,
 			}
 			result, err := service.Inspect(cmd.Context(), args[0])
 			if err != nil {
