@@ -1,42 +1,22 @@
 // cSpell: words imagesvc
-package iknitectl_test
+package image
 
 import (
 	"fmt"
+	"reflect"
 	"testing"
 
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	iknitectl "github.com/kaweezle/iknite/pkg/cmd/iknitectl"
+	imageMock "github.com/kaweezle/iknite/mocks/pkg/iknitectl/image"
 	"github.com/kaweezle/iknite/pkg/host"
-	"github.com/kaweezle/iknite/pkg/iknitectl/base"
 	"github.com/kaweezle/iknite/pkg/iknitectl/config"
 	"github.com/kaweezle/iknite/pkg/iknitectl/db"
-	imagesvc "github.com/kaweezle/iknite/pkg/iknitectl/image"
 	"github.com/kaweezle/iknite/pkg/testutil"
 )
 
-func TestCreateImageCmd(t *testing.T) {
-	t.Parallel()
-
-	h := testutil.NewDummyUserHost()
-	logger := testutil.TestLogger(t)
-	c := config.NewConfigOptions(h)
-	baseService := base.NewService(h, logger, c)
-	cmd := iknitectl.CreateImageCmd(baseService)
-	require.NotNil(t, cmd)
-
-	for _, sub := range []string{"inspect", "pull"} {
-		found, _, err := cmd.Find([]string{sub})
-		require.NoError(t, err)
-		require.NotNil(t, found)
-		require.Equal(t, sub, found.Name())
-	}
-}
-
-// --- Mock MetadataStore ---
-
-// mockMetadataStore implements image.MetadataStore for testing.
+// mockMetadataStore implements MetadataStore for testing.
 type mockMetadataStore struct {
 	onGetNameRef         func(string) (string, error)
 	onGetItem            func(string, any) error
@@ -112,8 +92,6 @@ func (m *mockMetadataStore) CreateOrUpdateItem(item db.IDAccessor) error {
 	return fmt.Errorf("CreateOrUpdateItem not implemented")
 }
 
-// --- FS mocks ---
-
 // trackingFS wraps a FileEnvironment and records RemoveAll calls.
 type trackingFS struct {
 	host.FileEnvironment
@@ -139,15 +117,13 @@ func (f *failingFS) RemoveAll(_ string) error {
 	return f.removeAllErr
 }
 
-// --- Helpers ---
-
 // newTestService creates a Service with mocks for testing.
-func newTestService(t *testing.T, store imagesvc.MetadataStore) *imagesvc.Service {
+func newTestService(t *testing.T, store MetadataStore) *Service {
 	t.Helper()
 	h := testutil.NewDummyUserHost()
 	c := &config.Config{}
 	require.NoError(t, config.NewConfigOptions(h).Resolve(h, c))
-	return &imagesvc.Service{
+	return &Service{
 		FS:     h,
 		Logger: testutil.TestLogger(t),
 		Config: c,
@@ -158,14 +134,14 @@ func newTestService(t *testing.T, store imagesvc.MetadataStore) *imagesvc.Servic
 // newTestServiceWithFS creates a Service with a custom FS for testing.
 func newTestServiceWithFS(
 	t *testing.T,
-	store imagesvc.MetadataStore,
+	store MetadataStore,
 	fs host.FileEnvironment,
-) *imagesvc.Service {
+) *Service {
 	t.Helper()
 	h := testutil.NewDummyUserHost()
 	c := &config.Config{}
 	require.NoError(t, config.NewConfigOptions(h).Resolve(h, c))
-	return &imagesvc.Service{
+	return &Service{
 		FS:     fs,
 		Logger: testutil.TestLogger(t),
 		Config: c,
@@ -178,58 +154,73 @@ func newTestServiceWithFS(
 func TestInfo_Success(t *testing.T) {
 	t.Parallel()
 
-	store := &mockMetadataStore{
-		onGetNameRef: func(name string) (string, error) {
-			require.Equal(t, "iknite:latest", name)
-			return "ghcr.io/kaweezle/iknite@latest", nil
-		},
-		onGetItem: func(id string, out any) error {
-			switch o := out.(type) {
-			case *db.Image:
-				*o = db.Image{
-					BaseModel: db.BaseModel{ID: id},
-					VersionID: "ghcr.io/kaweezle/iknite@latest",
-					Name:      "iknite:latest",
-					Path:      "/tmp/images/test",
-				}
-				return nil
-			case *db.ImageVersion:
-				*o = db.ImageVersion{
-					BaseModel:         db.BaseModel{ID: id},
-					SourceID:          "ghcr.io/kaweezle/iknite",
-					Tag:               "latest",
-					ManifestDigest:    "sha256:abc123",
-					ManifestMediaType: "application/vnd.oci.image.manifest.v1+json",
-				}
-				return nil
-			case *db.ImageSource:
-				*o = db.ImageSource{
-					BaseModel: db.BaseModel{ID: id},
-					Kind:      "registry",
-					Location:  "ghcr.io/kaweezle/iknite",
-				}
-				return nil
-			}
-			return db.ErrNotFound
-		},
-		onListItems: func(out any) error {
-			if artifacts, ok := out.(*[]db.ImageArtifact); ok {
-				*artifacts = []db.ImageArtifact{
-					{
-						BaseModel: db.BaseModel{ID: "art-1"},
-						ImageID:   "ghcr.io/kaweezle/iknite@latest",
-						Path:      "/tmp/images/test/rootfs.tar.gz",
-						Digest:    "sha256:def456",
-						Type:      db.ArtifactTypeRootFS,
-						Size:      1024,
-					},
-				}
+	s := imageMock.NewMockMetadataStore(t)
+	s.EXPECT().GetNameRef("iknite:latest").Return("ghcr.io/kaweezle/iknite@latest", nil)
+	s.EXPECT().GetItem(
+		"ghcr.io/kaweezle/iknite@latest",
+		mock.AnythingOfType(reflect.TypeFor[*db.Image]().String()),
+	).RunAndReturn(func(id string, out any) error {
+		if o, ok := out.(*db.Image); ok {
+			*o = db.Image{
+				BaseModel: db.BaseModel{ID: id},
+				VersionID: "ghcr.io/kaweezle/iknite@latest",
+				Name:      "iknite:latest",
+				Path:      "/tmp/images/test",
 			}
 			return nil
-		},
-	}
+		}
+		return fmt.Errorf("unexpected type for GetItem: %T", out)
+	})
+	s.EXPECT().GetItem(
+		"ghcr.io/kaweezle/iknite@latest",
+		mock.AnythingOfType(reflect.TypeFor[*db.ImageVersion]().String()),
+	).RunAndReturn(func(id string, out any) error {
+		if o, ok := out.(*db.ImageVersion); ok {
+			*o = db.ImageVersion{
+				BaseModel:         db.BaseModel{ID: id},
+				SourceID:          "ghcr.io/kaweezle/iknite",
+				Tag:               "latest",
+				ManifestDigest:    "sha256:abc123",
+				ManifestMediaType: "application/vnd.oci.image.manifest.v1+json",
+			}
+			return nil
+		}
+		return fmt.Errorf("unexpected type for GetItem: %T", out)
+	})
+	s.EXPECT().GetItem(
+		"ghcr.io/kaweezle/iknite",
+		mock.AnythingOfType(reflect.TypeFor[*db.ImageSource]().String()),
+	).RunAndReturn(func(id string, out any) error {
+		if o, ok := out.(*db.ImageSource); ok {
+			*o = db.ImageSource{
+				BaseModel: db.BaseModel{ID: id},
+				Kind:      "registry",
+				Location:  "ghcr.io/kaweezle/iknite",
+			}
+			return nil
+		}
+		return fmt.Errorf("unexpected type for GetItem: %T", out)
+	})
+	s.EXPECT().ListItems(
+		mock.AnythingOfType(reflect.TypeFor[*[]db.ImageArtifact]().String()),
+	).RunAndReturn(func(out any) error {
+		if artifacts, ok := out.(*[]db.ImageArtifact); ok {
+			*artifacts = []db.ImageArtifact{
+				{
+					BaseModel: db.BaseModel{ID: "art-1"},
+					ImageID:   "ghcr.io/kaweezle/iknite@latest",
+					Path:      "/tmp/images/test/rootfs.tar.gz",
+					Digest:    "sha256:def456",
+					Type:      db.ArtifactTypeRootFS,
+					Size:      1024,
+				},
+			}
+			return nil
+		}
+		return fmt.Errorf("unexpected type for ListItems: %T", out)
+	})
 
-	svc := newTestService(t, store)
+	svc := newTestService(t, s)
 	info, err := svc.Info("iknite:latest")
 	require.NoError(t, err)
 	require.Equal(t, "iknite:latest", info.Name)
@@ -249,7 +240,7 @@ func TestInfo_Success(t *testing.T) {
 func TestInfo_NilFS(t *testing.T) {
 	t.Parallel()
 
-	svc := &imagesvc.Service{}
+	svc := &Service{}
 	_, err := svc.Info("test")
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "filesystem dependency is required")
@@ -259,7 +250,7 @@ func TestInfo_NilStore(t *testing.T) {
 	t.Parallel()
 
 	h := testutil.NewDummyUserHost()
-	svc := &imagesvc.Service{FS: h}
+	svc := &Service{FS: h}
 	_, err := svc.Info("test")
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "store dependency is required")
@@ -482,7 +473,7 @@ func TestRemove_Success(t *testing.T) {
 func TestRemove_NilFS(t *testing.T) {
 	t.Parallel()
 
-	svc := &imagesvc.Service{}
+	svc := &Service{}
 	err := svc.Remove("test")
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "filesystem dependency is required")
@@ -492,7 +483,7 @@ func TestRemove_NilStore(t *testing.T) {
 	t.Parallel()
 
 	h := testutil.NewDummyUserHost()
-	svc := &imagesvc.Service{FS: h}
+	svc := &Service{FS: h}
 	err := svc.Remove("test")
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "store dependency is required")
@@ -648,8 +639,8 @@ func TestRemove_DeleteArtifactError(t *testing.T) {
 	require.Contains(t, err.Error(), "failed to delete artifact")
 }
 
-// removeStoreWithArtifacts creates a mock store for Remove tests with one artifact.
-func removeStoreWithArtifacts(deletedItems *[]string, okDeleteCount int) *mockMetadataStore {
+func deleteMockMetadataStore(t *testing.T, deletedItems *[]string, okDeletedCount int) *mockMetadataStore {
+	t.Helper()
 	return &mockMetadataStore{
 		onGetNameRef: func(_ string) (string, error) {
 			return "ghcr.io/kaweezle/iknite@latest", nil
@@ -688,7 +679,7 @@ func removeStoreWithArtifacts(deletedItems *[]string, okDeleteCount int) *mockMe
 		},
 		onDeleteItem: func(item db.IDAccessor) error {
 			*deletedItems = append(*deletedItems, item.GetID())
-			if len(*deletedItems) <= okDeleteCount { // allow first N deletes to succeed
+			if len(*deletedItems) <= okDeletedCount {
 				return nil // artifact succeeded
 			}
 			return fmt.Errorf("database delete error")
@@ -701,7 +692,7 @@ func TestRemove_DeleteImageError(t *testing.T) {
 
 	var deletedItems []string
 
-	store := removeStoreWithArtifacts(&deletedItems, 1)
+	store := deleteMockMetadataStore(t, &deletedItems, 1)
 
 	svc := newTestService(t, store)
 	err := svc.Remove("iknite:latest")
@@ -715,7 +706,7 @@ func TestRemove_DeleteVersionError(t *testing.T) {
 
 	var deletedItems []string
 
-	store := removeStoreWithArtifacts(&deletedItems, 2)
+	store := deleteMockMetadataStore(t, &deletedItems, 2)
 
 	svc := newTestService(t, store)
 	err := svc.Remove("iknite:latest")
@@ -729,49 +720,9 @@ func TestRemove_RemoveNameRefError(t *testing.T) {
 
 	var deletedItems []string
 
-	store := &mockMetadataStore{
-		onGetNameRef: func(_ string) (string, error) {
-			return "ghcr.io/kaweezle/iknite@latest", nil
-		},
-		onGetItem: func(id string, out any) error {
-			switch o := out.(type) {
-			case *db.Image:
-				*o = db.Image{
-					BaseModel: db.BaseModel{ID: id},
-					VersionID: "ghcr.io/kaweezle/iknite@latest",
-					Name:      "iknite:latest",
-					Path:      "/tmp/images/test",
-				}
-				return nil
-			case *db.ImageVersion:
-				*o = db.ImageVersion{
-					BaseModel: db.BaseModel{ID: id},
-					SourceID:  "ghcr.io/kaweezle/iknite",
-					Tag:       "latest",
-				}
-				return nil
-			}
-			return db.ErrNotFound
-		},
-		onListItems: func(out any) error {
-			if artifacts, ok := out.(*[]db.ImageArtifact); ok {
-				*artifacts = []db.ImageArtifact{
-					{
-						BaseModel: db.BaseModel{ID: "art-1"},
-						ImageID:   "ghcr.io/kaweezle/iknite@latest",
-						Type:      db.ArtifactTypeRootFS,
-					},
-				}
-			}
-			return nil
-		},
-		onDeleteItem: func(item db.IDAccessor) error {
-			deletedItems = append(deletedItems, item.GetID())
-			return nil
-		},
-		onRemoveNameRef: func(_ string) error {
-			return fmt.Errorf("database delete error")
-		},
+	store := deleteMockMetadataStore(t, &deletedItems, 15) // all deletes succeed
+	store.onRemoveNameRef = func(_ string) error {
+		return fmt.Errorf("database delete error")
 	}
 
 	svc := newTestService(t, store)
@@ -836,4 +787,107 @@ func TestRemoveRemoveAllErrorIsNonFatal(t *testing.T) {
 
 	require.Len(t, deletedItems, 2) // image + version (no artifacts)
 	require.Len(t, removedNameRefs, 1)
+}
+
+func TestRemoveNoArtifacts(t *testing.T) {
+	t.Parallel()
+
+	var deletedItems []string
+
+	h := testutil.NewDummyUserHost()
+	fs := &trackingFS{FileEnvironment: h}
+
+	store := &mockMetadataStore{
+		onGetNameRef: func(_ string) (string, error) {
+			return "ghcr.io/kaweezle/iknite@latest", nil
+		},
+		onGetItem: func(id string, out any) error {
+			switch o := out.(type) {
+			case *db.Image:
+				*o = db.Image{
+					BaseModel: db.BaseModel{ID: id},
+					VersionID: "ghcr.io/kaweezle/iknite@latest",
+					Name:      "iknite:latest",
+					Path:      "/tmp/images/test",
+				}
+				return nil
+			case *db.ImageVersion:
+				*o = db.ImageVersion{
+					BaseModel: db.BaseModel{ID: id},
+					SourceID:  "ghcr.io/kaweezle/iknite",
+					Tag:       "latest",
+				}
+				return nil
+			}
+			return db.ErrNotFound
+		},
+		onListItems: func(out any) error {
+			if artifacts, ok := out.(*[]db.ImageArtifact); ok {
+				*artifacts = []db.ImageArtifact{}
+			}
+			return nil
+		},
+		onDeleteItem: func(item db.IDAccessor) error {
+			deletedItems = append(deletedItems, item.GetID())
+			return nil
+		},
+		onRemoveNameRef: func(_ string) error {
+			return nil
+		},
+	}
+
+	svc := newTestServiceWithFS(t, store, fs)
+	err := svc.Remove("iknite:latest")
+	require.NoError(t, err)
+
+	require.Len(t, deletedItems, 2) // image + version only
+	require.Len(t, fs.removeAllCalls, 1)
+}
+
+func TestRemoveEmptyPath(t *testing.T) {
+	t.Parallel()
+
+	h := testutil.NewDummyUserHost()
+	fs := &trackingFS{FileEnvironment: h}
+
+	store := &mockMetadataStore{
+		onGetNameRef: func(_ string) (string, error) {
+			return "ghcr.io/kaweezle/iknite@latest", nil
+		},
+		onGetItem: func(id string, out any) error {
+			switch o := out.(type) {
+			case *db.Image:
+				*o = db.Image{
+					BaseModel: db.BaseModel{ID: id},
+					VersionID: "ghcr.io/kaweezle/iknite@latest",
+					Name:      "iknite:latest",
+					Path:      "", // empty path
+				}
+				return nil
+			case *db.ImageVersion:
+				*o = db.ImageVersion{
+					BaseModel: db.BaseModel{ID: id},
+					SourceID:  "ghcr.io/kaweezle/iknite",
+					Tag:       "latest",
+				}
+				return nil
+			}
+			return db.ErrNotFound
+		},
+		onListItems: func(_ any) error {
+			return nil
+		},
+		onDeleteItem: func(_ db.IDAccessor) error {
+			return nil
+		},
+		onRemoveNameRef: func(_ string) error {
+			return nil
+		},
+	}
+
+	svc := newTestServiceWithFS(t, store, fs)
+	err := svc.Remove("iknite:latest")
+	require.NoError(t, err)
+
+	require.Empty(t, fs.removeAllCalls) // RemoveAll should not be called
 }
