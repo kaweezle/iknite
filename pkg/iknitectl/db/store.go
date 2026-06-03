@@ -641,3 +641,28 @@ func (s *Store) GetNameRef(name string) (string, error) {
 	}
 	return ref, nil
 }
+
+// RemoveNameRef deletes the name-to-reference mapping for the given image name.
+func (s *Store) RemoveNameRef(name string) error {
+	if name == "" {
+		return fmt.Errorf("image name is required")
+	}
+
+	err := s.db.Update(func(tx *bbolt.Tx) error {
+		bucket, err := getBucket(tx, bucketImageNameRefs)
+		if err != nil {
+			return err
+		}
+		if bucket.Get([]byte(name)) == nil {
+			return fmt.Errorf("%w: image name %q", ErrNotFound, name)
+		}
+		if err = bucket.Delete([]byte(name)); err != nil {
+			return fmt.Errorf("failed to delete name reference %q: %w", name, err)
+		}
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("failed to remove name reference %q: %w", name, err)
+	}
+	return nil
+}

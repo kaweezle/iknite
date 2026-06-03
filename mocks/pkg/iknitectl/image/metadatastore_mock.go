@@ -138,6 +138,57 @@ func (_c *MockMetadataStore_CreateOrUpdateItem_Call) RunAndReturn(run func(item 
 	return _c
 }
 
+// DeleteItem provides a mock function for the type MockMetadataStore
+func (_mock *MockMetadataStore) DeleteItem(item db.IDAccessor) error {
+	ret := _mock.Called(item)
+
+	if len(ret) == 0 {
+		panic("no return value specified for DeleteItem")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(db.IDAccessor) error); ok {
+		r0 = returnFunc(item)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockMetadataStore_DeleteItem_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DeleteItem'
+type MockMetadataStore_DeleteItem_Call struct {
+	*mock.Call
+}
+
+// DeleteItem is a helper method to define mock.On call
+//   - item db.IDAccessor
+func (_e *MockMetadataStore_Expecter) DeleteItem(item interface{}) *MockMetadataStore_DeleteItem_Call {
+	return &MockMetadataStore_DeleteItem_Call{Call: _e.mock.On("DeleteItem", item)}
+}
+
+func (_c *MockMetadataStore_DeleteItem_Call) Run(run func(item db.IDAccessor)) *MockMetadataStore_DeleteItem_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 db.IDAccessor
+		if args[0] != nil {
+			arg0 = args[0].(db.IDAccessor)
+		}
+		run(
+			arg0,
+		)
+	})
+	return _c
+}
+
+func (_c *MockMetadataStore_DeleteItem_Call) Return(err error) *MockMetadataStore_DeleteItem_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockMetadataStore_DeleteItem_Call) RunAndReturn(run func(item db.IDAccessor) error) *MockMetadataStore_DeleteItem_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetItem provides a mock function for the type MockMetadataStore
 func (_mock *MockMetadataStore) GetItem(id string, out any) error {
 	ret := _mock.Called(id, out)
@@ -302,6 +353,57 @@ func (_c *MockMetadataStore_ListItems_Call) Return(err error) *MockMetadataStore
 }
 
 func (_c *MockMetadataStore_ListItems_Call) RunAndReturn(run func(out any) error) *MockMetadataStore_ListItems_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// RemoveNameRef provides a mock function for the type MockMetadataStore
+func (_mock *MockMetadataStore) RemoveNameRef(name string) error {
+	ret := _mock.Called(name)
+
+	if len(ret) == 0 {
+		panic("no return value specified for RemoveNameRef")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(string) error); ok {
+		r0 = returnFunc(name)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockMetadataStore_RemoveNameRef_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'RemoveNameRef'
+type MockMetadataStore_RemoveNameRef_Call struct {
+	*mock.Call
+}
+
+// RemoveNameRef is a helper method to define mock.On call
+//   - name string
+func (_e *MockMetadataStore_Expecter) RemoveNameRef(name interface{}) *MockMetadataStore_RemoveNameRef_Call {
+	return &MockMetadataStore_RemoveNameRef_Call{Call: _e.mock.On("RemoveNameRef", name)}
+}
+
+func (_c *MockMetadataStore_RemoveNameRef_Call) Run(run func(name string)) *MockMetadataStore_RemoveNameRef_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 string
+		if args[0] != nil {
+			arg0 = args[0].(string)
+		}
+		run(
+			arg0,
+		)
+	})
+	return _c
+}
+
+func (_c *MockMetadataStore_RemoveNameRef_Call) Return(err error) *MockMetadataStore_RemoveNameRef_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockMetadataStore_RemoveNameRef_Call) RunAndReturn(run func(name string) error) *MockMetadataStore_RemoveNameRef_Call {
 	_c.Call.Return(run)
 	return _c
 }

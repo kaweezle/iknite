@@ -56,9 +56,11 @@ type MetadataStore interface {
 	CreateItem(item db.IDAccessor) error
 	UpdateItem(item db.IDAccessor) error
 	CreateOrUpdateItem(item db.IDAccessor) error
+	DeleteItem(item db.IDAccessor) error
 	ListItems(out any) error
 	SetNameRef(name, ref string) error
 	GetNameRef(name string) (string, error)
+	RemoveNameRef(name string) error
 }
 
 // Service provides image inspect and pull operations.
@@ -273,6 +275,85 @@ func (s *Service) Info(imageName string) (*ImageInfo, error) {
 	}
 
 	return info, nil
+}
+
+// Remove deletes a downloaded image identified by its display name.
+// It removes the artifact files from disk and all associated database records.
+func (s *Service) Remove(imageName string) error {
+	if err := s.ensureDefaults(); err != nil {
+		return err
+	}
+
+	// Resolve the image name to the version ID via the name-refs bucket.
+	versionID, err := s.Store.GetNameRef(imageName)
+	if err != nil {
+		return fmt.Errorf("failed to resolve image name %q: %w", imageName, err)
+	}
+
+	// Load the image record.
+	var image db.Image
+	if err = s.Store.GetItem(versionID, &image); err != nil {
+		return fmt.Errorf("failed to get image record: %w", err)
+	}
+
+	// Load the version record.
+	var version db.ImageVersion
+	if err = s.Store.GetItem(image.VersionID, &version); err != nil {
+		return fmt.Errorf("failed to get image version: %w", err)
+	}
+
+	// Load all artifacts for this image.
+	allArtifacts := make([]db.ImageArtifact, 0)
+	if err = s.Store.ListItems(&allArtifacts); err != nil {
+		return fmt.Errorf("failed to list artifacts: %w", err)
+	}
+
+	artifacts := make([]db.ImageArtifact, 0)
+	for i := range allArtifacts {
+		if allArtifacts[i].ImageID == image.ID {
+			artifacts = append(artifacts, allArtifacts[i])
+		}
+	}
+
+	logger := s.Logger
+	logger.Info("Removing image",
+		"name", image.Name,
+		"path", image.Path,
+		"artifacts", len(artifacts),
+	)
+
+	// Remove artifact files from disk.
+	if image.Path != "" {
+		if err = s.FS.RemoveAll(image.Path); err != nil {
+			logger.Warn("Failed to remove image directory", "path", image.Path, "error", err)
+		}
+	}
+
+	// Delete artifact records.
+	for i := range artifacts {
+		if err = s.Store.DeleteItem(&artifacts[i]); err != nil {
+			return fmt.Errorf("failed to delete artifact %q: %w", artifacts[i].ID, err)
+		}
+	}
+
+	// Delete the image record.
+	if err = s.Store.DeleteItem(&image); err != nil {
+		return fmt.Errorf("failed to delete image record: %w", err)
+	}
+
+	// Delete the version record.
+	if err = s.Store.DeleteItem(&version); err != nil {
+		return fmt.Errorf("failed to delete version record: %w", err)
+	}
+
+	// Delete the name reference.
+	if err = s.Store.RemoveNameRef(imageName); err != nil {
+		return fmt.Errorf("failed to delete name reference: %w", err)
+	}
+
+	logger.Info("Image removed", "name", imageName)
+
+	return nil
 }
 
 // Inspect resolves and fetches manifest content for an image reference.

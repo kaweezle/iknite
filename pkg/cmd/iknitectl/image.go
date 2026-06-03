@@ -18,6 +18,7 @@ func CreateImageCmd(baseService base.ServiceInterface) *cobra.Command {
 	imageCmd.AddCommand(CreateImageListCmd(baseService))
 	imageCmd.AddCommand(CreateImageInspectCmd(baseService))
 	imageCmd.AddCommand(CreateImagePullCmd(baseService))
+	imageCmd.AddCommand(CreateImageRemoveCmd(baseService))
 
 	return imageCmd
 }
