@@ -78,6 +78,10 @@ func persistImageRecord(store MetadataStore, versionID, imageRef, outputDir stri
 		return "", fmt.Errorf("failed to create or update image record: %w", err)
 	}
 
+	if err := store.SetNameRef(imageRef, versionID); err != nil {
+		return "", fmt.Errorf("failed to create image name reference: %w", err)
+	}
+
 	return versionID, nil
 }
 

@@ -195,6 +195,66 @@ func (_c *MockMetadataStore_GetItem_Call) RunAndReturn(run func(id string, out a
 	return _c
 }
 
+// GetNameRef provides a mock function for the type MockMetadataStore
+func (_mock *MockMetadataStore) GetNameRef(name string) (string, error) {
+	ret := _mock.Called(name)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetNameRef")
+	}
+
+	var r0 string
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(string) (string, error)); ok {
+		return returnFunc(name)
+	}
+	if returnFunc, ok := ret.Get(0).(func(string) string); ok {
+		r0 = returnFunc(name)
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+	if returnFunc, ok := ret.Get(1).(func(string) error); ok {
+		r1 = returnFunc(name)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockMetadataStore_GetNameRef_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetNameRef'
+type MockMetadataStore_GetNameRef_Call struct {
+	*mock.Call
+}
+
+// GetNameRef is a helper method to define mock.On call
+//   - name string
+func (_e *MockMetadataStore_Expecter) GetNameRef(name interface{}) *MockMetadataStore_GetNameRef_Call {
+	return &MockMetadataStore_GetNameRef_Call{Call: _e.mock.On("GetNameRef", name)}
+}
+
+func (_c *MockMetadataStore_GetNameRef_Call) Run(run func(name string)) *MockMetadataStore_GetNameRef_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 string
+		if args[0] != nil {
+			arg0 = args[0].(string)
+		}
+		run(
+			arg0,
+		)
+	})
+	return _c
+}
+
+func (_c *MockMetadataStore_GetNameRef_Call) Return(s string, err error) *MockMetadataStore_GetNameRef_Call {
+	_c.Call.Return(s, err)
+	return _c
+}
+
+func (_c *MockMetadataStore_GetNameRef_Call) RunAndReturn(run func(name string) (string, error)) *MockMetadataStore_GetNameRef_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // ListItems provides a mock function for the type MockMetadataStore
 func (_mock *MockMetadataStore) ListItems(out any) error {
 	ret := _mock.Called(out)
@@ -242,6 +302,63 @@ func (_c *MockMetadataStore_ListItems_Call) Return(err error) *MockMetadataStore
 }
 
 func (_c *MockMetadataStore_ListItems_Call) RunAndReturn(run func(out any) error) *MockMetadataStore_ListItems_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// SetNameRef provides a mock function for the type MockMetadataStore
+func (_mock *MockMetadataStore) SetNameRef(name string, ref string) error {
+	ret := _mock.Called(name, ref)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SetNameRef")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(string, string) error); ok {
+		r0 = returnFunc(name, ref)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockMetadataStore_SetNameRef_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SetNameRef'
+type MockMetadataStore_SetNameRef_Call struct {
+	*mock.Call
+}
+
+// SetNameRef is a helper method to define mock.On call
+//   - name string
+//   - ref string
+func (_e *MockMetadataStore_Expecter) SetNameRef(name interface{}, ref interface{}) *MockMetadataStore_SetNameRef_Call {
+	return &MockMetadataStore_SetNameRef_Call{Call: _e.mock.On("SetNameRef", name, ref)}
+}
+
+func (_c *MockMetadataStore_SetNameRef_Call) Run(run func(name string, ref string)) *MockMetadataStore_SetNameRef_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 string
+		if args[0] != nil {
+			arg0 = args[0].(string)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockMetadataStore_SetNameRef_Call) Return(err error) *MockMetadataStore_SetNameRef_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockMetadataStore_SetNameRef_Call) RunAndReturn(run func(name string, ref string) error) *MockMetadataStore_SetNameRef_Call {
 	_c.Call.Return(run)
 	return _c
 }

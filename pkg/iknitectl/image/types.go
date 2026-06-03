@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"time"
+
+	"github.com/kaweezle/iknite/pkg/iknitectl/db"
 )
 
 type ImageType int
@@ -159,4 +161,38 @@ type ImageListItem struct {
 	Path      string
 	Artifacts string
 	TotalSize int64
+}
+
+// ImageInfo describes a downloaded image with full source and artifact details.
+type ImageInfo struct {
+	CreatedAt time.Time       `json:"createdAt,omitempty"`
+	UpdatedAt time.Time       `json:"updatedAt,omitempty"`
+	Source    ImageSourceInfo `json:"source"`
+	Manifest  ManifestInfo    `json:"manifest"`
+	Name      string          `json:"name"`
+	Path      string          `json:"path"`
+	Reference string          `json:"reference"`
+	Artifacts []ArtifactInfo  `json:"artifacts"`
+	TotalSize int64           `json:"totalSize"`
+}
+
+// ImageSourceInfo describes the registry source of an image.
+type ImageSourceInfo struct {
+	ID       string `json:"id"`
+	Kind     string `json:"kind"`
+	Location string `json:"location"`
+}
+
+// ManifestInfo describes the stored manifest metadata.
+type ManifestInfo struct {
+	Digest    string `json:"digest"`
+	MediaType string `json:"mediaType"`
+}
+
+// ArtifactInfo describes one physical artifact of a downloaded image.
+type ArtifactInfo struct {
+	Path   string          `json:"path"`
+	Digest string          `json:"digest"`
+	Type   db.ArtifactType `json:"type"`
+	Size   int64           `json:"size"`
 }

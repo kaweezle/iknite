@@ -57,6 +57,8 @@ type MetadataStore interface {
 	UpdateItem(item db.IDAccessor) error
 	CreateOrUpdateItem(item db.IDAccessor) error
 	ListItems(out any) error
+	SetNameRef(name, ref string) error
+	GetNameRef(name string) (string, error)
 }
 
 // Service provides image inspect and pull operations.
@@ -198,6 +200,79 @@ func (s *Service) ensureDefaults() error {
 	}
 
 	return nil
+}
+
+// Info returns extended information about a downloaded image identified by its display name.
+func (s *Service) Info(imageName string) (*ImageInfo, error) {
+	if err := s.ensureDefaults(); err != nil {
+		return nil, err
+	}
+
+	// Resolve the image name to the version ID via the name-refs bucket.
+	versionID, err := s.Store.GetNameRef(imageName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve image name %q: %w", imageName, err)
+	}
+
+	// Load the image record.
+	var image db.Image
+	if err = s.Store.GetItem(versionID, &image); err != nil {
+		return nil, fmt.Errorf("failed to get image record: %w", err)
+	}
+
+	// Load the version record.
+	var version db.ImageVersion
+	if err = s.Store.GetItem(image.VersionID, &version); err != nil {
+		return nil, fmt.Errorf("failed to get image version: %w", err)
+	}
+
+	// Load the source record.
+	var source db.ImageSource
+	if err = s.Store.GetItem(version.SourceID, &source); err != nil {
+		return nil, fmt.Errorf("failed to get image source: %w", err)
+	}
+
+	// Load all artifacts for this image.
+	allArtifacts := make([]db.ImageArtifact, 0)
+	if err = s.Store.ListItems(&allArtifacts); err != nil {
+		return nil, fmt.Errorf("failed to list artifacts: %w", err)
+	}
+
+	artifacts := make([]ArtifactInfo, 0)
+	var totalSize int64
+	for i := range allArtifacts {
+		if allArtifacts[i].ImageID != image.ID {
+			continue
+		}
+		artifacts = append(artifacts, ArtifactInfo{
+			Path:   allArtifacts[i].Path,
+			Digest: allArtifacts[i].Digest,
+			Type:   allArtifacts[i].Type,
+			Size:   allArtifacts[i].Size,
+		})
+		totalSize += allArtifacts[i].Size
+	}
+
+	info := &ImageInfo{
+		Name: image.Name,
+		Path: image.Path,
+		Source: ImageSourceInfo{
+			ID:       source.ID,
+			Kind:     source.Kind,
+			Location: source.Location,
+		},
+		Reference: version.Tag,
+		Manifest: ManifestInfo{
+			Digest:    version.ManifestDigest,
+			MediaType: version.ManifestMediaType,
+		},
+		Artifacts: artifacts,
+		TotalSize: totalSize,
+		CreatedAt: image.CreatedAt,
+		UpdatedAt: image.UpdatedAt,
+	}
+
+	return info, nil
 }
 
 // Inspect resolves and fetches manifest content for an image reference.

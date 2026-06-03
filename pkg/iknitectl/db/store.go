@@ -26,6 +26,7 @@ var (
 	bucketImageVersions  = []byte("image_versions")
 	bucketImages         = []byte("images")
 	bucketImageArtifacts = []byte("image_artifacts")
+	bucketImageNameRefs  = []byte("image_name_refs")
 	bucketBackendImages  = []byte("backend_images")
 	bucketClusters       = []byte("clusters")
 )
@@ -159,6 +160,9 @@ func (s *Store) ensureBuckets() error {
 			if _, err := tx.CreateBucketIfNotExists(params.bucketName); err != nil {
 				return fmt.Errorf("failed to create bucket %q: %w", string(params.bucketName), err)
 			}
+		}
+		if _, err := tx.CreateBucketIfNotExists(bucketImageNameRefs); err != nil {
+			return fmt.Errorf("failed to create bucket %q: %w", string(bucketImageNameRefs), err)
 		}
 		return nil
 	})
@@ -586,4 +590,54 @@ func (s *Store) GetItem(id string, out any) error {
 		return err
 	}
 	return s.get(bucketName, id, out)
+}
+
+// SetNameRef stores a mapping from an image name to its reference key in the images bucket.
+func (s *Store) SetNameRef(name, ref string) error {
+	if name == "" {
+		return fmt.Errorf("image name is required")
+	}
+	if ref == "" {
+		return fmt.Errorf("image reference is required")
+	}
+
+	err := s.db.Update(func(tx *bbolt.Tx) error {
+		bucket, err := getBucket(tx, bucketImageNameRefs)
+		if err != nil {
+			return err
+		}
+		if err = bucket.Put([]byte(name), []byte(ref)); err != nil {
+			return fmt.Errorf("failed to store name reference %q: %w", name, err)
+		}
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("failed to set name reference %q: %w", name, err)
+	}
+	return nil
+}
+
+// GetNameRef retrieves the image reference key for the given image name.
+func (s *Store) GetNameRef(name string) (string, error) {
+	if name == "" {
+		return "", fmt.Errorf("image name is required")
+	}
+
+	var ref string
+	err := s.db.View(func(tx *bbolt.Tx) error {
+		bucket, err := getBucket(tx, bucketImageNameRefs)
+		if err != nil {
+			return err
+		}
+		value := bucket.Get([]byte(name))
+		if value == nil {
+			return fmt.Errorf("%w: image name %q", ErrNotFound, name)
+		}
+		ref = string(value)
+		return nil
+	})
+	if err != nil {
+		return "", fmt.Errorf("failed to get name reference %q: %w", name, err)
+	}
+	return ref, nil
 }
