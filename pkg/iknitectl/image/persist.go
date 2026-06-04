@@ -85,7 +85,7 @@ func persistImageRecord(store MetadataStore, versionID, imageRef, outputDir stri
 	return versionID, nil
 }
 
-func persistImageArtifact(store MetadataStore, imageID, outputDir string, layer pullLayer) error {
+func persistImageArtifact(store MetadataStore, imageID, outputDir string, layer PullLayer) error {
 	artifact := &db.ImageArtifact{
 		BaseModel:  db.BaseModel{ID: imageArtifactID(imageID, layer.Descriptor.Digest.String())},
 		Descriptor: *layer.Descriptor,

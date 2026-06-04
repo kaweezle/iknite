@@ -39,16 +39,16 @@ func (it ImageType) String() string {
 	}
 }
 
-func (it ImageType) FileExtension() string {
+func (it ImageType) ImageFilename() string {
 	switch it {
 	case ImageTypeRootFS:
-		return "tar.gz"
+		return "rootfs.tar.gz"
 	case ImageTypeVHDX:
-		return "vhdx"
+		return "disk.vhdx"
 	case ImageTypeQCOW2:
-		return "qcow2"
+		return "disk.qcow2"
 	default:
-		return "bin"
+		return "disk.raw"
 	}
 }
 

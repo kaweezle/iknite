@@ -72,6 +72,12 @@ type Service struct {
 	NewRepository NewRepositoryFunc
 }
 
+// PullLayer represents a single artifact layer to be pulled, along with its target filename.
+type PullLayer struct {
+	Descriptor *specv1.Descriptor
+	FileName   string
+}
+
 // InspectResult contains parsed manifest details.
 type InspectResult struct {
 	Manifest         specv1.Manifest
@@ -79,6 +85,7 @@ type InspectResult struct {
 	Repository       string
 	Reference        string
 	ManifestTypeHint string
+	Layers           []PullLayer
 	ImageType        ImageType
 }
 
@@ -394,7 +401,7 @@ func (s *Service) Inspect(ctx context.Context, imageRef string) (*InspectResult,
 		return nil, fmt.Errorf("failed to parse manifest: %w", err)
 	}
 
-	imageType, err := inferImageType(&manifest)
+	imageType, layers, err := inferImageTypeAndLayers(&manifest)
 	if err != nil {
 		return nil, err
 	}
@@ -405,13 +412,12 @@ func (s *Service) Inspect(ctx context.Context, imageRef string) (*InspectResult,
 		Descriptor:       desc,
 		Manifest:         manifest,
 		ImageType:        imageType,
+		Layers:           layers,
 		ManifestTypeHint: manifest.ArtifactType,
 	}, nil
 }
 
 // Pull downloads image artifacts into ~/.config/iknite/images/<image-id>/ and writes inspect-result.json.
-//
-//nolint:gocyclo // Pull orchestrates validation, local cache checks, downloads, and metadata persistence.
 func (s *Service) Pull(ctx context.Context, req *PullRequest) (string, error) {
 	if req == nil {
 		return "", fmt.Errorf("pull request is required")
@@ -454,17 +460,12 @@ func (s *Service) Pull(ctx context.Context, req *PullRequest) (string, error) {
 		return "", err
 	}
 
-	layers, err := selectArtifactLayers(&inspectResult.Manifest, inspectResult.ImageType)
-	if err != nil {
-		return "", err
-	}
-
 	repo, err := s.NewRepository(inspectResult.Repository)
 	if err != nil {
 		return "", fmt.Errorf("failed to create repository client: %w", err)
 	}
 
-	for _, layer := range layers {
+	for _, layer := range inspectResult.Layers {
 		err = layer.download(ctx, repo, fs, outputDir, os.Stdout)
 		if err != nil {
 			return "", fmt.Errorf("failed to download layer %s: %w", layer.Descriptor.Digest.String(), err)
@@ -511,54 +512,55 @@ func (s *Service) hasMatchingSavedManifest(inspectResult *InspectResult) (bool, 
 	return true, nil // Found existing version with matching manifest digest, so we have a matching manifest.
 }
 
-func inferImageType(manifest *specv1.Manifest) (ImageType, error) {
+func inferImageTypeAndLayers(manifest *specv1.Manifest) (ImageType, []PullLayer, error) {
 	if manifest.ArtifactType == "" && len(manifest.Layers) == 1 {
 		layerType := manifest.Layers[0].MediaType
 		if layerType == rootfsMediaTypeDocker || layerType == rootfsMediaTypeOCI {
-			return ImageTypeRootFS, nil
+			return ImageTypeRootFS,
+				[]PullLayer{{Descriptor: &manifest.Layers[0], FileName: ImageTypeRootFS.ImageFilename()}}, nil
 		}
-		return ImageTypeUnknown, fmt.Errorf("unsupported rootfs layer media type: %s", layerType)
+		return ImageTypeUnknown, nil, fmt.Errorf("unsupported rootfs layer media type: %s", layerType)
 	}
 
 	if manifest.ArtifactType == vhdxArtifactType {
 		if len(manifest.Layers) != 1 {
-			return ImageTypeUnknown, fmt.Errorf("vhdx image must have exactly one layer")
+			return ImageTypeUnknown, nil, fmt.Errorf("vhdx image must have exactly one layer")
 		}
 		if manifest.Layers[0].MediaType != vhdxMediaType {
-			return ImageTypeUnknown, fmt.Errorf("vhdx image layer media type must be %s", vhdxMediaType)
+			return ImageTypeUnknown, nil, fmt.Errorf("vhdx image layer media type must be %s", vhdxMediaType)
 		}
-		return ImageTypeVHDX, nil
+		return ImageTypeVHDX,
+			[]PullLayer{{Descriptor: &manifest.Layers[0], FileName: ImageTypeVHDX.ImageFilename()}}, nil
 	}
 
 	if manifest.ArtifactType == qcow2ArtifactType {
 		if len(manifest.Layers) != 2 {
-			return ImageTypeUnknown, fmt.Errorf("qcow2 image must have exactly two layers")
+			return ImageTypeUnknown, nil, fmt.Errorf("qcow2 image must have exactly two layers")
 		}
+		layers := make([]PullLayer, 0, 2)
 		hasQCOW2 := false
 		hasIncusMetadata := false
 		for i := range manifest.Layers {
 			switch manifest.Layers[i].MediaType {
 			case qcow2MediaType:
 				hasQCOW2 = true
+				layers = append(layers,
+					PullLayer{Descriptor: &manifest.Layers[i], FileName: ImageTypeQCOW2.ImageFilename()})
 			case incusMetadataType:
 				hasIncusMetadata = true
+				layers = append(layers, PullLayer{Descriptor: &manifest.Layers[i], FileName: "incus-metadata.bin"})
 			}
 		}
 		if !hasQCOW2 || !hasIncusMetadata {
-			return ImageTypeUnknown, fmt.Errorf("qcow2 image must contain qcow2 and incus metadata layers")
+			return ImageTypeUnknown, nil, fmt.Errorf("qcow2 image must contain qcow2 and incus metadata layers")
 		}
-		return ImageTypeQCOW2, nil
+		return ImageTypeQCOW2, layers, nil
 	}
 
-	return ImageTypeUnknown, fmt.Errorf("unsupported manifest artifactType %q", manifest.ArtifactType)
+	return ImageTypeUnknown, nil, fmt.Errorf("unsupported manifest artifactType %q", manifest.ArtifactType)
 }
 
-type pullLayer struct {
-	Descriptor *specv1.Descriptor
-	FileName   string
-}
-
-func (layer *pullLayer) download(
+func (layer *PullLayer) download(
 	ctx context.Context,
 	repo Repository,
 	fs host.FileEnvironment,
@@ -591,36 +593,7 @@ func (layer *pullLayer) download(
 	return nil
 }
 
-func selectArtifactLayers(manifest *specv1.Manifest, imageType ImageType) ([]pullLayer, error) {
-	result := make([]pullLayer, 0, len(manifest.Layers))
-
-	switch imageType {
-	case ImageTypeRootFS:
-		result = append(result, pullLayer{Descriptor: &manifest.Layers[0], FileName: "rootfs.tar.gz"})
-		return result, nil
-	case ImageTypeVHDX:
-		result = append(result, pullLayer{Descriptor: &manifest.Layers[0], FileName: "disk.vhdx"})
-		return result, nil
-	case ImageTypeQCOW2:
-		for i := range manifest.Layers {
-			layer := &manifest.Layers[i]
-			switch layer.MediaType {
-			case qcow2MediaType:
-				result = append(result, pullLayer{Descriptor: layer, FileName: "disk.qcow2"})
-			case incusMetadataType:
-				result = append(result, pullLayer{Descriptor: layer, FileName: "incus-metadata.bin"})
-			}
-		}
-		if len(result) != 2 {
-			return nil, fmt.Errorf("qcow2 image must provide both qcow2 and incus metadata layers")
-		}
-		return result, nil
-	default:
-		return nil, fmt.Errorf("unsupported image type %s", imageType)
-	}
-}
-
-func readBlob(ctx context.Context, repo Repository, layer *pullLayer, destination, out io.Writer) error {
+func readBlob(ctx context.Context, repo Repository, layer *PullLayer, destination, out io.Writer) error {
 	blobReader, err := repo.Fetch(ctx, *layer.Descriptor)
 	if err != nil {
 		return fmt.Errorf("failed to fetch blob %s: %w", layer.Descriptor.Digest.String(), err)

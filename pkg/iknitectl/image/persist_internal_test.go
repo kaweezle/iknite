@@ -147,7 +147,7 @@ func TestPersistImageArtifactCreatesAndUpdatesArtifact(t *testing.T) {
 	imageID, err := persistImageMetadata(store, inspectResult, outputDir)
 	require.NoError(t, err)
 
-	layer := pullLayer{Descriptor: &manifest.Layers[0], FileName: "disk.qcow2"}
+	layer := PullLayer{Descriptor: &manifest.Layers[0], FileName: "disk.qcow2"}
 	require.NoError(t, persistImageArtifact(store, imageID, outputDir, layer))
 
 	artifactID := imageID + "@" + manifest.Layers[0].Digest.String()
@@ -188,6 +188,7 @@ func newPersistenceStore(t *testing.T) *db.Store {
 
 func newInspectResult(repository string, manifest *specv1.Manifest) *InspectResult {
 	manifestDigest := digest.FromBytes(mustMarshalManifest(manifest))
+	imageType, layers := mustInferImageTypeAndLayers(manifest)
 
 	return &InspectResult{
 		Repository: repository,
@@ -198,7 +199,8 @@ func newInspectResult(repository string, manifest *specv1.Manifest) *InspectResu
 		},
 		Manifest:         *manifest,
 		ManifestTypeHint: manifest.ArtifactType,
-		ImageType:        mustInferImageType(manifest),
+		ImageType:        imageType,
+		Layers:           layers,
 	}
 }
 
@@ -211,11 +213,11 @@ func mustMarshalManifest(manifest *specv1.Manifest) []byte {
 	return payload
 }
 
-func mustInferImageType(manifest *specv1.Manifest) ImageType {
-	imageType, err := inferImageType(manifest)
+func mustInferImageTypeAndLayers(manifest *specv1.Manifest) (ImageType, []PullLayer) {
+	imageType, layers, err := inferImageTypeAndLayers(manifest)
 	if err != nil {
 		panic(err)
 	}
 
-	return imageType
+	return imageType, layers
 }

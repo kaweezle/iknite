@@ -844,7 +844,7 @@ func TestInferImageTypeUnsupportedMediaType(t *testing.T) {
 			Digest:    digest.FromString("x"),
 		}},
 	}
-	_, svcErr := inferImageType(&manifest)
+	_, _, svcErr := inferImageTypeAndLayers(&manifest)
 	require.Error(t, svcErr)
 }
 
@@ -857,7 +857,7 @@ func TestInferImageTypeVHDXWrongLayers(t *testing.T) {
 			{MediaType: vhdxMediaType, Digest: digest.FromString("b")},
 		},
 	}
-	_, svcErr := inferImageType(&manifest)
+	_, _, svcErr := inferImageTypeAndLayers(&manifest)
 	require.Error(t, svcErr)
 }
 
@@ -867,7 +867,7 @@ func TestInferImageTypeVHDXWrongMediaType(t *testing.T) {
 		ArtifactType: vhdxArtifactType,
 		Layers:       []specv1.Descriptor{{MediaType: "wrong/type", Digest: digest.FromString("x")}},
 	}
-	_, svcErr := inferImageType(&manifest)
+	_, _, svcErr := inferImageTypeAndLayers(&manifest)
 	require.Error(t, svcErr)
 }
 
@@ -877,7 +877,7 @@ func TestInferImageTypeQCOW2WrongLayers(t *testing.T) {
 		ArtifactType: qcow2ArtifactType,
 		Layers:       []specv1.Descriptor{{MediaType: qcow2MediaType, Digest: digest.FromString("x")}},
 	}
-	_, svcErr := inferImageType(&manifest)
+	_, _, svcErr := inferImageTypeAndLayers(&manifest)
 	require.Error(t, svcErr)
 }
 
@@ -890,7 +890,7 @@ func TestInferImageTypeQCOW2MissingTypes(t *testing.T) {
 			{MediaType: qcow2MediaType, Digest: digest.FromString("b")},
 		},
 	}
-	_, svcErr := inferImageType(&manifest)
+	_, _, svcErr := inferImageTypeAndLayers(&manifest)
 	require.Error(t, svcErr)
 }
 
@@ -901,7 +901,7 @@ func TestDownloadFileExists(t *testing.T) {
 	// Create the file so it already exists
 	require.NoError(t, fs.WriteFile(filepath.Join(outputDir, "rootfs.tar.gz"), []byte("x"), 0o644))
 
-	layer := &pullLayer{
+	layer := &PullLayer{
 		Descriptor: &specv1.Descriptor{Digest: digest.FromString("x"), Size: 1},
 		FileName:   "rootfs.tar.gz",
 	}
@@ -918,7 +918,7 @@ func TestDownloadCreateError(t *testing.T) {
 	fs := &failingCreateFS{FileEnvironment: h}
 	outputDir := t.TempDir()
 
-	layer := &pullLayer{
+	layer := &PullLayer{
 		Descriptor: &specv1.Descriptor{Digest: digest.FromString("x"), Size: 1},
 		FileName:   "file.bin",
 	}
@@ -934,7 +934,7 @@ func TestDownloadReadError(t *testing.T) {
 	outputDir := t.TempDir()
 	desc := specv1.Descriptor{Digest: digest.FromString("x"), Size: 1}
 
-	layer := &pullLayer{Descriptor: &desc, FileName: "file.bin"}
+	layer := &PullLayer{Descriptor: &desc, FileName: "file.bin"}
 	repo := &errorRepository{fetchErr: fmt.Errorf("read failed")}
 	svcErr := layer.download(context.Background(), repo, fs, outputDir, io.Discard)
 	require.Error(t, svcErr)
@@ -943,20 +943,11 @@ func TestDownloadReadError(t *testing.T) {
 func TestReadBlobFetchError(t *testing.T) {
 	t.Parallel()
 	desc := specv1.Descriptor{Digest: digest.FromString("x"), Size: 1}
-	layer := &pullLayer{Descriptor: &desc, FileName: "file.bin"}
+	layer := &PullLayer{Descriptor: &desc, FileName: "file.bin"}
 	repo := &errorRepository{fetchErr: fmt.Errorf("fetch failed")}
 	svcErr := readBlob(context.Background(), repo, layer, io.Discard, io.Discard)
 	require.Error(t, svcErr)
 	require.Contains(t, svcErr.Error(), "failed to fetch blob")
-}
-
-func TestSelectArtifactLayersUnsupportedType(t *testing.T) {
-	t.Parallel()
-	manifest := &specv1.Manifest{
-		Layers: []specv1.Descriptor{{MediaType: "app/unknown", Digest: digest.FromString("x")}},
-	}
-	_, svcErr := selectArtifactLayers(manifest, ImageTypeUnknown)
-	require.Error(t, svcErr)
 }
 
 func TestImageDirectoryNameEmpty(t *testing.T) {
