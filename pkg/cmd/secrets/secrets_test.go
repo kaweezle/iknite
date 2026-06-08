@@ -22,7 +22,9 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/kaweezle/iknite/pkg/cmd/iknitectl"
 	secretsCmd "github.com/kaweezle/iknite/pkg/cmd/secrets"
+	"github.com/kaweezle/iknite/pkg/host"
 	"github.com/kaweezle/iknite/pkg/secrets"
 	"github.com/kaweezle/iknite/pkg/testutil"
 )
@@ -30,8 +32,8 @@ import (
 func TestCreateSecretsCmd(t *testing.T) {
 	t.Parallel()
 
-	fs := testutil.NewDummyUserHost()
-	cmd := secretsCmd.CreateSecretsCmd(fs, nil)
+	s := testutil.TestContainer(t).Scope("secrets")
+	cmd := secretsCmd.CreateSecretsCmd(s, nil)
 	if cmd == nil {
 		t.Fatal("CreateSecretsCmd returned nil")
 	}
@@ -60,22 +62,27 @@ func TestSecretsSetCommandFromStdin(t *testing.T) {
 	t.Parallel()
 	req := require.New(t)
 
-	testFs := testutil.NewDummyUserHost()
-	req.NoError(testFs.Setenv("SOPS_AGE_KEY", testSecretsAgeKey))
+	c := testutil.TestContainer(t)
+	s := c.Scope("secrets-set-stdin")
+	fe := testutil.Resolve[host.FileEnvironment](t, s)
+	req.NoError(fe.Setenv("SOPS_AGE_KEY", testSecretsAgeKey))
 
 	secretsPath := "/test/secrets.sops.yaml"
-	req.NoError(testFs.WriteFile(secretsPath, []byte(testSecretsEncryptedWithData), 0o644))
+	req.NoError(fe.WriteFile(secretsPath, []byte(testSecretsEncryptedWithData), 0o644))
 
-	opts := &secrets.Options{Fs: testFs}
-	cmd := secretsCmd.CreateSecretsCmd(testFs, opts)
+	opts := &secrets.Options{}
+	cmd := secretsCmd.CreateSecretsCmd(s, opts)
 	cmd.SetIn(strings.NewReader("new-token-from-stdin\n"))
-	cmd.SetArgs([]string{"--secrets-file", secretsPath, "set", "github.api_token"})
+	args := []string{"--secrets-file", secretsPath, "set", "github.api_token"}
+	cmd.SetArgs(args)
+	// This must be done for the root command
+	req.NoError(iknitectl.ProvideCommand(c, cmd, args[3:]))
 
-	if err := cmd.Execute(); err != nil {
+	if err := cmd.ExecuteContext(t.Context()); err != nil {
 		t.Fatalf("secrets set from stdin failed: %v", err)
 	}
 
-	testutil.AssertSecretValue(t, testFs, testSecretsAgeKey, secretsPath, "github.api_token", "new-token-from-stdin",
+	testutil.AssertSecretValue(t, fe, testSecretsAgeKey, secretsPath, "github.api_token", "new-token-from-stdin",
 		false)
 }
 

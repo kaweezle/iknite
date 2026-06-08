@@ -1,25 +1,23 @@
 package iknitectl
 
 import (
-	"io"
-
 	"github.com/spf13/cobra"
+	"go.uber.org/dig"
 
 	"github.com/kaweezle/iknite/pkg/cmd/secrets"
-	"github.com/kaweezle/iknite/pkg/host"
 )
 
 // CreateWorkspaceCmd creates the workspace command tree.
-func CreateWorkspaceCmd(fileExecutor host.UserHost, out io.Writer) *cobra.Command {
+func CreateWorkspaceCmd(s *dig.Scope) *cobra.Command {
 	workspaceCmd := &cobra.Command{
 		Use:     "workspace",
 		Aliases: []string{"w", "ws"},
 		Short:   "Manage workspace-level operations",
 	}
 
-	workspaceCmd.AddCommand(CreateApplicationCmd(fileExecutor, out))
-	workspaceCmd.AddCommand(CreateKustomizeCmd(fileExecutor, out))
-	workspaceCmd.AddCommand(secrets.CreateSecretsCmd(fileExecutor, nil))
+	workspaceCmd.AddCommand(CreateApplicationCmd(s))
+	workspaceCmd.AddCommand(CreateKustomizeCmd(s))
+	workspaceCmd.AddCommand(secrets.CreateSecretsCmd(s, nil))
 
 	return workspaceCmd
 }

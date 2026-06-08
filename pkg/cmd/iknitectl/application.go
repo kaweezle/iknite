@@ -28,10 +28,12 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
+	"go.uber.org/dig"
 	"sigs.k8s.io/kustomize/api/provider"
 	"sigs.k8s.io/kustomize/api/resmap"
 	"sigs.k8s.io/yaml"
 
+	"github.com/kaweezle/iknite/pkg/cmd/types"
 	"github.com/kaweezle/iknite/pkg/host"
 	"github.com/kaweezle/iknite/pkg/kustomize"
 )
@@ -395,11 +397,7 @@ func runRenderAll(
 }
 
 // CreateApplicationCmd creates the application command with validate, render, and render-all subcommands.
-func CreateApplicationCmd(fileExecutor host.FileExecutor, out io.Writer) *cobra.Command {
-	if fileExecutor == nil {
-		fileExecutor = host.NewDefaultHost()
-	}
-
+func CreateApplicationCmd(s *dig.Scope) *cobra.Command {
 	appCmd := &cobra.Command{
 		Use:   "application",
 		Short: "Manage ArgoCD applications",
@@ -421,8 +419,10 @@ The application type is auto-detected. Kustomize apps are built with Go code;
 helmfile and helm apps invoke the respective external commands. The output is
 then validated with kubeconform.`,
 		Args: cobra.ExactArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return runValidateApp(cmd.Context(), fileExecutor, out, args[0], schemasDir)
+		RunE: func(_ *cobra.Command, args []string) error {
+			return s.Invoke(func(ctx context.Context, fileExecutor host.FileExecutor, out types.CmdOut) error {
+				return runValidateApp(ctx, fileExecutor, out, args[0], schemasDir)
+			})
 		},
 	}
 	validateCmd.Flags().StringVar(&schemasDir, "schemas-dir", "",
@@ -439,8 +439,10 @@ The application type is auto-detected. Kustomize apps are built with Go code;
 helmfile and helm apps invoke the respective external commands.
 With --output, resources are split into individual <Kind>-<name>.yaml files.`,
 		Args: cobra.ExactArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return runRenderApp(cmd.Context(), fileExecutor, out, args[0], renderDestDir)
+		RunE: func(_ *cobra.Command, args []string) error {
+			return s.Invoke(func(ctx context.Context, fileExecutor host.FileExecutor, out types.CmdOut) error {
+				return runRenderApp(ctx, fileExecutor, out, args[0], renderDestDir)
+			})
 		},
 	}
 	renderCmd.Flags().StringVarP(&renderDestDir, "output", "o", "",
@@ -457,8 +459,10 @@ Processes each appstage-* directory found in <appstages-dir>, renders its
 kustomization manifests, then renders each referenced ArgoCD Application to
 <destination-dir>/<appstage>/applications/<app-name>/.`,
 		Args: cobra.ExactArgs(2),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return runRenderAll(cmd.Context(), fileExecutor, out, args[0], args[1], baseDir)
+		RunE: func(_ *cobra.Command, args []string) error {
+			return s.Invoke(func(ctx context.Context, fileExecutor host.FileExecutor, out types.CmdOut) error {
+				return runRenderAll(ctx, fileExecutor, out, args[0], args[1], baseDir)
+			})
 		},
 	}
 	renderAllCmd.Flags().StringVar(&baseDir, "base-dir", ".",

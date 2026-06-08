@@ -8,51 +8,45 @@ import (
 
 	"charm.land/bubbles/v2/table"
 	"github.com/spf13/cobra"
+	"go.uber.org/dig"
 
-	"github.com/kaweezle/iknite/pkg/iknitectl/base"
+	"github.com/kaweezle/iknite/pkg/cmd/types"
 	imagesvc "github.com/kaweezle/iknite/pkg/iknitectl/image"
 	"github.com/kaweezle/iknite/pkg/utils"
 )
 
 // CreateImageListCmd creates the image ls command.
-func CreateImageListCmd(baseService base.ServiceInterface) *cobra.Command {
+func CreateImageListCmd(s *dig.Scope) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "list",
 		Aliases: []string{"ls"},
 		Short:   "List persisted images",
-		RunE: func(cmd *cobra.Command, _ []string) error {
-			store, err := baseService.Store()
-			if err != nil {
-				return fmt.Errorf("failed to open metadata store: %w", err)
-			}
-
-			service := &imagesvc.Service{
-				FS:     baseService.Host(),
-				Logger: baseService.Logger(),
-				Config: baseService.Config(),
-				Store:  store,
-			}
-			items, err := service.ListImages()
-			if err != nil {
-				return fmt.Errorf("failed to list images: %w", err)
-			}
-
-			if len(items) == 0 {
-				if _, err = fmt.Fprintln(cmd.OutOrStdout(), "No images found"); err != nil {
-					return fmt.Errorf("failed to write output: %w", err)
-				}
-				return nil
-			}
-
-			if _, err = fmt.Fprintln(cmd.OutOrStdout(), renderImageListTable(items)); err != nil {
-				return fmt.Errorf("failed to write output: %w", err)
-			}
-
-			return nil
+		RunE: func(_ *cobra.Command, _ []string) error {
+			return s.Invoke(performImageList)
 		},
 	}
 
 	return cmd
+}
+
+func performImageList(service *imagesvc.Service, out types.CmdOut) error {
+	items, err := service.ListImages()
+	if err != nil {
+		return fmt.Errorf("failed to list images: %w", err)
+	}
+
+	if len(items) == 0 {
+		if _, err = fmt.Fprintln(out, "No images found"); err != nil {
+			return fmt.Errorf("failed to write output: %w", err)
+		}
+		return nil
+	}
+
+	if _, err = fmt.Fprintln(out, renderImageListTable(items)); err != nil {
+		return fmt.Errorf("failed to write output: %w", err)
+	}
+
+	return nil
 }
 
 func renderImageListTable(items []imagesvc.ImageListItem) string {

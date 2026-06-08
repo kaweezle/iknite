@@ -21,13 +21,15 @@ import (
 	"path/filepath"
 
 	"github.com/spf13/cobra"
+	"go.uber.org/dig"
 
+	"github.com/kaweezle/iknite/pkg/cmd/types"
 	"github.com/kaweezle/iknite/pkg/host"
 	"github.com/kaweezle/iknite/pkg/kustomize"
 )
 
 // CreateKustomizeCmd creates the kustomize command.
-func CreateKustomizeCmd(fs host.FileSystem, out io.Writer) *cobra.Command {
+func CreateKustomizeCmd(s *dig.Scope) *cobra.Command {
 	kustomizeCmd := &cobra.Command{
 		Use:   "kustomize <directory> [destination]",
 		Short: "Run kustomize on a directory",
@@ -44,7 +46,9 @@ Examples:
   iknitectl kustomize /path/to/kustomization /path/to/output`,
 		Args: cobra.RangeArgs(1, 2),
 		RunE: func(_ *cobra.Command, args []string) error {
-			return runKustomize(fs, out, args)
+			return s.Invoke(func(fs host.FileSystem, out types.CmdOut) error {
+				return runKustomize(fs, out, args)
+			})
 		},
 	}
 

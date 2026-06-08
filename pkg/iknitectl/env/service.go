@@ -41,6 +41,14 @@ type Service struct {
 	Config *config.Config
 }
 
+func NewService(fs host.FileEnvironment, logger *slog.Logger, c *config.Config) *Service {
+	return &Service{
+		FS:     fs,
+		Logger: logger,
+		Config: c,
+	}
+}
+
 // Init creates required directories, secrets files, and default CA material.
 func (s *Service) Init(req *InitRequest) (*InitResult, error) {
 	if req == nil {

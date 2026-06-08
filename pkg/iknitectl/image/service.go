@@ -72,6 +72,16 @@ type Service struct {
 	NewRepository NewRepositoryFunc
 }
 
+func NewService(fs host.FileEnvironment, logger *slog.Logger, c *config.Config, s MetadataStore) *Service {
+	return &Service{
+		FS:            fs,
+		Logger:        logger,
+		Config:        c,
+		Store:         s,
+		NewRepository: newRemoteRepository,
+	}
+}
+
 // PullLayer represents a single artifact layer to be pulled, along with its target filename.
 type PullLayer struct {
 	Descriptor *specv1.Descriptor

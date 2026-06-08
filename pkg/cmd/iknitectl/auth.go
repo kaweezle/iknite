@@ -2,19 +2,18 @@ package iknitectl
 
 import (
 	"github.com/spf13/cobra"
-
-	"github.com/kaweezle/iknite/pkg/host"
+	"go.uber.org/dig"
 )
 
 // CreateAuthCmd creates the auth command tree.
-func CreateAuthCmd(localHost host.Host) *cobra.Command {
+func CreateAuthCmd(s *dig.Scope) *cobra.Command {
 	authCmd := &cobra.Command{
 		Use:     "auth",
 		Aliases: []string{"a"},
 		Short:   "Manage credentials and key material",
 	}
 
-	authCmd.AddCommand(CreateSigningKeyCmd(localHost, nil))
+	authCmd.AddCommand(CreateSigningKeyCmd(s, nil))
 
 	return authCmd
 }

@@ -31,6 +31,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	"sigs.k8s.io/kustomize/api/provider"
 	"sigs.k8s.io/kustomize/api/resmap"
 
@@ -182,9 +183,7 @@ func newDummyFileExecutor(t *testing.T, options *testutil.DummyHostOptions) *tes
 	}
 	if networkHost, ok := host.Net.(*testutil.DummyNetworkHost); ok {
 		t.Cleanup(func() {
-			if err := networkHost.Cleanup(); err != nil {
-				t.Logf("Cleanup: %v", err)
-			}
+			_ = networkHost.Cleanup() //nolint:errcheck // best effort cleanup in tests
 		})
 	}
 
@@ -445,8 +444,8 @@ func TestDetectAppType_Errors(t *testing.T) {
 
 func TestCreateApplicationCmd(t *testing.T) {
 	t.Parallel()
-	out := &bytes.Buffer{}
-	cmd := CreateApplicationCmd(newMemFileExecutor(t), out)
+
+	cmd := CreateApplicationCmd(testutil.TestContainer(t).Scope("app"))
 	if cmd == nil {
 		t.Fatal("CreateApplicationCmd returned nil")
 	}
@@ -1187,25 +1186,36 @@ func TestCreateApplicationCmd_ExecuteSubcommands(t *testing.T) {
 			},
 		})
 		writeKustomizeApp(t, host, "/app")
+		c := testutil.TestContainer(t)
+		s := c.Scope("app")
+		// Replace the host in the test container with our dummy host that simulates kubeconform output
+		require.NoError(t, c.Decorate(func(_ *testutil.DelegateHost) *testutil.DelegateHost {
+			return host
+		}))
 
-		cmd := CreateApplicationCmd(host, &bytes.Buffer{})
+		cmd := CreateApplicationCmd(s)
 		cmd.SetArgs([]string{"validate", "/app"})
 
-		if err := cmd.ExecuteContext(context.Background()); err != nil {
+		if err := cmd.ExecuteContext(t.Context()); err != nil {
 			t.Fatalf("ExecuteContext: %v", err)
 		}
 	})
 
 	t.Run("render with default host", func(t *testing.T) {
 		t.Parallel()
+		req := require.New(t)
 
 		if testing.Short() {
 			t.Skip("skipping integration test in short mode")
 		}
 
-		var out bytes.Buffer
-		tmpDir := t.TempDir()
-		if err := os.WriteFile(
+		tmpDir := "/base"
+		s := testutil.TestContainer(t).Scope("app")
+
+		fs := testutil.Resolve[hostpkg.FileSystem](t, s)
+
+		req.NoError(fs.MkdirAll(tmpDir, os.FileMode(0o600)))
+		req.NoError(fs.WriteFile(
 			filepath.Join(tmpDir, "kustomization.yaml"),
 			[]byte(`apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
@@ -1213,19 +1223,18 @@ resources:
 - configmap.yaml
 `),
 			0o600,
-		); err != nil {
-			t.Fatal(err)
-		}
-		if err := os.WriteFile(filepath.Join(tmpDir, "configmap.yaml"), []byte(configMapContent), 0o600); err != nil {
-			t.Fatal(err)
-		}
+		))
 
-		cmd := CreateApplicationCmd(nil, &out)
+		req.NoError(fs.WriteFile(filepath.Join(tmpDir, "configmap.yaml"), []byte(configMapContent), 0o600))
+
+		cmd := CreateApplicationCmd(s)
 		cmd.SetArgs([]string{"render", tmpDir})
 
-		if err := cmd.ExecuteContext(context.Background()); err != nil {
+		if err := cmd.ExecuteContext(t.Context()); err != nil {
 			t.Fatalf("ExecuteContext: %v", err)
 		}
+
+		out := testutil.Resolve[*bytes.Buffer](t, s)
 		if !bytes.Contains(out.Bytes(), []byte("ConfigMap")) {
 			t.Fatalf("expected rendered output, got %s", out.String())
 		}
@@ -1234,7 +1243,6 @@ resources:
 	t.Run("render-all", func(t *testing.T) {
 		t.Parallel()
 
-		var out bytes.Buffer
 		host := newDummyFileExecutor(t, &testutil.DummyHostOptions{
 			FakeOutputs: map[string]*testutil.FakeProcessOutput{
 				"^helm template app-one /repo/apps/app-one --skip-crds$": testutil.FakeExec(configMapContent, 0),
@@ -1242,13 +1250,17 @@ resources:
 		})
 		writeAppstageApplication(t, host, "apps/app-one")
 		writeHelmChart(t, host, "/repo/apps/app-one")
+		c := testutil.TestContainer(t)
+		s := c.Scope("app")
+		require.NoError(t, c.Decorate(func(_ *testutil.DelegateHost) *testutil.DelegateHost { return host }))
 
-		cmd := CreateApplicationCmd(host, &out)
+		cmd := CreateApplicationCmd(s)
 		cmd.SetArgs([]string{"render-all", "/repo/appstages", "/dest", "--base-dir", "/repo"})
 
-		if err := cmd.ExecuteContext(context.Background()); err != nil {
+		if err := cmd.ExecuteContext(t.Context()); err != nil {
 			t.Fatalf("ExecuteContext: %v", err)
 		}
+		out := testutil.Resolve[*bytes.Buffer](t, s)
 		if !strings.Contains(out.String(), "Rendering appstage appstage-dev") ||
 			!strings.Contains(out.String(), "Rendering application app-one from apps/app-one") {
 			t.Fatalf("unexpected output: %s", out.String())

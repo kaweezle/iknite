@@ -26,8 +26,11 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	mockhost "github.com/kaweezle/iknite/mocks/pkg/host"
 	"github.com/kaweezle/iknite/pkg/host"
+	"github.com/kaweezle/iknite/pkg/testutil"
 )
 
 type failingFileSystem struct {
@@ -68,9 +71,8 @@ data:
 
 func TestCreateKustomizeCmd(t *testing.T) {
 	t.Parallel()
-	fs := host.NewMemMapFS()
-	out := &bytes.Buffer{}
-	cmd := CreateKustomizeCmd(fs, out)
+	s := testutil.TestContainer(t).Scope("kustomize")
+	cmd := CreateKustomizeCmd(s)
 
 	if cmd == nil {
 		t.Fatal("CreateKustomizeCmd returned nil")
@@ -314,12 +316,16 @@ spec:
 
 func TestKustomizeCmd_Integration(t *testing.T) {
 	t.Parallel()
+	req := require.New(t)
+
 	if testing.Short() {
 		t.Skip("skipping integration test in short mode")
 	}
 
 	// Create a temporary directory for input
-	tmpDir := t.TempDir()
+	tmpDir := "/base"
+	s := testutil.TestContainer(t).Scope("kustomize-integration")
+	fs := testutil.Resolve[host.FileSystem](t, s)
 
 	// Create a simple kustomization
 	kustomizationContent := `apiVersion: kustomize.config.k8s.io/v1beta1
@@ -329,23 +335,19 @@ resources:
 `
 
 	// Write files
-	if err := os.WriteFile(
+	req.NoError(fs.MkdirAll(tmpDir, os.FileMode(0o755)))
+	req.NoError(fs.WriteFile(
 		filepath.Join(tmpDir, "kustomization.yaml"),
 		[]byte(kustomizationContent),
 		0o600,
-	); err != nil {
-		t.Fatalf("failed to write kustomization.yaml: %v", err)
-	}
+	), "failed to write kustomization.yaml")
 
-	if err := os.WriteFile(filepath.Join(tmpDir, "configmap.yaml"), []byte(configMapContent), 0o600); err != nil {
-		t.Fatalf("failed to write configmap.yaml: %v", err)
-	}
+	req.NoError(
+		fs.WriteFile(filepath.Join(tmpDir, "configmap.yaml"), []byte(configMapContent), 0o600),
+		"failed to write configmap.yaml",
+	)
 
-	// Create command and execute
-	fs := host.NewDefaultHost()
-	// Capture output
-	var stdout bytes.Buffer
-	cmd := CreateKustomizeCmd(fs, &stdout)
+	cmd := CreateKustomizeCmd(s)
 
 	// Set args
 	cmd.SetArgs([]string{tmpDir})
@@ -357,7 +359,7 @@ resources:
 	}
 
 	// Check output contains expected content
-	output := stdout.String()
+	output := testutil.Resolve[*bytes.Buffer](t, s).String()
 	if !strings.Contains(output, "ConfigMap") || !strings.Contains(output, "test-config") {
 		t.Errorf("expected output to contain ConfigMap and test-config, got: %s", output)
 	}

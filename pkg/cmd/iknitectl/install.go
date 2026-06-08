@@ -17,12 +17,11 @@ package iknitectl
 
 import (
 	"github.com/spf13/cobra"
-
-	"github.com/kaweezle/iknite/pkg/host"
+	"go.uber.org/dig"
 )
 
 // CreateInstallCmd creates the install command with the given filesystem.
-func CreateInstallCmd(fs host.FileSystem) *cobra.Command {
+func CreateInstallCmd(s *dig.Scope) *cobra.Command {
 	installCmd := &cobra.Command{
 		Use:   "install",
 		Short: "Install various development artifacts",
@@ -33,7 +32,7 @@ needed for development and building the project.`,
 	}
 
 	// Add subcommands
-	installCmd.AddCommand(CreateSigningKeyCmd(fs, nil))
+	installCmd.AddCommand(CreateSigningKeyCmd(s, nil))
 
 	return installCmd
 }

@@ -17,22 +17,23 @@ package secrets
 
 import (
 	"fmt"
+	"log/slog"
 
 	"github.com/spf13/cobra"
+	"go.uber.org/dig"
 
-	"github.com/kaweezle/iknite/pkg/cmd/util"
 	"github.com/kaweezle/iknite/pkg/host"
 	pkgSecrets "github.com/kaweezle/iknite/pkg/secrets"
 )
 
 // CreateSecretsCmd creates the secrets command.
-func CreateSecretsCmd(fs host.FileEnvironment, opts *pkgSecrets.Options) *cobra.Command {
+func CreateSecretsCmd(s *dig.Scope, opts *pkgSecrets.Options) *cobra.Command {
 	if opts == nil {
 		opts = &pkgSecrets.Options{}
 	}
-	if opts.Fs == nil {
-		opts.Fs = fs
-	}
+	cobra.CheckErr(s.Provide(func() *pkgSecrets.Options {
+		return opts
+	}))
 
 	secretsCmd := &cobra.Command{
 		Use:   "secrets",
@@ -41,13 +42,20 @@ func CreateSecretsCmd(fs host.FileEnvironment, opts *pkgSecrets.Options) *cobra.
 
 Paths are specified in dot notation under the data key.
 For example, github.api_token targets data.github.api_token.`,
-		PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
-			opts.Logger = util.LoggerFromCommand(cmd)
-			err := opts.SetDefaults()
-			if err != nil {
-				return fmt.Errorf("error setting default opts: %w", err)
-			}
-			return nil
+		PersistentPreRunE: func(_ *cobra.Command, _ []string) error {
+			return s.Decorate(func(
+				opts *pkgSecrets.Options,
+				logger *slog.Logger,
+				fe host.FileEnvironment,
+			) (*pkgSecrets.Options, error) {
+				opts.Logger = logger
+				opts.Fs = fe
+				err := opts.SetDefaults()
+				if err != nil {
+					return nil, fmt.Errorf("error setting default opts: %w", err)
+				}
+				return opts, nil
+			})
 		},
 	}
 
@@ -59,10 +67,11 @@ For example, github.api_token targets data.github.api_token.`,
 		"Path to the SOPS secrets file",
 	)
 
-	secretsCmd.AddCommand(createSecretsGetCmd(opts))
-	secretsCmd.AddCommand(createSecretsSetCmd(opts))
-	secretsCmd.AddCommand(createSecretsRemoveCmd(opts))
-	secretsCmd.AddCommand(createSecretsInitCmd(opts))
+	// TODO: Change parameter to scope
+	secretsCmd.AddCommand(createSecretsGetCmd(s))
+	secretsCmd.AddCommand(createSecretsSetCmd(s))
+	secretsCmd.AddCommand(createSecretsRemoveCmd(s))
+	secretsCmd.AddCommand(createSecretsInitCmd(s))
 
 	return secretsCmd
 }

@@ -22,6 +22,7 @@ import (
 
 	iknitectl "github.com/kaweezle/iknite/pkg/cmd/iknitectl"
 	"github.com/kaweezle/iknite/pkg/host"
+	"github.com/kaweezle/iknite/pkg/testutil"
 )
 
 // cSpell: disable
@@ -65,12 +66,9 @@ TQIhAKMSvzIBnni7ot/OSie2TmJLY4SwTQAevXysE2RbFDYdAiEBCUEGq0g9u+w4
 func TestInstallSigningKey(t *testing.T) {
 	// Note: Cannot use t.Parallel() in parent when child tests use t.Setenv()
 
-	// Create a memory filesystem for testing
-	fs := host.NewMemMapFS()
-
 	t.Run("CreateSigningKeyCmd with nil options", func(t *testing.T) {
 		t.Parallel()
-		cmdInstance := iknitectl.CreateSigningKeyCmd(fs, nil)
+		cmdInstance := iknitectl.CreateSigningKeyCmd(testutil.TestContainer(t).Scope("signing-key"), nil)
 		if cmdInstance == nil {
 			t.Fatal("CreateSigningKeyCmd returned nil")
 		}
@@ -84,11 +82,11 @@ func TestInstallSigningKey(t *testing.T) {
 
 	t.Run("CreateSigningKeyCmd with custom options", func(t *testing.T) {
 		t.Parallel()
+		s := testutil.TestContainer(t).Scope("signing-key")
 		opts := &iknitectl.SigningKeyOptions{
 			KeyName: "custom_key",
-			Fs:      fs,
 		}
-		cmdInstance := iknitectl.CreateSigningKeyCmd(fs, opts)
+		cmdInstance := iknitectl.CreateSigningKeyCmd(s, opts)
 		if cmdInstance == nil {
 			t.Fatal("CreateSigningKeyCmd returned nil")
 		}

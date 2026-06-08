@@ -33,6 +33,7 @@ const (
 	PlatformLinux   = "linux"
 	PlatformWindows = "windows"
 	PlatformDarwin  = "darwin"
+	DefaultUsername = "alpine"
 )
 
 type DelegateHost struct {
@@ -861,6 +862,12 @@ func NewDummyEnvironment(platform, username string, env map[string]string) *Dumm
 	if env == nil {
 		env = make(map[string]string)
 	}
+	if platform == "" {
+		platform = PlatformLinux
+	}
+	if username == "" {
+		username = DefaultUsername
+	}
 	return &DummyEnvironment{
 		platform: platform,
 		username: username,
@@ -939,7 +946,7 @@ func NewDummyHost(
 }
 
 func NewDummyUserHost() *DelegateHost {
-	result, _ := NewDummyHost(host.NewMemMapFS(), &DummyHostOptions{Username: "alpine", Platform: "linux"})
+	result, _ := NewDummyHost(host.NewMemMapFS(), &DummyHostOptions{Username: DefaultUsername, Platform: PlatformLinux})
 	return result
 }
 

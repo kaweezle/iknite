@@ -9,7 +9,6 @@ import (
 
 	iknitectl "github.com/kaweezle/iknite/pkg/cmd/iknitectl"
 	"github.com/kaweezle/iknite/pkg/host"
-	"github.com/kaweezle/iknite/pkg/iknitectl/base"
 	"github.com/kaweezle/iknite/pkg/iknitectl/config"
 	"github.com/kaweezle/iknite/pkg/iknitectl/db"
 	imagesvc "github.com/kaweezle/iknite/pkg/iknitectl/image"
@@ -19,11 +18,8 @@ import (
 func TestCreateImageCmd(t *testing.T) {
 	t.Parallel()
 
-	h := testutil.NewDummyUserHost()
-	logger := testutil.TestLogger(t)
-	c := config.NewConfigOptions(h)
-	baseService := base.NewService(h, logger, c)
-	cmd := iknitectl.CreateImageCmd(baseService)
+	s := newImageScope(t)
+	cmd := iknitectl.CreateImageCmd(s)
 	require.NotNil(t, cmd)
 
 	for _, sub := range []string{"inspect", "pull"} {

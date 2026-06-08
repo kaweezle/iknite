@@ -27,6 +27,7 @@ require (
 	github.com/stretchr/testify v1.11.1
 	github.com/txn2/txeh v1.8.1
 	go.etcd.io/bbolt v1.4.3
+	go.uber.org/dig v1.19.0
 	golang.org/x/crypto v0.54.0
 	golang.org/x/net v0.57.0
 	golang.org/x/sync v0.22.0

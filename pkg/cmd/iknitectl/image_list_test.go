@@ -2,22 +2,24 @@ package iknitectl_test
 
 import (
 	"bytes"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"go.uber.org/dig"
 
 	iknitectl "github.com/kaweezle/iknite/pkg/cmd/iknitectl"
-	"github.com/kaweezle/iknite/pkg/iknitectl/base"
+	"github.com/kaweezle/iknite/pkg/host"
 	"github.com/kaweezle/iknite/pkg/iknitectl/config"
 	"github.com/kaweezle/iknite/pkg/iknitectl/db"
+	"github.com/kaweezle/iknite/pkg/iknitectl/image"
 	"github.com/kaweezle/iknite/pkg/testutil"
 )
 
 func TestCreateImageCmdIncludesList(t *testing.T) {
 	t.Parallel()
 
-	baseService := newImageListBaseService(t)
-	cmd := iknitectl.CreateImageCmd(baseService)
+	cmd := iknitectl.CreateImageCmd(newImageScope(t))
 	found, _, err := cmd.Find([]string{"list"})
 	require.NoError(t, err)
 	require.NotNil(t, found)
@@ -27,17 +29,15 @@ func TestCreateImageCmdIncludesList(t *testing.T) {
 
 func TestImageListCommandRendersTable(t *testing.T) {
 	t.Parallel()
+	req := require.New(t)
 
-	baseService := newImageListBaseService(t)
-	seedImageListData(t, baseService.Config().Database)
+	scope := newImageScope(t)
+	req.NoError(scope.Invoke(seedImageListData))
 
-	command := iknitectl.CreateImageListCmd(baseService)
-	stdout := &bytes.Buffer{}
-	command.SetOut(stdout)
-	command.SetErr(stdout)
-	require.NoError(t, command.Execute())
+	command := iknitectl.CreateImageListCmd(scope)
+	require.NoError(t, command.ExecuteContext(t.Context()))
 
-	output := stdout.String()
+	output := testutil.Resolve[*bytes.Buffer](t, scope).String()
 	require.Contains(t, output, "SOURCE")
 	require.NotContains(t, output, " ID ")
 	require.Contains(t, output, "ghcr.io/kaweezle/iknite")
@@ -48,29 +48,51 @@ func TestImageListCommandRendersTable(t *testing.T) {
 func TestImageListCommandShowsEmptyState(t *testing.T) {
 	t.Parallel()
 
-	baseService := newImageListBaseService(t)
-	command := iknitectl.CreateImageListCmd(baseService)
-	stdout := &bytes.Buffer{}
-	command.SetOut(stdout)
-	command.SetErr(stdout)
-	require.NoError(t, command.Execute())
-	require.Contains(t, stdout.String(), "No images found")
+	s := newImageScope(t)
+	command := iknitectl.CreateImageListCmd(s)
+	require.NoError(t, command.ExecuteContext(t.Context()))
+	output := testutil.Resolve[*bytes.Buffer](t, s).String()
+	require.Contains(t, output, "No images found")
 }
 
-func newImageListBaseService(t *testing.T) base.ServiceInterface {
+func newImageScope(t *testing.T) *dig.Scope {
 	t.Helper()
+	req := require.New(t)
+	c := testutil.TestContainer(t)
+	req.NoError(c.Provide(config.NewConfigOptions))
+	req.NoError(c.Decorate(func(opts *config.ConfigOptions) *config.ConfigOptions {
+		opts.ConfigDir = t.TempDir()
+		return opts
+	}))
+	req.NoError(c.Provide(func(h host.Host, opts *config.ConfigOptions) (*config.Config, error) {
+		c := &config.Config{}
+		err := opts.Resolve(h, c)
+		if err != nil {
+			return nil, fmt.Errorf("resolving config: %w", err)
+		}
+		return c, nil
+	}))
+	req.NoError(c.Provide(func(c *config.Config) (*db.Store, error) {
+		store, err := db.Open(c.Database)
+		if err != nil {
+			return nil, fmt.Errorf("opening store: %w", err)
+		}
+		t.Cleanup(func() {
+			require.NoError(t, store.Close())
+		})
+		return store, nil
+	}))
+	req.NoError(c.Provide(func(store *db.Store) image.MetadataStore { return store }))
 
-	h := testutil.NewDummyUserHost()
-	logger := testutil.TestLogger(t)
-	opts := config.NewConfigOptions(h)
-	opts.ConfigDir = t.TempDir()
-	return base.NewService(h, logger, opts)
+	req.NoError(c.Provide(image.NewService))
+
+	return c.Scope("image-list")
 }
 
-func seedImageListData(t *testing.T, databasePath string) {
+func seedImageListData(t *testing.T, c *config.Config) {
 	t.Helper()
 
-	store, err := db.Open(databasePath)
+	store, err := db.Open(c.Database)
 	require.NoError(t, err)
 
 	require.NoError(t, db.CreateItem(store, &db.ImageSource{

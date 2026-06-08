@@ -7,8 +7,8 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+	"go.uber.org/dig"
 
-	"github.com/kaweezle/iknite/pkg/iknitectl/base"
 	envsvc "github.com/kaweezle/iknite/pkg/iknitectl/env"
 )
 
@@ -19,19 +19,16 @@ type EnvInitOptions struct {
 }
 
 // CreateEnvInitCmd creates the env init command.
-func CreateEnvInitCmd(baseService base.ServiceInterface) *cobra.Command {
+func CreateEnvInitCmd(s *dig.Scope) *cobra.Command {
 	opts := &EnvInitOptions{}
+	cobra.CheckErr(s.Provide(func() *EnvInitOptions { return opts }))
+	cobra.CheckErr(s.Provide(envsvc.NewService))
 
 	cmd := &cobra.Command{
 		Use:   "init",
 		Short: "Initialize iknitectl working directory",
 		RunE: func(_ *cobra.Command, _ []string) error {
-			service := &envsvc.Service{
-				FS:     baseService.Host(),
-				Logger: baseService.Logger(),
-				Config: baseService.Config(),
-			}
-			return performEnvInit(service, opts)
+			return s.Invoke(performEnvInit)
 		},
 	}
 

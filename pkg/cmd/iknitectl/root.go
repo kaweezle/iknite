@@ -27,8 +27,8 @@ import (
 
 	"github.com/kaweezle/iknite/pkg/cmd/util"
 	"github.com/kaweezle/iknite/pkg/host"
-	"github.com/kaweezle/iknite/pkg/iknitectl/base"
 	"github.com/kaweezle/iknite/pkg/iknitectl/config"
+	"github.com/kaweezle/iknite/pkg/utils"
 )
 
 // RootOptions contains configuration for the root command.
@@ -38,25 +38,22 @@ type RootOptions struct {
 	util.BaseOptions
 }
 
-func NewRootOptions() *RootOptions {
-	localHost := host.NewDefaultHost()
+func NewRootOptions(e host.Host) *RootOptions {
+	if e == nil {
+		e = host.NewDefaultHost()
+	}
 	opts := &RootOptions{
+		host:          e,
 		BaseOptions:   *util.DefaultBaseOptions(),
-		host:          localHost,
-		ConfigOptions: *config.NewConfigOptions(localHost),
+		ConfigOptions: *config.NewConfigOptions(e),
 	}
 	return opts
 }
 
 // CreateRootCmd creates the root command with the given options.
 func CreateRootCmd(opts *RootOptions) *cobra.Command {
-	if opts == nil {
-		opts = NewRootOptions()
-	}
-
-	logger := opts.Logger()
-
-	baseService := base.NewService(opts.host, logger, &opts.ConfigOptions)
+	c, containerErr := NewContainer(opts)
+	cobra.CheckErr(containerErr)
 
 	rootCmd := &cobra.Command{
 		Use:   "iknitectl",
@@ -65,43 +62,53 @@ func CreateRootCmd(opts *RootOptions) *cobra.Command {
 
 It provides utilities for managing secrets, building artifacts, and other
 development tasks that are not part of the main iknite binary.`,
-		PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
-			cmdIf := util.NewCmdInterface(&opts.BaseOptions)
-			util.BindFlagsToViper(cmd.Root(), cmdIf)
-			opts.SetUpLogs(cmd.OutOrStderr(), cmdIf)
-			util.SetCmdInterface(cmd, cmdIf)
-			err := util.InitializeConfiguration(cmd.Root(), cmdIf)
-			if err != nil {
-				return fmt.Errorf("failed to initialize configuration: %w", err)
+		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+			rootCmd := cmd.Root()
+			if err := ProvideCommand(c, rootCmd, args); err != nil {
+				return fmt.Errorf("failed to provide command to container: %w", err)
 			}
-			// Re-setup logs after configuration is loaded to apply any log-related settings from the config file
-			opts.SetUpLogs(cmd.OutOrStderr(), cmdIf)
-			baseService.SetLogger(cmdIf.Logger())
-
-			err = opts.Resolve(baseService.Host(), baseService.Config())
-			if err != nil {
-				return fmt.Errorf("failed to resolve configuration: %w", err)
+			if err := c.Invoke(func(cmdIf util.CmdInterface, opts *RootOptions) error {
+				util.BindFlagsToViper(rootCmd, cmdIf)
+				opts.SetUpLogs(cmd.OutOrStderr(), cmdIf)
+				util.SetCmdInterface(cmd, cmdIf)
+				err := util.InitializeConfiguration(rootCmd, cmdIf)
+				if err != nil {
+					return fmt.Errorf("failed to initialize configuration: %w", err)
+				}
+				// Re-setup logs after configuration is loaded to apply any log-related settings from the config file
+				opts.SetUpLogs(cmd.OutOrStderr(), cmdIf)
+				return nil
+			}); err != nil {
+				return fmt.Errorf("failed to set up configuration and logging: %w", err)
+			}
+			containerErr = c.Invoke(func(fe host.FileEnvironment, c *config.Config, opts *RootOptions) error {
+				return opts.Resolve(fe, c)
+			})
+			if containerErr != nil {
+				return fmt.Errorf("failed to resolve configuration: %w", containerErr)
 			}
 			return nil
 		},
+
 		PersistentPostRunE: func(_ *cobra.Command, _ []string) error {
-			if err := baseService.CloseStore(); err != nil {
-				return fmt.Errorf("failed to close metadata store: %w", err)
-			}
-			return nil
+			return c.Invoke(func(hm *utils.HookManager) error {
+				return hm.Run()
+			})
 		},
 	}
-	rootCmd.SetOut(opts.Output)
+	cobra.CheckErr(c.Invoke(func(opts *RootOptions) {
+		rootCmd.SetOut(opts.Output)
 
-	opts.AddFlags(rootCmd.PersistentFlags())
+		opts.AddFlags(rootCmd.PersistentFlags())
+	}))
 
 	// Add subcommands
-	rootCmd.AddCommand(CreateEnvCmd(baseService))
-	rootCmd.AddCommand(CreateImageCmd(baseService))
-	rootCmd.AddCommand(CreateClusterCmd(opts.host))
-	rootCmd.AddCommand(CreateWorkspaceCmd(opts.host, opts.Output))
-	rootCmd.AddCommand(CreateAuthCmd(opts.host))
-	rootCmd.AddCommand(CreateBackendCmd(opts.host))
+	rootCmd.AddCommand(CreateEnvCmd(c.Scope("env")))
+	rootCmd.AddCommand(CreateImageCmd(c.Scope("image")))
+	rootCmd.AddCommand(CreateClusterCmd(c.Scope("cluster")))
+	rootCmd.AddCommand(CreateWorkspaceCmd(c.Scope("workspace")))
+	rootCmd.AddCommand(CreateAuthCmd(c.Scope("auth")))
+	rootCmd.AddCommand(CreateBackendCmd(c.Scope("backend")))
 	util.AddConfigFlag(rootCmd)
 
 	return rootCmd

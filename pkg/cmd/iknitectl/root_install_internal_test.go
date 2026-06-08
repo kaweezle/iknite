@@ -12,16 +12,16 @@ import (
 
 	"github.com/kaweezle/iknite/pkg/cmd/util"
 	"github.com/kaweezle/iknite/pkg/host"
+	"github.com/kaweezle/iknite/pkg/testutil"
 )
 
 func TestCreateWorkspaceCmd(t *testing.T) {
 	t.Parallel()
 	req := require.New(t)
 
-	fileExecutor, ok := host.NewMemMapFS().(host.UserHost)
-	req.True(ok, "MemMapFS should implement UserHost")
+	s := testutil.TestContainer(t).Scope("workspace")
 
-	cmd := CreateWorkspaceCmd(fileExecutor, &bytes.Buffer{})
+	cmd := CreateWorkspaceCmd(s)
 	req.NotNil(cmd)
 	req.Equal("workspace", cmd.Name())
 
@@ -37,7 +37,7 @@ func TestCreateWorkspaceCmd(t *testing.T) {
 func TestRootOptionsAndCreateRootCmd(t *testing.T) {
 	req := require.New(t)
 
-	opts := NewRootOptions()
+	opts := NewRootOptions(nil)
 	req.NotNil(opts)
 	req.NotNil(opts.host)
 
