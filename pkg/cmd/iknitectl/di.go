@@ -13,22 +13,10 @@ import (
 	"github.com/kaweezle/iknite/pkg/cmd/types"
 	"github.com/kaweezle/iknite/pkg/cmd/util"
 	"github.com/kaweezle/iknite/pkg/host"
-	"github.com/kaweezle/iknite/pkg/iknitectl/base"
 	"github.com/kaweezle/iknite/pkg/iknitectl/config"
 	"github.com/kaweezle/iknite/pkg/iknitectl/db"
 	"github.com/kaweezle/iknite/pkg/utils"
 )
-
-func newStore(s *base.Service, hm *utils.HookManager) (*db.Store, error) {
-	store, err := s.Store()
-	if err != nil {
-		return nil, fmt.Errorf("failed to create store: %w", err)
-	}
-	hm.Register("store", func() error {
-		return store.Close()
-	})
-	return store, nil
-}
 
 func NewContainer(opts *RootOptions) (*dig.Container, error) {
 	c := dig.New()
@@ -43,20 +31,24 @@ func NewContainer(opts *RootOptions) (*dig.Container, error) {
 		}
 	}
 
+	if err := c.Provide(utils.NewHookManager); err != nil {
+		return nil, fmt.Errorf("failed to provide HookManager: %w", err)
+	}
+
 	if err := c.Provide(func(opts *RootOptions) *config.ConfigOptions { return &opts.ConfigOptions }); err != nil {
 		return nil, fmt.Errorf("failed to provide ConfigOptions: %w", err)
 	}
 
+	if err := c.Provide(configFromOptions); err != nil {
+		return nil, fmt.Errorf("failed to provide Config: %w", err)
+	}
+
+	if err := c.Provide(newStore); err != nil {
+		return nil, fmt.Errorf("failed to provide store: %w", err)
+	}
+
 	if err := c.Provide(func(opts *RootOptions) *util.BaseOptions { return &opts.BaseOptions }); err != nil {
 		return nil, fmt.Errorf("failed to provide BaseOptions: %w", err)
-	}
-
-	if err := c.Provide(base.NewService); err != nil {
-		return nil, fmt.Errorf("failed to provide base service: %w", err)
-	}
-
-	if err := c.Provide(func(s *base.Service) *config.Config { return s.Config() }); err != nil {
-		return nil, fmt.Errorf("failed to provide Config: %w", err)
 	}
 
 	if err := c.Provide(util.NewCmdInterface); err != nil {
@@ -67,15 +59,27 @@ func NewContainer(opts *RootOptions) (*dig.Container, error) {
 		return nil, fmt.Errorf("failed to provide logger: %w", err)
 	}
 
-	if err := c.Provide(utils.NewHookManager); err != nil {
-		return nil, fmt.Errorf("failed to provide HookManager: %w", err)
-	}
-
-	if err := c.Provide(newStore); err != nil {
-		return nil, fmt.Errorf("failed to provide store: %w", err)
-	}
-
 	return c, nil
+}
+
+func configFromOptions(h host.Host, opts *config.ConfigOptions) (*config.Config, error) {
+	c := &config.Config{}
+	err := opts.Resolve(h, c)
+	if err != nil {
+		return nil, fmt.Errorf("resolving config: %w", err)
+	}
+	return c, nil
+}
+
+func newStore(c *config.Config, hm *utils.HookManager) (*db.Store, error) {
+	store, err := db.Open(c.Database)
+	if err != nil {
+		return nil, fmt.Errorf("opening store: %w", err)
+	}
+	hm.Register("store", func() error {
+		return store.Close()
+	})
+	return store, nil
 }
 
 func provideDefaultHostAndOptions(c *dig.Container) error {
