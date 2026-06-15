@@ -7,7 +7,7 @@ terraform {
     }
     ovh = {
       source  = "ovh/ovh"
-      version = "2.13.1"
+      version = "2.14.0"
     }
     aws = {
       source  = "hashicorp/aws"
