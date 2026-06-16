@@ -95,63 +95,6 @@ func (it *ImageType) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-type ArtifactType int
-
-const (
-	ArtifactTypeUnknown ArtifactType = iota
-	ArtifactTypeRootFS
-	ArtifactTypeVHDXImage
-	ArtifactTypeQCOW2Image
-	ArtifactTypeIncusMetadata
-)
-
-func (at ArtifactType) String() string {
-	switch at {
-	case ArtifactTypeRootFS:
-		return RootFSLabel
-	case ArtifactTypeVHDXImage:
-		return VHDXLabel
-	case ArtifactTypeQCOW2Image:
-		return QCOW2Label
-	case ArtifactTypeIncusMetadata:
-		return IncusMetaLabel
-	default:
-		return UnknownLabel
-	}
-}
-
-func ParseArtifactType(s string) (ArtifactType, error) {
-	switch s {
-	case RootFSLabel:
-		return ArtifactTypeRootFS, nil
-	case VHDXLabel:
-		return ArtifactTypeVHDXImage, nil
-	case QCOW2Label:
-		return ArtifactTypeQCOW2Image, nil
-	case IncusMetaLabel:
-		return ArtifactTypeIncusMetadata, nil
-	default:
-		return 0, fmt.Errorf("invalid artifact type: %s", s)
-	}
-}
-
-func (at ArtifactType) MarshalJSON() ([]byte, error) {
-	return json.Marshal(at.String()) //nolint:wrapcheck // Simple marshal to string.
-}
-
-func (at *ArtifactType) UnmarshalJSON(data []byte) error {
-	var s string
-	if err := json.Unmarshal(data, &s); err != nil {
-		return err //nolint:wrapcheck // Simple unmarshal from string.
-	}
-	parsed, err := ParseArtifactType(s)
-	if err != nil {
-		return err
-	}
-	*at = parsed
-	return nil
-}
-
 // ImageListItem describes one image entry shown by the ls command.
 type ImageListItem struct {
 	UpdatedAt time.Time
@@ -165,8 +108,8 @@ type ImageListItem struct {
 
 // ImageInfo describes a downloaded image with full source and artifact details.
 type ImageInfo struct {
-	CreatedAt time.Time       `json:"createdAt,omitempty"`
-	UpdatedAt time.Time       `json:"updatedAt,omitempty"`
+	CreatedAt time.Time       `json:"createdAt"`
+	UpdatedAt time.Time       `json:"updatedAt"`
 	Source    ImageSourceInfo `json:"source"`
 	Manifest  ManifestInfo    `json:"manifest"`
 	Name      string          `json:"name"`
