@@ -4,8 +4,8 @@ go 1.26.3
 
 require (
 	filippo.io/age v1.3.1
-	github.com/argoproj/argo-cd/v3 v3.4.2
-	github.com/bitfield/script v0.24.1
+	github.com/argoproj/argo-cd/v3 v3.4.3
+	github.com/bitfield/script v0.24.3
 	github.com/charmbracelet/bubbles v1.0.0
 	github.com/charmbracelet/bubbletea v1.3.10
 	github.com/charmbracelet/lipgloss v1.1.0
@@ -23,23 +23,23 @@ require (
 	github.com/spf13/pflag v1.0.10
 	github.com/spf13/viper v1.21.0
 	github.com/stretchr/testify v1.11.1
-	github.com/txn2/txeh v1.8.0
-	golang.org/x/crypto v0.51.0
-	golang.org/x/net v0.54.0
-	golang.org/x/sync v0.20.0
-	golang.org/x/text v0.37.0
-	k8s.io/api v0.36.1
-	k8s.io/apiextensions-apiserver v0.36.1
-	k8s.io/apimachinery v0.36.1
-	k8s.io/cli-runtime v0.36.1
-	k8s.io/client-go v0.36.1
-	k8s.io/code-generator v0.36.1
+	github.com/txn2/txeh v1.8.1
+	golang.org/x/crypto v0.53.0
+	golang.org/x/net v0.55.0
+	golang.org/x/sync v0.21.0
+	golang.org/x/text v0.38.0
+	k8s.io/api v0.36.2
+	k8s.io/apiextensions-apiserver v0.36.2
+	k8s.io/apimachinery v0.36.2
+	k8s.io/cli-runtime v0.36.2
+	k8s.io/client-go v0.36.2
+	k8s.io/code-generator v0.36.2
 	k8s.io/klog/v2 v2.140.0
-	k8s.io/kube-aggregator v0.36.1
-	k8s.io/kube-proxy v0.36.1
-	k8s.io/kubectl v0.36.1
-	k8s.io/kubelet v0.36.1
-	k8s.io/kubernetes v1.36.1
+	k8s.io/kube-aggregator v0.36.2
+	k8s.io/kube-proxy v0.36.2
+	k8s.io/kubectl v0.36.2
+	k8s.io/kubelet v0.36.2
+	k8s.io/kubernetes v1.36.2
 	sigs.k8s.io/cli-utils v0.37.2
 	sigs.k8s.io/controller-runtime v0.24.1
 	sigs.k8s.io/kustomize/api v0.21.1
@@ -271,12 +271,12 @@ require (
 	go.uber.org/zap v1.27.1 // indirect
 	go.yaml.in/yaml/v2 v2.4.3 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
-	golang.org/x/mod v0.35.0 // indirect
+	golang.org/x/mod v0.36.0 // indirect
 	golang.org/x/oauth2 v0.36.0 // indirect
-	golang.org/x/sys v0.44.0 // indirect
-	golang.org/x/term v0.43.0 // indirect
+	golang.org/x/sys v0.46.0 // indirect
+	golang.org/x/term v0.44.0 // indirect
 	golang.org/x/time v0.15.0 // indirect
-	golang.org/x/tools v0.44.0 // indirect
+	golang.org/x/tools v0.45.0 // indirect
 	google.golang.org/api v0.278.0 // indirect
 	google.golang.org/genproto v0.0.0-20260427160629-7cedc36a6bc4 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20260427160629-7cedc36a6bc4 // indirect
@@ -290,10 +290,10 @@ require (
 	gopkg.in/warnings.v0 v0.1.2 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
-	k8s.io/apiserver v0.36.1 // indirect
+	k8s.io/apiserver v0.36.2 // indirect
 	k8s.io/cluster-bootstrap v0.36.0 // indirect
-	k8s.io/component-base v0.36.1 // indirect
-	k8s.io/component-helpers v0.36.1 // indirect
+	k8s.io/component-base v0.36.2 // indirect
+	k8s.io/component-helpers v0.36.2 // indirect
 	k8s.io/controller-manager v0.36.0 // indirect
 	k8s.io/cri-api v0.36.0 // indirect
 	k8s.io/cri-client v0.36.0 // indirect
