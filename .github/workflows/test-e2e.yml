@@ -20,13 +20,13 @@ jobs:
       packages: write
     steps:
       -
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
           fetch-tags: "true"
       -
         name: Retrieve aqua cache
-        uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.local/share/aquaproj-aqua
           key: v2-aqua-installer-${{runner.os}}-${{runner.arch}}-${{hashFiles('aqua.yaml')}}
@@ -34,7 +34,7 @@ jobs:
             v2-aqua-installer-${{runner.os}}-${{runner.arch}}-
       -
         name: Install aqua dependencies
-        uses: aquaproj/aqua-installer@11dd79b4e498d471a9385aa9fb7f62bb5f52a73c # v4.0.4
+        uses: aquaproj/aqua-installer@96a9bc20066c5bf5e275b41019cfc165b25f4e2e # v4.0.5
         with:
           aqua_version: v2.56.6
           aqua_opts: "" # Unset `-l` option
