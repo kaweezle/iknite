@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.3-labs
 # cSpell: disable
-FROM alpine:3.23 as builder
+FROM alpine:3.24 as builder
 
 ARG USERNAME=alpine
 ARG GROUPNAME=alpine
