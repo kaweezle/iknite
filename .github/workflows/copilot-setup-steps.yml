@@ -23,14 +23,14 @@ jobs:
     steps:
       -
         name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
       -
         name: Set up Go
         uses: actions/setup-go@v6
         with:
           go-version: ^1
       - name: Set up Aqua cache
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: ~/.local/share/aquaproj-aqua
           key: v2-aqua-installer-${{runner.os}}-${{runner.arch}}-${{hashFiles('aqua.yaml')}}
@@ -38,7 +38,7 @@ jobs:
             v2-aqua-installer-${{runner.os}}-${{runner.arch}}-
       -
         name: Install aqua dependencies
-        uses: aquaproj/aqua-installer@11dd79b4e498d471a9385aa9fb7f62bb5f52a73c # v4.0.4
+        uses: aquaproj/aqua-installer@96a9bc20066c5bf5e275b41019cfc165b25f4e2e # v4.0.5
         with:
           aqua_version: v2.56.6
           aqua_opts: "" # Unset `-l` option
@@ -87,7 +87,7 @@ jobs:
           python -m pip freeze --local
       -
         name: Cache pre-commit hooks
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: ~/.cache/pre-commit
           key: pre-commit-3|${{ env.pythonLocation }}|${{ hashFiles('.pre-commit-config.yaml') }}
