@@ -67,7 +67,6 @@ For example, github.api_token targets data.github.api_token.`,
 		"Path to the SOPS secrets file",
 	)
 
-	// TODO: Change parameter to scope
 	secretsCmd.AddCommand(createSecretsGetCmd(s))
 	secretsCmd.AddCommand(createSecretsSetCmd(s))
 	secretsCmd.AddCommand(createSecretsRemoveCmd(s))
