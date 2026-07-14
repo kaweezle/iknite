@@ -133,6 +133,8 @@ The project provides the following deliverables:
 
 #### Build System
 
+- **Makefile** (`GNUmakefile`): Centralized build orchestration for APKs,
+  rootfs, VM images, and documentation.
 - **goreleaser** (`.goreleaser.yaml`): Produces APK packages with Alpine
   dependencies (kubelet, kubeadm, containerd, etc.)
 - **Tasks** (`.vscode/tasks.json`): `goreleaser-build`, `golangci-lint`,
@@ -149,7 +151,7 @@ The project provides the following deliverables:
    customization of init phases
 2. **OpenRC coordination**: Kubelet prevented from auto-starting via rc.conf
    patches (see ` pkg/k8s/runtime_environment.go`)
-3. **State tracking**: Custom `IkniteCluster` CR persisted as JSON to track
+3. **State tracking**: Custom `IkniteCluster` CRD persisted as JSON to track
    initialization phases and workload readiness. HTTPs server with mTLS on port
    11443 for status queries (see `pkg/server/server.go`).
 
