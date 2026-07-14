@@ -39,7 +39,7 @@ module "images" {
 | Name | Version |
 |------|---------|
 | <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | >= 1.11.0 |
-| <a name="requirement_null"></a> [null](#requirement\_null) | 3.2.4 |
+| <a name="requirement_null"></a> [null](#requirement\_null) | 3.3.0 |
 | <a name="requirement_openstack"></a> [openstack](#requirement\_openstack) | 3.4.0 |
 
 ## Modules
@@ -50,7 +50,7 @@ No modules.
 
 | Name | Type |
 |------|------|
-| [null_resource.image_hash](https://registry.terraform.io/providers/hashicorp/null/3.2.4/docs/resources/resource) | resource |
+| [null_resource.image_hash](https://registry.terraform.io/providers/hashicorp/null/3.3.0/docs/resources/resource) | resource |
 | [openstack_images_image_v2.this](https://registry.terraform.io/providers/terraform-provider-openstack/openstack/3.4.0/docs/resources/images_image_v2) | resource |
 
 ## Inputs
