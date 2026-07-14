@@ -65,6 +65,8 @@ func renderImageListTable(items []imagesvc.ImageListItem) string {
 	}
 
 	width := 180
+	styles := table.DefaultStyles()
+	styles.Selected = styles.Selected.Bold(false).Foreground(styles.Cell.GetForeground())
 	listTable := table.New(
 		table.WithColumns([]table.Column{
 			{Title: "NAME", Width: 30},
@@ -79,6 +81,8 @@ func renderImageListTable(items []imagesvc.ImageListItem) string {
 		table.WithRows(rows),
 		table.WithWidth(width),
 		table.WithHeight(len(items)+1),
+		table.WithFocused(false),
+		table.WithStyles(styles),
 	)
 
 	return listTable.View()
