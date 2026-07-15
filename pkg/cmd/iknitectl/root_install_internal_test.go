@@ -25,7 +25,7 @@ func TestCreateWorkspaceCmd(t *testing.T) {
 	req.NotNil(cmd)
 	req.Equal("workspace", cmd.Name())
 
-	for _, name := range []string{"application", "kustomize", "secrets"} {
+	for _, name := range []string{"application", "secrets"} {
 		sub, _, err := cmd.Find([]string{name})
 		req.NoError(err)
 		req.NotNil(sub)
@@ -87,12 +87,12 @@ func TestRunRootCmd_Path(t *testing.T) {
 	cmd := CreateRootCmd(options)
 	req.NotNil(cmd)
 
-	cmd.SetArgs([]string{"workspace", "kustomize", "nonexistent"})
+	cmd.SetArgs([]string{"workspace", "application", "render", "nonexistent"})
 
 	err := cmd.ExecuteContext(t.Context())
 	req.Error(err)
-	req.Contains(err.Error(), "kustomization directory does not exist")
-	req.Contains(out.String(), "Usage:\n  iknitectl workspace kustomize <directory> [destination]")
+	req.Contains(err.Error(), "directory does not exist: nonexistent")
+	req.Contains(out.String(), "Usage:\n  iknitectl workspace application render <directory> [flags]")
 }
 
 //nolint:paralleltest // Messing with home
@@ -114,7 +114,7 @@ func TestRunRootCmd_ConfigError(t *testing.T) {
 	cmd := CreateRootCmd(options)
 	req.NotNil(cmd)
 
-	cmd.SetArgs([]string{"workspace", "kustomize", "nonexistent"})
+	cmd.SetArgs([]string{"workspace", "application", "render", "nonexistent"})
 
 	oldHome := os.Getenv("HOME")
 	oldXDGConfigHome := os.Getenv("XDG_CONFIG_HOME")

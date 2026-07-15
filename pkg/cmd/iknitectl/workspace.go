@@ -16,7 +16,6 @@ func CreateWorkspaceCmd(s *dig.Scope) *cobra.Command {
 	}
 
 	workspaceCmd.AddCommand(CreateApplicationCmd(s))
-	workspaceCmd.AddCommand(CreateKustomizeCmd(s))
 	workspaceCmd.AddCommand(secrets.CreateSecretsCmd(s, nil))
 
 	return workspaceCmd

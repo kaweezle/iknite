@@ -147,7 +147,7 @@ func renderApp(ctx context.Context, fileExecutor host.FileExecutor, dir string) 
 	var buildErr error
 	switch appT {
 	case appTypeKustomize:
-		resources, buildErr = kustomize.BuildOnFileSystem(host.NewKustomizeFSWrapper(fileExecutor), path)
+		resources, buildErr = kustomize.BuildOnFileSystem(host.NewKustomizeFSWrapper(fileExecutor), dir)
 	case appTypeHelmfile:
 		resources, buildErr = renderHelmfile(ctx, fileExecutor, path)
 	case appTypeHelm:
@@ -399,14 +399,15 @@ func runRenderAll(
 // CreateApplicationCmd creates the application command with validate, render, and render-all subcommands.
 func CreateApplicationCmd(s *dig.Scope) *cobra.Command {
 	appCmd := &cobra.Command{
-		Use:   "application",
-		Short: "Manage ArgoCD applications",
+		Use:     "application",
+		Aliases: []string{"app", "a"},
+		Short:   "Manage ArgoCD applications",
 		Long: `Commands for validating and rendering ArgoCD applications.
 
 The application type is auto-detected from the directory contents:
-  - kustomization.yaml   → kustomize (uses Go code)
+  - kustomization.yaml     → kustomize (uses Go code)
   - helmfile.yaml(.gotmpl) → helmfile (invokes the helmfile command)
-  - Chart.yaml           → helm chart (invokes the helm command)`,
+  - Chart.yaml             → helm chart (invokes the helm command)`,
 	}
 
 	var schemasDir string

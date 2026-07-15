@@ -40,6 +40,16 @@ import (
 	"github.com/kaweezle/iknite/pkg/testutil"
 )
 
+const (
+	configMapContent = `apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: test-config
+data:
+  key: value
+`
+)
+
 // ---- helpers ----------------------------------------------------------------
 
 func newMemFileExecutor(t *testing.T) hostpkg.FileExecutor {
