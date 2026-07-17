@@ -1,0 +1,429 @@
+/*
+Copyright © 2025 Antoine Martin <antoine@openance.com>
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+	http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+// cSpell: words crds
+
+package application
+
+import (
+	"bytes"
+	"context"
+	"fmt"
+	"io"
+	"log/slog"
+	"os"
+	"path/filepath"
+	"sort"
+	"strings"
+
+	"sigs.k8s.io/kustomize/api/provider"
+	"sigs.k8s.io/kustomize/api/resmap"
+	"sigs.k8s.io/yaml"
+
+	"github.com/kaweezle/iknite/pkg/host"
+	"github.com/kaweezle/iknite/pkg/kustomize"
+)
+
+// appType represents the type of an application directory.
+type appType int
+
+const (
+	appTypeKustomize appType = iota
+	appTypeHelmfile
+	appTypeHelm
+	appTypeUnknown
+)
+
+// argoApplication is a minimal ArgoCD Application struct for YAML parsing.
+type argoApplication struct {
+	Kind     string `yaml:"kind"`
+	Metadata struct {
+		Name string `yaml:"name"`
+	} `yaml:"metadata"`
+	Spec struct {
+		Source struct {
+			Path string `yaml:"path"`
+		} `yaml:"source"`
+	} `yaml:"spec"`
+}
+
+// Service renders and validates ArgoCD applications.
+type Service struct {
+	FS     host.FileExecutor
+	Logger *slog.Logger
+}
+
+// NewService creates a Service backed by the given file executor and logger.
+func NewService(fs host.FileExecutor, logger *slog.Logger) *Service {
+	return &Service{
+		FS:     fs,
+		Logger: logger,
+	}
+}
+
+// Validate renders an application directory and validates the result with kubeconform.
+func (s *Service) Validate(ctx context.Context, dir, schemasDir string) error {
+	return runValidateApp(ctx, s.FS, dir, schemasDir)
+}
+
+// Render renders an application directory to stdout or a destination directory.
+func (s *Service) Render(ctx context.Context, dir, destDir string, out io.Writer) error {
+	return runRenderApp(ctx, s.FS, out, dir, destDir)
+}
+
+// RenderAll renders all appstages in an environment, mirroring render-environment.sh.
+func (s *Service) RenderAll(
+	ctx context.Context,
+	appstagesDir,
+	destDir,
+	baseDir string,
+	out io.Writer,
+) error {
+	return runRenderAll(ctx, s.FS, out, appstagesDir, destDir, baseDir)
+}
+
+// detectAppType auto-detects the application type from a directory.
+// It returns the type, the resolved path (helmfile path or dir), and any error.
+func detectAppType(fileExecutor host.FileExecutor, dir string) (appType, string, error) {
+	kustomizationFile := filepath.Join(dir, "kustomization.yaml")
+	exists, err := fileExecutor.Exists(kustomizationFile)
+	if err != nil {
+		return appTypeUnknown, "", fmt.Errorf("failed to check kustomization.yaml: %w", err)
+	}
+	if exists {
+		return appTypeKustomize, dir, nil
+	}
+
+	for _, name := range []string{"helmfile.yaml", "helmfile.yaml.gotmpl"} {
+		helmfileFile := filepath.Join(dir, name)
+		exists, err = fileExecutor.Exists(helmfileFile)
+		if err != nil {
+			return appTypeUnknown, "", fmt.Errorf("failed to check %s: %w", name, err)
+		}
+		if exists {
+			return appTypeHelmfile, helmfileFile, nil
+		}
+	}
+
+	chartFile := filepath.Join(dir, "Chart.yaml")
+	exists, err = fileExecutor.Exists(chartFile)
+	if err != nil {
+		return appTypeUnknown, "", fmt.Errorf("failed to check Chart.yaml: %w", err)
+	}
+	if exists {
+		return appTypeHelm, dir, nil
+	}
+
+	return appTypeUnknown, "", nil
+}
+
+func runCommandToResmap(
+	ctx context.Context,
+	fileExecutor host.FileExecutor,
+	options *host.CommandOptions,
+) (resmap.ResMap, error) {
+	var stdout, stderr bytes.Buffer
+	runOptions := *options
+	runOptions.Stdout = &stdout
+	runOptions.Stderr = &stderr
+	if err := fileExecutor.RunCommand(ctx, &runOptions); err != nil {
+		return nil, fmt.Errorf("command %s failed: %w\n%s", runOptions.Cmd, err, stderr.String())
+	}
+	result, err := resmap.NewFactory(provider.NewDefaultDepProvider().GetResourceFactory()).
+		NewResMapFromBytes(stdout.Bytes())
+	if err != nil {
+		return nil, fmt.Errorf("failed to create resmap from %s output: %w", runOptions.Cmd, err)
+	}
+	return result, nil
+}
+
+// renderHelmfile runs helmfile template and returns the YAML output.
+func renderHelmfile(ctx context.Context, fileExecutor host.FileExecutor, helmfileFile string) (resmap.ResMap, error) {
+	return runCommandToResmap(ctx, fileExecutor, &host.CommandOptions{
+		Cmd:  "helmfile",
+		Args: []string{"template", "--skip-tests", "--args=--skip-crds", "-f", helmfileFile},
+	})
+}
+
+// renderHelm runs helm template and returns the YAML output.
+func renderHelm(ctx context.Context, fileExecutor host.FileExecutor, dir string) (resmap.ResMap, error) {
+	releaseName := filepath.Base(dir)
+
+	return runCommandToResmap(ctx, fileExecutor, &host.CommandOptions{
+		Cmd:  "helm",
+		Args: []string{"template", releaseName, dir, "--skip-crds"},
+	})
+}
+
+// renderApp renders an application directory and returns the YAML output.
+// For kustomize apps it uses Go code; for helmfile and helm it invokes the
+// respective external commands.
+func renderApp(ctx context.Context, fileExecutor host.FileExecutor, dir string) (resmap.ResMap, error) {
+	appT, path, err := detectAppType(fileExecutor, dir)
+	if err != nil {
+		return nil, err
+	}
+
+	var resources resmap.ResMap
+	var buildErr error
+	switch appT {
+	case appTypeKustomize:
+		resources, buildErr = kustomize.BuildOnFileSystem(host.NewKustomizeFSWrapper(fileExecutor), dir)
+	case appTypeHelmfile:
+		resources, buildErr = renderHelmfile(ctx, fileExecutor, path)
+	case appTypeHelm:
+		resources, buildErr = renderHelm(ctx, fileExecutor, path)
+	case appTypeUnknown:
+		return nil, fmt.Errorf(
+			//nolint:lll // long error message
+			"directory %s has no recognized app definition (kustomization.yaml, helmfile.yaml, helmfile.yaml.gotmpl, or Chart.yaml)",
+			dir,
+		)
+	}
+	if buildErr != nil {
+		return nil, buildErr
+	}
+	return resources, nil
+}
+
+// renderAppWithOutput renders an application and writes output to stdout or
+// splits into destDir.
+func renderAppWithOutput(
+	ctx context.Context,
+	fileExecutor host.FileExecutor,
+	out io.Writer,
+	dir,
+	destDir string,
+) error {
+	resources, err := renderApp(ctx, fileExecutor, dir)
+	if err != nil {
+		return fmt.Errorf("while rendering with output: %w", err)
+	}
+	if destDir != "" {
+		err = kustomize.SplitResMapToDir(fileExecutor, resources, destDir)
+		if err != nil {
+			return fmt.Errorf("failed to split resources to directory: %w", err)
+		}
+		return nil
+	}
+	var yamlData []byte
+	yamlData, err = resources.AsYaml()
+	if err != nil {
+		return fmt.Errorf("failed to convert resources to YAML: %w", err)
+	}
+	_, err = out.Write(yamlData)
+	if err != nil {
+		return fmt.Errorf("failed to write output: %w", err)
+	}
+	return nil
+}
+
+// runKubeconform runs kubeconform validation on the provided YAML data.
+// SchemasDir may be empty to skip the local schema location.
+func runKubeconform(
+	ctx context.Context,
+	fileExecutor host.FileExecutor,
+	resources resmap.ResMap,
+	schemasDir string,
+) error {
+	args := []string{"-schema-location", "default"}
+	if schemasDir != "" {
+		args = append(args, "-schema-location",
+			schemasDir+"/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json")
+	}
+	args = append(
+		args,
+		"-schema-location",
+		//nolint:lll // template
+		"https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json",
+		"-schema-location",
+		"https://raw.githubusercontent.com/yannh/kubernetes-json-schema/master/master/customresourcedefinition.json",
+		"-summary",
+	)
+	data, err := resources.AsYaml()
+	if err != nil {
+		return fmt.Errorf("failed to convert resources to YAML: %w", err)
+	}
+	if err := fileExecutor.RunCommand(ctx, &host.CommandOptions{
+		Cmd:    "kubeconform",
+		Args:   args,
+		Stdin:  bytes.NewReader(data),
+		Stdout: os.Stderr,
+		Stderr: os.Stderr,
+	}); err != nil {
+		return fmt.Errorf("kubeconform validation failed: %w", err)
+	}
+	return nil
+}
+
+// runValidateApp validates an application directory.
+func runValidateApp(
+	ctx context.Context,
+	fileExecutor host.FileExecutor,
+	dir,
+	schemasDir string,
+) error {
+	exists, err := fileExecutor.DirExists(dir)
+	if err != nil {
+		return fmt.Errorf("failed to check directory: %w", err)
+	}
+	if !exists {
+		return fmt.Errorf("directory does not exist: %s", dir)
+	}
+
+	yamlData, err := renderApp(ctx, fileExecutor, dir)
+	if err != nil {
+		return err
+	}
+	return runKubeconform(ctx, fileExecutor, yamlData, schemasDir)
+}
+
+// runRenderApp renders an application directory to stdout or a destination directory.
+func runRenderApp(
+	ctx context.Context,
+	fileExecutor host.FileExecutor,
+	out io.Writer,
+	dir,
+	destDir string,
+) error {
+	exists, err := fileExecutor.DirExists(dir)
+	if err != nil {
+		return fmt.Errorf("failed to check directory: %w", err)
+	}
+	if !exists {
+		return fmt.Errorf("directory does not exist: %s", dir)
+	}
+	return renderAppWithOutput(ctx, fileExecutor, out, dir, destDir)
+}
+
+// parseApplicationsFromDir parses Application resources from YAML files in a directory.
+func parseApplicationsFromDir(fileExecutor host.FileExecutor, manifestsDir string) ([]argoApplication, error) {
+	files, err := fileExecutor.ReadDir(manifestsDir)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read directory %s: %w", manifestsDir, err)
+	}
+
+	sort.Slice(files, func(i, j int) bool {
+		return files[i].Name() < files[j].Name()
+	})
+
+	var apps []argoApplication
+	for _, file := range files {
+		if !strings.HasSuffix(file.Name(), ".yaml") {
+			continue
+		}
+		data, err := fileExecutor.ReadFile(filepath.Join(manifestsDir, file.Name()))
+		if err != nil {
+			return nil, fmt.Errorf("failed to read %s: %w", file.Name(), err)
+		}
+		var app argoApplication
+		if unmarshalErr := yaml.Unmarshal(data, &app); unmarshalErr != nil {
+			continue
+		}
+		if app.Kind == "Application" && app.Metadata.Name != "" {
+			apps = append(apps, app)
+		}
+	}
+	return apps, nil
+}
+
+// runRenderAll renders all appstages in an environment, mirroring render-environment.sh.
+//
+//nolint:gocyclo // complex function but straightforward flow
+func runRenderAll(
+	ctx context.Context,
+	fileExecutor host.FileExecutor,
+	out io.Writer,
+	appstagesDir,
+	destDir,
+	baseDir string,
+) error {
+	exists, err := fileExecutor.DirExists(appstagesDir)
+	if err != nil {
+		return fmt.Errorf("failed to check appstages directory: %w", err)
+	}
+	if !exists {
+		return fmt.Errorf("appstages directory not found: %s", appstagesDir)
+	}
+
+	if err = fileExecutor.RemoveAll(destDir); err != nil {
+		return fmt.Errorf("failed to remove destination directory: %w", err)
+	}
+	if err = fileExecutor.MkdirAll(destDir, 0o755); err != nil {
+		return fmt.Errorf("failed to create destination directory: %w", err)
+	}
+
+	entries, err := fileExecutor.ReadDir(appstagesDir)
+	if err != nil {
+		return fmt.Errorf("failed to read appstages directory: %w", err)
+	}
+
+	var appstageDirs []string
+	for _, entry := range entries {
+		if entry.IsDir() && strings.HasPrefix(entry.Name(), "appstage-") {
+			appstageDirs = append(appstageDirs, filepath.Join(appstagesDir, entry.Name()))
+		}
+	}
+	sort.Strings(appstageDirs)
+
+	if len(appstageDirs) == 0 {
+		return fmt.Errorf("no appstage- prefixed directories found in %s", appstagesDir)
+	}
+
+	for _, appstageDir := range appstageDirs {
+		appstageName := filepath.Base(appstageDir)
+		manifestsDir := filepath.Join(destDir, appstageName, "manifests")
+		applicationsDir := filepath.Join(destDir, appstageName, "applications")
+
+		fmt.Fprintf(out, "Rendering appstage %s\n", appstageName) //nolint:errcheck // best effort logging
+
+		resources, runErr := kustomize.BuildOnFileSystem(host.NewKustomizeFSWrapper(fileExecutor), appstageDir)
+		if runErr != nil {
+			return fmt.Errorf("failed to render appstage %s: %w", appstageName, runErr)
+		}
+		if err = kustomize.SplitResMapToDir(fileExecutor, resources, manifestsDir); err != nil {
+			return fmt.Errorf("failed to write manifests for appstage %s: %w", appstageName, err)
+		}
+
+		apps, err := parseApplicationsFromDir(fileExecutor, manifestsDir)
+		if err != nil {
+			return fmt.Errorf("failed to parse applications for appstage %s: %w", appstageName, err)
+		}
+
+		for _, app := range apps {
+			if app.Spec.Source.Path == "" {
+				return fmt.Errorf("application %s in appstage %s has no spec.source.path",
+					app.Metadata.Name, appstageName)
+			}
+			appSourceDir := filepath.Join(baseDir, app.Spec.Source.Path)
+			appDestDir := filepath.Join(applicationsDir, app.Metadata.Name)
+
+			//nolint:errcheck // best effort logging
+			fmt.Fprintf(out, "Rendering application %s from %s\n", app.Metadata.Name, app.Spec.Source.Path)
+
+			if renderErr := renderAppWithOutput(
+				ctx,
+				fileExecutor,
+				out,
+				appSourceDir,
+				appDestDir,
+			); renderErr != nil {
+				return fmt.Errorf("failed to render application %s: %w", app.Metadata.Name, renderErr)
+			}
+		}
+	}
+
+	return nil
+}
