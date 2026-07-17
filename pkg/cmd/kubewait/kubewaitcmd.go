@@ -36,7 +36,7 @@ import (
 )
 
 // CreateKubewaitCmd creates the root cobra command for kubewait.
-func CreateKubewaitCmd(out io.Writer, fse host.FileExecutor, opts *kubewait.Options) *cobra.Command {
+func CreateKubewaitCmd(out io.Writer, fse host.UserHost, opts *kubewait.Options) *cobra.Command {
 	if opts == nil {
 		opts = kubewait.NewOptions()
 	}

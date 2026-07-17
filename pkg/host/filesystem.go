@@ -234,7 +234,15 @@ func (a *hostImpl) Walk(root string, walkFn filepath.WalkFunc) error {
 }
 
 func (a *hostImpl) Abs(path string) (string, error) {
-	aBase := afero.NewBasePathFs(a.fs, string([]rune{filepath.Separator}))
+	basePath := string([]rune{filepath.Separator})
+	if !filepath.IsAbs(path) {
+		var err error
+		basePath, err = os.Getwd()
+		if err != nil {
+			return "", fmt.Errorf("failed to get current working directory: %w", err)
+		}
+	}
+	aBase := afero.NewBasePathFs(a.fs, basePath)
 	base, ok := aBase.(*afero.BasePathFs)
 	if !ok {
 		return "", fmt.Errorf("failed to assert BasePathFs")

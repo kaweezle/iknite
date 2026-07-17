@@ -18,7 +18,6 @@ limitations under the License.
 package kubewait
 
 import (
-	"os"
 	"path/filepath"
 	"testing"
 	"time"
@@ -98,33 +97,25 @@ func TestResourceAndBootstrapOptionFactories(t *testing.T) {
 	req.Equal(defaultBootstrapScript, bootstrap.BootstrapScript)
 }
 
-//nolint:paralleltest // mutates environment
 func TestReadEnvFile(t *testing.T) {
+	t.Parallel()
 	req := require.New(t)
 
-	fs := host.NewMemMapFS()
+	h, err := testutil.NewDummyHost(host.NewMemMapFS(), &testutil.DummyHostOptions{})
+	req.NoError(err)
 	dir := "base"
 	envPath := filepath.Join(dir, ".env")
-	req.NoError(fs.WriteFile(envPath, []byte("TEST_KUBEWAIT_ENV=enabled\n"), 0o600))
-	oldValue, hadValue := os.LookupEnv("TEST_KUBEWAIT_ENV")
-	req.NoError(os.Unsetenv("TEST_KUBEWAIT_ENV"))
-	t.Cleanup(func() {
-		if hadValue {
-			req.NoError(os.Setenv("TEST_KUBEWAIT_ENV", oldValue))
-			return
-		}
-		req.NoError(os.Unsetenv("TEST_KUBEWAIT_ENV"))
-	})
+	req.NoError(h.WriteFile(envPath, []byte("TEST_KUBEWAIT_ENV=enabled\n"), 0o600))
 
 	opts := &BootstrapOptions{BootstrapDir: dir}
 	logger := testutil.TestLogger(t)
-	ok, err := opts.ReadEnvFile(fs, logger)
+	ok, err := opts.ReadEnvFile(h, logger)
 	req.NoError(err)
 	req.True(ok)
-	req.Equal("enabled", os.Getenv("TEST_KUBEWAIT_ENV"))
+	req.Equal("enabled", h.Getenv("TEST_KUBEWAIT_ENV"))
 
 	missingOpts := &BootstrapOptions{BootstrapDir: filepath.Join(dir, "missing")}
-	ok, err = missingOpts.ReadEnvFile(fs, logger)
+	ok, err = missingOpts.ReadEnvFile(h, logger)
 	req.NoError(err)
 	req.True(ok)
 }

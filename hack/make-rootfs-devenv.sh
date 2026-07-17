@@ -34,7 +34,7 @@ echo "- Add $(aqua root-dir)/bin to your PATH."
 echo "- Install go based tools with:"
 echo "    aqua i"
 echo "- To install the signing key, run:"
-echo "    go run hack/iknitectl/iknitectl.go install signing-key secrets.sops.yaml ."
+echo "    go run hack/iknitectl/iknitectl.go auth signing-key secrets.sops.yaml ."
 echo "- Configure git as needed. The following is an example ~/.gitconfig:"
 echo ""
 printf '\033[90m' # dark gray

@@ -1,0 +1,97 @@
+package iknitectl
+
+// cSpell: words imagesvc
+
+import (
+	"fmt"
+	"time"
+
+	"charm.land/bubbles/v2/table"
+	"github.com/spf13/cobra"
+	"go.uber.org/dig"
+
+	"github.com/kaweezle/iknite/pkg/cmd/types"
+	imagesvc "github.com/kaweezle/iknite/pkg/iknitectl/image"
+	"github.com/kaweezle/iknite/pkg/utils"
+)
+
+// CreateImageListCmd creates the image ls command.
+func CreateImageListCmd(s *dig.Scope) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "list",
+		Aliases: []string{"ls"},
+		Short:   "List persisted images",
+		RunE: func(_ *cobra.Command, _ []string) error {
+			return s.Invoke(performImageList)
+		},
+	}
+
+	return cmd
+}
+
+func performImageList(service *imagesvc.Service, out types.CmdOut) error {
+	items, err := service.ListImages()
+	if err != nil {
+		return fmt.Errorf("failed to list images: %w", err)
+	}
+
+	if len(items) == 0 {
+		if _, err = fmt.Fprintln(out, "No images found"); err != nil {
+			return fmt.Errorf("failed to write output: %w", err)
+		}
+		return nil
+	}
+
+	if _, err = fmt.Fprintln(out, renderImageListTable(items)); err != nil {
+		return fmt.Errorf("failed to write output: %w", err)
+	}
+
+	return nil
+}
+
+func renderImageListTable(items []imagesvc.ImageListItem) string {
+	rows := make([]table.Row, 0, len(items))
+	for _, item := range items {
+		rows = append(rows, table.Row{
+			item.Name,
+			item.Source,
+			item.Reference,
+			// Keep for reference
+			// item.Path,
+			item.Artifacts,
+			utils.FormatBytes(item.TotalSize),
+			formatImageListTime(item.UpdatedAt),
+		})
+	}
+
+	width := 180
+	styles := table.DefaultStyles()
+	styles.Selected = styles.Selected.Bold(false).Foreground(styles.Cell.GetForeground())
+	listTable := table.New(
+		table.WithColumns([]table.Column{
+			{Title: "NAME", Width: 30},
+			{Title: "SOURCE", Width: 36},
+			{Title: "REF", Width: 20},
+			// Keep for reference
+			// {Title: "PATH", Width: 36},
+			{Title: "ARTIFACTS", Width: 30},
+			{Title: "SIZE", Width: 12},
+			{Title: "UPDATED", Width: 24},
+		}),
+		table.WithRows(rows),
+		table.WithWidth(width),
+		table.WithHeight(len(items)+1),
+		table.WithFocused(false),
+		table.WithStyles(styles),
+	)
+
+	return listTable.View()
+}
+
+func formatImageListTime(value time.Time) string {
+	if value.IsZero() {
+		return ""
+	}
+
+	return value.UTC().Format(time.RFC3339)
+}

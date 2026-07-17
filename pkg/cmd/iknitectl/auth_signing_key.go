@@ -23,11 +23,14 @@ import (
 	"github.com/getsops/sops/v3/cmd/sops/formats"
 	"github.com/getsops/sops/v3/decrypt"
 	"github.com/spf13/cobra"
+	"go.uber.org/dig"
 	"sigs.k8s.io/kustomize/kyaml/kio"
 	"sigs.k8s.io/kustomize/kyaml/yaml"
 
 	"github.com/kaweezle/iknite/pkg/host"
 )
+
+const defaultKeyName = "data.apk_signing_key"
 
 var decryptDataWithFormat = decrypt.DataWithFormat
 
@@ -39,19 +42,24 @@ type SigningKeyOptions struct {
 	DestDir     string
 }
 
-// CreateSigningKeyCmd creates the signing-key command with the given filesystem and options.
-func CreateSigningKeyCmd(fs host.FileSystem, opts *SigningKeyOptions) *cobra.Command {
-	if opts == nil {
-		opts = &SigningKeyOptions{
-			KeyName: "data.apk_signing_key",
-		}
+func NewSigningKeyOptions(fs host.FileSystem) *SigningKeyOptions {
+	return &SigningKeyOptions{
+		Fs:      fs,
+		KeyName: defaultKeyName,
 	}
-	if opts.Fs == nil {
-		opts.Fs = fs
-	}
+}
 
-	// Capture the initial keyName for the flag default
-	defaultKeyName := opts.KeyName
+// CreateSigningKeyCmd creates the signing-key command with the given filesystem and options.
+func CreateSigningKeyCmd(s *dig.Scope, opts *SigningKeyOptions) *cobra.Command {
+	if opts == nil {
+		cobra.CheckErr(s.Provide(NewSigningKeyOptions))
+	} else {
+		cobra.CheckErr(s.Provide(func() *SigningKeyOptions { return opts }))
+		cobra.CheckErr(s.Decorate(func(opts *SigningKeyOptions, fs host.FileSystem) *SigningKeyOptions {
+			opts.Fs = fs
+			return opts
+		}))
+	}
 
 	cmd := &cobra.Command{
 		Use:   "signing-key [secrets-file] [destination-directory]",
@@ -67,14 +75,18 @@ Example:
   iknitectl install signing-key --key data.apk_signing_key secrets.sops.yaml /path/to/dest`,
 		Args: cobra.ExactArgs(2),
 		RunE: func(_ *cobra.Command, args []string) error {
-			opts.SecretsFile = args[0]
-			opts.DestDir = args[1]
-			return InstallSigningKey(opts)
+			return s.Invoke(func(opts *SigningKeyOptions) error {
+				opts.SecretsFile = args[0]
+				opts.DestDir = args[1]
+				return InstallSigningKey(opts)
+			})
 		},
 	}
 
-	cmd.Flags().StringVar(&opts.KeyName, "key", defaultKeyName,
-		"Name of the key to extract from secrets file")
+	cobra.CheckErr(s.Invoke(func(opts *SigningKeyOptions) {
+		cmd.Flags().StringVar(&opts.KeyName, "key", opts.KeyName,
+			"Name of the key to extract from secrets file")
+	}))
 
 	return cmd
 }

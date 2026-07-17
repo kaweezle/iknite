@@ -17,14 +17,13 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	mockEngine "github.com/kaweezle/iknite/mocks/sigs.k8s.io/cli-utils/pkg/kstatus/polling/engine"
-	"github.com/kaweezle/iknite/pkg/host"
 	"github.com/kaweezle/iknite/pkg/testutil"
 )
 
 func TestNewRESTClientGetterFromKubeconfig(t *testing.T) {
 	t.Parallel()
 	req := require.New(t)
-	fs := host.NewMemMapFS()
+	fs := testutil.NewDummyUserHost()
 
 	_, err := NewClientFromKubeconfig(fs, "/tmp/nonexistent-kubeconfig", testutil.TestLogger(t))
 	req.Error(err)

@@ -17,17 +17,21 @@ package secrets
 
 import (
 	"github.com/spf13/cobra"
+	"go.uber.org/dig"
 
+	"github.com/kaweezle/iknite/pkg/cmd/types"
 	pkgSecrets "github.com/kaweezle/iknite/pkg/secrets"
 )
 
-func createSecretsRemoveCmd(opts *pkgSecrets.Options) *cobra.Command {
+func createSecretsRemoveCmd(s *dig.Scope) *cobra.Command {
 	return &cobra.Command{
 		Use:   "remove <path>",
 		Short: "Remove a secret key from the secrets file",
 		Args:  cobra.ExactArgs(1),
-		RunE: func(_ *cobra.Command, args []string) error {
-			return pkgSecrets.RemoveSecret(opts, args[0])
+		RunE: func(_ *cobra.Command, _ []string) error {
+			return s.Invoke(func(opts *pkgSecrets.Options, args types.CmdArgs) error {
+				return pkgSecrets.RemoveSecret(opts, args[0])
+			})
 		},
 	}
 }

@@ -89,7 +89,11 @@ func TestRunBootstrapVariants(t *testing.T) {
 			fs := host.NewMemMapFS()
 			mockExecutor := mockHost.NewMockExecutor(t)
 			opts := tt.prepare(t, fs, mockExecutor)
-			h := &testutil.DelegateHost{Fs: fs, Exec: mockExecutor}
+			h := &testutil.DelegateHost{
+				Fs:   fs,
+				Exec: mockExecutor,
+				Env:  testutil.NewDummyEnvironment("linux", "root", nil),
+			}
 			err := runBootstrap(t.Context(), h, opts, logger)
 			if tt.wantErr {
 				req.Error(err)
