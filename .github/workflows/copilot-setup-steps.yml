@@ -26,7 +26,7 @@ jobs:
         uses: actions/checkout@v7
       -
         name: Set up Go
-        uses: actions/setup-go@v6
+        uses: actions/setup-go@v7
         with:
           go-version: ^1
       - name: Set up Aqua cache
@@ -77,7 +77,7 @@ jobs:
         env:
           AGE_PRIVATE_KEY: ${{ secrets.AGE_PRIVATE_KEY }}
       - name: Set up Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v7
         with:
           python-version: "3.13"
       -
