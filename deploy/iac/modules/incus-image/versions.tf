@@ -4,12 +4,12 @@ terraform {
   required_providers {
     null = {
       source  = "hashicorp/null"
-      version = "3.3.0"
+      version = "3.3.1"
     }
 
     incus = {
       source  = "lxc/incus"
-      version = "1.1.1"
+      version = "1.2.0"
     }
   }
 }
