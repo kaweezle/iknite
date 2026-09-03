@@ -312,7 +312,7 @@ inputs = {
 
 ## Secrets Integration
 
-The module sources sensitive values from `deploy/iac/iknite/secrets.sops.yaml`:
+The module sources sensitive values from `secrets.sops.yaml`:
 
 ```yaml
 github:
@@ -392,7 +392,7 @@ After creation, GitHub displays:
 
 ### Step 4: Store in Secrets
 
-Add to `deploy/iac/iknite/secrets.sops.yaml`:
+Add to `secrets.sops.yaml`:
 
 ```yaml
 github:
@@ -403,7 +403,7 @@ github:
 Encrypt with SOPS:
 
 ```bash
-sops deploy/iac/iknite/secrets.sops.yaml
+sops secrets.sops.yaml
 ```
 
 ### Step 5: Configure ArgoCD

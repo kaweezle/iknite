@@ -323,7 +323,7 @@ function Install-Iknite {
 
         Write-InstallInfo "iknite installed successfully!" -ForegroundColor Green
         Write-InstallInfo "Start Kubernetes in the distribution with: wsl -d $WSL_NAME -u root iknite start"
-        Write-InstallInfo "Change `$env:KUBECONFIG=`"\\wsl.local\iknite\root\.kube\config`" to use Kubernetes from Windows."
+        Write-InstallInfo "Change `$env:KUBECONFIG=`"\\wsl.localhost\iknite\root\.kube\config`" to use Kubernetes from Windows."
         Write-InstallInfo "Stop Kubernetes with: wsl -d $WSL_NAME -u root openrc sysinit"
         Write-InstallInfo "Uninstall the distribution with: wsl --unregister $WSL_NAME"
     } finally {

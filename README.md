@@ -208,8 +208,8 @@ To start the kubernetes cluster, issue the following command:
 ```powershell
 ❯ wsl -d kwsl /sbin/iknite -v info start -w 120
 INFO[0000] Adding IP address                             iface=eth0 ip=192.168.99.2/24
-INFO[0000] Check domain name to IP mapping...            domainName=kaweezle.local ip=192.168.99.2
-INFO[0001] Mapping not found, creating...                domainName=kaweezle.local ip=192.168.99.2
+INFO[0000] Check domain name to IP mapping...            domainName=iknite.local ip=192.168.99.2
+INFO[0001] Mapping not found, creating...                domainName=iknite.local ip=192.168.99.2
 INFO[0001] Starting openrc...
 INFO[0003] Running/usr/bin/kubeadm init --config /tmp/config419805402.yaml...
 INFO[0012] Applying base kustomization...                directory=/etc/iknite.d
@@ -240,17 +240,17 @@ Now the kubernetes cluster can be accessed:
 ❯ $env:KUBECONFIG="\\wsl$\kwsl\root\.kube\config"
 ❯ kubectl get nodes
 NAME             STATUS   ROLES    AGE     VERSION
-kaweezle.local   Ready    <none>   3m22s   v1.26.0
+iknite.local   Ready    <none>   3m22s   v1.26.0
 ❯ kubectl get pod -A
 NAMESPACE            NAME                                     READY   STATUS    RESTARTS        AGE
 kube-flannel         kube-flannel-ds-nf9z2                    1/1     Running   0               3m43s
 kube-system          coredns-787d4945fb-vdv7s                 1/1     Running   0               3m43s
 kube-system          coredns-787d4945fb-zxdnc                 1/1     Running   0               3m43s
-kube-system          etcd-kaweezle.local                      1/1     Running   0               3m58s
-kube-system          kube-apiserver-kaweezle.local            1/1     Running   0               3m58s
-kube-system          kube-controller-manager-kaweezle.local   1/1     Running   0               3m57s
+kube-system          etcd-iknite.local                      1/1     Running   0               3m58s
+kube-system          kube-apiserver-iknite.local            1/1     Running   0               3m58s
+kube-system          kube-controller-manager-iknite.local   1/1     Running   0               3m57s
 kube-system          kube-proxy-hgzvk                         1/1     Running   0               3m43s
-kube-system          kube-scheduler-kaweezle.local            1/1     Running   0               3m56s
+kube-system          kube-scheduler-iknite.local            1/1     Running   0               3m56s
 kube-system          metrics-server-699cfc467c-jn28p          1/1     Running   0               3m43s
 local-path-storage   local-path-provisioner-8bc8875b-p7tqp    1/1     Running   0               3m43s
 metallb-system       controller-577b5bdfcc-8grxd              1/1     Running   1 (3m10s ago)   3m43s
@@ -355,7 +355,7 @@ ideas:
 
 By using
 [kubeadm](https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/create-cluster-kubeadm/)
-and Alpine, kaweezle is closer to the clusters you may use on public clouds.
+and Alpine, iknite is closer to the clusters you may use on public clouds.
 
 This readme has has been created from the
 [Best-README-Template](https://github.com/othneildrew/Best-README-Template)
