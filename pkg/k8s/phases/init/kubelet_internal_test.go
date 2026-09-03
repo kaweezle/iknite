@@ -14,7 +14,6 @@ import (
 	"github.com/stretchr/testify/require"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmScheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
-	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 
 	mockHost "github.com/kaweezle/iknite/mocks/pkg/host"
@@ -28,9 +27,9 @@ func createInitConfiguration() (*kubeadmapi.InitConfiguration, error) {
 	cfg := &kubeadmapi.InitConfiguration{
 		ClusterConfiguration: kubeadmapi.ClusterConfiguration{
 			KubernetesVersion: "1.36.1",
-			FeatureGates: map[string]bool{
-				features.NodeLocalCRISocket: true,
-			},
+			// FeatureGates: map[string]bool{
+			// 	features.NodeLocalCRISocket: true,
+			// },
 			// ComponentConfigs: kubeadmapi.ComponentConfigMap{},
 		},
 		NodeRegistration: kubeadmapi.NodeRegistrationOptions{

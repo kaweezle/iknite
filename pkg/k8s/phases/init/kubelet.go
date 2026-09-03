@@ -27,7 +27,6 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	cmdUtil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
-	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	kubeletPhase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubelet"
 
 	"github.com/kaweezle/iknite/pkg/host"
@@ -99,20 +98,14 @@ func runKubeletStart(c workflow.RunData) error {
 	}
 
 	// Write the instance kubelet configuration file to disk.
-	if features.Enabled(cfg.FeatureGates, features.NodeLocalCRISocket) {
-		kubeletConf := &kubeletConfig.KubeletConfiguration{
-			ContainerRuntimeEndpoint: cfg.NodeRegistration.CRISocket,
-		}
-		if err := kubeletPhase.WriteInstanceConfigToDisk(
-			kubeletConf,
-			kubeletDir,
-		); err != nil { // nocov -- only fails on disk write errors.
-			return fmt.Errorf("error writing instance kubelet configuration to disk: %w", err)
-		}
-	} else { // nocov - This is enabled by default in kubeadm since v1.35. almost dead code
-		logger.Info(
-			"Skipping writing instance kubelet configuration file as the NodeLocalCRISocket feature gate is disabled",
-		)
+	kubeletConf := &kubeletConfig.KubeletConfiguration{
+		ContainerRuntimeEndpoint: cfg.NodeRegistration.CRISocket,
+	}
+	if err := kubeletPhase.WriteInstanceConfigToDisk(
+		kubeletConf,
+		kubeletDir,
+	); err != nil { // nocov -- only fails on disk write errors.
+		return fmt.Errorf("error writing instance kubelet configuration to disk: %w", err)
 	}
 
 	// Write the kubelet configuration file to disk.

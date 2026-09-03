@@ -39,26 +39,28 @@ import (
 	v1beta19 "k8s.io/client-go/kubernetes/typed/flowcontrol/v1beta1"
 	v1beta20 "k8s.io/client-go/kubernetes/typed/flowcontrol/v1beta2"
 	"k8s.io/client-go/kubernetes/typed/flowcontrol/v1beta3"
+	v1alpha13 "k8s.io/client-go/kubernetes/typed/lifecycle/v1alpha1"
 	v111 "k8s.io/client-go/kubernetes/typed/networking/v1"
 	v1beta110 "k8s.io/client-go/kubernetes/typed/networking/v1beta1"
 	v112 "k8s.io/client-go/kubernetes/typed/node/v1"
-	v1alpha13 "k8s.io/client-go/kubernetes/typed/node/v1alpha1"
+	v1alpha14 "k8s.io/client-go/kubernetes/typed/node/v1alpha1"
 	v1beta111 "k8s.io/client-go/kubernetes/typed/node/v1beta1"
 	v113 "k8s.io/client-go/kubernetes/typed/policy/v1"
 	v1beta112 "k8s.io/client-go/kubernetes/typed/policy/v1beta1"
 	v114 "k8s.io/client-go/kubernetes/typed/rbac/v1"
-	v1alpha14 "k8s.io/client-go/kubernetes/typed/rbac/v1alpha1"
+	v1alpha15 "k8s.io/client-go/kubernetes/typed/rbac/v1alpha1"
 	v1beta113 "k8s.io/client-go/kubernetes/typed/rbac/v1beta1"
 	v115 "k8s.io/client-go/kubernetes/typed/resource/v1"
 	"k8s.io/client-go/kubernetes/typed/resource/v1alpha3"
 	v1beta114 "k8s.io/client-go/kubernetes/typed/resource/v1beta1"
 	v1beta21 "k8s.io/client-go/kubernetes/typed/resource/v1beta2"
 	v116 "k8s.io/client-go/kubernetes/typed/scheduling/v1"
-	v1alpha20 "k8s.io/client-go/kubernetes/typed/scheduling/v1alpha2"
+	v1alpha30 "k8s.io/client-go/kubernetes/typed/scheduling/v1alpha3"
 	v1beta115 "k8s.io/client-go/kubernetes/typed/scheduling/v1beta1"
 	v117 "k8s.io/client-go/kubernetes/typed/storage/v1"
-	v1alpha15 "k8s.io/client-go/kubernetes/typed/storage/v1alpha1"
+	v1alpha16 "k8s.io/client-go/kubernetes/typed/storage/v1alpha1"
 	v1beta116 "k8s.io/client-go/kubernetes/typed/storage/v1beta1"
+	v118 "k8s.io/client-go/kubernetes/typed/storagemigration/v1"
 	v1beta117 "k8s.io/client-go/kubernetes/typed/storagemigration/v1beta1"
 )
 
@@ -1102,19 +1104,19 @@ func (_c *MockInterface_CoreV1_Call) RunAndReturn(run func() v17.CoreV1Interface
 }
 
 // Discovery provides a mock function for the type MockInterface
-func (_mock *MockInterface) Discovery() discovery.DiscoveryInterface {
+func (_mock *MockInterface) Discovery() discovery.DiscoveryInterfaces {
 	ret := _mock.Called()
 
 	if len(ret) == 0 {
 		panic("no return value specified for Discovery")
 	}
 
-	var r0 discovery.DiscoveryInterface
-	if returnFunc, ok := ret.Get(0).(func() discovery.DiscoveryInterface); ok {
+	var r0 discovery.DiscoveryInterfaces
+	if returnFunc, ok := ret.Get(0).(func() discovery.DiscoveryInterfaces); ok {
 		r0 = returnFunc()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(discovery.DiscoveryInterface)
+			r0 = ret.Get(0).(discovery.DiscoveryInterfaces)
 		}
 	}
 	return r0
@@ -1137,12 +1139,12 @@ func (_c *MockInterface_Discovery_Call) Run(run func()) *MockInterface_Discovery
 	return _c
 }
 
-func (_c *MockInterface_Discovery_Call) Return(discoveryInterface discovery.DiscoveryInterface) *MockInterface_Discovery_Call {
-	_c.Call.Return(discoveryInterface)
+func (_c *MockInterface_Discovery_Call) Return(discoveryInterfaces discovery.DiscoveryInterfaces) *MockInterface_Discovery_Call {
+	_c.Call.Return(discoveryInterfaces)
 	return _c
 }
 
-func (_c *MockInterface_Discovery_Call) RunAndReturn(run func() discovery.DiscoveryInterface) *MockInterface_Discovery_Call {
+func (_c *MockInterface_Discovery_Call) RunAndReturn(run func() discovery.DiscoveryInterfaces) *MockInterface_Discovery_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -1607,6 +1609,52 @@ func (_c *MockInterface_InternalV1alpha1_Call) RunAndReturn(run func() v1alpha12
 	return _c
 }
 
+// LifecycleV1alpha1 provides a mock function for the type MockInterface
+func (_mock *MockInterface) LifecycleV1alpha1() v1alpha13.LifecycleV1alpha1Interface {
+	ret := _mock.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for LifecycleV1alpha1")
+	}
+
+	var r0 v1alpha13.LifecycleV1alpha1Interface
+	if returnFunc, ok := ret.Get(0).(func() v1alpha13.LifecycleV1alpha1Interface); ok {
+		r0 = returnFunc()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(v1alpha13.LifecycleV1alpha1Interface)
+		}
+	}
+	return r0
+}
+
+// MockInterface_LifecycleV1alpha1_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'LifecycleV1alpha1'
+type MockInterface_LifecycleV1alpha1_Call struct {
+	*mock.Call
+}
+
+// LifecycleV1alpha1 is a helper method to define mock.On call
+func (_e *MockInterface_Expecter) LifecycleV1alpha1() *MockInterface_LifecycleV1alpha1_Call {
+	return &MockInterface_LifecycleV1alpha1_Call{Call: _e.mock.On("LifecycleV1alpha1")}
+}
+
+func (_c *MockInterface_LifecycleV1alpha1_Call) Run(run func()) *MockInterface_LifecycleV1alpha1_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *MockInterface_LifecycleV1alpha1_Call) Return(lifecycleV1alpha1Interface v1alpha13.LifecycleV1alpha1Interface) *MockInterface_LifecycleV1alpha1_Call {
+	_c.Call.Return(lifecycleV1alpha1Interface)
+	return _c
+}
+
+func (_c *MockInterface_LifecycleV1alpha1_Call) RunAndReturn(run func() v1alpha13.LifecycleV1alpha1Interface) *MockInterface_LifecycleV1alpha1_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // NetworkingV1 provides a mock function for the type MockInterface
 func (_mock *MockInterface) NetworkingV1() v111.NetworkingV1Interface {
 	ret := _mock.Called()
@@ -1746,19 +1794,19 @@ func (_c *MockInterface_NodeV1_Call) RunAndReturn(run func() v112.NodeV1Interfac
 }
 
 // NodeV1alpha1 provides a mock function for the type MockInterface
-func (_mock *MockInterface) NodeV1alpha1() v1alpha13.NodeV1alpha1Interface {
+func (_mock *MockInterface) NodeV1alpha1() v1alpha14.NodeV1alpha1Interface {
 	ret := _mock.Called()
 
 	if len(ret) == 0 {
 		panic("no return value specified for NodeV1alpha1")
 	}
 
-	var r0 v1alpha13.NodeV1alpha1Interface
-	if returnFunc, ok := ret.Get(0).(func() v1alpha13.NodeV1alpha1Interface); ok {
+	var r0 v1alpha14.NodeV1alpha1Interface
+	if returnFunc, ok := ret.Get(0).(func() v1alpha14.NodeV1alpha1Interface); ok {
 		r0 = returnFunc()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(v1alpha13.NodeV1alpha1Interface)
+			r0 = ret.Get(0).(v1alpha14.NodeV1alpha1Interface)
 		}
 	}
 	return r0
@@ -1781,12 +1829,12 @@ func (_c *MockInterface_NodeV1alpha1_Call) Run(run func()) *MockInterface_NodeV1
 	return _c
 }
 
-func (_c *MockInterface_NodeV1alpha1_Call) Return(nodeV1alpha1Interface v1alpha13.NodeV1alpha1Interface) *MockInterface_NodeV1alpha1_Call {
+func (_c *MockInterface_NodeV1alpha1_Call) Return(nodeV1alpha1Interface v1alpha14.NodeV1alpha1Interface) *MockInterface_NodeV1alpha1_Call {
 	_c.Call.Return(nodeV1alpha1Interface)
 	return _c
 }
 
-func (_c *MockInterface_NodeV1alpha1_Call) RunAndReturn(run func() v1alpha13.NodeV1alpha1Interface) *MockInterface_NodeV1alpha1_Call {
+func (_c *MockInterface_NodeV1alpha1_Call) RunAndReturn(run func() v1alpha14.NodeV1alpha1Interface) *MockInterface_NodeV1alpha1_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -1976,19 +2024,19 @@ func (_c *MockInterface_RbacV1_Call) RunAndReturn(run func() v114.RbacV1Interfac
 }
 
 // RbacV1alpha1 provides a mock function for the type MockInterface
-func (_mock *MockInterface) RbacV1alpha1() v1alpha14.RbacV1alpha1Interface {
+func (_mock *MockInterface) RbacV1alpha1() v1alpha15.RbacV1alpha1Interface {
 	ret := _mock.Called()
 
 	if len(ret) == 0 {
 		panic("no return value specified for RbacV1alpha1")
 	}
 
-	var r0 v1alpha14.RbacV1alpha1Interface
-	if returnFunc, ok := ret.Get(0).(func() v1alpha14.RbacV1alpha1Interface); ok {
+	var r0 v1alpha15.RbacV1alpha1Interface
+	if returnFunc, ok := ret.Get(0).(func() v1alpha15.RbacV1alpha1Interface); ok {
 		r0 = returnFunc()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(v1alpha14.RbacV1alpha1Interface)
+			r0 = ret.Get(0).(v1alpha15.RbacV1alpha1Interface)
 		}
 	}
 	return r0
@@ -2011,12 +2059,12 @@ func (_c *MockInterface_RbacV1alpha1_Call) Run(run func()) *MockInterface_RbacV1
 	return _c
 }
 
-func (_c *MockInterface_RbacV1alpha1_Call) Return(rbacV1alpha1Interface v1alpha14.RbacV1alpha1Interface) *MockInterface_RbacV1alpha1_Call {
+func (_c *MockInterface_RbacV1alpha1_Call) Return(rbacV1alpha1Interface v1alpha15.RbacV1alpha1Interface) *MockInterface_RbacV1alpha1_Call {
 	_c.Call.Return(rbacV1alpha1Interface)
 	return _c
 }
 
-func (_c *MockInterface_RbacV1alpha1_Call) RunAndReturn(run func() v1alpha14.RbacV1alpha1Interface) *MockInterface_RbacV1alpha1_Call {
+func (_c *MockInterface_RbacV1alpha1_Call) RunAndReturn(run func() v1alpha15.RbacV1alpha1Interface) *MockInterface_RbacV1alpha1_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -2297,48 +2345,48 @@ func (_c *MockInterface_SchedulingV1_Call) RunAndReturn(run func() v116.Scheduli
 	return _c
 }
 
-// SchedulingV1alpha2 provides a mock function for the type MockInterface
-func (_mock *MockInterface) SchedulingV1alpha2() v1alpha20.SchedulingV1alpha2Interface {
+// SchedulingV1alpha3 provides a mock function for the type MockInterface
+func (_mock *MockInterface) SchedulingV1alpha3() v1alpha30.SchedulingV1alpha3Interface {
 	ret := _mock.Called()
 
 	if len(ret) == 0 {
-		panic("no return value specified for SchedulingV1alpha2")
+		panic("no return value specified for SchedulingV1alpha3")
 	}
 
-	var r0 v1alpha20.SchedulingV1alpha2Interface
-	if returnFunc, ok := ret.Get(0).(func() v1alpha20.SchedulingV1alpha2Interface); ok {
+	var r0 v1alpha30.SchedulingV1alpha3Interface
+	if returnFunc, ok := ret.Get(0).(func() v1alpha30.SchedulingV1alpha3Interface); ok {
 		r0 = returnFunc()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(v1alpha20.SchedulingV1alpha2Interface)
+			r0 = ret.Get(0).(v1alpha30.SchedulingV1alpha3Interface)
 		}
 	}
 	return r0
 }
 
-// MockInterface_SchedulingV1alpha2_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SchedulingV1alpha2'
-type MockInterface_SchedulingV1alpha2_Call struct {
+// MockInterface_SchedulingV1alpha3_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SchedulingV1alpha3'
+type MockInterface_SchedulingV1alpha3_Call struct {
 	*mock.Call
 }
 
-// SchedulingV1alpha2 is a helper method to define mock.On call
-func (_e *MockInterface_Expecter) SchedulingV1alpha2() *MockInterface_SchedulingV1alpha2_Call {
-	return &MockInterface_SchedulingV1alpha2_Call{Call: _e.mock.On("SchedulingV1alpha2")}
+// SchedulingV1alpha3 is a helper method to define mock.On call
+func (_e *MockInterface_Expecter) SchedulingV1alpha3() *MockInterface_SchedulingV1alpha3_Call {
+	return &MockInterface_SchedulingV1alpha3_Call{Call: _e.mock.On("SchedulingV1alpha3")}
 }
 
-func (_c *MockInterface_SchedulingV1alpha2_Call) Run(run func()) *MockInterface_SchedulingV1alpha2_Call {
+func (_c *MockInterface_SchedulingV1alpha3_Call) Run(run func()) *MockInterface_SchedulingV1alpha3_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		run()
 	})
 	return _c
 }
 
-func (_c *MockInterface_SchedulingV1alpha2_Call) Return(schedulingV1alpha2Interface v1alpha20.SchedulingV1alpha2Interface) *MockInterface_SchedulingV1alpha2_Call {
-	_c.Call.Return(schedulingV1alpha2Interface)
+func (_c *MockInterface_SchedulingV1alpha3_Call) Return(schedulingV1alpha3Interface v1alpha30.SchedulingV1alpha3Interface) *MockInterface_SchedulingV1alpha3_Call {
+	_c.Call.Return(schedulingV1alpha3Interface)
 	return _c
 }
 
-func (_c *MockInterface_SchedulingV1alpha2_Call) RunAndReturn(run func() v1alpha20.SchedulingV1alpha2Interface) *MockInterface_SchedulingV1alpha2_Call {
+func (_c *MockInterface_SchedulingV1alpha3_Call) RunAndReturn(run func() v1alpha30.SchedulingV1alpha3Interface) *MockInterface_SchedulingV1alpha3_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -2436,19 +2484,19 @@ func (_c *MockInterface_StorageV1_Call) RunAndReturn(run func() v117.StorageV1In
 }
 
 // StorageV1alpha1 provides a mock function for the type MockInterface
-func (_mock *MockInterface) StorageV1alpha1() v1alpha15.StorageV1alpha1Interface {
+func (_mock *MockInterface) StorageV1alpha1() v1alpha16.StorageV1alpha1Interface {
 	ret := _mock.Called()
 
 	if len(ret) == 0 {
 		panic("no return value specified for StorageV1alpha1")
 	}
 
-	var r0 v1alpha15.StorageV1alpha1Interface
-	if returnFunc, ok := ret.Get(0).(func() v1alpha15.StorageV1alpha1Interface); ok {
+	var r0 v1alpha16.StorageV1alpha1Interface
+	if returnFunc, ok := ret.Get(0).(func() v1alpha16.StorageV1alpha1Interface); ok {
 		r0 = returnFunc()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(v1alpha15.StorageV1alpha1Interface)
+			r0 = ret.Get(0).(v1alpha16.StorageV1alpha1Interface)
 		}
 	}
 	return r0
@@ -2471,12 +2519,12 @@ func (_c *MockInterface_StorageV1alpha1_Call) Run(run func()) *MockInterface_Sto
 	return _c
 }
 
-func (_c *MockInterface_StorageV1alpha1_Call) Return(storageV1alpha1Interface v1alpha15.StorageV1alpha1Interface) *MockInterface_StorageV1alpha1_Call {
+func (_c *MockInterface_StorageV1alpha1_Call) Return(storageV1alpha1Interface v1alpha16.StorageV1alpha1Interface) *MockInterface_StorageV1alpha1_Call {
 	_c.Call.Return(storageV1alpha1Interface)
 	return _c
 }
 
-func (_c *MockInterface_StorageV1alpha1_Call) RunAndReturn(run func() v1alpha15.StorageV1alpha1Interface) *MockInterface_StorageV1alpha1_Call {
+func (_c *MockInterface_StorageV1alpha1_Call) RunAndReturn(run func() v1alpha16.StorageV1alpha1Interface) *MockInterface_StorageV1alpha1_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -2523,6 +2571,52 @@ func (_c *MockInterface_StorageV1beta1_Call) Return(storageV1beta1Interface v1be
 }
 
 func (_c *MockInterface_StorageV1beta1_Call) RunAndReturn(run func() v1beta116.StorageV1beta1Interface) *MockInterface_StorageV1beta1_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// StoragemigrationV1 provides a mock function for the type MockInterface
+func (_mock *MockInterface) StoragemigrationV1() v118.StoragemigrationV1Interface {
+	ret := _mock.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for StoragemigrationV1")
+	}
+
+	var r0 v118.StoragemigrationV1Interface
+	if returnFunc, ok := ret.Get(0).(func() v118.StoragemigrationV1Interface); ok {
+		r0 = returnFunc()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(v118.StoragemigrationV1Interface)
+		}
+	}
+	return r0
+}
+
+// MockInterface_StoragemigrationV1_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'StoragemigrationV1'
+type MockInterface_StoragemigrationV1_Call struct {
+	*mock.Call
+}
+
+// StoragemigrationV1 is a helper method to define mock.On call
+func (_e *MockInterface_Expecter) StoragemigrationV1() *MockInterface_StoragemigrationV1_Call {
+	return &MockInterface_StoragemigrationV1_Call{Call: _e.mock.On("StoragemigrationV1")}
+}
+
+func (_c *MockInterface_StoragemigrationV1_Call) Run(run func()) *MockInterface_StoragemigrationV1_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *MockInterface_StoragemigrationV1_Call) Return(storagemigrationV1Interface v118.StoragemigrationV1Interface) *MockInterface_StoragemigrationV1_Call {
+	_c.Call.Return(storagemigrationV1Interface)
+	return _c
+}
+
+func (_c *MockInterface_StoragemigrationV1_Call) RunAndReturn(run func() v118.StoragemigrationV1Interface) *MockInterface_StoragemigrationV1_Call {
 	_c.Call.Return(run)
 	return _c
 }

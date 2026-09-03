@@ -188,6 +188,7 @@ func newResetData(
 			false,
 			false,
 			false,
+			true, // shortConfigMapGet. Same behavior as with k8s below 1.37
 		)
 		if err != nil {
 			klog.Warningf(
