@@ -11,23 +11,23 @@ import (
 	"github.com/stretchr/testify/require"
 
 	mockfs "github.com/kaweezle/iknite/mocks/pkg/host"
+	"github.com/kaweezle/iknite/pkg/testutil"
 )
 
 func TestCreateSigningKeyCmd_AssignsFSAndExecutes(t *testing.T) {
 	t.Parallel()
 
-	fs := mockfs.NewMockFileSystem(t)
-	fs.EXPECT().Exists("/secrets.sops.yaml").Return(false, nil)
+	s := testutil.TestContainer(t).Scope("signing-key")
 
 	opts := &SigningKeyOptions{KeyName: "data.custom_key"}
-	cmd := CreateSigningKeyCmd(fs, opts)
+	cmd := CreateSigningKeyCmd(s, opts)
 	cmd.SetArgs([]string{"/secrets.sops.yaml", "/dest"})
 
-	err := cmd.Execute()
+	err := cmd.ExecuteContext(t.Context())
 	if err == nil || err.Error() != "secrets file not found: /secrets.sops.yaml" {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if opts.Fs != fs {
+	if opts.Fs == nil {
 		t.Fatal("expected filesystem to be assigned to options")
 	}
 	if opts.SecretsFile != "/secrets.sops.yaml" {

@@ -587,11 +587,13 @@ o+83dWx3ngrT
 )
 
 func TestInClusterConfig_MissingServiceHost(t *testing.T) {
+	t.Parallel()
 	req := require.New(t)
-	t.Setenv("KUBERNETES_SERVICE_HOST", "")
-	t.Setenv("KUBERNETES_SERVICE_PORT", "6443")
 
-	fs := host.NewMemMapFS()
+	fs := testutil.NewDummyUserHost()
+	fs.Setenv("KUBERNETES_SERVICE_HOST", "")
+	fs.Setenv("KUBERNETES_SERVICE_PORT", "6443")
+
 	logger := testutil.TestLogger(t)
 	config, err := k8s.InClusterConfig(fs, logger)
 	req.ErrorIs(err, rest.ErrNotInCluster)
@@ -599,11 +601,12 @@ func TestInClusterConfig_MissingServiceHost(t *testing.T) {
 }
 
 func TestInClusterConfig_MissingServicePort(t *testing.T) {
+	t.Parallel()
 	req := require.New(t)
-	t.Setenv("KUBERNETES_SERVICE_HOST", "kubernetes.default.svc")
-	t.Setenv("KUBERNETES_SERVICE_PORT", "")
 
-	fs := host.NewMemMapFS()
+	fs := testutil.NewDummyUserHost()
+	fs.Setenv("KUBERNETES_SERVICE_HOST", "kubernetes.default.svc")
+	fs.Setenv("KUBERNETES_SERVICE_PORT", "")
 	logger := testutil.TestLogger(t)
 	config, err := k8s.InClusterConfig(fs, logger)
 	req.ErrorIs(err, rest.ErrNotInCluster)
@@ -611,11 +614,12 @@ func TestInClusterConfig_MissingServicePort(t *testing.T) {
 }
 
 func TestInClusterConfig_NoBothServiceHost(t *testing.T) {
+	t.Parallel()
 	req := require.New(t)
-	t.Setenv("KUBERNETES_SERVICE_HOST", "")
-	t.Setenv("KUBERNETES_SERVICE_PORT", "")
 
-	fs := host.NewMemMapFS()
+	fs := testutil.NewDummyUserHost()
+	fs.Setenv("KUBERNETES_SERVICE_HOST", "")
+	fs.Setenv("KUBERNETES_SERVICE_PORT", "")
 	logger := testutil.TestLogger(t)
 	config, err := k8s.InClusterConfig(fs, logger)
 	req.ErrorIs(err, rest.ErrNotInCluster)
@@ -623,23 +627,25 @@ func TestInClusterConfig_NoBothServiceHost(t *testing.T) {
 }
 
 func TestInClusterConfig_TokenFileNotFound(t *testing.T) {
+	t.Parallel()
 	req := require.New(t)
-	t.Setenv("KUBERNETES_SERVICE_HOST", "kubernetes.default.svc")
-	t.Setenv("KUBERNETES_SERVICE_PORT", "6443")
+	fs := testutil.NewDummyUserHost()
+	fs.Setenv("KUBERNETES_SERVICE_HOST", "kubernetes.default.svc")
+	fs.Setenv("KUBERNETES_SERVICE_PORT", "6443")
 	logger := testutil.TestLogger(t)
 
-	fs := host.NewMemMapFS()
 	config, err := k8s.InClusterConfig(fs, logger)
 	req.Error(err)
 	req.Nil(config)
 }
 
 func TestInClusterConfig_ValidTokenWithNoCA(t *testing.T) {
+	t.Parallel()
 	req := require.New(t)
-	t.Setenv("KUBERNETES_SERVICE_HOST", "kubernetes.default.svc")
-	t.Setenv("KUBERNETES_SERVICE_PORT", "6443")
 
-	fs := host.NewMemMapFS()
+	fs := testutil.NewDummyUserHost()
+	fs.Setenv("KUBERNETES_SERVICE_HOST", "kubernetes.default.svc")
+	fs.Setenv("KUBERNETES_SERVICE_PORT", "6443")
 
 	req.NoError(fs.MkdirAll(serviceAccountDir, 0o755))
 	req.NoError(fs.WriteFile(tokenFile, []byte("valid-token"), 0o644))
@@ -656,11 +662,12 @@ func TestInClusterConfig_ValidTokenWithNoCA(t *testing.T) {
 }
 
 func TestInClusterConfig_ValidTokenWithInvalidCA(t *testing.T) {
+	t.Parallel()
 	req := require.New(t)
-	t.Setenv("KUBERNETES_SERVICE_HOST", "kubernetes.default.svc")
-	t.Setenv("KUBERNETES_SERVICE_PORT", "6443")
 
-	fs := host.NewMemMapFS()
+	fs := testutil.NewDummyUserHost()
+	fs.Setenv("KUBERNETES_SERVICE_HOST", "kubernetes.default.svc")
+	fs.Setenv("KUBERNETES_SERVICE_PORT", "6443")
 
 	req.NoError(fs.MkdirAll(serviceAccountDir, 0o755))
 	req.NoError(fs.WriteFile(tokenFile, []byte("valid-token"), 0o644))
@@ -678,11 +685,11 @@ func TestInClusterConfig_ValidTokenWithInvalidCA(t *testing.T) {
 }
 
 func TestInClusterConfig_ValidTokenWithValidCA(t *testing.T) {
+	t.Parallel()
 	req := require.New(t)
-	t.Setenv("KUBERNETES_SERVICE_HOST", "kubernetes.default.svc")
-	t.Setenv("KUBERNETES_SERVICE_PORT", "6443")
-
-	fs := host.NewMemMapFS()
+	fs := testutil.NewDummyUserHost()
+	fs.Setenv("KUBERNETES_SERVICE_HOST", "kubernetes.default.svc")
+	fs.Setenv("KUBERNETES_SERVICE_PORT", "6443")
 
 	req.NoError(fs.MkdirAll(serviceAccountDir, 0o755))
 	req.NoError(fs.WriteFile(tokenFile, []byte("valid-token"), 0o644))

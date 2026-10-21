@@ -31,7 +31,7 @@ import (
 // NewClientFromKubeconfig creates a RESTClientGetter using the default kubeconfig
 // loading rules. If kubeconfigPath is non-empty it is used directly; otherwise KUBECONFIG
 // env var and ~/.kube/config are tried in turn, with a final fall-back to in-cluster config.
-func NewClientFromKubeconfig(fs host.FileSystem, kubeconfigPath string, logger *slog.Logger) (*Client, error) {
+func NewClientFromKubeconfig(fs host.FileEnvironment, kubeconfigPath string, logger *slog.Logger) (*Client, error) {
 	restConfig, err := InClusterConfig(fs, logger)
 	if err == nil {
 		logger.Info("Using in-cluster configuration")

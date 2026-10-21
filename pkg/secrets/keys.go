@@ -112,7 +112,12 @@ func createKeyPair(fs host.FileSystem, keyFile, publicKeyFile, comment string) (
 }
 
 // ensureSSHKeyPair checks for the existence of the SSH key pair and generates it if necessary.
-func ensureSSHKeyPair(fs host.FileSystem, keyFile, publicKeyFile string) (*sshKeyInfo, error) {
+func ensureSSHKeyPair(fs host.FileSystem, keyFile, publicKeyFile string, force bool) (*sshKeyInfo, error) {
+	comment := filepath.Base(keyFile)
+	if force {
+		return createKeyPair(fs, keyFile, publicKeyFile, comment)
+	}
+
 	privateExists, err := fs.Exists(keyFile)
 	if err != nil {
 		return nil, fmt.Errorf("failed to check key file: %w", err)
@@ -126,7 +131,6 @@ func ensureSSHKeyPair(fs host.FileSystem, keyFile, publicKeyFile string) (*sshKe
 		return nil, fmt.Errorf("public key file %s exists but private key file %s does not", publicKeyFile, keyFile)
 	}
 
-	comment := filepath.Base(keyFile)
 	result := &sshKeyInfo{Generated: false}
 
 	if publicExists {

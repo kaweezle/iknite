@@ -725,6 +725,50 @@ func (_c *MockHost_FindProcess_Call) RunAndReturn(run func(pid int) (host.Proces
 	return _c
 }
 
+// GOOS provides a mock function for the type MockHost
+func (_mock *MockHost) GOOS() string {
+	ret := _mock.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for GOOS")
+	}
+
+	var r0 string
+	if returnFunc, ok := ret.Get(0).(func() string); ok {
+		r0 = returnFunc()
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+	return r0
+}
+
+// MockHost_GOOS_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GOOS'
+type MockHost_GOOS_Call struct {
+	*mock.Call
+}
+
+// GOOS is a helper method to define mock.On call
+func (_e *MockHost_Expecter) GOOS() *MockHost_GOOS_Call {
+	return &MockHost_GOOS_Call{Call: _e.mock.On("GOOS")}
+}
+
+func (_c *MockHost_GOOS_Call) Run(run func()) *MockHost_GOOS_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *MockHost_GOOS_Call) Return(s string) *MockHost_GOOS_Call {
+	_c.Call.Return(s)
+	return _c
+}
+
+func (_c *MockHost_GOOS_Call) RunAndReturn(run func() string) *MockHost_GOOS_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetHostsConfig provides a mock function for the type MockHost
 func (_mock *MockHost) GetHostsConfig() *txeh.HostsConfig {
 	ret := _mock.Called()
@@ -822,6 +866,57 @@ func (_c *MockHost_GetOutboundIP_Call) Return(iP net.IP, err error) *MockHost_Ge
 }
 
 func (_c *MockHost_GetOutboundIP_Call) RunAndReturn(run func() (net.IP, error)) *MockHost_GetOutboundIP_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// Getenv provides a mock function for the type MockHost
+func (_mock *MockHost) Getenv(key string) string {
+	ret := _mock.Called(key)
+
+	if len(ret) == 0 {
+		panic("no return value specified for Getenv")
+	}
+
+	var r0 string
+	if returnFunc, ok := ret.Get(0).(func(string) string); ok {
+		r0 = returnFunc(key)
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+	return r0
+}
+
+// MockHost_Getenv_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Getenv'
+type MockHost_Getenv_Call struct {
+	*mock.Call
+}
+
+// Getenv is a helper method to define mock.On call
+//   - key string
+func (_e *MockHost_Expecter) Getenv(key interface{}) *MockHost_Getenv_Call {
+	return &MockHost_Getenv_Call{Call: _e.mock.On("Getenv", key)}
+}
+
+func (_c *MockHost_Getenv_Call) Run(run func(key string)) *MockHost_Getenv_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 string
+		if args[0] != nil {
+			arg0 = args[0].(string)
+		}
+		run(
+			arg0,
+		)
+	})
+	return _c
+}
+
+func (_c *MockHost_Getenv_Call) Return(s string) *MockHost_Getenv_Call {
+	_c.Call.Return(s)
+	return _c
+}
+
+func (_c *MockHost_Getenv_Call) RunAndReturn(run func(key string) string) *MockHost_Getenv_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -962,6 +1057,66 @@ func (_c *MockHost_IsHostMapped_Call) RunAndReturn(run func(ctx context.Context,
 	return _c
 }
 
+// JoinPath provides a mock function for the type MockHost
+func (_mock *MockHost) JoinPath(elem ...string) string {
+	var tmpRet mock.Arguments
+	if len(elem) > 0 {
+		tmpRet = _mock.Called(elem)
+	} else {
+		tmpRet = _mock.Called()
+	}
+	ret := tmpRet
+
+	if len(ret) == 0 {
+		panic("no return value specified for JoinPath")
+	}
+
+	var r0 string
+	if returnFunc, ok := ret.Get(0).(func(...string) string); ok {
+		r0 = returnFunc(elem...)
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+	return r0
+}
+
+// MockHost_JoinPath_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'JoinPath'
+type MockHost_JoinPath_Call struct {
+	*mock.Call
+}
+
+// JoinPath is a helper method to define mock.On call
+//   - elem ...string
+func (_e *MockHost_Expecter) JoinPath(elem ...interface{}) *MockHost_JoinPath_Call {
+	return &MockHost_JoinPath_Call{Call: _e.mock.On("JoinPath",
+		append([]interface{}{}, elem...)...)}
+}
+
+func (_c *MockHost_JoinPath_Call) Run(run func(elem ...string)) *MockHost_JoinPath_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 []string
+		var variadicArgs []string
+		if len(args) > 0 {
+			variadicArgs = args[0].([]string)
+		}
+		arg0 = variadicArgs
+		run(
+			arg0...,
+		)
+	})
+	return _c
+}
+
+func (_c *MockHost_JoinPath_Call) Return(s string) *MockHost_JoinPath_Call {
+	_c.Call.Return(s)
+	return _c
+}
+
+func (_c *MockHost_JoinPath_Call) RunAndReturn(run func(elem ...string) string) *MockHost_JoinPath_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // Listen provides a mock function for the type MockHost
 func (_mock *MockHost) Listen(ctx context.Context, network string, address string) (net.Listener, error) {
 	ret := _mock.Called(ctx, network, address)
@@ -1032,6 +1187,66 @@ func (_c *MockHost_Listen_Call) Return(listener net.Listener, err error) *MockHo
 }
 
 func (_c *MockHost_Listen_Call) RunAndReturn(run func(ctx context.Context, network string, address string) (net.Listener, error)) *MockHost_Listen_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// LookupEnv provides a mock function for the type MockHost
+func (_mock *MockHost) LookupEnv(key string) (string, bool) {
+	ret := _mock.Called(key)
+
+	if len(ret) == 0 {
+		panic("no return value specified for LookupEnv")
+	}
+
+	var r0 string
+	var r1 bool
+	if returnFunc, ok := ret.Get(0).(func(string) (string, bool)); ok {
+		return returnFunc(key)
+	}
+	if returnFunc, ok := ret.Get(0).(func(string) string); ok {
+		r0 = returnFunc(key)
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+	if returnFunc, ok := ret.Get(1).(func(string) bool); ok {
+		r1 = returnFunc(key)
+	} else {
+		r1 = ret.Get(1).(bool)
+	}
+	return r0, r1
+}
+
+// MockHost_LookupEnv_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'LookupEnv'
+type MockHost_LookupEnv_Call struct {
+	*mock.Call
+}
+
+// LookupEnv is a helper method to define mock.On call
+//   - key string
+func (_e *MockHost_Expecter) LookupEnv(key interface{}) *MockHost_LookupEnv_Call {
+	return &MockHost_LookupEnv_Call{Call: _e.mock.On("LookupEnv", key)}
+}
+
+func (_c *MockHost_LookupEnv_Call) Run(run func(key string)) *MockHost_LookupEnv_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 string
+		if args[0] != nil {
+			arg0 = args[0].(string)
+		}
+		run(
+			arg0,
+		)
+	})
+	return _c
+}
+
+func (_c *MockHost_LookupEnv_Call) Return(s string, b bool) *MockHost_LookupEnv_Call {
+	_c.Call.Return(s, b)
+	return _c
+}
+
+func (_c *MockHost_LookupEnv_Call) RunAndReturn(run func(key string) (string, bool)) *MockHost_LookupEnv_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -1794,6 +2009,63 @@ func (_c *MockHost_RunCommand_Call) RunAndReturn(run func(ctx context.Context, o
 	return _c
 }
 
+// Setenv provides a mock function for the type MockHost
+func (_mock *MockHost) Setenv(key string, value string) error {
+	ret := _mock.Called(key, value)
+
+	if len(ret) == 0 {
+		panic("no return value specified for Setenv")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(string, string) error); ok {
+		r0 = returnFunc(key, value)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockHost_Setenv_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Setenv'
+type MockHost_Setenv_Call struct {
+	*mock.Call
+}
+
+// Setenv is a helper method to define mock.On call
+//   - key string
+//   - value string
+func (_e *MockHost_Expecter) Setenv(key interface{}, value interface{}) *MockHost_Setenv_Call {
+	return &MockHost_Setenv_Call{Call: _e.mock.On("Setenv", key, value)}
+}
+
+func (_c *MockHost_Setenv_Call) Run(run func(key string, value string)) *MockHost_Setenv_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 string
+		if args[0] != nil {
+			arg0 = args[0].(string)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockHost_Setenv_Call) Return(err error) *MockHost_Setenv_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockHost_Setenv_Call) RunAndReturn(run func(key string, value string) error) *MockHost_Setenv_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // StartCommand provides a mock function for the type MockHost
 func (_mock *MockHost) StartCommand(ctx context.Context, options *host.CommandOptions) (host.Process, error) {
 	ret := _mock.Called(ctx, options)
@@ -2028,6 +2300,112 @@ func (_c *MockHost_Unmount_Call) Return(err error) *MockHost_Unmount_Call {
 }
 
 func (_c *MockHost_Unmount_Call) RunAndReturn(run func(path string) error) *MockHost_Unmount_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// UserConfigDir provides a mock function for the type MockHost
+func (_mock *MockHost) UserConfigDir() (string, error) {
+	ret := _mock.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for UserConfigDir")
+	}
+
+	var r0 string
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func() (string, error)); ok {
+		return returnFunc()
+	}
+	if returnFunc, ok := ret.Get(0).(func() string); ok {
+		r0 = returnFunc()
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+	if returnFunc, ok := ret.Get(1).(func() error); ok {
+		r1 = returnFunc()
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockHost_UserConfigDir_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'UserConfigDir'
+type MockHost_UserConfigDir_Call struct {
+	*mock.Call
+}
+
+// UserConfigDir is a helper method to define mock.On call
+func (_e *MockHost_Expecter) UserConfigDir() *MockHost_UserConfigDir_Call {
+	return &MockHost_UserConfigDir_Call{Call: _e.mock.On("UserConfigDir")}
+}
+
+func (_c *MockHost_UserConfigDir_Call) Run(run func()) *MockHost_UserConfigDir_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *MockHost_UserConfigDir_Call) Return(s string, err error) *MockHost_UserConfigDir_Call {
+	_c.Call.Return(s, err)
+	return _c
+}
+
+func (_c *MockHost_UserConfigDir_Call) RunAndReturn(run func() (string, error)) *MockHost_UserConfigDir_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// UserHomeDir provides a mock function for the type MockHost
+func (_mock *MockHost) UserHomeDir() (string, error) {
+	ret := _mock.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for UserHomeDir")
+	}
+
+	var r0 string
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func() (string, error)); ok {
+		return returnFunc()
+	}
+	if returnFunc, ok := ret.Get(0).(func() string); ok {
+		r0 = returnFunc()
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+	if returnFunc, ok := ret.Get(1).(func() error); ok {
+		r1 = returnFunc()
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockHost_UserHomeDir_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'UserHomeDir'
+type MockHost_UserHomeDir_Call struct {
+	*mock.Call
+}
+
+// UserHomeDir is a helper method to define mock.On call
+func (_e *MockHost_Expecter) UserHomeDir() *MockHost_UserHomeDir_Call {
+	return &MockHost_UserHomeDir_Call{Call: _e.mock.On("UserHomeDir")}
+}
+
+func (_c *MockHost_UserHomeDir_Call) Run(run func()) *MockHost_UserHomeDir_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *MockHost_UserHomeDir_Call) Return(s string, err error) *MockHost_UserHomeDir_Call {
+	_c.Call.Return(s, err)
+	return _c
+}
+
+func (_c *MockHost_UserHomeDir_Call) RunAndReturn(run func() (string, error)) *MockHost_UserHomeDir_Call {
 	_c.Call.Return(run)
 	return _c
 }

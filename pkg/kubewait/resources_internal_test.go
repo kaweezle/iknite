@@ -71,7 +71,7 @@ func TestClientDependentHelpersReturnErrors(t *testing.T) {
 				opts.Kubeconfig = missingKubeconfig
 				opts.ResourceTypes = []string{"deployments"}
 				opts.StatusUpdateInterval = time.Millisecond
-				fs := host.NewMemMapFS()
+				fs := testutil.NewDummyUserHost()
 				return waitForResources(context.Background(), fs, opts, []string{"default"}, logger)
 			},
 		},
@@ -193,7 +193,11 @@ func TestRunKubewaitErrorWrapping(t *testing.T) {
 		fakeExecs := map[string]*testutil.FakeProcessOutput{
 			`/base/iknite-bootstrap\.sh`: testutil.FakeExec("", 7),
 		}
-		h := &testutil.DelegateHost{Fs: fs, Exec: testutil.NewDummyExecutor(map[int]host.Process{}, fakeExecs)}
+		h := &testutil.DelegateHost{
+			Fs:   fs,
+			Exec: testutil.NewDummyExecutor(map[int]host.Process{}, fakeExecs),
+			Env:  testutil.NewDummyEnvironment("linux", "root", map[string]string{}),
+		}
 
 		opts := NewOptions()
 		opts.SkipWaitingForResources = true
@@ -765,7 +769,7 @@ func Test_waitForResources(t *testing.T) {
 			req := require.New(t)
 
 			sOpts := &testutil.TestServerOptions{Overrides: tt.overrides}
-			fs := host.NewMemMapFS()
+			fs := testutil.NewDummyUserHost()
 			restConfig := testutil.CreateTestAPIServer(t, testutil.ContentPatchHandler("with_resources", sOpts))
 			mapperType := tt.mapperType
 			if mapperType == "" {

@@ -1,0 +1,141 @@
+// cSpell: words oras wrapcheck
+package image
+
+import (
+	"encoding/json"
+	"fmt"
+	"time"
+
+	"github.com/kaweezle/iknite/pkg/iknitectl/db"
+)
+
+type ImageType int
+
+const (
+	ImageTypeUnknown ImageType = iota
+	ImageTypeRootFS
+	ImageTypeVHDX
+	ImageTypeQCOW2
+)
+
+const (
+	UnknownLabel   = "unknown"
+	RootFSLabel    = "rootfs"
+	VHDXLabel      = "vm-vhdx"
+	QCOW2Label     = "vm-qcow2"
+	IncusMetaLabel = "incus-metadata"
+)
+
+func (it ImageType) String() string {
+	switch it {
+	case ImageTypeRootFS:
+		return RootFSLabel
+	case ImageTypeVHDX:
+		return VHDXLabel
+	case ImageTypeQCOW2:
+		return QCOW2Label
+	default:
+		return UnknownLabel
+	}
+}
+
+func (it ImageType) ImageFilename() string {
+	switch it {
+	case ImageTypeRootFS:
+		return "rootfs.tar.gz"
+	case ImageTypeVHDX:
+		return "disk.vhdx"
+	case ImageTypeQCOW2:
+		return "disk.qcow2"
+	default:
+		return "disk.raw"
+	}
+}
+
+func ParseImageType(s string) (ImageType, error) {
+	switch s {
+	case RootFSLabel:
+		return ImageTypeRootFS, nil
+	case VHDXLabel:
+		return ImageTypeVHDX, nil
+	case QCOW2Label:
+		return ImageTypeQCOW2, nil
+	default:
+		return 0, fmt.Errorf("invalid image type: %s", s)
+	}
+}
+
+func (it ImageType) OrasMediaType() string {
+	switch it {
+	case ImageTypeRootFS:
+		return "application/vnd.oci.image.layer.v1.tar+gzip"
+	case ImageTypeVHDX:
+		return "application/vnd.openstack.image"
+	case ImageTypeQCOW2:
+		return "application/vnd.openstack.image"
+	default:
+		return "application/octet-stream"
+	}
+}
+
+func (it ImageType) MarshalJSON() ([]byte, error) {
+	return json.Marshal(it.String()) //nolint:wrapcheck // Simple marshal to string.
+}
+
+func (it *ImageType) UnmarshalJSON(data []byte) error {
+	var s string
+	if err := json.Unmarshal(data, &s); err != nil {
+		return err //nolint:wrapcheck // Simple unmarshal from string.
+	}
+	parsed, err := ParseImageType(s)
+	if err != nil {
+		return err
+	}
+	*it = parsed
+	return nil
+}
+
+// ImageListItem describes one image entry shown by the ls command.
+type ImageListItem struct {
+	UpdatedAt time.Time
+	Name      string
+	Source    string
+	Reference string
+	Path      string
+	Artifacts string
+	TotalSize int64
+}
+
+// ImageInfo describes a downloaded image with full source and artifact details.
+type ImageInfo struct {
+	CreatedAt time.Time       `json:"createdAt"`
+	UpdatedAt time.Time       `json:"updatedAt"`
+	Source    ImageSourceInfo `json:"source"`
+	Manifest  ManifestInfo    `json:"manifest"`
+	Name      string          `json:"name"`
+	Path      string          `json:"path"`
+	Reference string          `json:"reference"`
+	Artifacts []ArtifactInfo  `json:"artifacts"`
+	TotalSize int64           `json:"totalSize"`
+}
+
+// ImageSourceInfo describes the registry source of an image.
+type ImageSourceInfo struct {
+	ID       string `json:"id"`
+	Kind     string `json:"kind"`
+	Location string `json:"location"`
+}
+
+// ManifestInfo describes the stored manifest metadata.
+type ManifestInfo struct {
+	Digest    string `json:"digest"`
+	MediaType string `json:"mediaType"`
+}
+
+// ArtifactInfo describes one physical artifact of a downloaded image.
+type ArtifactInfo struct {
+	Path   string          `json:"path"`
+	Digest string          `json:"digest"`
+	Type   db.ArtifactType `json:"type"`
+	Size   int64           `json:"size"`
+}

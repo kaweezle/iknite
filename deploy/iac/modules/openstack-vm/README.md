@@ -64,9 +64,9 @@ module "vms" {
 | Name | Version |
 |------|---------|
 | <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | >= 1.11.0 |
-| <a name="requirement_null"></a> [null](#requirement\_null) | 3.2.4 |
+| <a name="requirement_null"></a> [null](#requirement\_null) | 3.3.0 |
 | <a name="requirement_openstack"></a> [openstack](#requirement\_openstack) | 3.4.0 |
-| <a name="requirement_ovh"></a> [ovh](#requirement\_ovh) | 2.13.0 |
+| <a name="requirement_ovh"></a> [ovh](#requirement\_ovh) | 2.16.1 |
 
 ## Modules
 
@@ -76,10 +76,10 @@ No modules.
 
 | Name | Type |
 |------|------|
-| [null_resource.wait_ssh](https://registry.terraform.io/providers/hashicorp/null/3.2.4/docs/resources/resource) | resource |
+| [null_resource.wait_ssh](https://registry.terraform.io/providers/hashicorp/null/3.3.0/docs/resources/resource) | resource |
 | [openstack_compute_instance_v2.this](https://registry.terraform.io/providers/terraform-provider-openstack/openstack/3.4.0/docs/resources/compute_instance_v2) | resource |
 | [openstack_compute_keypair_v2.this](https://registry.terraform.io/providers/terraform-provider-openstack/openstack/3.4.0/docs/resources/compute_keypair_v2) | resource |
-| [ovh_domain_zone_record.this](https://registry.terraform.io/providers/ovh/ovh/2.13.0/docs/resources/domain_zone_record) | resource |
+| [ovh_domain_zone_record.this](https://registry.terraform.io/providers/ovh/ovh/2.16.1/docs/resources/domain_zone_record) | resource |
 
 ## Inputs
 

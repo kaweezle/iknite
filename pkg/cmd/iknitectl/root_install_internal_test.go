@@ -10,37 +10,43 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/kaweezle/iknite/pkg/cmd/util"
 	"github.com/kaweezle/iknite/pkg/host"
+	"github.com/kaweezle/iknite/pkg/testutil"
 )
 
-func TestCreateInstallCmd(t *testing.T) {
+func TestCreateWorkspaceCmd(t *testing.T) {
 	t.Parallel()
 	req := require.New(t)
 
-	cmd := CreateInstallCmd(host.NewMemMapFS())
-	req.NotNil(cmd)
-	req.Equal("install", cmd.Name())
+	s := testutil.TestContainer(t).Scope("workspace")
 
-	signingKeyCmd, _, err := cmd.Find([]string{"signing-key"})
-	req.NoError(err)
-	req.NotNil(signingKeyCmd)
-	req.Equal("signing-key", signingKeyCmd.Name())
+	cmd := CreateWorkspaceCmd(s)
+	req.NotNil(cmd)
+	req.Equal("workspace", cmd.Name())
+
+	for _, name := range []string{"application", "secrets"} {
+		sub, _, err := cmd.Find([]string{name})
+		req.NoError(err)
+		req.NotNil(sub)
+		req.Equal(name, sub.Name())
+	}
 }
 
 //nolint:paralleltest // Finding subcommands is not thread-safe, so we cannot run these tests in parallel.
 func TestRootOptionsAndCreateRootCmd(t *testing.T) {
 	req := require.New(t)
 
-	opts := NewRootOptions()
+	opts := NewRootOptions(nil)
 	req.NotNil(opts)
-	req.NotNil(opts.FileExecutor)
+	req.NotNil(opts.host)
 
 	root := CreateRootCmd(opts)
 	req.NotNil(root)
 	req.Equal("iknitectl", root.Name())
 	req.NotNil(root.PersistentPreRunE)
 
-	expectedSubcommands := []string{"install", "kustomize", "application", "secrets"}
+	expectedSubcommands := []string{"env", "image", "cluster", "workspace", "auth", "backend"}
 	//nolint:paralleltest // Finding subcommands is not thread-safe, so we cannot run these tests in parallel.
 	for _, name := range expectedSubcommands {
 		t.Run(name, func(t *testing.T) {
@@ -68,21 +74,25 @@ func TestRunRootCmd_Path(t *testing.T) {
 
 	fileExecutor, ok := host.NewMemMapFS().(host.FileExecutor)
 	req.True(ok, "MemMapFS should implement FileExecutor")
+	h, hostOK := fileExecutor.(host.Host)
+	req.True(hostOK, "MemMapFS should implement Host")
 
 	out := &bytes.Buffer{}
 	options := &RootOptions{
-		FileExecutor: fileExecutor,
-		out:          out,
+		host: h,
+		BaseOptions: util.BaseOptions{
+			Output: out,
+		},
 	}
 	cmd := CreateRootCmd(options)
 	req.NotNil(cmd)
 
-	cmd.SetArgs([]string{"kustomize", "nonexistent"})
+	cmd.SetArgs([]string{"workspace", "application", "render", "nonexistent"})
 
 	err := cmd.ExecuteContext(t.Context())
 	req.Error(err)
-	req.Contains(err.Error(), "kustomization directory does not exist")
-	req.Contains(out.String(), "Usage:\n  iknitectl kustomize <directory> [destination]")
+	req.Contains(err.Error(), "directory does not exist: nonexistent")
+	req.Contains(out.String(), "Usage:\n  iknitectl workspace application render <directory> [flags]")
 }
 
 //nolint:paralleltest // Messing with home
@@ -91,16 +101,20 @@ func TestRunRootCmd_ConfigError(t *testing.T) {
 
 	fileExecutor, ok := host.NewMemMapFS().(host.FileExecutor)
 	req.True(ok, "MemMapFS should implement FileExecutor")
+	h, hostOK := fileExecutor.(host.Host)
+	req.True(hostOK, "MemMapFS should implement Host")
 
 	out := &bytes.Buffer{}
 	options := &RootOptions{
-		FileExecutor: fileExecutor,
-		out:          out,
+		host: h,
+		BaseOptions: util.BaseOptions{
+			Output: out,
+		},
 	}
 	cmd := CreateRootCmd(options)
 	req.NotNil(cmd)
 
-	cmd.SetArgs([]string{"kustomize", "nonexistent"})
+	cmd.SetArgs([]string{"workspace", "application", "render", "nonexistent"})
 
 	oldHome := os.Getenv("HOME")
 	oldXDGConfigHome := os.Getenv("XDG_CONFIG_HOME")

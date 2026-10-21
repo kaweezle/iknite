@@ -1,4 +1,4 @@
-// cSpell: words getsops
+// cSpell: words getsops sopsage filippo
 /*
 Copyright © 2025 Antoine Martin <antoine@openance.com>
 
@@ -17,17 +17,11 @@ limitations under the License.
 package secrets_test
 
 import (
-	"bytes"
-	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
-	"github.com/getsops/sops/v3/cmd/sops/formats"
-	"github.com/getsops/sops/v3/decrypt"
 	"github.com/stretchr/testify/require"
-	"sigs.k8s.io/yaml"
 
 	"github.com/kaweezle/iknite/pkg/host"
 	"github.com/kaweezle/iknite/pkg/secrets"
@@ -39,14 +33,13 @@ const (
 )
 
 func TestGetSecret(t *testing.T) {
-	// Cannot use t.Parallel because this test sets process env for SOPS decryption.
-	t.Setenv("SOPS_AGE_KEY", testSecretsAgeKey)
+	t.Parallel()
+	req := require.New(t)
 
-	testFs := host.NewMemMapFS()
+	testFs := testutil.NewDummyUserHost()
+	req.NoError(testFs.Setenv("SOPS_AGE_KEY", testSecretsAgeKey))
 
-	if err := testFs.WriteFile(secretsPath, []byte(testSecretsEncryptedWithData), 0o600); err != nil {
-		t.Fatalf("failed to write test secrets file: %v", err)
-	}
+	req.NoError(testFs.WriteFile(secretsPath, []byte(testSecretsEncryptedWithData), 0o600))
 
 	opts := &secrets.Options{Fs: testFs, SecretsFile: secretsPath, Logger: testutil.TestLogger(t)}
 	value, err := secrets.GetSecret(opts, "github.api_token")
@@ -60,13 +53,11 @@ func TestGetSecret(t *testing.T) {
 }
 
 func TestGetSecretMissingPath(t *testing.T) {
-	// Cannot use t.Parallel because this test sets process env for SOPS decryption.
-	t.Setenv("SOPS_AGE_KEY", testSecretsAgeKey)
-
-	testFs := host.NewMemMapFS()
-	if err := testFs.WriteFile(secretsPath, []byte(testSecretsEncryptedWithData), 0o600); err != nil {
-		t.Fatalf("failed to write test secrets file: %v", err)
-	}
+	t.Parallel()
+	req := require.New(t)
+	testFs := testutil.NewDummyUserHost()
+	req.NoError(testFs.Setenv("SOPS_AGE_KEY", testSecretsAgeKey))
+	req.NoError(testFs.WriteFile(secretsPath, []byte(testSecretsEncryptedWithData), 0o600))
 
 	opts := &secrets.Options{Fs: testFs, SecretsFile: secretsPath, Logger: testutil.TestLogger(t)}
 	_, err := secrets.GetSecret(opts, "github.missing")
@@ -79,47 +70,41 @@ func TestGetSecretMissingPath(t *testing.T) {
 }
 
 func TestSetSecret(t *testing.T) {
-	// Cannot use t.Parallel because this test sets process env for SOPS decryption.
-	t.Setenv("SOPS_AGE_KEY", testSecretsAgeKey)
-
-	testFs := host.NewMemMapFS()
-	if err := testFs.WriteFile(secretsPath, []byte(testSecretsEncryptedWithData), 0o600); err != nil {
-		t.Fatalf("failed to write test secrets file: %v", err)
-	}
+	t.Parallel()
+	req := require.New(t)
+	testFs := testutil.NewDummyUserHost()
+	req.NoError(testFs.Setenv("SOPS_AGE_KEY", testSecretsAgeKey))
+	req.NoError(testFs.WriteFile(secretsPath, []byte(testSecretsEncryptedWithData), 0o600))
 
 	opts := &secrets.Options{Fs: testFs, SecretsFile: secretsPath, Logger: testutil.TestLogger(t)}
 	if err := secrets.SetSecret(opts, "github.api_token", "new-token-value"); err != nil {
 		t.Fatalf("SetSecret failed: %v", err)
 	}
 
-	assertSecretValue(t, testFs, secretsPath, "data.github.api_token", "new-token-value")
+	testutil.AssertSecretValue(t, testFs, testSecretsAgeKey, secretsPath, "github.api_token", "new-token-value", false)
 }
 
 func TestRemoveSecret(t *testing.T) {
-	// Cannot use t.Parallel because this test sets process env for SOPS decryption.
-	t.Setenv("SOPS_AGE_KEY", testSecretsAgeKey)
-
-	testFs := host.NewMemMapFS()
-	if err := testFs.WriteFile(secretsPath, []byte(testSecretsEncryptedWithData), 0o600); err != nil {
-		t.Fatalf("failed to write test secrets file: %v", err)
-	}
+	t.Parallel()
+	req := require.New(t)
+	testFs := testutil.NewDummyUserHost()
+	req.NoError(testFs.Setenv("SOPS_AGE_KEY", testSecretsAgeKey))
+	req.NoError(testFs.WriteFile(secretsPath, []byte(testSecretsEncryptedWithData), 0o600))
 
 	opts := &secrets.Options{Fs: testFs, SecretsFile: secretsPath, Logger: testutil.TestLogger(t)}
 	if err := secrets.RemoveSecret(opts, "github.api_token"); err != nil {
 		t.Fatalf("RemoveSecret failed: %v", err)
 	}
 
-	assertSecretPathMissing(t, testFs, secretsPath, "data.github.api_token")
+	testutil.AssertSecretPathMissing(t, testFs, testSecretsAgeKey, secretsPath, "github.api_token")
 }
 
 func TestRemoveSecretMissingPath(t *testing.T) {
-	// Cannot use t.Parallel because this test sets process env for SOPS decryption.
-	t.Setenv("SOPS_AGE_KEY", testSecretsAgeKey)
-
-	testFs := host.NewMemMapFS()
-	if err := testFs.WriteFile(secretsPath, []byte(testSecretsEncryptedWithData), 0o600); err != nil {
-		t.Fatalf("failed to write test secrets file: %v", err)
-	}
+	t.Parallel()
+	req := require.New(t)
+	testFs := testutil.NewDummyUserHost()
+	req.NoError(testFs.Setenv("SOPS_AGE_KEY", testSecretsAgeKey))
+	req.NoError(testFs.WriteFile(secretsPath, []byte(testSecretsEncryptedWithData), 0o600))
 
 	opts := &secrets.Options{Fs: testFs, SecretsFile: secretsPath, Logger: testutil.TestLogger(t)}
 	err := secrets.RemoveSecret(opts, "github.missing")
@@ -132,17 +117,20 @@ func TestRemoveSecretMissingPath(t *testing.T) {
 }
 
 func TestInitSecrets(t *testing.T) {
-	fs := host.NewDefaultHost()
-	tempDir := t.TempDir()
+	t.Parallel()
+	req := require.New(t)
+
+	fs := testutil.NewDummyUserHost()
+	tempDir := "base"
 	homeDir := filepath.Join(tempDir, "home")
 	workspaceDir := filepath.Join(tempDir, "workspace")
 	secretsPath := filepath.Join(workspaceDir, secrets.DefaultSecretsFile)
 	keyPath := filepath.Join(homeDir, ".ssh", "id_ed25519")
 
-	if err := os.MkdirAll(homeDir, 0o750); err != nil {
+	if err := fs.MkdirAll(homeDir, 0o750); err != nil {
 		t.Fatalf("failed to create temp home: %v", err)
 	}
-	if err := os.MkdirAll(workspaceDir, 0o750); err != nil {
+	if err := fs.MkdirAll(workspaceDir, 0o750); err != nil {
 		t.Fatalf("failed to create workspace dir: %v", err)
 	}
 
@@ -158,9 +146,8 @@ func TestInitSecrets(t *testing.T) {
 	assertFileExists(t, fs, keyPath+".pub")
 
 	configBytes, err := fs.ReadFile(filepath.Join(workspaceDir, ".sops.yaml"))
-	if err != nil {
-		t.Fatalf("failed to read .sops.yaml: %v", err)
-	}
+	req.NoError(err, "failed to read .sops.yaml")
+
 	configText := string(configBytes)
 	if !strings.Contains(configText, "encrypted_regex: \"^data$\"") {
 		t.Fatalf("expected .sops.yaml to contain encrypted_regex, got:\n%s", configText)
@@ -169,9 +156,19 @@ func TestInitSecrets(t *testing.T) {
 		t.Fatalf("expected .sops.yaml to contain ssh-ed25519 recipient, got:\n%s", configText)
 	}
 
-	t.Setenv("SOPS_AGE_SSH_PRIVATE_KEY_FILE", keyPath)
-	assertSecretValueFromOSFile(t, secretsPath, "data.keys.main.public_key", "ssh-ed25519 ")
-	assertSecretValueFromOSFile(t, secretsPath, "data.keys.main.private_key", "-----BEGIN OPENSSH PRIVATE KEY-----")
+	keyBytes, err := fs.ReadFile(keyPath)
+	key := string(keyBytes)
+	req.NoError(err, "failed to read generated SSH private key")
+	testutil.AssertSecretValue(t, fs, key, secretsPath, "keys.main.public_key", "ssh-ed25519 ", true)
+	testutil.AssertSecretValue(
+		t,
+		fs,
+		key,
+		secretsPath,
+		"keys.main.private_key",
+		"-----BEGIN OPENSSH PRIVATE KEY-----",
+		true,
+	)
 
 	hasWrote := false
 	for _, msg := range result.Messages {
@@ -187,43 +184,28 @@ func TestInitSecrets(t *testing.T) {
 
 func TestInitSecretsDoesNotOverwriteExistingFiles(t *testing.T) {
 	t.Parallel()
-	fs := host.NewDefaultHost()
-	tempDir := t.TempDir()
+	req := require.New(t)
+	fs := testutil.NewDummyUserHost()
+	tempDir := "base"
 	workspaceDir := filepath.Join(tempDir, "workspace")
 	secretsPath := filepath.Join(workspaceDir, secrets.DefaultSecretsFile)
 	sopsConfigPath := filepath.Join(workspaceDir, ".sops.yaml")
 
-	if err := os.MkdirAll(workspaceDir, 0o750); err != nil {
-		t.Fatalf("failed to create workspace dir: %v", err)
-	}
-	if err := os.WriteFile(sopsConfigPath, []byte("existing config\n"), 0o600); err != nil {
-		t.Fatalf("failed to seed .sops.yaml: %v", err)
-	}
-	if err := os.WriteFile(secretsPath, []byte("existing secrets\n"), 0o600); err != nil {
-		t.Fatalf("failed to seed secrets file: %v", err)
-	}
+	req.NoError(fs.MkdirAll(workspaceDir, 0o750))
+	req.NoError(fs.WriteFile(sopsConfigPath, []byte("existing config\n"), 0o600))
+	req.NoError(fs.WriteFile(secretsPath, []byte("existing secrets\n"), 0o600))
 
 	opts := &secrets.Options{Fs: fs, SecretsFile: secretsPath, HomeDir: tempDir}
 	result, err := secrets.InitSecrets(opts)
-	if err != nil {
-		t.Fatalf("InitSecrets failed: %v", err)
-	}
+	req.NoError(err, "InitSecrets should not fail when files already exist")
 
-	configBytes, err := os.ReadFile(sopsConfigPath) //nolint:gosec // temp file read in test
-	if err != nil {
-		t.Fatalf("failed to read .sops.yaml: %v", err)
-	}
-	if string(configBytes) != "existing config\n" {
-		t.Fatalf("expected existing .sops.yaml to be preserved, got: %s", string(configBytes))
-	}
+	configBytes, err := fs.ReadFile(sopsConfigPath)
+	req.NoError(err, "failed to read .sops.yaml")
+	req.Equal("existing config\n", string(configBytes), "expected existing .sops.yaml to be preserved")
 
-	secretBytes, err := os.ReadFile(secretsPath) //nolint:gosec // temp file read in test
-	if err != nil {
-		t.Fatalf("failed to read secrets.sops.yaml: %v", err)
-	}
-	if string(secretBytes) != "existing secrets\n" {
-		t.Fatalf("expected existing secrets.sops.yaml to be preserved, got: %s", string(secretBytes))
-	}
+	secretBytes, err := fs.ReadFile(secretsPath)
+	req.NoError(err, "failed to read secrets.sops.yaml")
+	req.Equal("existing secrets\n", string(secretBytes), "expected existing secrets.sops.yaml to be preserved")
 
 	hasAlreadyExists := false
 	for _, msg := range result.Messages {
@@ -232,28 +214,23 @@ func TestInitSecretsDoesNotOverwriteExistingFiles(t *testing.T) {
 			break
 		}
 	}
-	if !hasAlreadyExists {
-		t.Fatalf("expected init result to mention existing files, got: %v", result.Messages)
-	}
+	req.True(hasAlreadyExists, "expected init result to mention existing files, got: %v", result.Messages)
 }
 
 func TestInitSecretsWithCustomKeyFile(t *testing.T) {
 	t.Parallel()
-	fs := host.NewDefaultHost()
-	tempDir := t.TempDir()
-	workspaceDir := filepath.Join(tempDir, "workspace")
-	secretsPath := filepath.Join(workspaceDir, secrets.DefaultSecretsFile)
-	keyPath := filepath.Join(tempDir, "keys", "custom_ed25519")
+	req := require.New(t)
+	fs := testutil.NewDummyUserHost()
+	tempDir := "base"
+	workspaceDir := fs.JoinPath(tempDir, "workspace")
+	secretsPath := fs.JoinPath(workspaceDir, secrets.DefaultSecretsFile)
+	keyPath := fs.JoinPath(tempDir, "keys", "custom_ed25519")
 
-	if err := os.MkdirAll(workspaceDir, 0o750); err != nil {
-		t.Fatalf("failed to create workspace dir: %v", err)
-	}
+	req.NoError(fs.MkdirAll(fs.JoinPath(tempDir, "keys"), 0o750))
 
 	opts := &secrets.Options{Fs: fs, SecretsFile: secretsPath, HomeDir: tempDir, KeyFile: keyPath}
 	result, err := secrets.InitSecrets(opts)
-	if err != nil {
-		t.Fatalf("InitSecrets with custom key failed: %v", err)
-	}
+	req.NoError(err, "InitSecrets should succeed with custom key file")
 
 	hasCfgTip := false
 	for _, msg := range result.Messages {
@@ -262,9 +239,7 @@ func TestInitSecretsWithCustomKeyFile(t *testing.T) {
 			break
 		}
 	}
-	if !hasCfgTip {
-		t.Fatalf("expected result to contain SSH key env var guidance, got: %v", result.Messages)
-	}
+	req.True(hasCfgTip, "expected result to contain SSH key env var guidance, got: %v", result.Messages)
 }
 
 func TestOptionsSetDefaults(t *testing.T) {
@@ -282,9 +257,11 @@ func TestOptionsSetDefaults(t *testing.T) {
 }
 
 func TestOptionsSetDefaults_Env(t *testing.T) {
+	t.Parallel()
 	req := require.New(t)
-	t.Setenv("SOPS_AGE_SSH_PRIVATE_KEY_FILE", "/env/age/key")
-	opts := &secrets.Options{}
+	fs := testutil.NewDummyUserHost()
+	req.NoError(fs.Setenv("SOPS_AGE_SSH_PRIVATE_KEY_FILE", "/env/age/key"))
+	opts := &secrets.Options{Fs: fs}
 	err := opts.SetDefaults()
 	req.NoError(err)
 	req.Equal("/env/age/key", opts.KeyFile, "KeyFile should be set from env var")
@@ -300,127 +277,6 @@ func assertFileExists(t *testing.T, fs host.FileSystem, path string) {
 	if !exists {
 		t.Fatalf("expected %s to exist", path)
 	}
-}
-
-func assertSecretValue(t *testing.T, fs host.FileSystem, secretsPath, path, want string) {
-	t.Helper()
-
-	encrypted, err := fs.ReadFile(secretsPath)
-	if err != nil {
-		t.Fatalf("failed to read secrets file: %v", err)
-	}
-
-	cleartext, err := decrypt.DataWithFormat(encrypted, formats.Yaml)
-	if err != nil {
-		t.Fatalf("failed to decrypt secrets file: %v", err)
-	}
-
-	assertSecretValueFromCleartext(t, encrypted, cleartext, path, want)
-}
-
-func assertSecretValueFromOSFile(t *testing.T, secretsPath, path, wantContains string) {
-	t.Helper()
-
-	encrypted, err := os.ReadFile(secretsPath) //nolint:gosec // temp file read in test
-	if err != nil {
-		t.Fatalf("failed to read secrets file: %v", err)
-	}
-
-	cleartext, err := decrypt.DataWithFormat(encrypted, formats.Yaml)
-	if err != nil {
-		t.Fatalf("failed to decrypt secrets file: %v", err)
-	}
-
-	assertSecretValueFromCleartextContains(t, cleartext, path, wantContains)
-}
-
-func assertSecretValueFromCleartext(t *testing.T, encrypted, cleartext []byte, path, want string) {
-	t.Helper()
-
-	var data map[string]any
-	if err := yaml.Unmarshal(cleartext, &data); err != nil {
-		t.Fatalf("failed to unmarshal cleartext yaml: %v", err)
-	}
-
-	got, err := getMapValue(data, strings.Split(path, "."))
-	if err != nil {
-		t.Fatalf("failed to read value at %s: %v", path, err)
-	}
-
-	gotString, ok := got.(string)
-	if !ok {
-		t.Fatalf("expected string value at %s, got %T", path, got)
-	}
-
-	if gotString != want {
-		t.Fatalf("unexpected value at %s: got %q, want %q", path, gotString, want)
-	}
-
-	if bytes.Contains(encrypted, []byte(want)) {
-		t.Fatalf("encrypted file unexpectedly contains plaintext value %q", want)
-	}
-}
-
-func assertSecretValueFromCleartextContains(t *testing.T, cleartext []byte, path, wantContains string) {
-	t.Helper()
-
-	var data map[string]any
-	if err := yaml.Unmarshal(cleartext, &data); err != nil {
-		t.Fatalf("failed to unmarshal cleartext yaml: %v", err)
-	}
-
-	got, err := getMapValue(data, strings.Split(path, "."))
-	if err != nil {
-		t.Fatalf("failed to read value at %s: %v", path, err)
-	}
-
-	gotString, ok := got.(string)
-	if !ok {
-		t.Fatalf("expected string value at %s, got %T", path, got)
-	}
-
-	if !strings.Contains(gotString, wantContains) {
-		t.Fatalf("expected value at %s to contain %q, got %q", path, wantContains, gotString)
-	}
-}
-
-func assertSecretPathMissing(t *testing.T, fs host.FileSystem, secretsPath, path string) {
-	t.Helper()
-
-	encrypted, err := fs.ReadFile(secretsPath)
-	if err != nil {
-		t.Fatalf("failed to read secrets file: %v", err)
-	}
-
-	cleartext, err := decrypt.DataWithFormat(encrypted, formats.Yaml)
-	if err != nil {
-		t.Fatalf("failed to decrypt secrets file: %v", err)
-	}
-
-	var data map[string]any
-	if err := yaml.Unmarshal(cleartext, &data); err != nil {
-		t.Fatalf("failed to unmarshal cleartext yaml: %v", err)
-	}
-
-	if _, err := getMapValue(data, strings.Split(path, ".")); err == nil {
-		t.Fatalf("expected path %s to be missing after remove", path)
-	}
-}
-
-func getMapValue(root map[string]any, parts []string) (any, error) {
-	var current any = root
-	for _, part := range parts {
-		asMap, ok := current.(map[string]any)
-		if !ok {
-			return nil, fmt.Errorf("path segment %q does not point to a map", part)
-		}
-		next, ok := asMap[part]
-		if !ok {
-			return nil, fmt.Errorf("path segment %q not found", part)
-		}
-		current = next
-	}
-	return current, nil
 }
 
 // cSpell: disable

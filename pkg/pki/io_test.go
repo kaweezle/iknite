@@ -90,7 +90,7 @@ func TestWriteKey(t *testing.T) {
 	t.Run("nil key returns error", func(t *testing.T) {
 		t.Parallel()
 		fs := host.NewMemMapFS()
-		err := pki.WriteKey(fs, pkiDir, "test", nil)
+		err := pki.WriteKey(fs, filepath.Join(pkiDir, "test.key"), nil)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "private key cannot be nil")
 	})
@@ -104,10 +104,10 @@ func TestWriteKey(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		err = pki.WriteKey(fs, pkiDir, "mykey", caKey)
+		keyPath := pki.PathForKey(pkiDir, "mykey")
+		err = pki.WriteKey(fs, keyPath, caKey)
 		require.NoError(t, err)
 
-		_, keyPath := pki.PathsForCertAndKey(pkiDir, "mykey")
 		ok, err := fs.Exists(keyPath)
 		require.NoError(t, err)
 		require.True(t, ok, "expected key file at %s", keyPath)
@@ -119,10 +119,10 @@ func TestWriteKey(t *testing.T) {
 		ecKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 		require.NoError(t, err)
 
-		err = pki.WriteKey(fs, pkiDir, "eckey", ecKey)
+		keyPath := pki.PathForKey(pkiDir, "eckey")
+		err = pki.WriteKey(fs, keyPath, ecKey)
 		require.NoError(t, err)
 
-		_, keyPath := pki.PathsForCertAndKey(pkiDir, "eckey")
 		ok, err := fs.Exists(keyPath)
 		require.NoError(t, err)
 		require.True(t, ok, "expected key file at %s", keyPath)
@@ -134,7 +134,8 @@ func TestWriteKey(t *testing.T) {
 		_, ed25519Key, err := ed25519.GenerateKey(rand.Reader)
 		require.NoError(t, err)
 		fs := host.NewMemMapFS()
-		err = pki.WriteKey(fs, pkiDir, "ed25519key", ed25519Key)
+		keyPath := pki.PathForKey(pkiDir, "ed25519key")
+		err = pki.WriteKey(fs, keyPath, ed25519Key)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "unable to marshal private key to PEM")
 	})
@@ -146,7 +147,8 @@ func TestWriteCert(t *testing.T) {
 	t.Run("nil certificate returns error", func(t *testing.T) {
 		t.Parallel()
 		fs := host.NewMemMapFS()
-		err := pki.WriteCert(fs, pkiDir, "test", nil)
+		certPath := pki.PathForCert(pkiDir, "test")
+		err := pki.WriteCert(fs, certPath, nil)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "certificate cannot be nil")
 	})
@@ -160,7 +162,8 @@ func TestWriteCert(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		require.NoError(t, pki.WriteCert(fs, pkiDir, "ca", caCert))
+		certPath := pki.PathForCert(pkiDir, "ca")
+		require.NoError(t, pki.WriteCert(fs, certPath, caCert))
 
 		// Verify round-trip: the written cert must be loadable and have the same serial.
 		loaded, err := pki.TryLoadCertFromDisk(fs, pkiDir, "ca")
@@ -213,12 +216,12 @@ func TestWrite_MkdirAllError(t *testing.T) {
 	}{
 		{
 			name:    "WriteKey propagates mkdir error",
-			fn:      func(fs host.FileSystem) error { return pki.WriteKey(fs, pkiDir, "fail", caKey) },
+			fn:      func(fs host.FileSystem) error { return pki.WriteKey(fs, pki.PathForKey(pkiDir, "fail"), caKey) },
 			wantErr: "unable to write private key to file",
 		},
 		{
 			name:    "WriteCert propagates mkdir error",
-			fn:      func(fs host.FileSystem) error { return pki.WriteCert(fs, pkiDir, "fail", caCert) },
+			fn:      func(fs host.FileSystem) error { return pki.WriteCert(fs, pki.PathForCert(pkiDir, "fail"), caCert) },
 			wantErr: "unable to write certificate to file",
 		},
 		{
@@ -255,7 +258,8 @@ func TestCertOrKeyExist(t *testing.T) {
 			EncryptionAlgorithm: kubeadmapi.EncryptionAlgorithmRSA2048,
 		})
 		require.NoError(t, err)
-		require.NoError(t, pki.WriteCert(fs, pkiDir, "certonly", caCert))
+		certPath := pki.PathForCert(pkiDir, "certonly")
+		require.NoError(t, pki.WriteCert(fs, certPath, caCert))
 		require.True(t, pki.CertOrKeyExist(fs, pkiDir, "certonly"))
 	})
 
@@ -267,7 +271,8 @@ func TestCertOrKeyExist(t *testing.T) {
 			EncryptionAlgorithm: kubeadmapi.EncryptionAlgorithmRSA2048,
 		})
 		require.NoError(t, err)
-		require.NoError(t, pki.WriteKey(fs, pkiDir, "keyonly", caKey))
+		keyPath := pki.PathForKey(pkiDir, "keyonly")
+		require.NoError(t, pki.WriteKey(fs, keyPath, caKey))
 		require.True(t, pki.CertOrKeyExist(fs, pkiDir, "keyonly"))
 	})
 
@@ -417,29 +422,23 @@ func TestTryLoadCertAndKeyFromDisk(t *testing.T) {
 		require.Equal(t, caCommonName, loadedCert.Subject.CommonName)
 	})
 
-	t.Run("returns error when cert is missing", func(t *testing.T) {
+	t.Run("returns error when cert or key is missing", func(t *testing.T) {
 		t.Parallel()
 		fs := host.NewMemMapFS()
-		_, caKey, err := pkiutil.NewCertificateAuthority(&pkiutil.CertConfig{
+		caCert, caKey, err := pkiutil.NewCertificateAuthority(&pkiutil.CertConfig{
 			Config:              certutil.Config{CommonName: caCommonName},
 			EncryptionAlgorithm: kubeadmapi.EncryptionAlgorithmRSA2048,
 		})
 		require.NoError(t, err)
-		require.NoError(t, pki.WriteKey(fs, pkiDir, "keyonly", caKey))
+		keyPath := pki.PathForKey(pkiDir, "keyonly")
+		require.NoError(t, pki.WriteKey(fs, keyPath, caKey))
 
 		_, _, err = pki.TryLoadCertAndKeyFromDisk(fs, pkiDir, "keyonly")
 		require.Error(t, err)
-	})
 
-	t.Run("returns error when key is missing", func(t *testing.T) {
-		t.Parallel()
-		fs := host.NewMemMapFS()
-		caCert, _, err := pkiutil.NewCertificateAuthority(&pkiutil.CertConfig{
-			Config:              certutil.Config{CommonName: caCommonName},
-			EncryptionAlgorithm: kubeadmapi.EncryptionAlgorithmRSA2048,
-		})
-		require.NoError(t, err)
-		require.NoError(t, pki.WriteCert(fs, pkiDir, "certonly", caCert))
+		require.NoError(t, fs.Remove(keyPath))
+		certPath := pki.PathForCert(pkiDir, "certonly")
+		require.NoError(t, pki.WriteCert(fs, certPath, caCert))
 
 		_, _, err = pki.TryLoadCertAndKeyFromDisk(fs, pkiDir, "certonly")
 		require.Error(t, err)
@@ -457,9 +456,9 @@ func TestPrivateKeyFromFile(t *testing.T) {
 			EncryptionAlgorithm: kubeadmapi.EncryptionAlgorithmRSA2048,
 		})
 		require.NoError(t, err)
-		require.NoError(t, pki.WriteKey(fs, pkiDir, "rsa", caKey))
+		keyPath := pki.PathForKey(pkiDir, "rsa")
+		require.NoError(t, pki.WriteKey(fs, keyPath, caKey))
 
-		_, keyPath := pki.PathsForCertAndKey(pkiDir, "rsa")
 		key, err := pki.PrivateKeyFromFile(fs, keyPath)
 		require.NoError(t, err)
 		require.NotNil(t, key)
@@ -573,7 +572,7 @@ func TestLoadX509KeyPair(t *testing.T) {
 			EncryptionAlgorithm: kubeadmapi.EncryptionAlgorithmRSA2048,
 		})
 		require.NoError(t, err)
-		require.NoError(t, pki.WriteKey(fs, pkiDir, "ca2", key2))
+		require.NoError(t, pki.WriteKey(fs, pki.PathForKey(pkiDir, "ca2"), key2))
 
 		certPath, _ := pki.PathsForCertAndKey(pkiDir, "ca1")
 		_, keyPath := pki.PathsForCertAndKey(pkiDir, "ca2")

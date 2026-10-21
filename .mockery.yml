@@ -84,5 +84,9 @@ packages:
     config:
       dir: mocks/{{.InterfaceDirRelative}}
     interfaces: { CmdInterface }
+  github.com/kaweezle/iknite/pkg/iknitectl/image:
+    config:
+      dir: mocks/{{.InterfaceDirRelative}}
+    interfaces: { MetadataStore }
   sigs.k8s.io/cli-utils/pkg/kstatus/polling/engine:
     interfaces: { ClusterReader }

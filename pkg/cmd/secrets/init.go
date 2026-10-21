@@ -19,33 +19,42 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
+	"go.uber.org/dig"
 
+	"github.com/kaweezle/iknite/pkg/cmd/types"
 	pkgSecrets "github.com/kaweezle/iknite/pkg/secrets"
 )
 
-func createSecretsInitCmd(opts *pkgSecrets.Options) *cobra.Command {
-	defaultKeyFile := opts.KeyFile
+func createSecretsInitCmd(s *dig.Scope) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "init",
 		Short: "Initialize .sops.yaml, secrets.sops.yaml, and an SSH key pair",
-		RunE: func(cmd *cobra.Command, _ []string) error {
-			result, err := pkgSecrets.InitSecrets(opts)
-			if err != nil {
-				return fmt.Errorf("failed to initialize secrets: %w", err)
-			}
-
-			for _, message := range result.Messages {
-				if _, writeErr := fmt.Fprintln(cmd.OutOrStdout(), message); writeErr != nil {
-					return fmt.Errorf("error while outputting result: %w", writeErr)
-				}
-			}
-
-			return nil
+		RunE: func(_ *cobra.Command, _ []string) error {
+			return s.Invoke(performSecretsInit)
 		},
 	}
 
-	cmd.Flags().BoolVarP(&opts.Force, "force", "f", false, "Overwrite existing generated files")
-	cmd.Flags().StringVarP(&opts.KeyFile, "key-file", "k", defaultKeyFile, "SSH private key file to use or generate")
+	cobra.CheckErr(s.Invoke(func(opts *pkgSecrets.Options) {
+		cmd.Flags().BoolVarP(&opts.Force, "force", "f", false, "Overwrite existing generated files")
+		cmd.Flags().BoolVarP(&opts.OverwriteKey, "overwrite-key", "o", false,
+			"Overwrite existing SSH key pair (implies --force)")
+		cmd.Flags().StringVarP(&opts.KeyFile, "key-file", "k", opts.KeyFile, "SSH private key file to use or generate")
+	}))
 
 	return cmd
+}
+
+func performSecretsInit(opts *pkgSecrets.Options, out types.CmdOut) error {
+	result, err := pkgSecrets.InitSecrets(opts)
+	if err != nil {
+		return fmt.Errorf("failed to initialize secrets: %w", err)
+	}
+
+	for _, message := range result.Messages {
+		if _, writeErr := fmt.Fprintln(out, message); writeErr != nil {
+			return fmt.Errorf("error while outputting result: %w", writeErr)
+		}
+	}
+
+	return nil
 }

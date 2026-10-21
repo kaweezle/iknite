@@ -19,26 +19,32 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
+	"go.uber.org/dig"
 
+	"github.com/kaweezle/iknite/pkg/cmd/types"
 	pkgSecrets "github.com/kaweezle/iknite/pkg/secrets"
 )
 
-func createSecretsGetCmd(opts *pkgSecrets.Options) *cobra.Command {
+func createSecretsGetCmd(s *dig.Scope) *cobra.Command {
 	return &cobra.Command{
 		Use:   "get <path>",
 		Short: "Get a secret value from the secrets file",
 		Args:  cobra.ExactArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			value, err := pkgSecrets.GetSecret(opts, args[0])
-			if err != nil {
-				return fmt.Errorf("failed to get secret: %w", err)
-			}
-
-			_, err = fmt.Fprintln(cmd.OutOrStdout(), value)
-			if err != nil {
-				return fmt.Errorf("error while outputting result: %w", err)
-			}
-			return nil
+		RunE: func(_ *cobra.Command, _ []string) error {
+			return s.Invoke(performSecretsGet)
 		},
 	}
+}
+
+func performSecretsGet(opts *pkgSecrets.Options, args types.CmdArgs, out types.CmdOut) error {
+	value, err := pkgSecrets.GetSecret(opts, args[0])
+	if err != nil {
+		return fmt.Errorf("failed to get secret: %w", err)
+	}
+
+	_, err = fmt.Fprintln(out, value)
+	if err != nil {
+		return fmt.Errorf("error while outputting result: %w", err)
+	}
+	return nil
 }

@@ -176,6 +176,9 @@ linters:
       replace-allow-list:
         - github.com/argoproj/argo-cd/gitops-engine
 
+    exhaustive:
+      default-signifies-exhaustive: true
+
   exclusions:
     rules:
       - linters:

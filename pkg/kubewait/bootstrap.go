@@ -76,7 +76,7 @@ func AddBootstrapFlags(flags *pflag.FlagSet, opts *BootstrapOptions) {
 		"Path to an env file to load before running the bootstrap script (default: .env inside --bootstrap-dir)")
 }
 
-func (opts *BootstrapOptions) ReadEnvFile(fs host.FileSystem, logger *slog.Logger) (bool, error) {
+func (opts *BootstrapOptions) ReadEnvFile(fs host.FileEnvironment, logger *slog.Logger) (bool, error) {
 	// Determine the env file path.
 	envFile := opts.EnvFile
 	if envFile == "" {
@@ -90,7 +90,7 @@ func (opts *BootstrapOptions) ReadEnvFile(fs host.FileSystem, logger *slog.Logge
 			return false, fmt.Errorf("failed to load env file %s: %w", envFile, err)
 		}
 		for key, value := range variables {
-			err = os.Setenv(key, value)
+			err = fs.Setenv(key, value)
 			if err != nil {
 				return false, fmt.Errorf("failed to set environment variable %s: %w", key, err)
 			}
@@ -102,7 +102,7 @@ func (opts *BootstrapOptions) ReadEnvFile(fs host.FileSystem, logger *slog.Logge
 
 // runBootstrap clones the bootstrap repository (if URL and ref are provided), loads the env
 // file (if present), and executes the bootstrap script.
-func runBootstrap(ctx context.Context, fse host.FileExecutor, opts *BootstrapOptions, logger *slog.Logger) error {
+func runBootstrap(ctx context.Context, fse host.UserHost, opts *BootstrapOptions, logger *slog.Logger) error {
 	// Clone the repository when a ref is also supplied; if no ref is given the clone is skipped.
 
 	baseDir := opts.BootstrapDir
@@ -110,7 +110,7 @@ func runBootstrap(ctx context.Context, fse host.FileExecutor, opts *BootstrapOpt
 		if err := cloneBootstrapRepo(ctx, fse, opts, logger); err != nil {
 			return fmt.Errorf("error during bootstrap: %w", err)
 		}
-		baseDir = filepath.Join(opts.BootstrapDir, bootstrapRepoDirname)
+		baseDir = fse.JoinPath(opts.BootstrapDir, bootstrapRepoDirname)
 	} else {
 		logger.Info("Bootstrap repo URL or ref not provided, skipping clone")
 	}
@@ -118,7 +118,7 @@ func runBootstrap(ctx context.Context, fse host.FileExecutor, opts *BootstrapOpt
 	// Locate and execute the bootstrap script.
 	scriptPath := opts.BootstrapScript
 	if !filepath.IsAbs(scriptPath) {
-		scriptPath = filepath.Join(baseDir, opts.BootstrapScript)
+		scriptPath = fse.JoinPath(baseDir, opts.BootstrapScript)
 	}
 	if _, err := fse.Stat(scriptPath); err != nil {
 		logger.Info(
@@ -165,11 +165,11 @@ func runBootstrap(ctx context.Context, fse host.FileExecutor, opts *BootstrapOpt
 // cloneBootstrapRepo performs a shallow git clone of the bootstrap repository.
 func cloneBootstrapRepo(
 	ctx context.Context,
-	fse host.FileExecutor,
+	fse host.UserHost,
 	opts *BootstrapOptions,
 	logger *slog.Logger,
 ) error {
-	repoPath := filepath.Join(opts.BootstrapDir, bootstrapRepoDirname)
+	repoPath := fse.JoinPath(opts.BootstrapDir, bootstrapRepoDirname)
 	logger.Info("Cloning bootstrap repository", "url", opts.RepoURL, "ref", opts.RepoRef, "path", repoPath)
 
 	if err := ensureSSHKnownHost(ctx, fse, opts.RepoURL, logger); err != nil {
@@ -202,7 +202,7 @@ func cloneBootstrapRepo(
 	return nil
 }
 
-func ensureSSHKnownHost(ctx context.Context, fse host.FileExecutor, repoURL string, logger *slog.Logger) error {
+func ensureSSHKnownHost(ctx context.Context, fse host.UserHost, repoURL string, logger *slog.Logger) error {
 	sshServer := extractDomain(repoURL)
 	if sshServer == "" {
 		logger.Warn(
@@ -238,13 +238,17 @@ func ensureSSHKnownHost(ctx context.Context, fse host.FileExecutor, repoURL stri
 	}
 
 	// Ensure $HOME/.ssh directory exists so that ssh-keyscan can write to known_hosts without permission issues.
-	sshDir := filepath.Join(os.Getenv("HOME"), ".ssh")
+	homeDir, err := fse.UserHomeDir()
+	if err != nil {
+		return fmt.Errorf("failed to get user home directory: %w", err)
+	}
+	sshDir := fse.JoinPath(homeDir, ".ssh")
 
 	if err := fse.MkdirAll(sshDir, 0o700); err != nil {
 		return fmt.Errorf("failed to create .ssh directory: %w", err)
 	}
 
-	knownHostsPath := filepath.Join(sshDir, "known_hosts")
+	knownHostsPath := fse.JoinPath(sshDir, "known_hosts")
 
 	if err := fse.WriteFile(knownHostsPath, keyscanOutput, 0o600); err != nil {
 		return fmt.Errorf("failed to write known_hosts file: %w", err)

@@ -22,7 +22,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"os"
 	"slices"
 	"syscall"
 	"time"
@@ -486,7 +485,7 @@ func newInitData(
 		// the KUBEADM_INIT_DRYRUN_DIR environment variable allows overriding the dry-run temporary
 		// directory from the command line. This makes it possible to run "kubeadm init" integration
 		// tests without root.
-		if dryRunDir, err = kubeadmConstants.CreateTempDir(os.Getenv("KUBEADM_INIT_DRYRUN_DIR"),
+		if dryRunDir, err = kubeadmConstants.CreateTempDir(alpineHost.Getenv("KUBEADM_INIT_DRYRUN_DIR"),
 			"kubeadm-init-dryrun"); err != nil {
 			return nil, fmt.Errorf("couldn't create a temporary directory: %w", err)
 		}

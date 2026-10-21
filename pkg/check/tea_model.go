@@ -7,9 +7,9 @@ import (
 	"log/slog"
 	"strings"
 
-	"github.com/charmbracelet/bubbles/spinner"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/bubbles/v2/spinner"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 )
 
 // cSpell: enable
@@ -40,7 +40,7 @@ func (m *CheckModel) Update(
 	msg tea.Msg,
 ) (tea.Model, tea.Cmd) {
 	switch msg.(type) {
-	case tea.KeyMsg:
+	case tea.KeyPressMsg:
 		m.logger.Info("Canceling checks...", "cancel", m.cancel)
 		m.cancel()
 		return m, tea.Batch(
@@ -67,12 +67,12 @@ func (m *CheckModel) Update(
 	}
 }
 
-func (m *CheckModel) View() string {
+func (m *CheckModel) View() tea.View {
 	var output strings.Builder
 	for _, result := range m.executor.Results {
 		output.WriteString(result.Format("", m.checkData, m.spinner.View()))
 	}
-	return output.String()
+	return tea.NewView(output.String())
 }
 
 func (m *CheckModel) Context() context.Context {

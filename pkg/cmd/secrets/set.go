@@ -13,6 +13,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
+// cSpell: words wrapcheck
 package secrets
 
 import (
@@ -21,11 +22,13 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
+	"go.uber.org/dig"
 
+	"github.com/kaweezle/iknite/pkg/cmd/types"
 	pkgSecrets "github.com/kaweezle/iknite/pkg/secrets"
 )
 
-func createSecretsSetCmd(opts *pkgSecrets.Options) *cobra.Command {
+func createSecretsSetCmd(s *dig.Scope) *cobra.Command {
 	return &cobra.Command{
 		Use:   "set <path> [value]",
 		Short: "Set a secret value in the secrets file",
@@ -33,19 +36,23 @@ func createSecretsSetCmd(opts *pkgSecrets.Options) *cobra.Command {
 
 When value is omitted, it is read from stdin.`,
 		Args: cobra.RangeArgs(1, 2),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			var value string
-			if len(args) == 2 {
-				value = args[1]
-			} else {
-				data, err := io.ReadAll(cmd.InOrStdin())
-				if err != nil {
-					return fmt.Errorf("failed to read value from stdin: %w", err)
-				}
-				value = strings.TrimRight(string(data), "\r\n")
-			}
-
-			return pkgSecrets.SetSecret(opts, args[0], value)
+		RunE: func(_ *cobra.Command, _ []string) error {
+			return s.Invoke(performSecretsSet)
 		},
 	}
+}
+
+func performSecretsSet(opts *pkgSecrets.Options, args types.CmdArgs, in types.CmdIn) error {
+	var value string
+	if len(args) == 2 {
+		value = args[1]
+	} else {
+		data, err := io.ReadAll(in)
+		if err != nil {
+			return fmt.Errorf("failed to read value from stdin: %w", err)
+		}
+		value = strings.TrimRight(string(data), "\r\n")
+	}
+
+	return pkgSecrets.SetSecret(opts, args[0], value) //nolint:wrapcheck // intentional
 }

@@ -40,8 +40,8 @@ func NewCmdInterface(opts *BaseOptions) CmdInterface {
 	if opts == nil {
 		opts = DefaultBaseOptions()
 	}
-	le := opts.Logger(os.Stdout)
-	viperLogger := utils.NewLogger(os.Stdout, slog.LevelWarn, opts.JSONLogs)
+	le := opts.Logger()
+	viperLogger := utils.NewLogger(opts.Output, slog.LevelWarn, opts.JSONLogs)
 	v := viper.NewWithOptions(viper.WithLogger(viperLogger))
 	return &cmdStruct{
 		LogEnabled:   utils.LogEnabled{LogEntry: le},

@@ -70,7 +70,7 @@ func (opts *Options) AddFlags(flags *pflag.FlagSet) {
 // RunKubewait is the main logic for the kubewait command.
 func RunKubewait(
 	ctx context.Context,
-	fse host.FileExecutor,
+	fse host.UserHost,
 	opts *Options,
 	namespaces []string,
 	logger *slog.Logger,
